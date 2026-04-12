@@ -7,6 +7,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { useTenant } from '../../services/tenantService';
+import { T } from "../../styles/tokens";
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 
@@ -641,13 +642,14 @@ export default function HQJournals() {
 
 // ─── STYLES ──────────────────────────────────────────────────────────────────
 
+// WP-UNIFY: TK palette aliased to src/styles/tokens.js
 const TK = {
-  ink900: '#111827', ink700: '#374151', ink500: '#6b7280',
-  ink300: '#d1d5db', ink200: '#e5e7eb', ink100: '#f3f4f6', ink50: '#f9fafb',
-  purple: '#6d28d9', purpleLt: '#ede9fe',
-  green:  '#15803d', greenLt:  '#dcfce7',
-  red:    '#b91c1c', redLt:    '#fee2e2',
-  amber:  '#b45309',
+  ...T,
+  ink200: T.border,      ink100: T.bg,          ink50: T.surface,
+  green:  T.success,     greenLt: T.successLight,
+  red:    T.danger,      redLt:   T.dangerLight,
+  amber:  T.warning,
+  purple: '#6d28d9',     purpleLt: '#ede9fe',
 };
 
 const S = {

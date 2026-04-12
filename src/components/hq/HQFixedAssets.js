@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { useTenant } from '../../services/tenantService';
+import { T } from "../../styles/tokens";
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 
@@ -418,9 +419,11 @@ export default function HQFixedAssets() {
 
 // ─── STYLES ──────────────────────────────────────────────────────────────────
 
+// WP-UNIFY: TK grey palette aliased to src/styles/tokens.js
 const TK = {
-  ink900: '#111827', ink700: '#374151', ink500: '#6b7280',
-  ink300: '#d1d5db', ink200: '#e5e7eb', ink100: '#f3f4f6',
+  ...T,
+  ink200: T.border,
+  ink100: T.bg,
 };
 
 const S = {

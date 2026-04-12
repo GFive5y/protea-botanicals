@@ -6,25 +6,10 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
 import { ChartCard } from "../viz";
+import { T } from "../../styles/tokens";
+const PRIMARY = "#6366F1";
 
-// ── Design tokens ────────────────────────────────────────────────────────────
-const T = {
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#6B7280",
-  ink300: "#9CA3AF",
-  ink150: "#E5E7EB",
-  ink075: "#F4F4F3",
-  success: "#059669",
-  warning: "#D97706",
-  danger: "#DC2626",
-  successBg: "#F0FDF4",
-  warningBg: "#FFFBEB",
-  dangerBg: "#FEF2F2",
-  primary: "#6366F1",
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
 const fmtZar = (n) =>
   n >= 1000000
@@ -35,7 +20,7 @@ const fmtZar = (n) =>
 
 const sCard = {
   background: "#FFFFFF",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: 10,
   overflow: "hidden",
 };
@@ -45,7 +30,7 @@ const sLabel = {
   fontWeight: 700,
   letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: T.ink400,
+  color: T.ink500,
   fontFamily: T.font,
 };
 
@@ -320,7 +305,7 @@ export default function HQForecast() {
     return (
       <div style={{ textAlign: "center", padding: 60, color: T.ink500, fontFamily: T.font }}>
         <style>{`@keyframes fc-spin{to{transform:rotate(360deg)}}`}</style>
-        <div style={{ width: 28, height: 28, border: `2px solid ${T.ink150}`, borderTopColor: T.primary, borderRadius: "50%", animation: "fc-spin 0.8s linear infinite", margin: "0 auto 12px" }} />
+        <div style={{ width: 28, height: 28, border: `2px solid ${T.border}`, borderTopColor: PRIMARY, borderRadius: "50%", animation: "fc-spin 0.8s linear infinite", margin: "0 auto 12px" }} />
         <span style={{ ...sLabel }}>Loading forecast…</span>
       </div>
     );
@@ -377,7 +362,7 @@ export default function HQForecast() {
       {/* ── SECTION 1: Revenue + GP + Net Projection ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
         {[
-          { label: "Projected Revenue", value: projRev, color: T.primary },
+          { label: "Projected Revenue", value: projRev, color: PRIMARY },
           { label: "Projected COGS", value: projCogs, color: T.danger },
           { label: "Projected Gross Profit", value: projGP, sub: `${projMargin.toFixed(1)}% margin`, color: T.success },
           { label: "Monthly OPEX", value: opexMonthly, color: T.warning },
@@ -391,7 +376,7 @@ export default function HQForecast() {
             }}>
               {fmtZar(Math.abs(tile.value))}
             </div>
-            {tile.sub && <div style={{ fontSize: 10, color: T.ink400, marginTop: 4 }}>{tile.sub}</div>}
+            {tile.sub && <div style={{ fontSize: 10, color: T.ink500, marginTop: 4 }}>{tile.sub}</div>}
             <div style={{ fontSize: 10, color: T.ink300, marginTop: 4 }}>
               {fmtZar(Math.abs(tile.value / 30))}/day
             </div>
@@ -414,7 +399,7 @@ export default function HQForecast() {
             <span style={{ textAlign: "right" }}>Urgency</span>
           </div>
           {depletion.length === 0 ? (
-            <div style={{ padding: 20, textAlign: "center", color: T.ink400, fontSize: 12 }}>
+            <div style={{ padding: 20, textAlign: "center", color: T.ink500, fontSize: 12 }}>
               {industryProfile === "food_beverage"
                 ? "Raw material depletion is tracked via production runs in the Kitchen tab."
                 : "No velocity data — run simulator or record sales"}
@@ -424,7 +409,7 @@ export default function HQForecast() {
               {depletion.filter((d) => d.urgency !== "ok").map((d, i) => (
                 <div key={i} style={{
                   display: "grid", gridTemplateColumns: "2fr 70px 70px 70px 70px 60px",
-                  gap: 4, padding: "6px 0", borderBottom: `1px solid ${T.ink075}`, fontSize: 12, alignItems: "center",
+                  gap: 4, padding: "6px 0", borderBottom: `1px solid ${T.bg}`, fontSize: 12, alignItems: "center",
                 }}>
                   <span style={{ color: T.ink900, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</span>
                   <span style={{ textAlign: "right", color: T.ink500, fontVariantNumeric: "tabular-nums" }}>{d.onHand}</span>
@@ -436,7 +421,7 @@ export default function HQForecast() {
                   <span style={{ textAlign: "right" }}>
                     <span style={{
                       fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 3,
-                      background: d.urgency === "critical" ? T.dangerBg : T.warningBg,
+                      background: d.urgency === "critical" ? T.dangerLight : T.warningLight,
                       color: d.urgency === "critical" ? T.danger : T.warning,
                     }}>
                       {d.urgency === "critical" ? "CRITICAL" : "ORDER"}
@@ -459,20 +444,20 @@ export default function HQForecast() {
         <div style={{ ...sLabel, marginBottom: 10 }}>Restock Spend Forecast — Next 30 Days</div>
         <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-end" }}>
           <div>
-            <div style={{ fontSize: 10, color: T.ink400, marginBottom: 2 }}>Items needing restock</div>
+            <div style={{ fontSize: 10, color: T.ink500, marginBottom: 2 }}>Items needing restock</div>
             <div style={{ fontSize: 22, fontWeight: 600, color: T.ink900, fontVariantNumeric: "tabular-nums" }}>
               {restockItems.length}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 10, color: T.ink400, marginBottom: 2 }}>Estimated restock cost</div>
+            <div style={{ fontSize: 10, color: T.ink500, marginBottom: 2 }}>Estimated restock cost</div>
             <div style={{ fontSize: 22, fontWeight: 600, color: T.danger, fontVariantNumeric: "tabular-nums" }}>
               {fmtZar(totalRestockCost)}
             </div>
           </div>
           {currentCash !== null && (
             <div>
-              <div style={{ fontSize: 10, color: T.ink400, marginBottom: 2 }}>Cash available (last EOD)</div>
+              <div style={{ fontSize: 10, color: T.ink500, marginBottom: 2 }}>Cash available (last EOD)</div>
               <div style={{ fontSize: 22, fontWeight: 600, color: T.success, fontVariantNumeric: "tabular-nums" }}>
                 {fmtZar(currentCash)}
               </div>
@@ -480,7 +465,7 @@ export default function HQForecast() {
           )}
           {currentCash !== null && (
             <div>
-              <div style={{ fontSize: 10, color: T.ink400, marginBottom: 2 }}>Headroom</div>
+              <div style={{ fontSize: 10, color: T.ink500, marginBottom: 2 }}>Headroom</div>
               <div style={{
                 fontSize: 22, fontWeight: 600, fontVariantNumeric: "tabular-nums",
                 color: currentCash - totalRestockCost >= 0 ? T.success : T.danger,
@@ -508,7 +493,7 @@ export default function HQForecast() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
             <div style={{ ...sLabel }}>S21 Authorisation Expiry — Next 60 Days</div>
             {clinicalAlerts.s21Expiring.length === 0 && (
-              <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 3, background: T.successBg, color: T.success }}>
+              <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 3, background: T.successLight, color: T.success }}>
                 All clear
               </span>
             )}
@@ -531,18 +516,18 @@ export default function HQForecast() {
               {clinicalAlerts.s21Expiring.map((p, i) => (
                 <div key={i} style={{
                   display: "grid", gridTemplateColumns: "2fr 160px 80px 80px",
-                  gap: 4, padding: "7px 0", borderBottom: `1px solid ${T.ink075}`,
+                  gap: 4, padding: "7px 0", borderBottom: `1px solid ${T.bg}`,
                   fontSize: 12, alignItems: "center",
                 }}>
                   <span style={{ fontWeight: 500, color: T.ink900 }}>{p.name}</span>
-                  <span style={{ color: T.ink400, fontSize: 10, fontVariantNumeric: "tabular-nums" }}>{p.section_21_number || "\u2014"}</span>
+                  <span style={{ color: T.ink500, fontSize: 10, fontVariantNumeric: "tabular-nums" }}>{p.section_21_number || "\u2014"}</span>
                   <span style={{ textAlign: "right", color: T.ink500 }}>
                     {new Date(p.s21_expiry_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })}
                   </span>
                   <span style={{ textAlign: "right" }}>
                     <span style={{
                       fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 3,
-                      background: p.daysLeft <= 14 ? T.dangerBg : T.warningBg,
+                      background: p.daysLeft <= 14 ? T.dangerLight : T.warningLight,
                       color: p.daysLeft <= 14 ? T.danger : T.warning,
                     }}>
                       {p.daysLeft}d
@@ -564,7 +549,7 @@ export default function HQForecast() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
             <div style={{ ...sLabel }}>Prescription Repeats — Low Stock</div>
             {clinicalAlerts.rxLow.length === 0 && (
-              <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 3, background: T.successBg, color: T.success }}>
+              <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 3, background: T.successLight, color: T.success }}>
                 All clear
               </span>
             )}
@@ -587,21 +572,21 @@ export default function HQForecast() {
               {clinicalAlerts.rxLow.map((rx, i) => (
                 <div key={i} style={{
                   display: "grid", gridTemplateColumns: "1.5fr 2fr 80px 80px",
-                  gap: 4, padding: "7px 0", borderBottom: `1px solid ${T.ink075}`,
+                  gap: 4, padding: "7px 0", borderBottom: `1px solid ${T.bg}`,
                   fontSize: 12, alignItems: "center",
                 }}>
                   <span style={{ fontWeight: 500, color: T.ink900 }}>{rx.patientName}</span>
-                  <span style={{ color: T.ink400, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rx.substance}</span>
+                  <span style={{ color: T.ink500, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rx.substance}</span>
                   <span style={{ textAlign: "right" }}>
                     <span style={{
                       fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 3,
-                      background: rx.remaining === 0 ? T.dangerBg : T.warningBg,
+                      background: rx.remaining === 0 ? T.dangerLight : T.warningLight,
                       color: rx.remaining === 0 ? T.danger : T.warning,
                     }}>
                       {rx.remaining === 0 ? "NONE" : `${rx.remaining} left`}
                     </span>
                   </span>
-                  <span style={{ textAlign: "right", fontSize: 11, color: T.ink400 }}>
+                  <span style={{ textAlign: "right", fontSize: 11, color: T.ink500 }}>
                     {rx.expiry_date
                       ? new Date(rx.expiry_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })
                       : "\u2014"}
@@ -628,7 +613,7 @@ export default function HQForecast() {
           ].map((row, i) => (
             <div key={i} style={{
               display: "flex", justifyContent: "space-between", padding: "6px 0",
-              borderBottom: i < 4 ? `1px solid ${T.ink075}` : "none", fontSize: 13,
+              borderBottom: i < 4 ? `1px solid ${T.bg}` : "none", fontSize: 13,
             }}>
               <span style={{ color: T.ink500 }}>{row.label}</span>
               <span style={{ fontWeight: 500, fontVariantNumeric: "tabular-nums", color: row.color }}>
@@ -638,7 +623,7 @@ export default function HQForecast() {
           ))}
           <div style={{
             display: "flex", justifyContent: "space-between", padding: "10px 0 0",
-            borderTop: `2px solid ${T.ink150}`, marginTop: 4, fontSize: 15, fontWeight: 700,
+            borderTop: `2px solid ${T.border}`, marginTop: 4, fontSize: 15, fontWeight: 700,
           }}>
             <span style={{ color: T.ink900 }}>Projected Closing Cash</span>
             <span style={{

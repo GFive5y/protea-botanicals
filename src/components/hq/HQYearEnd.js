@@ -6,16 +6,13 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
 import { sendYearEndEmail } from "../../services/emailService";
+import { T } from "../../styles/tokens";
 
+// WP-UNIFY: local D palette aliased to src/styles/tokens.js
 const D = {
-  font:"'Inter','Helvetica Neue',Arial,sans-serif",
-  ink900:"#0D0D0D",ink700:"#1F2937",ink500:"#6B7280",ink300:"#D1D5DB",ink150:"#E5E7EB",ink075:"#F9FAFB",
-  accent:"#1A3D2B",accentMid:"#2D6A4F",accentLit:"#ECFDF5",
-  success:"#059669",successBg:"#ECFDF5",successBd:"#6EE7B7",
-  danger:"#DC2626",dangerBg:"#FEF2F2",dangerBd:"#FECACA",
-  warning:"#D97706",warningBg:"#FFFBEB",warningBd:"#FDE68A",
-  shadow:"0 1px 4px rgba(0,0,0,0.08),0 0 0 1px rgba(0,0,0,0.04)",
-  shadowLg:"0 8px 32px rgba(0,0,0,0.12)",
+  ...T,
+  shadow: T.shadow?.sm || "0 1px 4px rgba(0,0,0,0.08)",
+  shadowLg: T.shadow?.lg || "0 8px 32px rgba(0,0,0,0.12)",
 };
 const fmtZar = (n) => `R\u202F${(parseFloat(n)||0).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 const card = {background:"#fff",borderRadius:12,boxShadow:D.shadow,overflow:"hidden",marginBottom:16};
@@ -33,9 +30,9 @@ function KpiCard({label,value,sub,color}){
 function StepBar({step}){
   const steps=["Summary","Closing Journal","Confirm & Close","Year Closed"];
   return (
-    <div style={{display:"flex",gap:0,marginBottom:24,border:`1px solid ${D.ink150}`,borderRadius:10,overflow:"hidden"}}>
+    <div style={{display:"flex",gap:0,marginBottom:24,border:`1px solid ${D.border}`,borderRadius:10,overflow:"hidden"}}>
       {steps.map((s,i)=>(
-        <div key={s} style={{flex:1,padding:"10px 8px",textAlign:"center",fontSize:12,fontWeight:700,background:i===step?D.accent:i<step?"#E8F5EE":"#fff",color:i===step?"#fff":i<step?D.accentMid:D.ink300,borderRight:i<3?`1px solid ${D.ink150}`:"none"}}>
+        <div key={s} style={{flex:1,padding:"10px 8px",textAlign:"center",fontSize:12,fontWeight:700,background:i===step?D.accent:i<step?"#E8F5EE":"#fff",color:i===step?"#fff":i<step?D.accentMid:D.ink300,borderRight:i<3?`1px solid ${D.border}`:"none"}}>
           {i<step?"\u2713 ":""}{s}
         </div>
       ))}
@@ -215,7 +212,7 @@ export default function HQYearEnd() {
 
       <StepBar step={step} />
 
-      {error && <div style={{ padding: "10px 14px", background: D.dangerBg, border: `1px solid ${D.dangerBd}`, borderRadius: 8, fontSize: 13, color: D.danger, marginBottom: 16 }}>{"\u26A0"} {error}</div>}
+      {error && <div style={{ padding: "10px 14px", background: D.dangerLight, border: `1px solid ${D.dangerBd}`, borderRadius: 8, fontSize: 13, color: D.danger, marginBottom: 16 }}>{"\u26A0"} {error}</div>}
 
       {/* SCREEN 0 — Summary */}
       {step === 0 && pnl && (
@@ -226,12 +223,12 @@ export default function HQYearEnd() {
             <KpiCard label="Gross Profit" value={fmtZar(pnl.gross)} color={pnl.gross >= 0 ? D.success : D.danger} />
             <KpiCard label="Operating Expenses" value={fmtZar(pnl.opex)} color={D.warning} />
           </div>
-          <div style={{ ...card, padding: 20, background: pnl.netProfit >= 0 ? D.accentLit : D.dangerBg, border: `2px solid ${pnl.netProfit >= 0 ? D.successBd : D.dangerBd}` }}>
+          <div style={{ ...card, padding: 20, background: pnl.netProfit >= 0 ? D.accentLight : D.dangerLight, border: `2px solid ${pnl.netProfit >= 0 ? D.successBd : D.dangerBd}` }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: D.ink500, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4 }}>Net {pnl.netProfit >= 0 ? "Profit" : "Loss"} for {fyLabel}</div>
             <div style={{ fontSize: 32, fontWeight: 800, color: pnl.netProfit >= 0 ? D.accent : D.danger }}>{fmtZar(Math.abs(pnl.netProfit))}</div>
             <div style={{ fontSize: 12, color: D.ink500, marginTop: 4 }}>{journals[0]?.count || 0} posted journal entries {"\u00b7"} Will be closed and locked</div>
           </div>
-          <div style={{ ...card, padding: 16, background: D.warningBg, border: `1px solid ${D.warningBd}` }}>
+          <div style={{ ...card, padding: 16, background: D.warningLight, border: `1px solid ${D.warningBd}` }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: D.warning, marginBottom: 6 }}>{"\u26A0"} This action is irreversible</div>
             <div style={{ fontSize: 12, color: D.ink700, lineHeight: 1.6 }}>Closing the year will lock all {fyLabel} journal entries, post retained earnings, and archive the period. Ensure all transactions have been captured and bank statements reconciled before proceeding.</div>
           </div>
@@ -245,9 +242,9 @@ export default function HQYearEnd() {
       {step === 1 && (
         <div>
           <div style={card}>
-            <div style={{ padding: "12px 20px", background: D.ink075, borderBottom: `1px solid ${D.ink150}`, fontSize: 11, fontWeight: 700, color: D.ink500, textTransform: "uppercase", letterSpacing: "0.08em" }}>Closing Journal Entries {"\u2014"} {fyLabel}</div>
+            <div style={{ padding: "12px 20px", background: D.bg, borderBottom: `1px solid ${D.border}`, fontSize: 11, fontWeight: 700, color: D.ink500, textTransform: "uppercase", letterSpacing: "0.08em" }}>Closing Journal Entries {"\u2014"} {fyLabel}</div>
             {closingLines.map((l, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "12px 20px", borderBottom: i < closingLines.length - 1 ? `1px solid ${D.ink150}` : "none", alignItems: "center" }}>
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "12px 20px", borderBottom: i < closingLines.length - 1 ? `1px solid ${D.border}` : "none", alignItems: "center" }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: D.ink700 }}>{l.description}</div>
                   <div style={{ fontSize: 11, color: D.ink500 }}>{l.account}</div>
@@ -265,7 +262,7 @@ export default function HQYearEnd() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={() => setStep(0)} style={{ padding: "12px 20px", border: `1px solid ${D.ink150}`, borderRadius: 8, background: "#fff", color: D.ink500, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{"\u2190"} Back</button>
+            <button onClick={() => setStep(0)} style={{ padding: "12px 20px", border: `1px solid ${D.border}`, borderRadius: 8, background: "#fff", color: D.ink500, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{"\u2190"} Back</button>
             <button onClick={() => setStep(2)} style={{ flex: 1, padding: "12px 0", background: D.accent, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
               Proceed to Close Year {"\u2192"}
             </button>
@@ -276,7 +273,7 @@ export default function HQYearEnd() {
       {/* SCREEN 2 — Confirm & Close */}
       {step === 2 && (
         <div>
-          <div style={{ ...card, padding: 24, background: D.dangerBg, border: `2px solid ${D.dangerBd}` }}>
+          <div style={{ ...card, padding: 24, background: D.dangerLight, border: `2px solid ${D.dangerBd}` }}>
             <div style={{ fontSize: 18, fontWeight: 800, color: D.danger, marginBottom: 8 }}>{"\u26D4"} Final Confirmation Required</div>
             <div style={{ fontSize: 13, color: D.ink700, lineHeight: 1.7, marginBottom: 20 }}>
               You are about to permanently close <strong>{fyLabel}</strong>. This will:
@@ -299,7 +296,7 @@ export default function HQYearEnd() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={() => setStep(1)} style={{ padding: "12px 20px", border: `1px solid ${D.ink150}`, borderRadius: 8, background: "#fff", color: D.ink500, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{"\u2190"} Back</button>
+            <button onClick={() => setStep(1)} style={{ padding: "12px 20px", border: `1px solid ${D.border}`, borderRadius: 8, background: "#fff", color: D.ink500, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{"\u2190"} Back</button>
             <button onClick={handleClose} disabled={posting || pin.length < 4} style={{ flex: 1, padding: "12px 0", background: posting ? "#9CA3AF" : D.danger, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: posting ? "not-allowed" : "pointer" }}>
               {posting ? "Closing year\u2026" : `\uD83D\uDD12 Close ${fyLabel} Permanently`}
             </button>
@@ -321,13 +318,13 @@ export default function HQYearEnd() {
                 <KpiCard label="Net Result" value={fmtZar(archiveRow.net_profit)} color={archiveRow.net_profit >= 0 ? D.success : D.danger} />
                 <KpiCard label="Total Revenue" value={fmtZar(archiveRow.total_revenue)} color={D.accent} />
               </div>
-              <div style={{ background: D.accentLit, borderRadius: 10, padding: 16, marginBottom: 16 }}>
+              <div style={{ background: D.accentLight, borderRadius: 10, padding: 16, marginBottom: 16 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: D.ink500, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Archive Record</div>
                 <div style={{ fontSize: 12, color: D.accentMid, marginBottom: 4 }}>{"\u2705"} Archive ID: <span style={{ fontFamily: "monospace" }}>{archiveRow.id.slice(0, 16)}{"\u2026"}</span></div>
                 <div style={{ fontSize: 12, color: D.accentMid, marginBottom: 4 }}>{"\u2705"} Closed at: {new Date(archiveRow.closed_at).toLocaleString("en-ZA")}</div>
                 <div style={{ fontSize: 12, color: D.accentMid }}>{"\u2705"} Retained earnings carried forward: {fmtZar(archiveRow.retained_earnings_carried_forward)}</div>
               </div>
-              <div style={{ background: D.warningBg, borderRadius: 8, padding: 14, fontSize: 13, color: D.warning }}>
+              <div style={{ background: D.warningLight, borderRadius: 8, padding: 14, fontSize: 13, color: D.warning }}>
                 {"\uD83D\uDCCB"} <strong>Next step:</strong> Create a new financial year in Financial Setup to resume posting transactions.
               </div>
               <button
