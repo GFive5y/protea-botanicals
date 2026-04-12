@@ -4,7 +4,7 @@
 // Renders: context label + IntelStrip pills + hybrid search + status dots + AI drawer
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { T } from "../../styles/tokens";
+import { T, profileOverrides } from "../../styles/tokens";
 import { supabase } from "../../services/supabaseClient";
 import IntelStrip from "../IntelStrip";
 import { useHQIntelStrip } from "../../hooks/useHQIntelStrip";
@@ -249,6 +249,10 @@ Previous context: ${drawerTitle}. Be direct and specific.`;
 
   const profileLabel = PROFILE_LABELS[industryProfile] || "";
   const tabLabel = TAB_LABELS[activeTab] || activeTab || "";
+  const pOvr       = profileOverrides[industryProfile] || {};
+  const pBadgeBg   = pOvr.accentLight || T.accentLight;
+  const pBadgeText = pOvr.accentText  || T.accentText;
+  const pAccent    = pOvr.accent      || T.accent;
 
   // ── Status dot color ──────────────────────────────────────────
   const dotColor = (status) => {
@@ -281,7 +285,7 @@ Previous context: ${drawerTitle}. Be direct and specific.`;
             <span style={{
               fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
               padding: "2px 6px", borderRadius: T.radius.full,
-              background: T.accentLight, color: T.accentText,
+              background: pBadgeBg, color: pBadgeText,
               whiteSpace: "nowrap",
             }}>
               {profileLabel}
@@ -312,7 +316,7 @@ Previous context: ${drawerTitle}. Be direct and specific.`;
               color: T.ink700, background: T.bg,
               outline: "none",
               transition: "width 0.2s ease, border-color 0.15s",
-              borderColor: searchFocused ? T.accent : T.border,
+              borderColor: searchFocused ? pAccent : T.border,
             }}
           />
 

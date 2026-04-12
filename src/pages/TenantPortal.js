@@ -7,6 +7,8 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTenant } from "../services/tenantService";
+import { profileOverrides, getTokens } from "../styles/tokens";
+import { TokenContext } from "../contexts/TokenContext";
 // PlatformBar removed — WP-AINS Phase 5
 // Jobs migrated: alerts → IntelLines, actions → IntelStrip,
 // comms → Customers nav badge, fraud → NuAiBrief (Phase 6)
@@ -808,7 +810,7 @@ function renderTab(tabId, tenantId, industryProfile, onTabChange, searchKey, sea
   }
 }
 
-function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, onExpand, badge, tabInsights }) {
+function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, onExpand, badge, tabInsights, accentLit = T.accentLit }) {
   const isActiveSection = section.tabs.some((t) => t.id === activeTab);
   const [open, setOpen] = useState(defaultOpen || section.alwaysOpen || isActiveSection);
   const effectiveOpen = open || isActiveSection;
@@ -951,7 +953,7 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, 
                 style={{
                   display: "flex", alignItems: "center", width: "100%",
                   padding: section.alwaysOpen ? "9px 16px" : "7px 16px 7px 36px",
-                  background: active ? T.accentLit : "transparent",
+                  background: active ? accentLit : "transparent",
                   border: "none",
                   boxShadow: active ? `inset 3px 0 0 ${section.color}` : "none",
                   cursor: "pointer", fontFamily: T.font, textAlign: "left",
@@ -1008,6 +1010,10 @@ export default function TenantPortal() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { tenant, tenantId, industryProfile, isOperator, role: userRole } = useTenant();
+  const pOvr       = profileOverrides[industryProfile] || {};
+  const pAccent    = pOvr.accent     || T.accent;
+  const pAccentMid = pOvr.accentMid  || T.accentMid;
+  const pAccentLit = pOvr.accentLight || T.accentLit;
 
   const activeTab = searchParams.get("tab") || "overview";
   const setActiveTab = useCallback(
@@ -1121,6 +1127,7 @@ export default function TenantPortal() {
 
   return (
     <DevErrorCapture>
+        <TokenContext.Provider value={getTokens(industryProfile)}>
         <IntelligenceProvider value={intelligence}>
         <style>{PORTAL_CSS}</style>
         <div style={{
@@ -1166,15 +1173,15 @@ export default function TenantPortal() {
                   }}
                 >
                   <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
-                    <rect x="0" y="0"  width="16" height="1.5" rx="0.75" fill={T.accentMid} />
-                    <rect x="0" y="5"  width="16" height="1.5" rx="0.75" fill={T.accentMid} />
-                    <rect x="0" y="10" width="16" height="1.5" rx="0.75" fill={T.accentMid} />
+                    <rect x="0" y="0"  width="16" height="1.5" rx="0.75" fill={pAccentMid} />
+                    <rect x="0" y="5"  width="16" height="1.5" rx="0.75" fill={pAccentMid} />
+                    <rect x="0" y="10" width="16" height="1.5" rx="0.75" fill={pAccentMid} />
                   </svg>
                 </button>
               ) : (
                 <div style={{ width: "100%", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: T.accent, marginBottom: 6, lineHeight: 1.3 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: pAccent, marginBottom: 6, lineHeight: 1.3 }}>
                       {tenantName}
                     </div>
                     <div style={{
@@ -1226,6 +1233,7 @@ export default function TenantPortal() {
                   onExpand={() => setSidebarCollapsed(false)}
                   badge={sectionBadge(section.id)}
                   tabInsights={tabInsights}
+                  accentLit={pAccentLit}
                 />
               ))}
             </div>
@@ -1268,7 +1276,7 @@ export default function TenantPortal() {
                 }}
                 style={{
                   width: 28, height: 28, borderRadius: "50%",
-                  background: bubbleOpen ? T.accent : T.accentMid,
+                  background: bubbleOpen ? pAccent : pAccentMid,
                   border: "none", cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   flexShrink: 0, color: "#fff", fontSize: 10, fontWeight: 700,
@@ -1384,14 +1392,14 @@ export default function TenantPortal() {
               padding: "0 20px", gap: 16,
             }}>
               <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.04em" }}>
-                <span style={{ color: "#1A3D2B" }}>Nu</span><span style={{ color: "#00E87A" }}>Ai</span>
+                <span style={{ color: pAccent }}>Nu</span><span style={{ color: "#00E87A" }}>Ai</span>
               </span>
               <span style={{ fontSize: 10, color: "#999" }}>v0.1 {"\u00b7"} dev</span>
               <span style={{ flex: 1 }} />
               <span style={{ fontSize: 10, color: "#999" }}>
                 {new Date().toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}
               </span>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#2D6A4F", display: "inline-block" }} title="Connected" />
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: pAccentMid, display: "inline-block" }} title="Connected" />
             </div>
           </div>
 
@@ -1406,7 +1414,7 @@ export default function TenantPortal() {
               }}>
                 <div style={{ padding: "14px 16px 12px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: T.accent, marginBottom: 5 }}>{tenantName}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: pAccent, marginBottom: 5 }}>{tenantName}</div>
                     <div style={{ display: "inline-block", fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: profileBadge.bg, color: profileBadge.color, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                       {profileBadge.label}
                     </div>
@@ -1415,7 +1423,7 @@ export default function TenantPortal() {
                 </div>
                 <div style={{ flex: 1, paddingTop: 6, paddingBottom: 16 }}>
                   {visibleSections.map((section, i) => (
-                    <SidebarSection key={section.id} section={section} activeTab={activeTab} onSelect={handleTabSelect} defaultOpen={i <= 1} badge={sectionBadge(section.id)} tabInsights={tabInsights} />
+                    <SidebarSection key={section.id} section={section} activeTab={activeTab} onSelect={handleTabSelect} defaultOpen={i <= 1} badge={sectionBadge(section.id)} tabInsights={tabInsights} accentLit={pAccentLit} />
                   ))}
                 </div>
                 <div style={{ padding: "10px 16px 14px", borderTop: `1px solid ${T.border}`, fontSize: 10, color: T.ink300 }}>
@@ -1437,6 +1445,7 @@ export default function TenantPortal() {
           />
         </div>
         </IntelligenceProvider>
+        </TokenContext.Provider>
         <ToastContainer />
     </DevErrorCapture>
   );
