@@ -16,36 +16,8 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
-
-// ─── DESIGN TOKENS ───────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
+import { T } from "../../styles/tokens";
+// Design tokens — imported from tokens.js (WP-UNIFY)
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -116,10 +88,10 @@ function shiftCoversDate(shift, dateStr) {
 
 // ─── EVENT COLOURS (light-theme semantic palette) ────────────────────────────
 const EV = {
-  leave: { bg: T.accentLit, border: T.accentBd, text: T.accent },
-  holiday: { bg: T.warningBg, border: T.warningBd, text: T.warning },
-  hearing: { bg: T.dangerBg, border: T.dangerBd, text: T.danger },
-  timesheet: { bg: T.infoBg, border: T.infoBd, text: T.info },
+  leave: { bg: T.accentLight, border: T.accentBd, text: T.accent },
+  holiday: { bg: T.warningLight, border: T.warningBd, text: T.warning },
+  hearing: { bg: T.dangerLight, border: T.dangerBd, text: T.danger },
+  timesheet: { bg: T.infoLight, border: T.infoBd, text: T.info },
   shift: { bg: "#EDE9FE", border: "#A78BFA", text: "#5B21B6" },
   diary: { bg: "#F0F9FF", border: "#BAE6FD", text: "#0369A1" },
 };
@@ -129,7 +101,7 @@ const STATUS_COLOR = {
   admin_approved: T.success,
   hr_approved: T.accentMid,
   rejected: T.danger,
-  draft: T.ink400,
+  draft: T.ink500,
   staff_submitted: T.warning,
   locked: T.ink300,
 };
@@ -208,7 +180,7 @@ function DetailModal({ event, onClose }) {
           padding: 28,
           minWidth: 340,
           maxWidth: 500,
-          boxShadow: T.shadow,
+          boxShadow: T.shadow.sm,
           fontFamily: T.font,
         }}
       >
@@ -250,7 +222,7 @@ function DetailModal({ event, onClose }) {
             style={{
               background: "none",
               border: "none",
-              color: T.ink400,
+              color: T.ink500,
               fontSize: 20,
               cursor: "pointer",
               lineHeight: 1,
@@ -293,9 +265,9 @@ function DetailModal({ event, onClose }) {
             <DRow label="Status">
               <span
                 style={{
-                  background: (STATUS_COLOR[event.status] || T.ink400) + "20",
-                  color: STATUS_COLOR[event.status] || T.ink400,
-                  border: `1px solid ${STATUS_COLOR[event.status] || T.ink400}44`,
+                  background: (STATUS_COLOR[event.status] || T.ink500) + "20",
+                  color: STATUS_COLOR[event.status] || T.ink500,
+                  border: `1px solid ${STATUS_COLOR[event.status] || T.ink500}44`,
                   padding: "2px 10px",
                   borderRadius: 20,
                   fontSize: 11,
@@ -320,7 +292,7 @@ function DRow({ label, value, children }) {
     <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
       <span
         style={{
-          color: T.ink400,
+          color: T.ink500,
           fontSize: 11,
           fontWeight: 600,
           fontFamily: T.font,
@@ -366,9 +338,9 @@ function Legend({ layers, onToggle }) {
               padding: "4px 11px",
               borderRadius: 20,
               cursor: "pointer",
-              border: `1px solid ${on ? c.border : T.ink150}`,
+              border: `1px solid ${on ? c.border : T.border}`,
               background: on ? c.bg : "transparent",
-              color: on ? c.text : T.ink400,
+              color: on ? c.text : T.ink500,
               fontSize: 11,
               fontWeight: 700,
               fontFamily: T.font,
@@ -435,7 +407,7 @@ function MonthView({ year, month, events, layers, onEventClick, onDayClick }) {
               fontWeight: 700,
               letterSpacing: "0.08em",
               fontFamily: T.font,
-              color: T.ink400,
+              color: T.ink500,
               textTransform: "uppercase",
             }}
           >
@@ -471,12 +443,12 @@ function MonthView({ year, month, events, layers, onEventClick, onDayClick }) {
                 padding: "5px 4px",
                 background: day
                   ? isToday
-                    ? T.accentLit
+                    ? T.accentLight
                     : isWeekend
-                      ? T.ink075
+                      ? T.bg
                       : "#fff"
-                  : T.ink050,
-                border: `1px solid ${isToday ? T.accentBd : T.ink150}`,
+                  : T.surface,
+                border: `1px solid ${isToday ? T.accentBd : T.border}`,
                 cursor: day ? "pointer" : "default",
               }}
             >
@@ -523,7 +495,7 @@ function MonthView({ year, month, events, layers, onEventClick, onDayClick }) {
                     <div
                       style={{
                         fontSize: 10,
-                        color: T.ink400,
+                        color: T.ink500,
                         fontFamily: T.font,
                         paddingLeft: 3,
                       }}
@@ -578,11 +550,11 @@ function WeekView({ weekStart, events, layers, onEventClick, onDayClick }) {
               onClick={() => onDayClick && onDayClick(ds)}
               style={{
                 background: isToday
-                  ? T.accentLit
+                  ? T.accentLight
                   : isWeekend
-                    ? T.ink075
+                    ? T.bg
                     : "#fff",
-                border: `1px solid ${isToday ? T.accentBd : T.ink150}`,
+                border: `1px solid ${isToday ? T.accentBd : T.border}`,
                 borderRadius: 8,
                 padding: "10px 7px",
                 minHeight: 220,
@@ -597,7 +569,7 @@ function WeekView({ weekStart, events, layers, onEventClick, onDayClick }) {
                     textTransform: "uppercase",
                     letterSpacing: "0.08em",
                     fontFamily: T.font,
-                    color: isWeekend ? T.ink300 : T.ink400,
+                    color: isWeekend ? T.ink300 : T.ink500,
                   }}
                 >
                   {DAYS_SHORT[dow]}
@@ -625,7 +597,7 @@ function WeekView({ weekStart, events, layers, onEventClick, onDayClick }) {
                   style={{
                     fontSize: 11,
                     fontFamily: T.font,
-                    color: T.ink150,
+                    color: T.border,
                     textAlign: "center",
                     marginTop: 16,
                   }}
@@ -699,7 +671,7 @@ function TeamView({ year, month, staff, events, layers, onEventClick }) {
                   fontSize: 9,
                   lineHeight: 1.4,
                   fontFamily: T.font,
-                  color: isToday ? T.accent : isWeekend ? T.ink300 : T.ink400,
+                  color: isToday ? T.accent : isWeekend ? T.ink300 : T.ink500,
                   fontWeight: isToday ? 700 : 500,
                 }}
               >
@@ -713,7 +685,7 @@ function TeamView({ year, month, staff, events, layers, onEventClick }) {
         {staff.length === 0 && (
           <div
             style={{
-              color: T.ink400,
+              color: T.ink500,
               textAlign: "center",
               padding: 48,
               fontSize: 13,
@@ -754,13 +726,13 @@ function TeamView({ year, month, staff, events, layers, onEventClick }) {
               const dow = new Date(ds + "T00:00:00").getDay();
               const isWeekend = dow === 0 || dow === 6;
 
-              let bg = isWeekend ? T.ink075 : "#fff";
-              let border = isToday ? T.accentBd : T.ink150;
+              let bg = isWeekend ? T.bg : "#fff";
+              let border = isToday ? T.accentBd : T.border;
               let symbol = null;
               let clickEv = null;
 
               if (holiday) {
-                bg = T.warningBg;
+                bg = T.warningLight;
                 border = T.warningBd;
                 symbol = (
                   <span style={{ color: T.warning, fontSize: 9 }}>★</span>
@@ -782,7 +754,7 @@ function TeamView({ year, month, staff, events, layers, onEventClick }) {
                 clickEv = leave[0];
               }
               if (hearing) {
-                bg = T.dangerBg;
+                bg = T.dangerLight;
                 border = T.dangerBd;
                 symbol = (
                   <span style={{ color: T.danger, fontSize: 9 }}>⚠</span>
@@ -828,14 +800,14 @@ function TeamView({ year, month, staff, events, layers, onEventClick }) {
         style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 16 }}
       >
         {[
-          { sym: "✓", color: T.accent, bg: T.accentLit, label: "On Leave" },
+          { sym: "✓", color: T.accent, bg: T.accentLight, label: "On Leave" },
           {
             sym: "★",
             color: T.warning,
-            bg: T.warningBg,
+            bg: T.warningLight,
             label: "Public Holiday",
           },
-          { sym: "⚠", color: T.danger, bg: T.dangerBg, label: "Hearing" },
+          { sym: "⚠", color: T.danger, bg: T.dangerLight, label: "Hearing" },
           { sym: "S", color: "#5B21B6", bg: "#EDE9FE", label: "Shift" },
         ].map(({ sym, color, bg, label }) => (
           <div
@@ -896,7 +868,7 @@ function MiniMonth({ year, month, events, layers, todayStr }) {
           <div key={i} style={{
             textAlign: "center", fontSize: 8, fontWeight: 700,
             fontFamily: T.font,
-            color: i === 0 || i === 6 ? T.ink300 : T.ink400,
+            color: i === 0 || i === 6 ? T.ink300 : T.ink500,
           }}>{d}</div>
         ))}
       </div>
@@ -918,7 +890,7 @@ function MiniMonth({ year, month, events, layers, todayStr }) {
                 width: 16, height: 16, borderRadius: "50%",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 margin: "0 auto", boxSizing: "border-box",
-                background: isToday ? T.accent : isHoliday ? T.warningBg : "transparent",
+                background: isToday ? T.accent : isHoliday ? T.warningLight : "transparent",
                 color: isToday ? "#fff" : isHoliday ? T.warning : isWeekend ? T.ink300 : T.ink500,
                 border: isHoliday && !isToday ? `1px solid ${T.warningBd}` : "none",
               }}>
@@ -929,7 +901,7 @@ function MiniMonth({ year, month, events, layers, todayStr }) {
                   {eventTypes.slice(0, 3).map((type) => (
                     <div key={type} style={{
                       width: 3, height: 3, borderRadius: "50%",
-                      background: EV[type]?.text || T.ink400, flexShrink: 0,
+                      background: EV[type]?.text || T.ink500, flexShrink: 0,
                     }} />
                   ))}
                 </div>
@@ -956,10 +928,10 @@ function YearView({ year, events, layers, todayYear, todayMonth, onMonthSelect }
             key={m}
             onClick={() => onMonthSelect(m)}
             style={{
-              border: `1.5px solid ${isNow ? T.accentBd : T.ink150}`,
+              border: `1.5px solid ${isNow ? T.accentBd : T.border}`,
               borderRadius: 10,
               padding: "12px 14px 10px",
-              background: isNow ? T.accentLit : "#fff",
+              background: isNow ? T.accentLight : "#fff",
               cursor: "pointer",
               boxShadow: isNow ? `0 0 0 2px ${T.accentBd}` : T.shadow,
               transition: "box-shadow 0.15s, border-color 0.15s",
@@ -970,7 +942,7 @@ function YearView({ year, events, layers, todayYear, todayMonth, onMonthSelect }
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.boxShadow = isNow ? `0 0 0 2px ${T.accentBd}` : T.shadow;
-              e.currentTarget.style.borderColor = isNow ? T.accentBd : T.ink150;
+              e.currentTarget.style.borderColor = isNow ? T.accentBd : T.border;
             }}
           >
             <div style={{
@@ -1087,7 +1059,7 @@ function DayPanel({ date, events, onClose, tenantId, onSaved }) {
           position: "fixed", top: 0, right: 0, bottom: 0,
           width: "min(380px, 90vw)",
           background: "#fff",
-          borderLeft: `1px solid ${T.ink150}`,
+          borderLeft: `1px solid ${T.border}`,
           boxShadow: "-4px 0 24px rgba(0,0,0,0.10)",
           zIndex: 901,
           display: "flex", flexDirection: "column",
@@ -1098,13 +1070,13 @@ function DayPanel({ date, events, onClose, tenantId, onSaved }) {
         {/* Header */}
         <div style={{
           padding: "18px 20px 14px",
-          borderBottom: `1px solid ${T.ink150}`,
+          borderBottom: `1px solid ${T.border}`,
           display: "flex", justifyContent: "space-between", alignItems: "flex-start",
           flexShrink: 0,
         }}>
           <div>
             <div style={{
-              fontSize: 10, fontWeight: 700, color: T.ink400,
+              fontSize: 10, fontWeight: 700, color: T.ink500,
               textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3,
               fontFamily: T.font,
             }}>
@@ -1116,7 +1088,7 @@ function DayPanel({ date, events, onClose, tenantId, onSaved }) {
           </div>
           <button onClick={onClose} style={{
             background: "none", border: "none", cursor: "pointer",
-            fontSize: 20, color: T.ink400, lineHeight: 1, padding: "2px 6px",
+            fontSize: 20, color: T.ink500, lineHeight: 1, padding: "2px 6px",
           }}>×</button>
         </div>
 
@@ -1126,7 +1098,7 @@ function DayPanel({ date, events, onClose, tenantId, onSaved }) {
           {otherEvs.length > 0 && (
             <div>
               <div style={{
-                fontSize: 10, fontWeight: 700, color: T.ink400,
+                fontSize: 10, fontWeight: 700, color: T.ink500,
                 textTransform: "uppercase", letterSpacing: "0.08em",
                 marginBottom: 8, fontFamily: T.font,
               }}>
@@ -1155,7 +1127,7 @@ function DayPanel({ date, events, onClose, tenantId, onSaved }) {
           {diaryEvs.length > 0 && (
             <div>
               <div style={{
-                fontSize: 10, fontWeight: 700, color: T.ink400,
+                fontSize: 10, fontWeight: 700, color: T.ink500,
                 textTransform: "uppercase", letterSpacing: "0.08em",
                 marginBottom: 8, fontFamily: T.font,
               }}>
@@ -1218,9 +1190,9 @@ function DayPanel({ date, events, onClose, tenantId, onSaved }) {
           )}
 
           {/* Add note form */}
-          <div style={{ borderTop: `1px solid ${T.ink150}`, paddingTop: 16 }}>
+          <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 16 }}>
             <div style={{
-              fontSize: 10, fontWeight: 700, color: T.ink400,
+              fontSize: 10, fontWeight: 700, color: T.ink500,
               textTransform: "uppercase", letterSpacing: "0.08em",
               marginBottom: 12, fontFamily: T.font,
             }}>
@@ -1236,9 +1208,9 @@ function DayPanel({ date, events, onClose, tenantId, onSaved }) {
                   style={{
                     padding: "4px 10px", borderRadius: 20, cursor: "pointer",
                     fontSize: 11, fontFamily: T.font, fontWeight: 600,
-                    border: `1px solid ${form.entry_type === t.value ? form.color : T.ink150}`,
+                    border: `1px solid ${form.entry_type === t.value ? form.color : T.border}`,
                     background: form.entry_type === t.value ? form.color + "18" : "transparent",
-                    color: form.entry_type === t.value ? form.color : T.ink400,
+                    color: form.entry_type === t.value ? form.color : T.ink500,
                     transition: "all 0.12s",
                   }}
                 >
@@ -1271,7 +1243,7 @@ function DayPanel({ date, events, onClose, tenantId, onSaved }) {
               placeholder="Title (required)…"
               style={{
                 width: "100%", padding: "8px 12px", marginBottom: 8,
-                border: `1px solid ${T.ink150}`, borderRadius: 8,
+                border: `1px solid ${T.border}`, borderRadius: 8,
                 fontSize: 13, fontFamily: T.font, color: T.ink900,
                 outline: "none", boxSizing: "border-box",
               }}
@@ -1285,7 +1257,7 @@ function DayPanel({ date, events, onClose, tenantId, onSaved }) {
               rows={3}
               style={{
                 width: "100%", padding: "8px 12px", marginBottom: 12,
-                border: `1px solid ${T.ink150}`, borderRadius: 8,
+                border: `1px solid ${T.border}`, borderRadius: 8,
                 fontSize: 13, fontFamily: T.font, color: T.ink900,
                 outline: "none", resize: "vertical", boxSizing: "border-box",
               }}
@@ -1297,8 +1269,8 @@ function DayPanel({ date, events, onClose, tenantId, onSaved }) {
               disabled={saving || !form.title.trim()}
               style={{
                 width: "100%", padding: "10px", borderRadius: 8, border: "none",
-                background: form.title.trim() ? form.color : T.ink150,
-                color: form.title.trim() ? "#fff" : T.ink400,
+                background: form.title.trim() ? form.color : T.border,
+                color: form.title.trim() ? "#fff" : T.ink500,
                 fontWeight: 700, fontSize: 13, fontFamily: T.font,
                 cursor: form.title.trim() ? "pointer" : "not-allowed",
                 opacity: saving ? 0.7 : 1, transition: "background 0.15s",
@@ -1614,8 +1586,8 @@ export default function HRCalendar({ tenantId }) {
 
   const navBtnStyle = {
     background: "none",
-    border: `1px solid ${T.ink150}`,
-    color: T.ink400,
+    border: `1px solid ${T.border}`,
+    color: T.ink500,
     borderRadius: 6,
     padding: "5px 11px",
     cursor: "pointer",
@@ -1629,7 +1601,7 @@ export default function HRCalendar({ tenantId }) {
     <div
       style={{
         background: "#fff",
-        border: `1px solid ${T.ink150}`,
+        border: `1px solid ${T.border}`,
         borderRadius: 10,
         padding: 24,
         minHeight: "70vh",
@@ -1637,7 +1609,7 @@ export default function HRCalendar({ tenantId }) {
         flexDirection: "column",
         gap: 18,
         fontFamily: T.font,
-        boxShadow: T.shadow,
+        boxShadow: T.shadow.sm,
       }}
     >
       {/* Header */}
@@ -1674,7 +1646,7 @@ export default function HRCalendar({ tenantId }) {
             ].map(({ key, label, color }) => (
               <span
                 key={key}
-                style={{ fontSize: 12, fontFamily: T.font, color: T.ink400 }}
+                style={{ fontSize: 12, fontFamily: T.font, color: T.ink500 }}
               >
                 <span style={{ color, fontWeight: 700 }}>{counts[key]}</span>{" "}
                 {label}
@@ -1688,7 +1660,7 @@ export default function HRCalendar({ tenantId }) {
           style={{
             display: "flex",
             gap: 2,
-            background: T.ink075,
+            background: T.bg,
             borderRadius: 8,
             padding: 3,
           }}
@@ -1703,7 +1675,7 @@ export default function HRCalendar({ tenantId }) {
                 border: "none",
                 cursor: "pointer",
                 background: view === v ? T.accent : "transparent",
-                color: view === v ? "#fff" : T.ink400,
+                color: view === v ? "#fff" : T.ink500,
                 fontWeight: 700,
                 fontSize: 11,
                 fontFamily: T.font,
@@ -1788,7 +1760,7 @@ export default function HRCalendar({ tenantId }) {
       {error && (
         <div
           style={{
-            background: T.dangerBg,
+            background: T.dangerLight,
             border: `1px solid ${T.dangerBd}`,
             borderRadius: 8,
             padding: "10px 14px",

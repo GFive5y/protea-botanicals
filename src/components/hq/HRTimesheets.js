@@ -9,66 +9,38 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
-
-// ─── Design Tokens ────────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
+import { T } from "../../styles/tokens";
+// Design tokens — imported from tokens.js (WP-UNIFY)
 // Legacy aliases — preserve all internal logic referencing C
 const C = {
   green: T.accent,
-  greenLight: T.accentLit,
+  greenLight: T.accentLight,
   greenMid: T.accentMid,
   amber: T.warning,
-  amberLight: T.warningBg,
+  amberLight: T.warningLight,
   red: T.danger,
-  redLight: T.dangerBg,
+  redLight: T.dangerLight,
   blue: T.info,
-  blueLight: T.infoBg,
+  blueLight: T.infoLight,
   orange: T.warning,
-  orangeLight: T.warningBg,
+  orangeLight: T.warningLight,
   purple: T.info,
-  purpleLight: T.infoBg,
+  purpleLight: T.infoLight,
   grey: T.ink500,
-  greyLight: T.ink075,
-  border: T.ink150,
-  bg: T.ink075,
+  greyLight: T.bg,
+  border: T.border,
+  bg: T.bg,
   white: "#fff",
   text: T.ink700,
-  muted: T.ink400,
+  muted: T.ink500,
 };
 
 const STATUS_CFG = {
-  draft: { label: "Draft", bg: T.ink075, color: T.ink500 },
-  staff_submitted: { label: "Submitted", bg: T.warningBg, color: T.warning },
-  admin_approved: { label: "Admin Approved", bg: T.infoBg, color: T.info },
-  hr_approved: { label: "HR Approved", bg: T.successBg, color: T.success },
-  locked: { label: "Locked", bg: T.ink075, color: T.ink700 },
+  draft: { label: "Draft", bg: T.bg, color: T.ink500 },
+  staff_submitted: { label: "Submitted", bg: T.warningLight, color: T.warning },
+  admin_approved: { label: "Admin Approved", bg: T.infoLight, color: T.info },
+  hr_approved: { label: "HR Approved", bg: T.successLight, color: T.success },
+  locked: { label: "Locked", bg: T.bg, color: T.ink700 },
 };
 
 const ENTRY_TYPES = [
@@ -156,7 +128,7 @@ const s = {
   wrapper: { fontFamily: T.font, color: T.ink700 },
   subTabs: {
     display: "flex",
-    borderBottom: `1px solid ${T.ink150}`,
+    borderBottom: `1px solid ${T.border}`,
     marginBottom: 24,
   },
   subTab: (a) => ({
@@ -166,7 +138,7 @@ const s = {
     background: "transparent",
     fontSize: 11,
     fontFamily: T.font,
-    color: a ? T.accent : T.ink400,
+    color: a ? T.accent : T.ink500,
     borderBottom: a ? `2px solid ${T.accent}` : "2px solid transparent",
     fontWeight: a ? 700 : 400,
     letterSpacing: "0.06em",
@@ -234,7 +206,7 @@ const s = {
   }),
   select: {
     padding: "8px 12px",
-    border: `1px solid ${T.ink150}`,
+    border: `1px solid ${T.border}`,
     borderRadius: 6,
     fontSize: 13,
     fontFamily: T.font,
@@ -244,7 +216,7 @@ const s = {
   },
   input: {
     padding: "8px 12px",
-    border: `1px solid ${T.ink150}`,
+    border: `1px solid ${T.border}`,
     borderRadius: 6,
     fontSize: 13,
     fontFamily: T.font,
@@ -257,7 +229,7 @@ const s = {
     fontSize: 11,
     fontWeight: 600,
     fontFamily: T.font,
-    color: T.ink400,
+    color: T.ink500,
     textTransform: "uppercase",
     letterSpacing: "0.06em",
     marginBottom: 4,
@@ -285,7 +257,7 @@ const s = {
     fontSize: 10,
     fontWeight: 700,
     fontFamily: T.font,
-    color: T.ink400,
+    color: T.ink500,
     textTransform: "uppercase",
     letterSpacing: "0.1em",
     marginTop: 6,
@@ -603,7 +575,7 @@ function EntriesDrawer({ timesheet, staffName, tenantId, onClose, onSaved }) {
                   fontSize: 10,
                   fontFamily: T.font,
                   fontWeight: 700,
-                  color: T.ink400,
+                  color: T.ink500,
                   textTransform: "uppercase",
                   letterSpacing: "0.08em",
                   marginTop: 4,
@@ -1239,20 +1211,20 @@ function TimesheetSetupWizard({ staffList, tenantId, onCreated, onSkip }) {
   }
 
   const inp = {
-    padding: "10px 14px", border: `1px solid ${T.ink150}`, borderRadius: 8,
+    padding: "10px 14px", border: `1px solid ${T.border}`, borderRadius: 8,
     fontSize: 13, fontFamily: T.font, color: T.ink900, outline: "none",
     width: "100%", boxSizing: "border-box", background: "#fff",
   };
   const lbl = {
     display: "block", fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
-    textTransform: "uppercase", color: T.ink400, fontFamily: T.font, marginBottom: 6,
+    textTransform: "uppercase", color: T.ink500, fontFamily: T.font, marginBottom: 6,
   };
 
   // No staff guard
   if (staffList.length === 0) {
     return (
       <div style={{
-        background: "#fff", border: `1px solid ${T.ink150}`,
+        background: "#fff", border: `1px solid ${T.border}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
       }}>
@@ -1278,7 +1250,7 @@ function TimesheetSetupWizard({ staffList, tenantId, onCreated, onSkip }) {
               <div key={num} style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
                 <div style={{
                   width: 28, height: 28, borderRadius: "50%",
-                  background: T.ink150, color: T.ink500,
+                  background: T.border, color: T.ink500,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 12, fontWeight: 700, flexShrink: 0,
                 }}>
@@ -1292,7 +1264,7 @@ function TimesheetSetupWizard({ staffList, tenantId, onCreated, onSkip }) {
           </div>
           <div style={{
             padding: "14px 18px", borderRadius: 8,
-            background: T.accentLit, border: `1px solid ${T.accentBd}`,
+            background: T.accentLight, border: `1px solid ${T.accentBd}`,
             fontSize: 12, color: T.accent, fontFamily: T.font,
             display: "flex", alignItems: "center", gap: 10,
           }}>
@@ -1306,7 +1278,7 @@ function TimesheetSetupWizard({ staffList, tenantId, onCreated, onSkip }) {
 
   return (
     <div style={{
-      background: "#fff", border: `1px solid ${T.ink150}`,
+      background: "#fff", border: `1px solid ${T.border}`,
       borderRadius: 12, overflow: "hidden",
       boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
     }}>
@@ -1368,7 +1340,7 @@ function TimesheetSetupWizard({ staffList, tenantId, onCreated, onSkip }) {
               style={inp}
             />
             {periodStart && (
-              <div style={{ fontSize: 11, color: T.ink400, fontFamily: T.font, marginTop: 5 }}>
+              <div style={{ fontSize: 11, color: T.ink500, fontFamily: T.font, marginTop: 5 }}>
                 Period: {fmtDate(periodStart)} — {fmtDate(periodEnd)}
               </div>
             )}
@@ -1378,7 +1350,7 @@ function TimesheetSetupWizard({ staffList, tenantId, onCreated, onSkip }) {
         {/* What happens next */}
         <div style={{
           padding: "14px 18px", borderRadius: 8, marginBottom: 24,
-          background: T.accentLit, border: `1px solid ${T.accentBd}`,
+          background: T.accentLight, border: `1px solid ${T.accentBd}`,
           fontSize: 12, color: T.accent, fontFamily: T.font, lineHeight: 1.6,
         }}>
           <strong>What happens next:</strong> After clicking Create, a daily entry
@@ -1390,7 +1362,7 @@ function TimesheetSetupWizard({ staffList, tenantId, onCreated, onSkip }) {
         {error && (
           <div style={{
             padding: "10px 14px", borderRadius: 8, marginBottom: 16,
-            background: T.dangerBg, border: `1px solid ${T.dangerBd}`,
+            background: T.dangerLight, border: `1px solid ${T.dangerBd}`,
             fontSize: 12, color: T.danger, fontFamily: T.font,
           }}>
             ⚠ {error}
@@ -1402,7 +1374,7 @@ function TimesheetSetupWizard({ staffList, tenantId, onCreated, onSkip }) {
             onClick={onSkip}
             style={{
               background: "none", border: "none", cursor: "pointer",
-              fontSize: 12, color: T.ink400, fontFamily: T.font,
+              fontSize: 12, color: T.ink500, fontFamily: T.font,
               textDecoration: "underline",
             }}
           >
@@ -1413,7 +1385,7 @@ function TimesheetSetupWizard({ staffList, tenantId, onCreated, onSkip }) {
             disabled={saving || !staffId || !periodStart}
             style={{
               padding: "12px 28px", borderRadius: 8, border: "none",
-              background: staffId && periodStart ? T.accent : T.ink150,
+              background: staffId && periodStart ? T.accent : T.border,
               color: "#fff", fontWeight: 700, fontSize: 13,
               fontFamily: T.font,
               cursor: staffId && periodStart ? "pointer" : "not-allowed",
@@ -1601,11 +1573,11 @@ function TimesheetsList({ tenantId, staffList }) {
           display: "grid",
           gridTemplateColumns: "repeat(4, 1fr)",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: 6,
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
-          boxShadow: T.shadow,
+          border: `1px solid ${T.border}`,
+          boxShadow: T.shadow.sm,
           marginBottom: 20,
         }}
       >
@@ -2288,7 +2260,7 @@ function HoursMonitor({ tenantId, staffList }) {
 
   // Variance colour
   function varColor(v, scheduled) {
-    if (scheduled === 0) return T.ink400;
+    if (scheduled === 0) return T.ink500;
     const pct = scheduled > 0 ? (v / scheduled) * 100 : 0;
     if (v > 0) return T.info;          // over scheduled — blue
     if (pct >= -10) return T.success;  // within 10% short — green
@@ -2306,7 +2278,7 @@ function HoursMonitor({ tenantId, staffList }) {
       {/* Week nav */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={prevWeek} style={{ padding: "6px 12px", borderRadius: 6, border: `1px solid ${T.ink150}`, background: "#fff", cursor: "pointer", fontSize: 15, color: T.ink400 }}>‹</button>
+          <button onClick={prevWeek} style={{ padding: "6px 12px", borderRadius: 6, border: `1px solid ${T.border}`, background: "#fff", cursor: "pointer", fontSize: 15, color: T.ink500 }}>‹</button>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.ink900, fontFamily: T.font }}>
               {fmtWeekLabel(weekStart)}
@@ -2314,24 +2286,24 @@ function HoursMonitor({ tenantId, staffList }) {
             {rosterExists && (
               <span style={{
                 fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 10,
-                background: rosterExists.status === "published" ? T.accentLit
-                          : rosterExists.status === "locked" ? T.infoBg : T.ink075,
+                background: rosterExists.status === "published" ? T.accentLight
+                          : rosterExists.status === "locked" ? T.infoLight : T.bg,
                 color: rosterExists.status === "published" ? T.accentMid
-                     : rosterExists.status === "locked" ? T.info : T.ink400,
+                     : rosterExists.status === "locked" ? T.info : T.ink500,
                 fontFamily: T.font, textTransform: "uppercase", letterSpacing: "0.06em",
               }}>
                 Roster: {rosterExists.status}
               </span>
             )}
           </div>
-          <button onClick={nextWeek} style={{ padding: "6px 12px", borderRadius: 6, border: `1px solid ${T.ink150}`, background: "#fff", cursor: "pointer", fontSize: 15, color: T.ink400 }}>›</button>
+          <button onClick={nextWeek} style={{ padding: "6px 12px", borderRadius: 6, border: `1px solid ${T.border}`, background: "#fff", cursor: "pointer", fontSize: 15, color: T.ink500 }}>›</button>
           <button onClick={() => setWeekStart(getMonday())} style={{
             padding: "6px 12px", borderRadius: 6,
-            border: `1px solid ${T.accentBd}`, background: T.accentLit,
+            border: `1px solid ${T.accentBd}`, background: T.accentLight,
             cursor: "pointer", fontSize: 11, fontWeight: 700, color: T.accent, fontFamily: T.font,
           }}>This Week</button>
         </div>
-        <button onClick={load} style={{ padding: "6px 12px", borderRadius: 6, border: `1px solid ${T.ink150}`, background: "#fff", cursor: "pointer", fontSize: 11, color: T.ink400, fontFamily: T.font }}>
+        <button onClick={load} style={{ padding: "6px 12px", borderRadius: 6, border: `1px solid ${T.border}`, background: "#fff", cursor: "pointer", fontSize: 11, color: T.ink500, fontFamily: T.font }}>
           ↻ Refresh
         </button>
       </div>
@@ -2339,7 +2311,7 @@ function HoursMonitor({ tenantId, staffList }) {
       {/* Holiday banner */}
       {holidays.length > 0 && (
         <div style={{
-          padding: "8px 14px", borderRadius: 8, background: T.warningBg,
+          padding: "8px 14px", borderRadius: 8, background: T.warningLight,
           border: `1px solid ${T.warningBd}`, marginBottom: 16,
           fontSize: 12, color: T.warning, fontFamily: T.font,
         }}>
@@ -2353,7 +2325,7 @@ function HoursMonitor({ tenantId, staffList }) {
       ) : staffList.length === 0 ? (
         <div style={s.emptyState}>
           <div style={{ fontSize: 36, marginBottom: 8 }}>👥</div>
-          <div style={{ fontFamily: T.font, fontSize: 14, color: T.ink400 }}>
+          <div style={{ fontFamily: T.font, fontSize: 14, color: T.ink500 }}>
             No active staff profiles yet. Add staff in the Staff tab first.
           </div>
         </div>
@@ -2363,9 +2335,9 @@ function HoursMonitor({ tenantId, staffList }) {
           {hasAnyData && (
             <div style={{
               display: "grid", gridTemplateColumns: "repeat(4,1fr)",
-              gap: "1px", background: T.ink150, borderRadius: 8,
-              overflow: "hidden", border: `1px solid ${T.ink150}`,
-              boxShadow: T.shadow, marginBottom: 20,
+              gap: "1px", background: T.border, borderRadius: 8,
+              overflow: "hidden", border: `1px solid ${T.border}`,
+              boxShadow: T.shadow.sm, marginBottom: 20,
             }}>
               {[
                 { label: "Scheduled", value: `${totalScheduled.toFixed(1)}h`, color: T.ink700 },
@@ -2382,7 +2354,7 @@ function HoursMonitor({ tenantId, staffList }) {
                 },
               ].map(({ label, value, color }) => (
                 <div key={label} style={{ background: "#fff", padding: "14px 16px" }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: T.ink400, fontFamily: T.font, marginBottom: 4 }}>{label}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: T.ink500, fontFamily: T.font, marginBottom: 4 }}>{label}</div>
                   <div style={{ fontSize: 22, fontWeight: 600, color, fontFamily: T.font, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em" }}>{value}</div>
                 </div>
               ))}
@@ -2410,10 +2382,10 @@ function HoursMonitor({ tenantId, staffList }) {
                   const vc = varColor(row.variance, row.scheduledHours);
                   const noData = !row.hasEntries && !row.hasAssignments;
                   return (
-                    <tr key={row.staff.id} style={{ background: noData ? T.ink050 : "#fff" }}>
+                    <tr key={row.staff.id} style={{ background: noData ? T.surface : "#fff" }}>
                       <td style={s.td}>
                         <div style={{ fontWeight: 600, color: T.ink900, fontFamily: T.font }}>{row.staff.full_name || row.staff.preferred_name}</div>
-                        {row.staff.job_title && <div style={{ fontSize: 10, color: T.ink400 }}>{row.staff.job_title}</div>}
+                        {row.staff.job_title && <div style={{ fontSize: 10, color: T.ink500 }}>{row.staff.job_title}</div>}
                       </td>
 
                       <td style={{ ...s.td, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
@@ -2471,7 +2443,7 @@ function HoursMonitor({ tenantId, staffList }) {
                         ) : !row.hasEntries ? (
                           <span style={{ fontSize: 10, fontWeight: 700, color: T.warning, fontFamily: T.font }}>Missing entries</span>
                         ) : !row.hasAssignments ? (
-                          <span style={{ fontSize: 10, fontWeight: 700, color: T.ink400, fontFamily: T.font }}>No roster</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: T.ink500, fontFamily: T.font }}>No roster</span>
                         ) : row.hasOT ? (
                           <span style={{ fontSize: 10, fontWeight: 700, color: T.info, fontFamily: T.font }}>Overtime</span>
                         ) : Math.abs(row.variance) <= 1 ? (
@@ -2488,7 +2460,7 @@ function HoursMonitor({ tenantId, staffList }) {
               </tbody>
               {hasAnyData && (
                 <tfoot>
-                  <tr style={{ background: T.accentLit, borderTop: `2px solid ${T.accentBd}` }}>
+                  <tr style={{ background: T.accentLight, borderTop: `2px solid ${T.accentBd}` }}>
                     <td style={{ ...s.td, fontWeight: 700, color: T.accent }}>TOTAL</td>
                     <td style={{ ...s.td, textAlign: "right", fontWeight: 700, color: T.ink700, fontVariantNumeric: "tabular-nums" }}>{totalScheduled.toFixed(1)}h</td>
                     <td style={{ ...s.td, textAlign: "right", fontWeight: 700, color: T.accentMid, fontVariantNumeric: "tabular-nums" }}>{totalActual.toFixed(1)}h</td>
@@ -2509,7 +2481,7 @@ function HoursMonitor({ tenantId, staffList }) {
               <div style={{ fontFamily: T.font, fontSize: 14, fontWeight: 600, color: T.ink700, marginBottom: 8 }}>
                 No hours data for this week
               </div>
-              <div style={{ fontSize: 12, color: T.ink400, fontFamily: T.font, maxWidth: 360, margin: "0 auto 20px" }}>
+              <div style={{ fontSize: 12, color: T.ink500, fontFamily: T.font, maxWidth: 360, margin: "0 auto 20px" }}>
                 Build a roster in the Roster tab, then add timesheet entries in the Timesheets tab. Hours Monitor will compare them here.
               </div>
             </div>
@@ -2679,7 +2651,7 @@ function PayCalculator({ tenantId, staffList }) {
             <label style={s.label}>Week Starting (Monday)</label>
             <input type="date" style={{ ...s.input, width: "100%" }} value={weekStart}
               onChange={(e) => { setWeekStart(e.target.value); setResult(null); }} />
-            <div style={{ fontSize: 11, color: T.ink400, fontFamily: T.font, marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: T.ink500, fontFamily: T.font, marginTop: 4 }}>
               {fmtDate(weekStart)} — {fmtDate(weekEnd)}
             </div>
           </div>
@@ -2704,19 +2676,19 @@ function PayCalculator({ tenantId, staffList }) {
               <div style={{ ...s.sectionTitle, fontSize: 18, marginBottom: 4 }}>
                 {result.staffName} — {fmtDate(result.weekStart)} to {fmtDate(result.weekEnd)}
               </div>
-              <div style={{ fontSize: 12, color: T.ink400, fontFamily: T.font }}>
+              <div style={{ fontSize: 12, color: T.ink500, fontFamily: T.font }}>
                 R{result.rate.toFixed(2)}/hr · {result.contract.contract_type || "Contractor"} · BCEA compliant
               </div>
             </div>
           </div>
 
           {result.entries.length === 0 ? (
-            <div style={{ ...s.card, textAlign: "center", padding: "48px 24px", color: T.ink400 }}>
+            <div style={{ ...s.card, textAlign: "center", padding: "48px 24px", color: T.ink500 }}>
               <div style={{ fontSize: 36, marginBottom: 12 }}>⏱</div>
               <div style={{ fontFamily: T.font, fontSize: 14, fontWeight: 600, color: T.ink700, marginBottom: 6 }}>
                 No timesheet entries for this week
               </div>
-              <div style={{ fontSize: 12, color: T.ink400, fontFamily: T.font }}>
+              <div style={{ fontSize: 12, color: T.ink500, fontFamily: T.font }}>
                 Add clock-in / clock-out entries in the Timesheets tab, then come back to calculate pay.
               </div>
             </div>
@@ -2724,7 +2696,7 @@ function PayCalculator({ tenantId, staffList }) {
             <>
               {/* PH banner */}
               {result.holidays.length > 0 && (
-                <div style={{ padding: "8px 14px", borderRadius: 8, background: T.warningBg, border: `1px solid ${T.warningBd}`, marginBottom: 16, fontSize: 12, color: T.warning, fontFamily: T.font }}>
+                <div style={{ padding: "8px 14px", borderRadius: 8, background: T.warningLight, border: `1px solid ${T.warningBd}`, marginBottom: 16, fontSize: 12, color: T.warning, fontFamily: T.font }}>
                   ★ Public holiday this week: {result.holidays.map((h) => h.name).join(", ")} — 2× rate applied
                 </div>
               )}
@@ -2737,15 +2709,15 @@ function PayCalculator({ tenantId, staffList }) {
                   { label: "Sunday Work", hours: result.sundayHours, cost: result.sundayCost, mult: "1.5×", color: T.warning, show: result.sundayHours > 0 },
                   { label: "Public Holiday", hours: result.phHours, cost: result.phCost, mult: "2×", color: T.danger, show: result.phHours > 0 },
                 ].filter((item) => item.show).map((item) => (
-                  <div key={item.label} style={{ background: "#fff", border: `1px solid ${T.ink150}`, borderTop: `3px solid ${item.color}`, borderRadius: 8, padding: "14px 16px" }}>
+                  <div key={item.label} style={{ background: "#fff", border: `1px solid ${T.border}`, borderTop: `3px solid ${item.color}`, borderRadius: 8, padding: "14px 16px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: T.ink400, fontFamily: T.font }}>{item.label}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: T.ink500, fontFamily: T.font }}>{item.label}</span>
                       <span style={{ fontSize: 10, fontWeight: 700, background: `${item.color}18`, color: item.color, padding: "2px 6px", borderRadius: 4 }}>{item.mult} rate</span>
                     </div>
                     <div style={{ fontSize: 22, fontWeight: 600, color: item.color, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em", marginBottom: 4 }}>
                       R{item.cost.toFixed(2)}
                     </div>
-                    <div style={{ fontSize: 11, color: T.ink400, fontFamily: T.font }}>
+                    <div style={{ fontSize: 11, color: T.ink500, fontFamily: T.font }}>
                       {item.hours.toFixed(1)}h × R{result.rate.toFixed(2)}{item.mult !== "1×" ? ` × ${item.mult}` : ""}
                     </div>
                   </div>
@@ -2767,7 +2739,7 @@ function PayCalculator({ tenantId, staffList }) {
 
               {/* Daily breakdown table */}
               <div style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: T.ink400, fontFamily: T.font, marginBottom: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: T.ink500, fontFamily: T.font, marginBottom: 10 }}>
                   Daily breakdown
                 </div>
                 <div style={{ overflowX: "auto" }}>
@@ -2790,17 +2762,17 @@ function PayCalculator({ tenantId, staffList }) {
                         return (
                           <tr key={i}>
                             <td style={{ ...s.td, fontSize: 11 }}>{fmtDate(entry.date)}</td>
-                            <td style={{ ...s.td, color: T.ink400, fontSize: 11 }}>{dayName}</td>
+                            <td style={{ ...s.td, color: T.ink500, fontSize: 11 }}>{dayName}</td>
                             <td style={{ ...s.td, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: T.accent }}>{entry.hours.toFixed(1)}h</td>
                             <td style={s.td}><span style={{ fontSize: 11, fontWeight: 700, color: col }}>{entry.category}</span></td>
                             <td style={{ ...s.td, textAlign: "right", color: T.ink500, fontVariantNumeric: "tabular-nums" }}>R{result.rate.toFixed(2)}</td>
-                            <td style={{ ...s.td, textAlign: "right", fontWeight: entry.multiplier > 1 ? 700 : 400, color: entry.multiplier > 1 ? col : T.ink400 }}>{entry.multiplier}×</td>
+                            <td style={{ ...s.td, textAlign: "right", fontWeight: entry.multiplier > 1 ? 700 : 400, color: entry.multiplier > 1 ? col : T.ink500 }}>{entry.multiplier}×</td>
                             <td style={{ ...s.td, textAlign: "right", fontWeight: 700, color: T.ink900, fontVariantNumeric: "tabular-nums" }}>R{entry.cost.toFixed(2)}</td>
                           </tr>
                         );
                       })}
                       {result.overtimeHours > 0 && (
-                        <tr style={{ background: T.infoBg }}>
+                        <tr style={{ background: T.infoLight }}>
                           <td colSpan={2} style={{ ...s.td, fontSize: 11, color: T.info, fontWeight: 600, fontStyle: "italic" }}>+ Overtime premium (hours beyond 45h/wk)</td>
                           <td style={{ ...s.td, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: T.info }}>{result.overtimeHours.toFixed(1)}h</td>
                           <td style={s.td}><span style={{ fontSize: 11, fontWeight: 700, color: T.info }}>Overtime</span></td>
@@ -2811,7 +2783,7 @@ function PayCalculator({ tenantId, staffList }) {
                       )}
                     </tbody>
                     <tfoot>
-                      <tr style={{ background: T.accentLit, borderTop: `2px solid ${T.accentBd}` }}>
+                      <tr style={{ background: T.accentLight, borderTop: `2px solid ${T.accentBd}` }}>
                         <td colSpan={2} style={{ ...s.td, fontWeight: 700, color: T.accent, fontFamily: T.font }}>GROSS PAY</td>
                         <td style={{ ...s.td, textAlign: "right", fontWeight: 700, color: T.accent, fontVariantNumeric: "tabular-nums" }}>{result.totalHours.toFixed(1)}h</td>
                         <td colSpan={3} />
@@ -2823,7 +2795,7 @@ function PayCalculator({ tenantId, staffList }) {
               </div>
 
               {/* BCEA footnote */}
-              <div style={{ fontSize: 11, color: T.ink400, fontFamily: T.font, marginTop: 14, padding: "10px 14px", background: T.ink075, borderRadius: 6, lineHeight: 1.6 }}>
+              <div style={{ fontSize: 11, color: T.ink500, fontFamily: T.font, marginTop: 14, padding: "10px 14px", background: T.bg, borderRadius: 6, lineHeight: 1.6 }}>
                 <strong>SA BCEA rules applied:</strong> Regular hours at 1× rate (up to 45h/week) ·
                 Overtime at 1.5× (hours beyond 45h) · Sunday work at 1.5× ·
                 Public holidays at 2×. Gross pay only — excludes UIF, PAYE tax, and deductions.

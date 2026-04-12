@@ -24,49 +24,20 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
-
-// ─── THEME ───────────────────────────────────────────────────────────────────
-
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
+import { T } from "../../styles/tokens";
+// Design tokens — imported from tokens.js (WP-UNIFY)
 // Legacy aliases — all internal C.* and FONTS.* references resolve correctly
 const C = {
   green: T.accent,
   mid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
-  cream: T.ink050,
-  border: T.ink150,
-  muted: T.ink400,
+  cream: T.surface,
+  border: T.border,
+  muted: T.ink500,
   white: "#fff",
   red: T.danger,
-  bg: T.ink075,
+  bg: T.bg,
 };
 const FONTS = { heading: T.font, body: T.font };
 
@@ -653,11 +624,11 @@ export default function HRPayroll({ tenantId }) {
               display: "grid",
               gridTemplateColumns: "repeat(auto-fill, minmax(160px,1fr))",
               gap: "1px",
-              background: T.ink150,
+              background: T.border,
               borderRadius: 6,
               overflow: "hidden",
-              border: `1px solid ${T.ink150}`,
-              boxShadow: T.shadow,
+              border: `1px solid ${T.border}`,
+              boxShadow: T.shadow.sm,
               marginBottom: 20,
             }}
           >
@@ -671,7 +642,7 @@ export default function HRPayroll({ tenantId }) {
               {
                 label: "Total Deductions",
                 value: zar(totalDeductions),
-                color: warningCount > 0 ? T.warning : T.ink400,
+                color: warningCount > 0 ? T.warning : T.ink500,
               },
               {
                 label: "Total Net Pay",
@@ -681,7 +652,7 @@ export default function HRPayroll({ tenantId }) {
               {
                 label: "Warnings",
                 value: warningCount,
-                color: warningCount > 0 ? T.danger : T.ink400,
+                color: warningCount > 0 ? T.danger : T.ink500,
               },
             ].map((tile) => (
               <div
@@ -694,7 +665,7 @@ export default function HRPayroll({ tenantId }) {
                     fontWeight: 700,
                     letterSpacing: "0.1em",
                     textTransform: "uppercase",
-                    color: T.ink400,
+                    color: T.ink500,
                     marginBottom: 6,
                     fontFamily: T.font,
                   }}

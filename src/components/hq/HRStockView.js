@@ -14,41 +14,12 @@ import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { CATEGORY_LABELS } from "./ProductWorlds";
 import { useTenant } from "../../services/tenantService";
-
-// ── Design tokens ─────────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  mono: "'DM Mono','Courier New',monospace",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
+import { T } from "../../styles/tokens";
+// Design tokens — imported from tokens.js (WP-UNIFY)
 
 const sInput = {
   padding: "8px 12px",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: "4px",
   fontSize: "13px",
   fontFamily: T.font,
@@ -65,26 +36,26 @@ const sTh = {
   fontSize: "10px",
   letterSpacing: "0.1em",
   textTransform: "uppercase",
-  color: T.ink400,
-  borderBottom: `2px solid ${T.ink150}`,
+  color: T.ink500,
+  borderBottom: `2px solid ${T.border}`,
   fontWeight: 700,
   fontFamily: T.font,
   whiteSpace: "nowrap",
-  background: T.ink050,
+  background: T.surface,
 };
 const sTd = {
   padding: "10px 12px",
-  borderBottom: `1px solid ${T.ink150}`,
+  borderBottom: `1px solid ${T.border}`,
   fontSize: "13px",
   fontFamily: T.font,
   verticalAlign: "middle",
 };
 const sCard = {
   background: "#fff",
-  border: "1px solid " + T.ink150,
+  border: "1px solid " + T.border,
   borderRadius: "6px",
   padding: "20px",
-  boxShadow: T.shadow,
+  boxShadow: T.shadow.sm,
 };
 
 const sBtn = (v = "primary") => ({
@@ -119,30 +90,30 @@ const sBadge = (v) => ({
   padding: "2px 7px",
   ...(v === "danger"
     ? {
-        background: T.dangerBg,
+        background: T.dangerLight,
         color: T.danger,
         border: "1px solid " + T.dangerBd,
       }
     : {}),
   ...(v === "warning"
     ? {
-        background: T.warningBg,
+        background: T.warningLight,
         color: T.warning,
         border: "1px solid " + T.warningBd,
       }
     : {}),
   ...(v === "success"
     ? {
-        background: T.successBg,
+        background: T.successLight,
         color: T.success,
         border: "1px solid " + T.successBd,
       }
     : {}),
   ...(v === "info"
-    ? { background: T.infoBg, color: T.info, border: "1px solid " + T.infoBd }
+    ? { background: T.infoLight, color: T.info, border: "1px solid " + T.infoBd }
     : {}),
   ...(v === "default"
-    ? { background: T.ink075, color: T.ink500, border: "1px solid " + T.ink150 }
+    ? { background: T.bg, color: T.ink500, border: "1px solid " + T.border }
     : {}),
 });
 
@@ -556,7 +527,7 @@ export default function HRStockView({ tenantId }) {
       <div
         style={{
           padding: "16px",
-          background: T.dangerBg,
+          background: T.dangerLight,
           border: "1px solid " + T.dangerBd,
           borderRadius: "4px",
           color: T.danger,
@@ -680,7 +651,7 @@ export default function HRStockView({ tenantId }) {
         style={{
           display: "flex",
           gap: 0,
-          borderBottom: "1px solid " + T.ink150,
+          borderBottom: "1px solid " + T.border,
           marginBottom: "24px",
           marginTop: "16px",
           overflowX: "auto",
@@ -727,36 +698,36 @@ export default function HRStockView({ tenantId }) {
               display: "grid",
               gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
               gap: "1px",
-              background: T.ink150,
+              background: T.border,
               borderRadius: "6px",
               overflow: "hidden",
-              border: "1px solid " + T.ink150,
+              border: "1px solid " + T.border,
             }}
           >
             {[
-              { label: "Total Items", value: items.length, top: T.ink150 },
-              { label: "Locations", value: allTenants.length, top: T.ink150 },
+              { label: "Total Items", value: items.length, top: T.border },
+              { label: "Locations", value: allTenants.length, top: T.border },
               {
                 label: "Low Stock",
                 value: lowItems.length,
-                top: lowItems.length > 0 ? T.warning : T.ink150,
+                top: lowItems.length > 0 ? T.warning : T.border,
               },
               {
                 label: "Expiring <30d",
                 value: expiringItems.length,
-                top: expiringItems.length > 0 ? T.warning : T.ink150,
+                top: expiringItems.length > 0 ? T.warning : T.border,
               },
               {
                 label: "Active Count",
                 value: activeSession ? "Yes" : "None",
-                top: activeSession ? T.info : T.ink150,
+                top: activeSession ? T.info : T.border,
               },
               {
                 label: "Last Count",
                 value: schedule?.last_completed
                   ? fmtDate(schedule.last_completed)
                   : "Never",
-                top: T.ink150,
+                top: T.border,
               },
               {
                 label: "Next Due",
@@ -766,7 +737,7 @@ export default function HRStockView({ tenantId }) {
                 top:
                   daysUntilDue != null && daysUntilDue <= 3
                     ? T.warning
-                    : T.ink150,
+                    : T.border,
               },
               {
                 label: "Count Frequency",
@@ -774,7 +745,7 @@ export default function HRStockView({ tenantId }) {
                   SCHEDULE_OPTIONS.find(
                     (s) => s.value === schedule?.frequency,
                   )?.label?.split(" ")[0] || "—",
-                top: T.ink150,
+                top: T.border,
               },
             ].map((k) => (
               <div
@@ -802,7 +773,7 @@ export default function HRStockView({ tenantId }) {
                   style={{
                     fontSize: "10px",
                     fontWeight: 700,
-                    color: T.ink400,
+                    color: T.ink500,
                     textTransform: "uppercase",
                     letterSpacing: "0.1em",
                   }}
@@ -851,7 +822,7 @@ export default function HRStockView({ tenantId }) {
                   {lowItems.slice(0, 10).map((item) => (
                     <tr key={item.id}>
                       <td style={{ ...sTd, fontWeight: 600 }}>{item.name}</td>
-                      <td style={{ ...sTd, fontSize: "11px", color: T.ink400 }}>
+                      <td style={{ ...sTd, fontSize: "11px", color: T.ink500 }}>
                         {getTenantName(item.tenant_id)}
                       </td>
                       <td
@@ -865,7 +836,7 @@ export default function HRStockView({ tenantId }) {
                         {fmtQty(item.quantity_on_hand, item.unit)}
                       </td>
                       <td
-                        style={{ ...sTd, fontFamily: T.mono, color: T.ink400 }}
+                        style={{ ...sTd, fontFamily: T.mono, color: T.ink500 }}
                       >
                         {fmtQty(item.reorder_level, item.unit)}
                       </td>
@@ -885,7 +856,7 @@ export default function HRStockView({ tenantId }) {
                   fontWeight: 700,
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  color: T.ink400,
+                  color: T.ink500,
                   marginBottom: "12px",
                 }}
               >
@@ -943,13 +914,13 @@ export default function HRStockView({ tenantId }) {
                         style={{
                           ...sTd,
                           fontSize: "11px",
-                          color: T.ink400,
+                          color: T.ink500,
                           fontFamily: T.mono,
                         }}
                       >
                         {fmtDate(s.created_at)}
                       </td>
-                      <td style={{ ...sTd, fontSize: "11px", color: T.ink400 }}>
+                      <td style={{ ...sTd, fontSize: "11px", color: T.ink500 }}>
                         —
                       </td>
                     </tr>
@@ -1079,7 +1050,7 @@ export default function HRStockView({ tenantId }) {
                   <div
                     style={{
                       padding: "8px 12px",
-                      background: T.ink075,
+                      background: T.bg,
                       borderRadius: "4px",
                       fontSize: "13px",
                       color: T.ink500,
@@ -1104,7 +1075,7 @@ export default function HRStockView({ tenantId }) {
               Variance Thresholds by Category
             </div>
             <p
-              style={{ fontSize: "11px", color: T.ink400, margin: "0 0 16px" }}
+              style={{ fontSize: "11px", color: T.ink500, margin: "0 0 16px" }}
             >
               Set the % variance at which a discrepancy is flagged for approval.
               Lower = stricter. Higher = only large gaps flagged.
@@ -1157,7 +1128,7 @@ export default function HRStockView({ tenantId }) {
                         })
                       }
                     />
-                    <span style={{ fontSize: "11px", color: T.ink400 }}>%</span>
+                    <span style={{ fontSize: "11px", color: T.ink500 }}>%</span>
                   </div>
                 </div>
               ))}
@@ -1379,8 +1350,8 @@ export default function HRStockView({ tenantId }) {
                   padding: "12px 14px",
                   background:
                     newSessionForm.count_mode === "blind"
-                      ? T.infoBg
-                      : T.accentLit,
+                      ? T.infoLight
+                      : T.accentLight,
                   border:
                     "1px solid " +
                     (newSessionForm.count_mode === "blind"
@@ -1456,7 +1427,7 @@ export default function HRStockView({ tenantId }) {
                 {activeSession.title}
               </div>
               <div
-                style={{ fontSize: "11px", color: T.ink400, marginTop: "2px" }}
+                style={{ fontSize: "11px", color: T.ink500, marginTop: "2px" }}
               >
                 {activeSession.count_mode === "blind"
                   ? "Blind count"
@@ -1470,7 +1441,7 @@ export default function HRStockView({ tenantId }) {
               <div
                 style={{
                   height: "8px",
-                  background: T.ink150,
+                  background: T.border,
                   borderRadius: "4px",
                   overflow: "hidden",
                 }}
@@ -1488,7 +1459,7 @@ export default function HRStockView({ tenantId }) {
               <div
                 style={{
                   fontSize: "10px",
-                  color: T.ink400,
+                  color: T.ink500,
                   marginTop: "4px",
                   textAlign: "right",
                 }}
@@ -1511,10 +1482,10 @@ export default function HRStockView({ tenantId }) {
           <div
             style={{
               background: "#fff",
-              border: "1px solid " + T.ink150,
+              border: "1px solid " + T.border,
               borderRadius: "6px",
               overflow: "auto",
-              boxShadow: T.shadow,
+              boxShadow: T.shadow.sm,
             }}
           >
             <table
@@ -1583,7 +1554,7 @@ export default function HRStockView({ tenantId }) {
                 {activeSession.title} — Variance Review
               </div>
               <div
-                style={{ fontSize: "11px", color: T.ink400, marginTop: "2px" }}
+                style={{ fontSize: "11px", color: T.ink500, marginTop: "2px" }}
               >
                 {flaggedLines.length} line{flaggedLines.length !== 1 ? "s" : ""}{" "}
                 above threshold · {varianceLines.length} total variance
@@ -1613,7 +1584,7 @@ export default function HRStockView({ tenantId }) {
               <div
                 style={{
                   background: "#fff",
-                  border: "1px solid " + T.ink150,
+                  border: "1px solid " + T.border,
                   borderRadius: "6px",
                   overflow: "auto",
                 }}
@@ -1665,7 +1636,7 @@ export default function HRStockView({ tenantId }) {
                   fontWeight: 700,
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  color: T.ink400,
+                  color: T.ink500,
                   marginBottom: "10px",
                 }}
               >
@@ -1674,7 +1645,7 @@ export default function HRStockView({ tenantId }) {
               <div
                 style={{
                   background: "#fff",
-                  border: "1px solid " + T.ink150,
+                  border: "1px solid " + T.border,
                   borderRadius: "6px",
                   overflow: "auto",
                 }}
@@ -1708,7 +1679,7 @@ export default function HRStockView({ tenantId }) {
                       return (
                         <tr
                           key={sItem.id}
-                          style={{ background: above ? T.warningBg : "#fff" }}
+                          style={{ background: above ? T.warningLight : "#fff" }}
                         >
                           <td style={{ ...sTd, fontWeight: 500 }}>
                             {sItem.inventory_items?.name}
@@ -1757,7 +1728,7 @@ export default function HRStockView({ tenantId }) {
                               ...sTd,
                               fontFamily: T.mono,
                               textAlign: "right",
-                              color: above ? T.warning : T.ink400,
+                              color: above ? T.warning : T.ink500,
                             }}
                           >
                             {sItem.variance_pct?.toFixed(1)}%
@@ -1793,7 +1764,7 @@ export default function HRStockView({ tenantId }) {
                 No variances found
               </div>
               <div
-                style={{ fontSize: "12px", color: T.ink400, marginTop: "4px" }}
+                style={{ fontSize: "12px", color: T.ink500, marginTop: "4px" }}
               >
                 All counted quantities match system records.
               </div>
@@ -1836,10 +1807,10 @@ export default function HRStockView({ tenantId }) {
             <div
               style={{
                 background: "#fff",
-                border: "1px solid " + T.ink150,
+                border: "1px solid " + T.border,
                 borderRadius: "6px",
                 overflow: "auto",
-                boxShadow: T.shadow,
+                boxShadow: T.shadow.sm,
               }}
             >
               <table
@@ -1880,7 +1851,7 @@ export default function HRStockView({ tenantId }) {
                       <td style={{ ...sTd, fontSize: "11px" }}>
                         {s.count_mode === "blind" ? "Blind" : "Guided"}
                       </td>
-                      <td style={{ ...sTd, fontSize: "11px", color: T.ink400 }}>
+                      <td style={{ ...sTd, fontSize: "11px", color: T.ink500 }}>
                         HQ
                       </td>
                       <td style={sTd}>
@@ -1902,7 +1873,7 @@ export default function HRStockView({ tenantId }) {
                         style={{
                           ...sTd,
                           fontSize: "11px",
-                          color: T.ink400,
+                          color: T.ink500,
                           fontFamily: T.mono,
                         }}
                       >
@@ -1912,7 +1883,7 @@ export default function HRStockView({ tenantId }) {
                         style={{
                           ...sTd,
                           fontSize: "11px",
-                          color: T.ink400,
+                          color: T.ink500,
                           fontFamily: T.mono,
                         }}
                       >
@@ -1984,7 +1955,7 @@ function CountRow({
   return (
     <tr
       style={{
-        background: isDone ? (isAbove ? T.warningBg : T.successBg) : "#fff",
+        background: isDone ? (isAbove ? T.warningLight : T.successLight) : "#fff",
         opacity: isDone ? 0.85 : 1,
       }}
     >

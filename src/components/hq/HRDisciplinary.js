@@ -10,6 +10,8 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
+import { T } from "../../styles/tokens";
+// Design tokens — imported from tokens.js (WP-UNIFY)
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const RECORD_TYPES = [
@@ -47,66 +49,38 @@ const RECORD_TYPES = [
   { value: "dismissal", label: "Dismissal", hrOnly: true, validMonths: null },
 ];
 
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
 // Legacy aliases — preserve all internal logic referencing C
 const C = {
   green: T.accent,
-  greenLight: T.accentLit,
+  greenLight: T.accentLight,
   greenMid: T.accentMid,
   amber: T.warning,
-  amberLight: T.warningBg,
+  amberLight: T.warningLight,
   red: T.danger,
-  redLight: T.dangerBg,
+  redLight: T.dangerLight,
   blue: T.info,
-  blueLight: T.infoBg,
-  border: T.ink150,
-  bg: T.ink075,
+  blueLight: T.infoLight,
+  border: T.border,
+  bg: T.bg,
   white: "#fff",
   text: T.ink700,
-  muted: T.ink400,
+  muted: T.ink500,
 };
 
 const STATUS_CFG = {
-  draft: { label: "Draft", bg: T.ink075, color: T.ink500 },
-  issued: { label: "Issued", bg: T.warningBg, color: T.warning },
-  acknowledged: { label: "Acknowledged", bg: T.successBg, color: T.success },
-  appealed: { label: "Appealed", bg: T.infoBg, color: T.info },
-  lapsed: { label: "Lapsed", bg: T.ink075, color: T.ink400 },
-  closed: { label: "Closed", bg: T.ink075, color: T.ink400 },
+  draft: { label: "Draft", bg: T.bg, color: T.ink500 },
+  issued: { label: "Issued", bg: T.warningLight, color: T.warning },
+  acknowledged: { label: "Acknowledged", bg: T.successLight, color: T.success },
+  appealed: { label: "Appealed", bg: T.infoLight, color: T.info },
+  lapsed: { label: "Lapsed", bg: T.bg, color: T.ink500 },
+  closed: { label: "Closed", bg: T.bg, color: T.ink500 },
 };
 
 const TYPE_CFG = {
-  verbal_warning: { color: T.warning, bg: T.warningBg },
+  verbal_warning: { color: T.warning, bg: T.warningLight },
   written_warning: { color: "#e65100", bg: "#fff3e0" },
-  final_warning: { color: T.danger, bg: T.dangerBg },
-  notice_to_attend: { color: T.info, bg: T.infoBg },
+  final_warning: { color: T.danger, bg: T.dangerLight },
+  notice_to_attend: { color: T.info, bg: T.infoLight },
   suspension: { color: "#6a1b9a", bg: "#f3e5f5" },
   hearing_outcome: { color: "#4e342e", bg: "#efebe9" },
   dismissal: { color: "#b71c1c", bg: "#ffebee" },
@@ -126,7 +100,7 @@ function daysUntil(d) {
   return Math.ceil((new Date(d) - new Date()) / 86400000);
 }
 function typeCfg(type) {
-  return TYPE_CFG[type] || { color: T.ink400, bg: T.ink075 };
+  return TYPE_CFG[type] || { color: T.ink500, bg: T.bg };
 }
 function typeLabel(type) {
   return RECORD_TYPES.find((r) => r.value === type)?.label || type;
@@ -156,8 +130,8 @@ function TypeBadge({ type }) {
 function StatusBadge({ status }) {
   const cfg = STATUS_CFG[status] || {
     label: status,
-    bg: T.ink075,
-    color: T.ink400,
+    bg: T.bg,
+    color: T.ink500,
   };
   return (
     <span
@@ -251,7 +225,7 @@ const s = {
     width: "100%",
     borderCollapse: "collapse",
     background: "#fff",
-    border: `1px solid ${T.ink150}`,
+    border: `1px solid ${T.border}`,
     borderRadius: 8,
     overflow: "hidden",
   },
@@ -261,16 +235,16 @@ const s = {
     fontSize: 10,
     fontWeight: 700,
     fontFamily: T.font,
-    color: T.ink400,
+    color: T.ink500,
     textTransform: "uppercase",
     letterSpacing: "0.08em",
-    borderBottom: `1px solid ${T.ink150}`,
-    background: T.ink075,
+    borderBottom: `1px solid ${T.border}`,
+    background: T.bg,
     whiteSpace: "nowrap",
   },
   td: {
     padding: "11px 14px",
-    borderBottom: `1px solid ${T.ink150}`,
+    borderBottom: `1px solid ${T.border}`,
     verticalAlign: "middle",
     fontSize: 13,
     fontFamily: T.font,
@@ -303,7 +277,7 @@ const s = {
   }),
   select: {
     padding: "8px 12px",
-    border: `1px solid ${T.ink150}`,
+    border: `1px solid ${T.border}`,
     borderRadius: 6,
     fontSize: 13,
     fontFamily: T.font,
@@ -314,7 +288,7 @@ const s = {
   },
   input: {
     padding: "8px 12px",
-    border: `1px solid ${T.ink150}`,
+    border: `1px solid ${T.border}`,
     borderRadius: 6,
     fontSize: 13,
     fontFamily: T.font,
@@ -325,7 +299,7 @@ const s = {
   },
   textarea: {
     padding: "8px 12px",
-    border: `1px solid ${T.ink150}`,
+    border: `1px solid ${T.border}`,
     borderRadius: 6,
     fontSize: 13,
     fontFamily: T.font,
@@ -340,7 +314,7 @@ const s = {
     fontSize: 11,
     fontWeight: 600,
     fontFamily: T.font,
-    color: T.ink400,
+    color: T.ink500,
     textTransform: "uppercase",
     letterSpacing: "0.06em",
     marginBottom: 4,
@@ -367,8 +341,8 @@ const s = {
   },
   dHead: {
     padding: "18px 24px",
-    borderBottom: `1px solid ${T.ink150}`,
-    background: T.ink075,
+    borderBottom: `1px solid ${T.border}`,
+    background: T.bg,
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
@@ -377,8 +351,8 @@ const s = {
   dBody: { flex: 1, overflowY: "auto", padding: 24 },
   dFoot: {
     padding: "14px 24px",
-    borderTop: `1px solid ${T.ink150}`,
-    background: T.ink075,
+    borderTop: `1px solid ${T.border}`,
+    background: T.bg,
     flexShrink: 0,
     display: "flex",
     justifyContent: "space-between",
@@ -395,12 +369,12 @@ const s = {
     fontFamily: T.font,
     fontSize: 11,
     fontWeight: 700,
-    color: T.ink400,
+    color: T.ink500,
     textTransform: "uppercase",
     letterSpacing: "0.08em",
     margin: "20px 0 12px 0",
     paddingBottom: 8,
-    borderBottom: `1px solid ${T.ink150}`,
+    borderBottom: `1px solid ${T.border}`,
   },
   toast: (t) => ({
     padding: "10px 16px",
@@ -408,12 +382,12 @@ const s = {
     fontSize: 13,
     marginBottom: 12,
     fontFamily: T.font,
-    background: t === "success" ? T.successBg : T.dangerBg,
+    background: t === "success" ? T.successLight : T.dangerLight,
     color: t === "success" ? T.success : T.danger,
   }),
   error: {
     padding: "12px 16px",
-    background: T.dangerBg,
+    background: T.dangerLight,
     color: T.danger,
     borderRadius: 6,
     marginBottom: 16,
@@ -433,7 +407,7 @@ const s = {
     fontSize: 10,
     fontWeight: 700,
     fontFamily: T.font,
-    color: T.ink400,
+    color: T.ink500,
     textTransform: "uppercase",
     letterSpacing: "0.1em",
     marginTop: 6,
@@ -650,7 +624,7 @@ function RecordDrawer({
               border: "none",
               fontSize: 20,
               cursor: "pointer",
-              color: T.ink400,
+              color: T.ink500,
             }}
             onClick={onClose}
           >
@@ -662,9 +636,9 @@ function RecordDrawer({
         <div
           style={{
             display: "flex",
-            borderBottom: `1px solid ${T.ink150}`,
+            borderBottom: `1px solid ${T.border}`,
             flexShrink: 0,
-            background: T.ink075,
+            background: T.bg,
           }}
         >
           {DRAWER_TABS.map((t) => (
@@ -677,7 +651,7 @@ function RecordDrawer({
                 background: "transparent",
                 fontSize: 11,
                 fontFamily: T.font,
-                color: tab === t ? T.danger : T.ink400,
+                color: tab === t ? T.danger : T.ink500,
                 borderBottom:
                   tab === t ? `2px solid ${T.danger}` : "2px solid transparent",
                 fontWeight: tab === t ? 700 : 400,
@@ -979,7 +953,7 @@ function ProgressiveTracker({ records }) {
     <div
       style={{
         padding: "12px 16px",
-        background: T.dangerBg,
+        background: T.dangerLight,
         border: `1px solid ${T.dangerBd}`,
         borderRadius: 8,
         marginBottom: 16,
@@ -1007,7 +981,7 @@ function ProgressiveTracker({ records }) {
                   width: 32,
                   height: 32,
                   borderRadius: "50%",
-                  background: step.active ? step.color : T.ink150,
+                  background: step.active ? step.color : T.border,
                   color: "#fff",
                   fontWeight: 700,
                   fontSize: 14,
@@ -1018,7 +992,7 @@ function ProgressiveTracker({ records }) {
                   margin: "0 auto 4px",
                   border: step.active
                     ? `2px solid ${step.color}`
-                    : `2px solid ${T.ink150}`,
+                    : `2px solid ${T.border}`,
                 }}
               >
                 {i + 1}
@@ -1027,7 +1001,7 @@ function ProgressiveTracker({ records }) {
                 style={{
                   fontSize: 10,
                   fontFamily: T.font,
-                  color: step.active ? step.color : T.ink400,
+                  color: step.active ? step.color : T.ink500,
                   fontWeight: step.active ? 700 : 400,
                 }}
               >
@@ -1039,7 +1013,7 @@ function ProgressiveTracker({ records }) {
                 style={{
                   height: 2,
                   flex: 1,
-                  background: i < level ? steps[i].color : T.ink150,
+                  background: i < level ? steps[i].color : T.border,
                   marginBottom: 18,
                 }}
               />
@@ -1157,7 +1131,7 @@ export default function HRDisciplinary({ tenantId }) {
         <div
           style={{
             padding: "10px 14px",
-            background: T.warningBg,
+            background: T.warningLight,
             border: `1px solid ${T.warningBd}`,
             borderRadius: 6,
             marginBottom: 12,
@@ -1178,11 +1152,11 @@ export default function HRDisciplinary({ tenantId }) {
           display: "grid",
           gridTemplateColumns: "repeat(4, 1fr)",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: 6,
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
-          boxShadow: T.shadow,
+          border: `1px solid ${T.border}`,
+          boxShadow: T.shadow.sm,
           marginBottom: 20,
         }}
       >
@@ -1191,17 +1165,17 @@ export default function HRDisciplinary({ tenantId }) {
           {
             label: "Active Warnings",
             num: activeWarnings.length,
-            color: activeWarnings.length > 0 ? T.danger : T.ink400,
+            color: activeWarnings.length > 0 ? T.danger : T.ink500,
           },
           {
             label: "Pending Acknowledgement",
             num: pendingAck.length,
-            color: pendingAck.length > 0 ? T.warning : T.ink400,
+            color: pendingAck.length > 0 ? T.warning : T.ink500,
           },
           {
             label: "Dismissals",
             num: statsByType.dismissal || 0,
-            color: statsByType.dismissal > 0 ? "#b71c1c" : T.ink400,
+            color: statsByType.dismissal > 0 ? "#b71c1c" : T.ink500,
           },
         ].map(({ label, num, color }) => (
           <div key={label} style={s.statCard}>
@@ -1290,7 +1264,7 @@ export default function HRDisciplinary({ tenantId }) {
           style={{
             padding: "40px",
             textAlign: "center",
-            color: T.ink400,
+            color: T.ink500,
             fontFamily: T.font,
           }}
         >
@@ -1298,14 +1272,14 @@ export default function HRDisciplinary({ tenantId }) {
         </div>
       ) : filtered.length === 0 ? (
         <div
-          style={{ padding: "48px 24px", textAlign: "center", color: T.ink400 }}
+          style={{ padding: "48px 24px", textAlign: "center", color: T.ink500 }}
         >
           <div style={{ fontSize: 36, marginBottom: 8 }}>⚠</div>
           <div
             style={{
               fontFamily: T.font,
               fontSize: 15,
-              color: T.ink400,
+              color: T.ink500,
               marginBottom: 6,
             }}
           >
@@ -1346,7 +1320,7 @@ export default function HRDisciplinary({ tenantId }) {
                 return (
                   <tr
                     key={r.id}
-                    style={{ background: expiring ? T.warningBg : "#fff" }}
+                    style={{ background: expiring ? T.warningLight : "#fff" }}
                   >
                     <td style={s.td}>
                       <strong>{staffName(r.staff_profile_id)}</strong>
@@ -1394,7 +1368,7 @@ export default function HRDisciplinary({ tenantId }) {
                                 fontSize: 9,
                                 fontWeight: 700,
                                 fontFamily: T.font,
-                                color: T.ink400,
+                                color: T.ink500,
                                 textTransform: "uppercase",
                               }}
                             >
@@ -1403,7 +1377,7 @@ export default function HRDisciplinary({ tenantId }) {
                           )}
                         </div>
                       ) : (
-                        <span style={{ color: T.ink150 }}>—</span>
+                        <span style={{ color: T.border }}>—</span>
                       )}
                     </td>
                     <td style={s.td}>
@@ -1422,7 +1396,7 @@ export default function HRDisciplinary({ tenantId }) {
                           Yes
                         </span>
                       ) : (
-                        <span style={{ color: T.ink150 }}>—</span>
+                        <span style={{ color: T.border }}>—</span>
                       )}
                     </td>
                     <td style={s.td}>
@@ -1466,7 +1440,7 @@ export default function HRDisciplinary({ tenantId }) {
             style={{
               fontSize: 11,
               fontFamily: T.font,
-              color: T.ink400,
+              color: T.ink500,
               marginTop: 8,
               textAlign: "right",
             }}

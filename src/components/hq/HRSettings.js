@@ -9,49 +9,20 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
-
-// ─── THEME ───────────────────────────────────────────────────────────────────
-
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
+import { T } from "../../styles/tokens";
+// Design tokens — imported from tokens.js (WP-UNIFY)
 // Legacy aliases — all internal C.* references resolve correctly
 const C = {
   green: T.accent,
-  greenLight: T.accentLit,
+  greenLight: T.accentLight,
   greenMid: T.accentMid,
   red: T.danger,
-  redLight: T.dangerBg,
-  border: T.ink150,
-  bg: T.ink075,
+  redLight: T.dangerLight,
+  border: T.border,
+  bg: T.bg,
   white: "#fff",
   text: T.ink700,
-  muted: T.ink400,
+  muted: T.ink500,
 };
 
 const LEAVE_COLORS = [
@@ -81,7 +52,7 @@ const s = {
     background: "transparent",
     fontSize: 11,
     fontFamily: T.font,
-    color: a ? T.accent : T.ink400,
+    color: a ? T.accent : T.ink500,
     borderBottom: a ? `2px solid ${T.accent}` : "2px solid transparent",
     fontWeight: a ? 700 : 400,
     letterSpacing: "0.06em",
@@ -122,7 +93,7 @@ const s = {
     display: "block",
     fontSize: 11,
     fontWeight: 600,
-    color: T.ink400,
+    color: T.ink500,
     textTransform: "uppercase",
     letterSpacing: "0.07em",
     marginBottom: 4,
@@ -695,7 +666,7 @@ function WorkHoursSettings() {
                 flex: "1 1 160px",
                 padding: "16px 18px",
                 background: "#fff",
-                border: `1px solid ${T.ink150}`,
+                border: `1px solid ${T.border}`,
                 borderRadius: 4,
               }}
             >
@@ -703,7 +674,7 @@ function WorkHoursSettings() {
                 style={{
                   fontSize: 10,
                   fontWeight: 700,
-                  color: T.ink400,
+                  color: T.ink500,
                   textTransform: "uppercase",
                   letterSpacing: "0.1em",
                   marginBottom: 6,
@@ -727,7 +698,7 @@ function WorkHoursSettings() {
                 {value}
               </div>
               <div
-                style={{ fontSize: 11, color: T.ink400, fontFamily: T.font }}
+                style={{ fontSize: 11, color: T.ink500, fontFamily: T.font }}
               >
                 {note}
               </div>

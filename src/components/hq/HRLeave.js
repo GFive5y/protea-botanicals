@@ -10,62 +10,34 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
-
-// ─── Design Tokens ────────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
+import { T } from "../../styles/tokens";
+// Design tokens — imported from tokens.js (WP-UNIFY)
 // Legacy aliases — preserve all internal logic that references C
 const C = {
   green: T.accent,
-  greenLight: T.accentLit,
+  greenLight: T.accentLight,
   greenMid: T.accentMid,
   amber: T.warning,
-  amberLight: T.warningBg,
+  amberLight: T.warningLight,
   red: T.danger,
-  redLight: T.dangerBg,
+  redLight: T.dangerLight,
   blue: T.info,
-  blueLight: T.infoBg,
+  blueLight: T.infoLight,
   grey: T.ink500,
-  greyLight: T.ink075,
-  border: T.ink150,
-  bg: T.ink075,
+  greyLight: T.bg,
+  border: T.border,
+  bg: T.bg,
   white: "#fff",
   text: T.ink700,
-  muted: T.ink400,
+  muted: T.ink500,
 };
 
 const STATUS_CFG = {
-  pending: { label: "Pending", bg: T.warningBg, color: T.warning },
-  admin_approved: { label: "Approved", bg: T.successBg, color: T.success },
-  approved: { label: "Approved", bg: T.successBg, color: T.success },
-  rejected: { label: "Rejected", bg: T.dangerBg, color: T.danger },
-  cert_pending: { label: "Cert Required", bg: T.warningBg, color: T.warning },
+  pending: { label: "Pending", bg: T.warningLight, color: T.warning },
+  admin_approved: { label: "Approved", bg: T.successLight, color: T.success },
+  approved: { label: "Approved", bg: T.successLight, color: T.success },
+  rejected: { label: "Rejected", bg: T.dangerLight, color: T.danger },
+  cert_pending: { label: "Cert Required", bg: T.warningLight, color: T.warning },
 };
 
 const SUB_TABS = ["Requests", "Balances", "Calendar", "Leave Types"];
@@ -114,7 +86,7 @@ const s = {
   wrapper: { fontFamily: T.font, color: T.ink700 },
   subTabs: {
     display: "flex",
-    borderBottom: `1px solid ${T.ink150}`,
+    borderBottom: `1px solid ${T.border}`,
     marginBottom: 24,
     gap: 0,
   },
@@ -125,7 +97,7 @@ const s = {
     background: "transparent",
     fontSize: 11,
     fontFamily: T.font,
-    color: a ? T.accent : T.ink400,
+    color: a ? T.accent : T.ink500,
     borderBottom: a ? `2px solid ${T.accent}` : "2px solid transparent",
     fontWeight: a ? 700 : 400,
     letterSpacing: "0.06em",
@@ -195,7 +167,7 @@ const s = {
   input: {
     width: "100%",
     padding: "8px 12px",
-    border: `1px solid ${T.ink150}`,
+    border: `1px solid ${T.border}`,
     borderRadius: 6,
     fontSize: 13,
     fontFamily: T.font,
@@ -204,7 +176,7 @@ const s = {
   },
   select: {
     padding: "8px 12px",
-    border: `1px solid ${T.ink150}`,
+    border: `1px solid ${T.border}`,
     borderRadius: 6,
     fontSize: 13,
     fontFamily: T.font,
@@ -217,7 +189,7 @@ const s = {
     fontSize: 11,
     fontWeight: 600,
     fontFamily: T.font,
-    color: T.ink400,
+    color: T.ink500,
     textTransform: "uppercase",
     letterSpacing: "0.06em",
     marginBottom: 5,
@@ -245,7 +217,7 @@ const s = {
     fontSize: 10,
     fontWeight: 700,
     fontFamily: T.font,
-    color: T.ink400,
+    color: T.ink500,
     textTransform: "uppercase",
     letterSpacing: "0.1em",
     marginTop: 6,
@@ -488,11 +460,11 @@ function LeaveRequests({ tenantId, staffList, leaveTypes }) {
             display: "grid",
             gridTemplateColumns: "repeat(3, 1fr)",
             gap: "1px",
-            background: T.ink150,
+            background: T.border,
             borderRadius: 6,
             overflow: "hidden",
-            border: `1px solid ${T.ink150}`,
-            boxShadow: T.shadow,
+            border: `1px solid ${T.border}`,
+            boxShadow: T.shadow.sm,
             flex: 1,
           }}
         >
@@ -710,7 +682,7 @@ function LeaveRequests({ tenantId, staffList, leaveTypes }) {
             style={{
               fontFamily: T.font,
               fontSize: 15,
-              color: T.ink400,
+              color: T.ink500,
               marginBottom: 6,
             }}
           >
@@ -940,7 +912,7 @@ function LeaveBalances({ tenantId, staffList, leaveTypes }) {
             style={{
               fontFamily: T.font,
               fontSize: 15,
-              color: T.ink400,
+              color: T.ink500,
               marginBottom: 6,
             }}
           >

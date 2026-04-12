@@ -8,6 +8,8 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
+import { T } from "../../styles/tokens";
+// Design tokens — imported from tokens.js (WP-UNIFY)
 
 const CONTRACT_TYPES = [
   "permanent",
@@ -18,50 +20,22 @@ const CONTRACT_TYPES = [
 ];
 const SALARY_FREQUENCIES = ["monthly", "weekly", "fortnightly", "hourly"];
 
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
 // Legacy aliases — preserve all internal logic referencing C
 const C = {
   green: T.accent,
-  greenLight: T.accentLit,
+  greenLight: T.accentLight,
   greenMid: T.accentMid,
   amber: T.warning,
-  amberLight: T.warningBg,
+  amberLight: T.warningLight,
   red: T.danger,
-  redLight: T.dangerBg,
+  redLight: T.dangerLight,
   blue: T.info,
-  blueLight: T.infoBg,
-  border: T.ink150,
-  bg: T.ink075,
+  blueLight: T.infoLight,
+  border: T.border,
+  bg: T.bg,
   white: "#fff",
   text: T.ink700,
-  muted: T.ink400,
+  muted: T.ink500,
 };
 
 function fmtDate(d) {
@@ -136,7 +110,7 @@ const s = {
   }),
   select: {
     padding: "8px 12px",
-    border: `1px solid ${T.ink150}`,
+    border: `1px solid ${T.border}`,
     borderRadius: 6,
     fontSize: 13,
     fontFamily: T.font,
@@ -147,7 +121,7 @@ const s = {
   },
   input: {
     padding: "8px 12px",
-    border: `1px solid ${T.ink150}`,
+    border: `1px solid ${T.border}`,
     borderRadius: 6,
     fontSize: 13,
     fontFamily: T.font,
@@ -161,7 +135,7 @@ const s = {
     fontSize: 11,
     fontWeight: 600,
     fontFamily: T.font,
-    color: T.ink400,
+    color: T.ink500,
     textTransform: "uppercase",
     letterSpacing: "0.06em",
     marginBottom: 4,
@@ -221,12 +195,12 @@ const s = {
     fontFamily: T.font,
     fontSize: 11,
     fontWeight: 700,
-    color: T.ink400,
+    color: T.ink500,
     textTransform: "uppercase",
     letterSpacing: "0.08em",
     margin: "20px 0 12px 0",
     paddingBottom: 8,
-    borderBottom: `1px solid ${T.ink150}`,
+    borderBottom: `1px solid ${T.border}`,
   },
   error: {
     padding: "12px 16px",
@@ -888,7 +862,7 @@ export default function HRContracts({ tenantId }) {
             style={{
               fontFamily: T.font,
               fontSize: 15,
-              color: T.ink400,
+              color: T.ink500,
               marginBottom: 6,
             }}
           >
@@ -1001,7 +975,7 @@ export default function HRContracts({ tenantId }) {
                           <span
                             style={{
                               fontSize: 10,
-                              color: T.ink400,
+                              color: T.ink500,
                               fontFamily: T.font,
                               marginLeft: 3,
                             }}

@@ -6,48 +6,21 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import HRStaffProfile from "./HRStaffProfile";
-
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
+import { T } from "../../styles/tokens";
+// Design tokens — imported from tokens.js (WP-UNIFY)
 
 const STATUS_CONFIG = {
-  active: { label: "Active", bg: T.successBg, color: T.success },
-  on_leave: { label: "On Leave", bg: T.warningBg, color: T.warning },
-  terminated: { label: "Terminated", bg: T.dangerBg, color: T.danger },
-  suspended: { label: "Suspended", bg: T.warningBg, color: T.warning },
+  active: { label: "Active", bg: T.successLight, color: T.success },
+  on_leave: { label: "On Leave", bg: T.warningLight, color: T.warning },
+  terminated: { label: "Terminated", bg: T.dangerLight, color: T.danger },
+  suspended: { label: "Suspended", bg: T.warningLight, color: T.warning },
 };
 
 const EMP_TYPE_CONFIG = {
-  full_time: { label: "Full Time", bg: T.infoBg, color: T.info },
-  part_time: { label: "Part Time", bg: T.infoBg, color: T.info },
-  contractor: { label: "Contractor", bg: T.accentLit, color: T.accentMid },
-  casual: { label: "Casual", bg: T.ink075, color: T.ink500 },
+  full_time: { label: "Full Time", bg: T.infoLight, color: T.info },
+  part_time: { label: "Part Time", bg: T.infoLight, color: T.info },
+  contractor: { label: "Contractor", bg: T.accentLight, color: T.accentMid },
+  casual: { label: "Casual", bg: T.bg, color: T.ink500 },
 };
 
 const DEPT_COLORS = {
@@ -126,7 +99,7 @@ const st = {
   searchInput: {
     flex: "1 1 200px",
     padding: "9px 14px",
-    border: `1px solid ${T.ink150}`,
+    border: `1px solid ${T.border}`,
     borderRadius: 6,
     fontSize: 13,
     fontFamily: T.font,
@@ -136,7 +109,7 @@ const st = {
   },
   filterSelect: {
     padding: "9px 14px",
-    border: `1px solid ${T.ink150}`,
+    border: `1px solid ${T.border}`,
     borderRadius: 6,
     fontSize: 13,
     fontFamily: T.font,
@@ -164,11 +137,11 @@ const st = {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(160px,1fr))",
     gap: "1px",
-    background: T.ink150,
+    background: T.border,
     borderRadius: 6,
     overflow: "hidden",
-    border: `1px solid ${T.ink150}`,
-    boxShadow: T.shadow,
+    border: `1px solid ${T.border}`,
+    boxShadow: T.shadow.sm,
     marginBottom: 24,
   },
   statCard: {
@@ -187,7 +160,7 @@ const st = {
   statLabel: {
     fontSize: 10,
     fontWeight: 700,
-    color: T.ink400,
+    color: T.ink500,
     textTransform: "uppercase",
     letterSpacing: "0.1em",
     fontFamily: T.font,
@@ -197,7 +170,7 @@ const st = {
     width: "100%",
     borderCollapse: "collapse",
     background: "#fff",
-    border: `1px solid ${T.ink150}`,
+    border: `1px solid ${T.border}`,
     borderRadius: 8,
     overflow: "hidden",
   },
@@ -207,16 +180,16 @@ const st = {
     fontSize: 10,
     fontWeight: 700,
     fontFamily: T.font,
-    color: T.ink400,
+    color: T.ink500,
     textTransform: "uppercase",
     letterSpacing: "0.08em",
-    borderBottom: `1px solid ${T.ink150}`,
-    background: T.ink075,
+    borderBottom: `1px solid ${T.border}`,
+    background: T.bg,
     whiteSpace: "nowrap",
   },
   td: {
     padding: "12px 16px",
-    borderBottom: `1px solid ${T.ink150}`,
+    borderBottom: `1px solid ${T.border}`,
     verticalAlign: "middle",
     fontSize: 13,
     fontFamily: T.font,
@@ -231,7 +204,7 @@ const st = {
   },
   staffMeta: {
     fontSize: 11,
-    color: T.ink400,
+    color: T.ink500,
     marginTop: 2,
     fontFamily: T.font,
   },
@@ -247,7 +220,7 @@ const st = {
   editBtn: {
     padding: "5px 14px",
     background: "none",
-    border: `1px solid ${T.ink150}`,
+    border: `1px solid ${T.border}`,
     borderRadius: 5,
     fontSize: 12,
     color: T.ink500,
@@ -259,7 +232,7 @@ const st = {
     padding: "60px 24px",
     textAlign: "center",
     background: "#fff",
-    border: `1px solid ${T.ink150}`,
+    border: `1px solid ${T.border}`,
     borderRadius: 8,
   },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
@@ -267,7 +240,7 @@ const st = {
     fontFamily: T.font,
     fontSize: 18,
     fontWeight: 600,
-    color: T.ink400,
+    color: T.ink500,
     margin: "0 0 8px 0",
   },
   emptyText: {
@@ -279,13 +252,13 @@ const st = {
   loading: {
     padding: "40px",
     textAlign: "center",
-    color: T.ink400,
+    color: T.ink500,
     fontSize: 13,
     fontFamily: T.font,
   },
   error: {
     padding: "14px 16px",
-    background: T.dangerBg,
+    background: T.dangerLight,
     color: T.danger,
     borderRadius: 6,
     marginBottom: 16,
@@ -317,7 +290,7 @@ function StaffSetupWizard({ onAddStaff }) {
 
   return (
     <div style={{
-      background: "#fff", border: `1px solid ${T.ink150}`,
+      background: "#fff", border: `1px solid ${T.border}`,
       borderRadius: 12, overflow: "hidden",
       boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
     }}>
@@ -357,7 +330,7 @@ function StaffSetupWizard({ onAddStaff }) {
       <div style={{ padding: "28px 36px 32px" }}>
         <div style={{
           fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
-          textTransform: "uppercase", color: T.ink400, fontFamily: T.font,
+          textTransform: "uppercase", color: T.ink500, fontFamily: T.font,
           marginBottom: 14,
         }}>
           What you'll need for each team member
@@ -372,8 +345,8 @@ function StaffSetupWizard({ onAddStaff }) {
             <div key={label} style={{
               display: "flex", alignItems: "flex-start", gap: 10,
               padding: "11px 14px", borderRadius: 8,
-              background: required ? T.accentLit : T.ink050,
-              border: `1px solid ${required ? T.accentBd : T.ink150}`,
+              background: required ? T.accentLight : T.surface,
+              border: `1px solid ${required ? T.accentBd : T.border}`,
             }}>
               <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{icon}</span>
               <div>
@@ -390,7 +363,7 @@ function StaffSetupWizard({ onAddStaff }) {
                     }}>Required</span>
                   )}
                 </div>
-                <div style={{ fontSize: 10, color: T.ink400, fontFamily: T.font }}>
+                <div style={{ fontSize: 10, color: T.ink500, fontFamily: T.font }}>
                   {note}
                 </div>
               </div>
@@ -401,7 +374,7 @@ function StaffSetupWizard({ onAddStaff }) {
         {/* Tip strip */}
         <div style={{
           padding: "12px 16px", borderRadius: 8, marginBottom: 24,
-          background: T.accentLit, border: `1px solid ${T.accentBd}`,
+          background: T.accentLight, border: `1px solid ${T.accentBd}`,
           fontSize: 12, color: T.accent, fontFamily: T.font, lineHeight: 1.6,
           display: "flex", gap: 10, alignItems: "flex-start",
         }}>
