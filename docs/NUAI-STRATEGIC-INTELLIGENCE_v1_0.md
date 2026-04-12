@@ -827,3 +827,48 @@ That is the system you are working on.
 *WP-ANALYTICS SUITE COMPLETE · 6 of 6 modules live · 0 modules remaining*
 *Session close commit bundles this addendum + Addendum 4 to SESSION-STATE*
 *+ WP-ANALYTICS.md + WP-ANALYTICS-6.md + NEXT-SESSION-PROMPT_v249 + file header bump*
+
+---
+
+## DS-6 MIGRATION BACKLOG — noted 12 April 2026
+
+The following components are pre-WP-DS-6 and use local `const T` (or
+`const C`) token objects instead of importing from `src/styles/tokens.js`.
+Full migration is deferred post-demo. Reference: use the Group Portal
+analytics pages (NetworkIntelligence, CustomerIntelligence, Revenue
+Intelligence, Stock Intelligence, StoreComparison, CombinedPL) as the
+DS-6 gold standard — they all import `{ T } from "../../styles/tokens"`
+and use the canonical `T.container`, `T.page`, `T.gap`, `T.pad`,
+`T.inset`, `T.text`, `T.weight`, `T.radius.*`, and semantic colour
+tokens throughout. Zero local token declarations.
+
+| Component | Lines | Scope | Local tokens | Notes |
+|---|---|---|---|---|
+| `SmartInventory.js` | 5,428 | Tenant Portal "Catalog" tab | `const T` + 162 hardcoded px + 329+ T.* refs | WP-UI-CATALOG-BAR shipped a targeted bar cleanup within the existing token system; not a migration. Line count post-bar-cleanup (was 5,343 pre-refactor) |
+| `HQOverview.js` | 3,188 | **HQ + Tenant Portal Dashboard** (routed from both `case "overview"` in TenantPortal.js and from HQ command centre) | `const T` + 69 hardcoded px + 90 T.* refs | Shared across two portals — any migration has to regression-test both. Typography presets (`T.display`, `T.kpi`, etc) have no canonical equivalent, requires tokens.js extension or per-callsite rewrite |
+| `HQFoodIngredients.js` | 5,082 | HQ F&B ingredient encyclopedia | **`const C`** (not `T`) + unknown px count | Uses a differently-named local object (`const C = {...}`), references `CATEGORIES` with hardcoded icons and colour values per category. Migration also requires reconciling the 14-category `CATEGORIES` const with ProductWorlds.js |
+| `HQStock.js` | 5,794 | HQ Stock module (NOT shared with Tenant Portal — Tenant Portal Stock tab routes to a different component) | `const T` + 482 T.* refs | Largest local-token footprint of the four. Listed as PROTECTED in CLAUDE.md — requires read-in-full before any change per LL-221 |
+
+**Scope of remaining DS-6 migration work:** approximately **19,492 lines**
+of pre-WP-DS-6 component code across four files plus uncounted hardcoded
+px values inside each. Estimated 4-6 dedicated sessions with browser
+verification per profile (cannabis_retail, cannabis_dispensary,
+food_beverage, general_retail) for the shared surfaces.
+
+**WP-UI-CATALOG-BAR (shipped 12 April 2026)** demonstrated that targeted
+surgical UI improvements can be made inside a pre-DS-6 component without
+performing the full migration — the bar cleanup reused the existing
+local `const T` palette and made only structural changes (moving
+buttons into a `⋯` popover). This pattern is acceptable for demo-
+critical work but does NOT reduce the DS-6 migration debt; the backlog
+stays at four files.
+
+**Do NOT start a DS-6 migration in a demo-preparation session.** The
+regression surface is too large. Migration is a dedicated post-demo
+work package that needs its own spec (proposed name: `WP-DS-MIGRATION`)
+with per-file checklists, a tokens.js extension plan for the missing
+typography presets, and a browser verification matrix across all four
+industry profiles and both portals where applicable.
+
+*DS-6 backlog noted 12 April 2026 · HEAD at note: `50bf2c9`*
+*Demonstrated by WP-UI-CATALOG-BAR surgical-edit pattern · not a migration*

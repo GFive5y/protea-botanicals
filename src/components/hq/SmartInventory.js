@@ -1023,6 +1023,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
   const [modalSaving, setModalSaving] = useState(false);
   const [showWorldPicker, setShowWorldPicker] = useState(false);
   const [showReorderPanel, setShowReorderPanel] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false); // WP-UI-CATALOG-BAR
   const searchRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -1084,6 +1085,16 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
   useEffect(() => {
     load();
   }, [load]);
+
+  // WP-UI-CATALOG-BAR: close the ⋯ popover on outside click
+  useEffect(() => {
+    if (!moreOpen) return;
+    const close = (e) => {
+      if (!e.target.closest("[data-more-popover]")) setMoreOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [moreOpen]);
 
   const [activePanel, setActivePanel] = useState(null);
   const [noPriceDraft, setNoPriceDraft] = useState({});
@@ -1715,7 +1726,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
         style={{
           background: T.white,
           borderBottom: `1px solid ${T.border}`,
-          padding: "10px 0 0",
+          padding: "10px 16px 0",
           flexShrink: 0,
           boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
         }}
@@ -1795,281 +1806,38 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
           )}
 
           <div
+            data-more-popover="true"
             style={{
               marginLeft: "auto",
               display: "flex",
               gap: 8,
               alignItems: "center",
+              flexShrink: 0,
+              position: "relative",
             }}
           >
-            <ViewToggle
-              current={viewMode}
-              onChange={(v) => {
-                setViewMode(v);
-                exitSelectMode();
-              }}
-              T={T}
-            />
-            {viewMode === VIEW_TILE && !selectMode && (
-              <div
+            {/* WP-UI-CATALOG-BAR: ⋯ More toggle — collapses all secondary actions */}
+            {!selectMode && (
+              <button
+                onClick={() => setMoreOpen((v) => !v)}
                 style={{
-                  display: "flex",
-                  border: `1.5px solid ${T.border}`,
-                  borderRadius: 8,
-                  overflow: "hidden",
+                  background: moreOpen ? T.accentLit : T.white,
+                  border: `1px solid ${moreOpen ? T.accentMid : T.border}`,
+                  borderRadius: T.radius,
+                  padding: "6px 14px",
+                  cursor: "pointer",
+                  fontSize: 18,
+                  color: moreOpen ? T.accent : T.ink500,
+                  letterSpacing: "0.12em",
+                  fontWeight: 600,
+                  lineHeight: 1,
                 }}
+                title="More options"
               >
-                {["S", "M", "L"].map((s, i) => (
-                  <button
-                    key={s}
-                    onClick={() => setTileSize(s)}
-                    style={{
-                      padding: "5px 10px",
-                      border: "none",
-                      borderRight: i < 2 ? `1px solid ${T.border}` : "none",
-                      background: tileSize === s ? T.accent : T.white,
-                      color: tileSize === s ? T.white : T.ink500,
-                      cursor: "pointer",
-                      fontSize: 11,
-                      fontWeight: 700,
-                      fontFamily: T.font,
-                      transition: "all 0.12s",
-                    }}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            )}
-            {!selectMode && (
-              <button
-                onClick={() => setFilterRowOpen((v) => !v)}
-                style={btnStyle(
-                  filterRowOpen || sortByIssues ? T.accent : T.white,
-                  filterRowOpen || sortByIssues ? T.white : T.ink500,
-                  T.border,
-                  T,
-                )}
-              >
-                🔽 Filters{sortByIssues ? " ·⚠" : ""}
+                ···
               </button>
             )}
-            {viewMode === VIEW_DETAIL && !selectMode && (
-              <button
-                onClick={exportCSV}
-                style={btnStyle(T.white, T.ink500, T.border, T)}
-                title="Export visible columns to CSV"
-              >
-                ↓ CSV
-              </button>
-            )}
-            {viewMode === VIEW_DETAIL && !selectMode && (
-              <div style={{ position: "relative" }} ref={colPickerRef}>
-                <button
-                  onClick={() => setColPickerOpen((v) => !v)}
-                  style={btnStyle(
-                    colPickerOpen ? T.accent : T.white,
-                    colPickerOpen ? T.white : T.ink500,
-                    T.border,
-                    T,
-                  )}
-                >
-                  Columns ({shownCount} shown)
-                </button>
-                {colPickerOpen && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "calc(100% + 4px)",
-                      right: 0,
-                      background: T.white,
-                      border: `1px solid ${T.border}`,
-                      borderRadius: 10,
-                      boxShadow: "0 8px 30px rgba(0,0,0,0.12)",
-                      zIndex: 500,
-                      padding: "6px 0",
-                      minWidth: 210,
-                    }}
-                  >
-                    <div
-                      style={{
-                        padding: "4px 14px 6px",
-                        fontSize: 10,
-                        fontWeight: 700,
-                        color: T.ink400,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                      }}
-                    >
-                      Show / hide columns
-                    </div>
-                    {pickerCols.map((col) => {
-                      const isHidden = hiddenCols.has(col.key);
-                      const hasData = items.some((i) => {
-                        if (col.key.startsWith("_")) return true;
-                        const v = i[col.key];
-                        return (
-                          v !== null &&
-                          v !== undefined &&
-                          v !== "" &&
-                          v !== false &&
-                          v !== 0
-                        );
-                      });
-                      return (
-                        <label
-                          key={col.key}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: "5px 14px",
-                            cursor: "pointer",
-                            fontSize: 13,
-                            color: T.ink700,
-                          }}
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.background = T.accentXlit)
-                          }
-                          onMouseLeave={(e) =>
-                            (e.currentTarget.style.background = "transparent")
-                          }
-                        >
-                          <input
-                            type="checkbox"
-                            checked={!isHidden}
-                            onChange={() => toggleCol(col.key)}
-                            style={{ accentColor: T.accent, flexShrink: 0 }}
-                          />
-                          <span style={{ flex: 1 }}>
-                            {col.label || col.key}
-                          </span>
-                          {!hasData && (
-                            <span
-                              style={{
-                                fontSize: 10,
-                                color: T.amber,
-                                fontWeight: 600,
-                              }}
-                            >
-                              no data
-                            </span>
-                          )}
-                        </label>
-                      );
-                    })}
-                    <div
-                      style={{
-                        borderTop: `1px solid ${T.border}`,
-                        margin: "4px 0",
-                      }}
-                    />
-                    <button
-                      onClick={() => {
-                        const emptyKeys = pickerCols
-                          .filter(
-                            (c) =>
-                              !items.some((i) => {
-                                const v = i[c.key];
-                                return (
-                                  v !== null &&
-                                  v !== undefined &&
-                                  v !== "" &&
-                                  v !== false &&
-                                  v !== 0
-                                );
-                              }),
-                          )
-                          .map((c) => c.key);
-                        setHiddenCols((prev) => {
-                          const next = new Set([...prev, ...emptyKeys]);
-                          try {
-                            localStorage.setItem(
-                              "nuai_detail_hidden_cols",
-                              JSON.stringify([...next]),
-                            );
-                          } catch {}
-                          return next;
-                        });
-                      }}
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        padding: "5px 14px",
-                        border: "none",
-                        background: "none",
-                        textAlign: "left",
-                        fontSize: 12,
-                        color: T.amber,
-                        cursor: "pointer",
-                        fontFamily: T.font,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Hide columns with no data
-                    </button>
-                    <button
-                      onClick={() => {
-                        setHiddenCols(new Set());
-                        try {
-                          localStorage.removeItem("nuai_detail_hidden_cols");
-                        } catch {}
-                      }}
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        padding: "5px 14px",
-                        border: "none",
-                        background: "none",
-                        textAlign: "left",
-                        fontSize: 12,
-                        color: T.ink400,
-                        cursor: "pointer",
-                        fontFamily: T.font,
-                      }}
-                    >
-                      Show all columns
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-            <button
-              onClick={load}
-              style={btnStyle(T.white, T.ink500, T.border, T)}
-            >
-              ↺
-            </button>
-            {/* SC-08: Select mode toggle */}
-            <button
-              onClick={() => {
-                if (selectMode) exitSelectMode();
-                else setSelectMode(true);
-              }}
-              title={
-                selectMode ? "Exit selection mode" : "Select multiple items"
-              }
-              style={btnStyle(
-                selectMode ? T.blue : T.white,
-                selectMode ? T.white : T.ink500,
-                selectMode ? T.blue : T.border,
-                T,
-              )}
-            >
-              {selectMode ? "✕ Cancel" : "☑ Select"}
-            </button>
-            {!selectMode && <InfoTooltip id="sc_bulk_select" size="sm" />}
-            {!selectMode && (
-              <button
-                onClick={() => setShowReorderPanel(true)}
-                style={btnStyle(T.white, T.amber, T.amber + "60", T)}
-              >
-                ⚑ Reorder
-                {gSoldOut + gBelowReorder > 0
-                  ? ` (${gSoldOut + gBelowReorder})`
-                  : ""}
-              </button>
-            )}
+            {/* WP-UI-CATALOG-BAR: + Add Item — primary CTA always visible in browse mode */}
             {!selectMode && (
               <button
                 onClick={openAdd}
@@ -2077,6 +1845,313 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
               >
                 + Add Item
               </button>
+            )}
+            {/* WP-UI-CATALOG-BAR: ⋯ Popover — all secondary actions */}
+            {moreOpen && !selectMode && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 8px)",
+                  right: 0,
+                  background: T.white,
+                  border: `1px solid ${T.border}`,
+                  borderRadius: T.radius,
+                  boxShadow: T.shadowMd,
+                  padding: "12px 16px",
+                  zIndex: 999,
+                  minWidth: 280,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                }}
+              >
+                {/* Row 1: View mode + Tile size picker */}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <ViewToggle
+                    current={viewMode}
+                    onChange={(v) => {
+                      setViewMode(v);
+                      exitSelectMode();
+                    }}
+                    T={T}
+                  />
+                  {viewMode === VIEW_TILE && (
+                    <div
+                      style={{
+                        display: "flex",
+                        border: `1.5px solid ${T.border}`,
+                        borderRadius: 8,
+                        overflow: "hidden",
+                      }}
+                    >
+                      {["S", "M", "L"].map((s, i) => (
+                        <button
+                          key={s}
+                          onClick={() => setTileSize(s)}
+                          style={{
+                            padding: "5px 10px",
+                            border: "none",
+                            borderRight: i < 2 ? `1px solid ${T.border}` : "none",
+                            background: tileSize === s ? T.accent : T.white,
+                            color: tileSize === s ? T.white : T.ink500,
+                            cursor: "pointer",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            fontFamily: T.font,
+                            transition: "all 0.12s",
+                          }}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div style={{ height: 1, background: T.border }} />
+                {/* Row 2: Filters + Columns */}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    alignItems: "flex-start",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <button
+                    onClick={() => setFilterRowOpen((v) => !v)}
+                    style={btnStyle(
+                      filterRowOpen || sortByIssues ? T.accent : T.white,
+                      filterRowOpen || sortByIssues ? T.white : T.ink500,
+                      T.border,
+                      T,
+                    )}
+                  >
+                    🔽 Filters{sortByIssues ? " ·⚠" : ""}
+                  </button>
+                  {viewMode === VIEW_DETAIL && (
+                    <div style={{ position: "relative" }} ref={colPickerRef}>
+                      <button
+                        onClick={() => setColPickerOpen((v) => !v)}
+                        style={btnStyle(
+                          colPickerOpen ? T.accent : T.white,
+                          colPickerOpen ? T.white : T.ink500,
+                          T.border,
+                          T,
+                        )}
+                      >
+                        Columns ({shownCount} shown)
+                      </button>
+                      {colPickerOpen && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "calc(100% + 4px)",
+                            right: 0,
+                            background: T.white,
+                            border: `1px solid ${T.border}`,
+                            borderRadius: 10,
+                            boxShadow: "0 8px 30px rgba(0,0,0,0.12)",
+                            zIndex: 500,
+                            padding: "6px 0",
+                            minWidth: 210,
+                          }}
+                        >
+                          <div
+                            style={{
+                              padding: "4px 14px 6px",
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: T.ink400,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.05em",
+                            }}
+                          >
+                            Show / hide columns
+                          </div>
+                          {pickerCols.map((col) => {
+                            const isHidden = hiddenCols.has(col.key);
+                            const hasData = items.some((i) => {
+                              if (col.key.startsWith("_")) return true;
+                              const v = i[col.key];
+                              return (
+                                v !== null &&
+                                v !== undefined &&
+                                v !== "" &&
+                                v !== false &&
+                                v !== 0
+                              );
+                            });
+                            return (
+                              <label
+                                key={col.key}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 8,
+                                  padding: "5px 14px",
+                                  cursor: "pointer",
+                                  fontSize: 13,
+                                  color: T.ink700,
+                                }}
+                                onMouseEnter={(e) =>
+                                  (e.currentTarget.style.background = T.accentXlit)
+                                }
+                                onMouseLeave={(e) =>
+                                  (e.currentTarget.style.background = "transparent")
+                                }
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={!isHidden}
+                                  onChange={() => toggleCol(col.key)}
+                                  style={{ accentColor: T.accent, flexShrink: 0 }}
+                                />
+                                <span style={{ flex: 1 }}>
+                                  {col.label || col.key}
+                                </span>
+                                {!hasData && (
+                                  <span
+                                    style={{
+                                      fontSize: 10,
+                                      color: T.amber,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    no data
+                                  </span>
+                                )}
+                              </label>
+                            );
+                          })}
+                          <div
+                            style={{
+                              borderTop: `1px solid ${T.border}`,
+                              margin: "4px 0",
+                            }}
+                          />
+                          <button
+                            onClick={() => {
+                              const emptyKeys = pickerCols
+                                .filter(
+                                  (c) =>
+                                    !items.some((i) => {
+                                      const v = i[c.key];
+                                      return (
+                                        v !== null &&
+                                        v !== undefined &&
+                                        v !== "" &&
+                                        v !== false &&
+                                        v !== 0
+                                      );
+                                    }),
+                                )
+                                .map((c) => c.key);
+                              setHiddenCols((prev) => {
+                                const next = new Set([...prev, ...emptyKeys]);
+                                try {
+                                  localStorage.setItem(
+                                    "nuai_detail_hidden_cols",
+                                    JSON.stringify([...next]),
+                                  );
+                                } catch {}
+                                return next;
+                              });
+                            }}
+                            style={{
+                              display: "block",
+                              width: "100%",
+                              padding: "5px 14px",
+                              border: "none",
+                              background: "none",
+                              textAlign: "left",
+                              fontSize: 12,
+                              color: T.amber,
+                              cursor: "pointer",
+                              fontFamily: T.font,
+                              fontWeight: 600,
+                            }}
+                          >
+                            Hide columns with no data
+                          </button>
+                          <button
+                            onClick={() => {
+                              setHiddenCols(new Set());
+                              try {
+                                localStorage.removeItem("nuai_detail_hidden_cols");
+                              } catch {}
+                            }}
+                            style={{
+                              display: "block",
+                              width: "100%",
+                              padding: "5px 14px",
+                              border: "none",
+                              background: "none",
+                              textAlign: "left",
+                              fontSize: 12,
+                              color: T.ink400,
+                              cursor: "pointer",
+                              fontFamily: T.font,
+                            }}
+                          >
+                            Show all columns
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {/* Row 3: CSV + Refresh */}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {viewMode === VIEW_DETAIL && (
+                    <button
+                      onClick={exportCSV}
+                      style={btnStyle(T.white, T.ink500, T.border, T)}
+                      title="Export visible columns to CSV"
+                    >
+                      ↓ CSV
+                    </button>
+                  )}
+                  <button
+                    onClick={load}
+                    style={btnStyle(T.white, T.ink500, T.border, T)}
+                    title="Refresh inventory"
+                  >
+                    ↺ Refresh
+                  </button>
+                </div>
+                {/* Row 4: Select + Reorder */}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    onClick={() => {
+                      setMoreOpen(false);
+                      setSelectMode(true);
+                    }}
+                    title="Select multiple items"
+                    style={btnStyle(T.white, T.ink500, T.border, T)}
+                  >
+                    ☑ Select
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMoreOpen(false);
+                      setShowReorderPanel(true);
+                    }}
+                    style={btnStyle(T.white, T.amber, T.amber + "60", T)}
+                  >
+                    ⚑ Reorder
+                    {gSoldOut + gBelowReorder > 0
+                      ? ` (${gSoldOut + gBelowReorder})`
+                      : ""}
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -2093,6 +2168,16 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
               flexWrap: "wrap",
             }}
           >
+            <button
+              onClick={exitSelectMode}
+              style={{
+                ...btnStyle(T.white, T.ink500, T.border, T),
+                fontSize: 12,
+              }}
+              title="Exit select mode (Esc)"
+            >
+              ✕ Exit
+            </button>
             <span
               style={{
                 fontSize: 13,
