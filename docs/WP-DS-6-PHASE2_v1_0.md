@@ -501,7 +501,7 @@ This is not a feature list. This is a moment that closes deals.
 
 | Phase | Name | Status | Commit | Date |
 |---|---|---|---|---|
-| Phase 1 | Shell Unification (Gap Fix) | NOT STARTED | — | — |
+| Phase 1 | Shell Unification (Gap Fix) | COMPLETE | 2e3aed4 | 13 Apr 2026 |
 | Phase 2 | AINS Bar Unification | NOT STARTED | — | — |
 | Phase 3 | Profile-Aware Tokens | NOT STARTED | — | — |
 | Phase 4 | Notification Badges | NOT STARTED | — | — |
