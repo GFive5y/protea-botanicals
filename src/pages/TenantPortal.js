@@ -9,6 +9,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTenant } from "../services/tenantService";
 import { profileOverrides, getTokens } from "../styles/tokens";
 import { TokenContext } from "../contexts/TokenContext";
+import { useBadges } from "../hooks/useBadges";
 // PlatformBar removed — WP-AINS Phase 5
 // Jobs migrated: alerts → IntelLines, actions → IntelStrip,
 // comms → Customers nav badge, fraud → NuAiBrief (Phase 6)
@@ -810,7 +811,7 @@ function renderTab(tabId, tenantId, industryProfile, onTabChange, searchKey, sea
   }
 }
 
-function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, onExpand, badge, tabInsights, accentLit = T.accentLit }) {
+function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, onExpand, badge, tabInsights, accentLit = T.accentLit, tabBadges = {} }) {
   const isActiveSection = section.tabs.some((t) => t.id === activeTab);
   const [open, setOpen] = useState(defaultOpen || section.alwaysOpen || isActiveSection);
   const effectiveOpen = open || isActiveSection;
@@ -965,6 +966,16 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, 
                 <span style={{ fontSize: 13, fontWeight: active ? 600 : 400, color: active ? section.color : T.ink500, flex: 1 }}>
                   {tab.label}
                 </span>
+                {tabBadges[tab.id]?.count > 0 && (
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, flexShrink: 0,
+                    padding: "1px 5px", borderRadius: 8, fontFamily: T.font,
+                    background: tabBadges[tab.id].severity === "danger" ? "#FEE2E2" : "#FFF3CD",
+                    color:      tabBadges[tab.id].severity === "danger" ? "#991B1B" : "#92400E",
+                  }}>
+                    {tabBadges[tab.id].count}
+                  </span>
+                )}
                 {tabInsights?.[tab.id] && (
                   <span style={{
                     fontSize: 9, color: "#888",
@@ -1039,12 +1050,18 @@ export default function TenantPortal() {
   // WP-AINS Phase 2 — intelligence data for sidebar badges + sub-item insights
   const intelligence = useNavIntelligence(tenantId);
   const intelData    = intelligence?.data;
+  const { badges, clearBadge } = useBadges(tenantId);
 
   // WP-AINS Phase 3 — IntelStrip pills for current tab
   const { pills: intelPills, loading: intelStripLoading } =
     useIntelStrip(activeTab, tenantId, intelData);
 
   const sectionBadge = (sectionId) => {
+    const sec = activeWaterfall.find(s => s.id === sectionId);
+    const tabIds = sec?.tabs.map(t => t.id) || [];
+    const tabCount = tabIds.reduce((sum, id) => sum + (badges[id]?.count || 0), 0);
+    const tabSeverity = tabIds.some(id => badges[id]?.severity === "danger") ? "danger" : "warning";
+    if (tabCount > 0) return { count: tabCount, variant: tabSeverity };
     if (!intelData) return null;
     switch (sectionId) {
       case "inventory":    return { count: intelData.inventory?.badgeCount,  variant: intelData.inventory?.badgeVariant };
@@ -1058,11 +1075,12 @@ export default function TenantPortal() {
   const tabInsights = intelData?.subItems || {};
 
   const handleNavigateWithFilter = useCallback((tabId, filter) => {
+    clearBadge(tabId);
     setSearchFilter(filter);
     setSearchKey((k) => k + 1);
     setSearchParams({ tab: tabId }, { replace: true });
     setDrawerOpen(false);
-  }, [setSearchParams]);
+  }, [setSearchParams, clearBadge]);
 
   useEffect(() => {
     const t = setTimeout(() => setSearchFilter(null), 800);
@@ -1097,10 +1115,11 @@ export default function TenantPortal() {
 
   const handleTabSelect = useCallback(
     (tabId) => {
+      clearBadge(tabId);
       setSearchParams({ tab: tabId }, { replace: true });
       setDrawerOpen(false);
     },
-    [setSearchParams],
+    [setSearchParams, clearBadge],
   );
 
   const activeWaterfall = getWaterfall(industryProfile);
@@ -1234,6 +1253,7 @@ export default function TenantPortal() {
                   badge={sectionBadge(section.id)}
                   tabInsights={tabInsights}
                   accentLit={pAccentLit}
+                  tabBadges={badges}
                 />
               ))}
             </div>
@@ -1423,7 +1443,7 @@ export default function TenantPortal() {
                 </div>
                 <div style={{ flex: 1, paddingTop: 6, paddingBottom: 16 }}>
                   {visibleSections.map((section, i) => (
-                    <SidebarSection key={section.id} section={section} activeTab={activeTab} onSelect={handleTabSelect} defaultOpen={i <= 1} badge={sectionBadge(section.id)} tabInsights={tabInsights} accentLit={pAccentLit} />
+                    <SidebarSection key={section.id} section={section} activeTab={activeTab} onSelect={handleTabSelect} defaultOpen={i <= 1} badge={sectionBadge(section.id)} tabInsights={tabInsights} accentLit={pAccentLit} tabBadges={badges} />
                   ))}
                 </div>
                 <div style={{ padding: "10px 16px 14px", borderTop: `1px solid ${T.border}`, fontSize: 10, color: T.ink300 }}>
