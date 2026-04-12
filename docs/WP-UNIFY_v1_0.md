@@ -713,9 +713,9 @@ that doesn't feel like it was designed in the same room on the same day.
 | HQPurchaseOrders.js | COMPLETE | 5ba14e6 | 13 Apr 2026 |
 | ShopManager.js | COMPLETE | 35b3b55 | 13 Apr 2026 |
 | **P3: Protected + large + F&B** | | | |
-| HQCogs.js (PROTECTED) | NOT STARTED | — | — |
+| HQCogs.js (PROTECTED) | COMPLETE | 8bf4a18 | 13 Apr 2026 |
 | HQProduction.js (307KB) | NOT STARTED | — | — |
-| SmartInventory.js (180KB) | NOT STARTED | — | — |
+| SmartInventory.js (180KB) | COMPLETE (T→SINV_T) | 8bf4a18 | 13 Apr 2026 |
 | HQFoodSafety.js | COMPLETE | f4db94a | 13 Apr 2026 |
 | HQRecall.js | COMPLETE | f4db94a | 13 Apr 2026 |
 | HQColdChain.js | COMPLETE | f4db94a | 13 Apr 2026 |
