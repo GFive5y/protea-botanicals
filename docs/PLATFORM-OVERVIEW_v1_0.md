@@ -454,3 +454,18 @@ Group Portal (/group-portal) added — 7th portal, franchise/network view.
 Demo group "NuAi Business Rescue Portfolio" seeded with all 4 CA demo stores.
 
 *Update by: Claude.ai + George Fivaz · 13 April 2026*
+
+---
+
+## UPDATE: 13 April 2026 — WP-UNIFY COMPLETE
+
+**WP-UNIFY migration is fully complete.** All authenticated portal components
+now import from src/styles/tokens.js. 80+ files migrated across P1-P5.
+
+Alt schema registry (intentionally different from tokens.js):
+- SINV_T: SmartInventory.js
+- POS_T: POSScreen.js
+- GEO_T: GeoAnalyticsDashboard.js
+- FI_T: HQFoodIntelligence.js (slate ink palette + 9 composite styles)
+
+*Update: WP-UNIFY session close · 13 April 2026*
