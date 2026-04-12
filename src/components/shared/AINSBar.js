@@ -118,26 +118,35 @@ export default function AINSBar({
           stream: true,
         }),
       });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error || `API ${res.status}`);
+      }
       const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let text = "";
+      const dec = new TextDecoder();
+      let buf = "";
+      let full = "";
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value);
-        for (const line of chunk.split("\n")) {
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6);
-          if (data === "[DONE]") break;
+          const raw = line.slice(6).trim();
+          if (raw === "[DONE]") continue;
           try {
-            const parsed = JSON.parse(data);
-            const token = parsed.delta?.text || parsed.choices?.[0]?.delta?.content || "";
-            text += token;
-            setDrawerContent(text);
+            const { token } = JSON.parse(raw);
+            if (token) {
+              full += token;
+              setDrawerContent(full);
+            }
           } catch {}
         }
       }
-      messagesRef.current.push({ role: "assistant", content: text });
+      messagesRef.current.push({ role: "assistant", content: full });
+      if (!full) setDrawerContent("No response received. Try again.");
       setAiHealthy(true);
     } catch (err) {
       console.error("[AINSBar] ai-copilot error:", err);
@@ -209,26 +218,28 @@ Previous context: ${drawerTitle}. Be direct and specific.`;
         stream: true,
       }),
     }).then(async (res) => {
+      if (!res.ok) throw new Error(`API ${res.status}`);
       const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let text = "";
+      const dec = new TextDecoder();
+      let buf = "";
+      let full = "";
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value);
-        for (const line of chunk.split("\n")) {
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6);
-          if (data === "[DONE]") break;
+          const raw = line.slice(6).trim();
+          if (raw === "[DONE]") continue;
           try {
-            const parsed = JSON.parse(data);
-            const token = parsed.delta?.text || parsed.choices?.[0]?.delta?.content || "";
-            text += token;
-            setDrawerContent(text);
+            const { token } = JSON.parse(raw);
+            if (token) { full += token; setDrawerContent(full); }
           } catch {}
         }
       }
-      messagesRef.current.push({ role: "assistant", content: text });
+      messagesRef.current.push({ role: "assistant", content: full });
       setDrawerLoading(false);
     }).catch(() => {
       setDrawerContent("AI service unavailable.");
