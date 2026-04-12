@@ -191,6 +191,15 @@ const TIER_PRESETS = {
   },
 };
 
+// Demo + operator tenants — never deletable
+const PROTECTED_TENANT_IDS = new Set([
+  "43b34c33-6864-4f02-98dd-df1d340475c3", // Protea Botanicals HQ
+  "b1bad266-ceb4-4558-bbc3-22cfeeeafe74", // Medi Recreational
+  "8b9cb8e6-1eb9-4e3e-8d7f-2a8a4aa7395b", // MediCare Dispensary
+  "7d50ea34-9bb2-46da-825a-956d0e4023e1", // The Garden Bistro
+  "57156762-deb8-4721-a1f3-0c6d7c2a67d8", // Metro Hardware
+]);
+
 function TierBadge({ tier }) {
   const t = TIERS[tier] || {
     label: tier || "—",
@@ -991,6 +1000,8 @@ export default function HQTenants() {
   const [toast, setToast] = useState(null);
   const [simRunning, setSimRunning] = useState(false);
   const [simWiping, setSimWiping] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
@@ -1050,6 +1061,26 @@ export default function HQTenants() {
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  const handleDeactivate = async (tenant) => {
+    if (!window.confirm(`Deactivate "${tenant.name}"? The tenant and all their data will be preserved but they will not appear as active.`)) return;
+    const { error } = await supabase.from("tenants").update({ is_active: false }).eq("id", tenant.id);
+    if (error) { showToast("Deactivate failed: " + error.message, "error"); return; }
+    showToast(`${tenant.name} deactivated`);
+    fetchAll();
+  };
+
+  const handleDelete = async (tenant) => {
+    if (deleteConfirm !== tenant.name) { showToast("Name did not match — type the exact tenant name to confirm", "error"); return; }
+    const { error: cfgErr } = await supabase.from("tenant_config").delete().eq("tenant_id", tenant.id);
+    if (cfgErr) { showToast("Delete failed (config): " + cfgErr.message, "error"); return; }
+    const { error: tErr } = await supabase.from("tenants").delete().eq("id", tenant.id);
+    if (tErr) { showToast("Delete failed: " + tErr.message + " — tenant may have linked data. Try Deactivate instead.", "error"); return; }
+    showToast(`${tenant.name} permanently deleted`);
+    setDeletingId(null);
+    setDeleteConfirm("");
+    fetchAll();
+  };
 
   const activeTenants = tenants.filter((t) => t.is_active !== false);
   const totalTenants = tenants.length;
@@ -1611,6 +1642,15 @@ export default function HQTenants() {
                     >
                       {"\u2709 Invite User"}
                     </button>
+                    {!PROTECTED_TENANT_IDS.has(tenant.id) && tenant.is_active !== false && (
+                      <button
+                        onClick={() => handleDeactivate(tenant)}
+                        style={{ ...sBtn("outline"), padding: "5px 12px", fontSize: "9px", color: T.warning, borderColor: T.warningBd }}
+                        title="Mark tenant inactive — data preserved, reversible"
+                      >
+                        ⏸ Deactivate
+                      </button>
+                    )}
                     <button
                       onClick={() => setExpanded(isOpen ? null : tenant.id)}
                       style={{
@@ -1771,6 +1811,49 @@ export default function HQTenants() {
                           ))}
                       </div>
                     </div>
+                  {/* Delete tenant */}
+                  {PROTECTED_TENANT_IDS.has(tenant.id) ? (
+                    <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${T.ink075}`, fontSize: 11, color: T.ink400, fontFamily: T.font }}>
+                      🔒 Protected demo tenant — cannot be deleted
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${T.dangerBd}` }}>
+                      {deletingId !== tenant.id ? (
+                        <button
+                          onClick={() => { setDeletingId(tenant.id); setDeleteConfirm(""); }}
+                          style={{ ...sBtn("danger"), fontSize: 10, padding: "5px 12px", background: "transparent", color: T.danger, border: `1px solid ${T.dangerBd}` }}
+                        >
+                          🗑 Delete Tenant Permanently
+                        </button>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 420 }}>
+                          <div style={{ fontSize: 12, color: T.danger, fontFamily: T.font, fontWeight: 600 }}>This cannot be undone. All config will be removed.</div>
+                          <div style={{ fontSize: 11, color: T.ink500, fontFamily: T.font }}>Type <strong>{tenant.name}</strong> to confirm:</div>
+                          <input
+                            style={{ ...sInput, borderColor: T.dangerBd, maxWidth: 320 }}
+                            placeholder={tenant.name}
+                            value={deleteConfirm}
+                            onChange={e => setDeleteConfirm(e.target.value)}
+                          />
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button
+                              onClick={() => handleDelete(tenant)}
+                              disabled={deleteConfirm !== tenant.name}
+                              style={{ ...sBtn("danger"), fontSize: 10, padding: "5px 14px", opacity: deleteConfirm !== tenant.name ? 0.4 : 1 }}
+                            >
+                              Confirm Delete
+                            </button>
+                            <button
+                              onClick={() => { setDeletingId(null); setDeleteConfirm(""); }}
+                              style={{ ...sBtn("outline"), fontSize: 10, padding: "5px 14px" }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   </div>
                 )}
               </div>
