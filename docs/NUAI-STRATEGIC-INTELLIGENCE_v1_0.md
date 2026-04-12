@@ -872,3 +872,58 @@ industry profiles and both portals where applicable.
 
 *DS-6 backlog noted 12 April 2026 · HEAD at note: `50bf2c9`*
 *Demonstrated by WP-UI-CATALOG-BAR surgical-edit pattern · not a migration*
+
+---
+
+## ADDENDUM — 12 April 2026
+
+### DEMO BUILD STATUS
+CA meeting: 4 weeks from 12 April 2026.
+Target: 4 production-grade rescue-scenario demo tenants across all 4 industry profiles.
+
+| Store | Tenant ID | Industry | Status | Signals |
+|---|---|---|---|---|
+| The Garden Bistro | 7d50ea34-9bb2-46da-825a-956d0e4023e1 | food_beverage | ✅ COMPLETE | 14 rescue signals |
+| Medi Recreational | b1bad266-ceb4-4558-bbc3-22cfeeeafe74 | cannabis_retail | ✅ COMPLETE | 10 rescue signals |
+| MediCare Dispensary | TBD — create in browser | cannabis_dispensary | ⏳ NEXT | SAHPRA signals |
+| Metro Hardware | TBD — create in browser | general_retail | ⏳ PENDING | covenant breach |
+
+Both complete tenants are grouped under Medi Can Franchise Network.
+Group Portal login: medican@nuai.dev / MediCan2026! → /group-portal
+Navigation to Group Portal: URL only (Phase 4b cross-tenant nav not yet built).
+
+### LESSONS LEARNED THIS SESSION (add to NUAI-AGENT-BIBLE)
+LL-NEW-1: opex INSERTs with input_vat_claimable=true trigger auto-creation of
+vat_transactions rows (source='calculated'). When back-filling historical opex,
+always check which VAT periods were auto-created and add vat_period_filings rows
+for them so only the INTENDED period shows as overdue.
+
+LL-NEW-2: bank_accounts created by the Financial Statements Setup Wizard may
+conflict with bank_accounts seeded directly to Supabase. Always check for
+existing bank_accounts before seeding. If a wizard account exists, UPDATE it
+in-place rather than inserting a second row. Move bank_statement_lines to the
+wizard account UUID.
+
+LL-203 REINFORCED: product_metadata on order_items MUST use key 'weighted_avg_cost'
+not 'cost'. HQProfitLoss.js:1240 reads oi.product_metadata?.weighted_avg_cost.
+Wrong key = R0 COGS on the income statement. See 50bf2c9 for the Garden Bistro
+fix and WP-DEMO-CA-RESCUE_v1_0.md GAP 2 for the seeding rule.
+
+LL-NEW-3: user_profiles.id has a FK to auth.users(id). Cannot INSERT new
+user_profiles rows without a matching auth.users row. For loyalty cohort seeding,
+UPDATE last_purchase_at on existing rows only (POPIA-clean — timestamp column,
+no PII).
+
+LL-NEW-4: leave_balances.available is a GENERATED column computed automatically
+as opening_balance + accrued + carried_over - used - pending - forfeited.
+Never include 'available' in INSERT column lists.
+
+### KNOWN ISSUES (current)
+- HQTransfer historical AVCO corruption (LL-242 forward-fix done, pre-fix not remediated)
+- Cross-tenant "View store →" navigation (Phase 4b — Group Portal only navigable via URL)
+- loyalty_campaigns table doesn't exist (Customer Intelligence Section 4 deferred)
+- DS-6 migration debt: 19,492 lines across 4 pre-DS-6 components (see backlog)
+- Garden Bistro Financial Statements Wizard: wizard-created bank account supersedes seeded account — pattern documented in LL-NEW-2
+- Greenleaf Trading dropped from demo build — Medi Rec fills cannabis_retail slot
+
+*Addendum 3 · 12 April 2026 · CA demo build status + LL-NEW-1 through LL-NEW-4*

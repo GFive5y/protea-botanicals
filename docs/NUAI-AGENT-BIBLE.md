@@ -1022,6 +1022,93 @@ Source: WP-TENANT-GROUPS Phase 5 build decision + owner addendum,
 
 ---
 
+## LL-NEW-1 — opex INSERTs trigger VAT transactions (12 April 2026)
+
+**Rule:** opex INSERTs with `input_vat_claimable=true` trigger auto-creation
+of `vat_transactions` rows (source='calculated'). When back-filling historical
+opex, always check which VAT periods were auto-created and add
+`vat_period_filings` rows for them so only the INTENDED period shows as overdue.
+
+**Why this matters:** During Medi Recreational enrichment (700ad77), Phase 4
+back-filled 6 months of opex. A database trigger auto-created 40
+`vat_transactions` rows and pushed 2025-P6 into unintentionally-overdue state.
+The rescue narrative required exactly one overdue period (P3). Fix applied in
+Phase 7b: insert `vat_period_filings` row for 2025-P6 with ref VR2025P6-MEDREC.
+
+**How to apply:** Before back-filling opex for a tenant, enumerate the VAT
+periods that the date range will touch. After the INSERT, query
+`vat_transactions WHERE tenant_id = :t AND source = 'calculated'` grouped by
+period. Decide which periods should remain overdue vs filed, and insert
+`vat_period_filings` rows for the "should be filed" set.
+
+---
+
+## LL-NEW-2 — Wizard bank accounts are canonical (12 April 2026)
+
+**Rule:** `bank_accounts` rows created by the Financial Statements Setup Wizard
+may conflict with `bank_accounts` seeded directly to Supabase. Always check for
+existing `bank_accounts` before seeding. If a wizard account exists, UPDATE it
+in-place rather than inserting a second row. Move `bank_statement_lines` to the
+wizard account UUID.
+
+**Why this matters:** During Garden Bistro build (a9ab90d), we seeded a
+`bank_accounts` row and the owner subsequently ran the Financial Statements
+Wizard in the browser, creating a second row with `is_primary=true`. The result
+was two primary rows and split statement lines. Fix (50bf2c9): moved 15
+statement lines to the wizard row, backfilled wizard row with seed values,
+deleted seed row. The wizard row is canonical because the Financial
+Statements module reads it as the source of truth.
+
+**How to apply:** Before INSERT into `bank_accounts`, run
+`SELECT id, is_primary FROM bank_accounts WHERE tenant_id = :t`. If rows exist,
+UPDATE the primary wizard row rather than inserting. If you must reconcile
+post-hoc: UPDATE statement lines to point at the wizard UUID, then DELETE the
+seed row.
+
+---
+
+## LL-NEW-3 — user_profiles FK to auth.users (12 April 2026)
+
+**Rule:** `user_profiles.id` has a FK to `auth.users(id)`. Cannot INSERT new
+`user_profiles` rows without a matching `auth.users` row. For loyalty cohort
+seeding, UPDATE `last_purchase_at` on existing rows only — POPIA-clean because
+it is a timestamp column with no PII.
+
+**Why this matters:** During Medi Recreational Phase 3 (cohort churn seeding),
+the original spec called for INSERTing 11 dormant members. The FK blocked the
+INSERT because there were no matching `auth.users` rows. Direct INSERT into
+`auth.users` is not permitted (Supabase auth manages that table). The decision
+(700ad77) was to reverse to Option C: UPDATE `last_purchase_at` on 25 existing
+rows to shift 15 → lapsed and 11 → dormant. POPIA-clean because only a
+timestamp column was touched.
+
+**How to apply:** Never plan a loyalty-cohort seed that requires new
+`user_profiles` rows. Always shape the cohort by UPDATEing
+`last_purchase_at`, `loyalty_tier`, or `points_balance` on existing rows.
+If a tenant has no members, the cohort sections will render empty — that
+is the correct behaviour for a greenfield tenant.
+
+---
+
+## LL-NEW-4 — leave_balances.available is GENERATED (12 April 2026)
+
+**Rule:** `leave_balances.available` is a PostgreSQL GENERATED column computed
+automatically as
+`opening_balance + accrued + carried_over - used - pending - forfeited`.
+Never include `available` in INSERT column lists.
+
+**Why this matters:** During Garden Bistro Phase 4 staff seed (a9ab90d),
+including `available` in the INSERT column list produced error 428C9
+(`cannot insert a non-DEFAULT value into column "available"`). The fix was to
+remove the column from the INSERT — the database computes it on every read.
+
+**How to apply:** When INSERTing `leave_balances`, include only the 6 input
+columns: `opening_balance`, `accrued`, `carried_over`, `used`, `pending`,
+`forfeited` (plus `tenant_id`, `employee_id`, `leave_type`). The `available`
+column will compute correctly on first SELECT.
+
+---
+
 *NUAI-AGENT-BIBLE.md v1.0 · 08 Apr 2026*
 *Maintained by: Claude Code after each major session*
 *Owner reviews: after each WP completion*
