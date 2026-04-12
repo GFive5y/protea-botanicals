@@ -1359,23 +1359,6 @@ export default function TenantPortal() {
                     <span style={{ fontSize: 11, color: T.ink300, marginLeft: 2 }}>{"\u00b7"} {activeTabDef.desc}</span>
                   )}
                 </div>
-                <button
-                  onClick={() => window.dispatchEvent(new CustomEvent("nuai:open-search"))}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    padding: "6px 20px", background: "#FAFAF9",
-                    border: `1px solid ${T.ink150}`, borderRadius: 7,
-                    cursor: "pointer", fontFamily: T.font, flexShrink: 0,
-                    whiteSpace: "nowrap", lineHeight: 1, minWidth: 260,
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.ink300} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-                  </svg>
-                  <span style={{ fontSize: 12, color: T.ink400 }}>Search products, staff, orders{"\u2026"}</span>
-                  <span style={{ fontSize: 10, padding: "1px 6px", background: "#fff", border: `1px solid ${T.ink150}`, borderRadius: 3, color: T.ink400, fontFamily: "monospace", fontWeight: 600 }}>Ctrl+K</span>
-                </button>
               </div>
             </div>
 
