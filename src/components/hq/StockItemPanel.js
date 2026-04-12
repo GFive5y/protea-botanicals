@@ -7,42 +7,15 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
-
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  purple: "#5B21B6",
-  purpleBg: "#F5F3FF",
-  purpleBd: "#DDD6FE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  mono: "'DM Mono','Courier New',monospace",
-};
+import { T } from "../../styles/tokens";
+const MONO = "'DM Mono','Courier New',monospace";
+const PURPLE = "#5B21B6";
+const PURPLE_BG = "#F5F3FF";
+const PURPLE_BD = "#DDD6FE";
 
 const sInput = {
   padding: "7px 10px",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: "4px",
   fontSize: "12px",
   fontFamily: T.font,
@@ -115,13 +88,13 @@ function Row({ label, value, mono }) {
         justifyContent: "space-between",
         alignItems: "center",
         padding: "7px 0",
-        borderBottom: `1px solid ${T.ink075}`,
+        borderBottom: `1px solid ${T.bg}`,
       }}
     >
       <span
         style={{
           fontSize: 11,
-          color: T.ink400,
+          color: T.ink500,
           fontFamily: T.font,
           fontWeight: 600,
           textTransform: "uppercase",
@@ -134,7 +107,7 @@ function Row({ label, value, mono }) {
         style={{
           fontSize: 12,
           color: T.ink700,
-          fontFamily: mono ? T.mono : T.font,
+          fontFamily: mono ? MONO : T.font,
           fontWeight: mono ? 600 : 400,
         }}
       >
@@ -150,14 +123,14 @@ function SectionLabel({ children }) {
       style={{
         fontSize: 9,
         fontWeight: 700,
-        color: T.ink400,
+        color: T.ink500,
         textTransform: "uppercase",
         letterSpacing: "0.1em",
         fontFamily: T.font,
         marginTop: 16,
         marginBottom: 8,
         paddingBottom: 4,
-        borderBottom: `1px solid ${T.ink150}`,
+        borderBottom: `1px solid ${T.border}`,
       }}
     >
       {children}
@@ -168,7 +141,7 @@ function SectionLabel({ children }) {
 function Chip({
   label,
   color = T.accentMid,
-  bg = T.accentLit,
+  bg = T.accentLight,
   border = T.accentBd,
 }) {
   return (
@@ -245,12 +218,12 @@ function TabDetails({ item, onEdit, onSave, tenantId }) {
       )}
       {item.variant_value && (
         <div
-          style={{ padding: "7px 0", borderBottom: `1px solid ${T.ink075}` }}
+          style={{ padding: "7px 0", borderBottom: `1px solid ${T.bg}` }}
         >
           <span
             style={{
               fontSize: 11,
-              color: T.ink400,
+              color: T.ink500,
               fontFamily: T.font,
               fontWeight: 600,
               textTransform: "uppercase",
@@ -271,12 +244,12 @@ function TabDetails({ item, onEdit, onSave, tenantId }) {
       )}
       {item.tags && item.tags.length > 0 && (
         <div
-          style={{ padding: "7px 0", borderBottom: `1px solid ${T.ink075}` }}
+          style={{ padding: "7px 0", borderBottom: `1px solid ${T.bg}` }}
         >
           <span
             style={{
               fontSize: 11,
-              color: T.ink400,
+              color: T.ink500,
               fontFamily: T.font,
               fontWeight: 600,
               textTransform: "uppercase",
@@ -290,9 +263,9 @@ function TabDetails({ item, onEdit, onSave, tenantId }) {
               <Chip
                 key={tag}
                 label={tag}
-                color={T.purple}
-                bg={T.purpleBg}
-                border={T.purpleBd}
+                color={PURPLE}
+                bg={PURPLE_BG}
+                border={PURPLE_BD}
               />
             ))}
           </div>
@@ -346,7 +319,7 @@ function TabDetails({ item, onEdit, onSave, tenantId }) {
             <div
               style={{
                 padding: "7px 0",
-                borderBottom: `1px solid ${T.ink075}`,
+                borderBottom: `1px solid ${T.bg}`,
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
@@ -355,7 +328,7 @@ function TabDetails({ item, onEdit, onSave, tenantId }) {
               <span
                 style={{
                   fontSize: 11,
-                  color: T.ink400,
+                  color: T.ink500,
                   fontFamily: T.font,
                   fontWeight: 600,
                   textTransform: "uppercase",
@@ -368,7 +341,7 @@ function TabDetails({ item, onEdit, onSave, tenantId }) {
                 style={{
                   fontSize: 13,
                   fontWeight: 800,
-                  fontFamily: T.mono,
+                  fontFamily: MONO,
                   color:
                     parseFloat(margin) >= 50
                       ? T.success
@@ -404,8 +377,8 @@ function TabDetails({ item, onEdit, onSave, tenantId }) {
       ) : (
         <div
           style={{
-            background: T.ink075,
-            border: `1px solid ${T.ink150}`,
+            background: T.bg,
+            border: `1px solid ${T.border}`,
             borderRadius: 6,
             padding: "14px",
           }}
@@ -469,7 +442,7 @@ function TabDetails({ item, onEdit, onSave, tenantId }) {
             <div
               style={{
                 fontSize: 12,
-                fontFamily: T.mono,
+                fontFamily: MONO,
                 fontWeight: 700,
                 marginBottom: 10,
                 color:
@@ -509,7 +482,7 @@ function TabDetails({ item, onEdit, onSave, tenantId }) {
                 fontSize: 11,
                 fontFamily: T.font,
                 background: "transparent",
-                border: `1px solid ${T.ink150}`,
+                border: `1px solid ${T.border}`,
                 color: T.ink500,
                 borderRadius: 3,
                 cursor: "pointer",
@@ -654,7 +627,7 @@ function TabHistory({ item, tenantId }) {
       ) : (
         <div
           style={{
-            background: T.warningBg,
+            background: T.warningLight,
             border: `1px solid ${T.warningBd}`,
             borderRadius: 6,
             padding: "14px",
@@ -764,7 +737,7 @@ function TabHistory({ item, tenantId }) {
                 fontSize: 11,
                 fontFamily: T.font,
                 background: "transparent",
-                border: `1px solid ${T.ink150}`,
+                border: `1px solid ${T.border}`,
                 color: T.ink500,
                 borderRadius: 3,
                 cursor: "pointer",
@@ -781,7 +754,7 @@ function TabHistory({ item, tenantId }) {
         style={{
           fontSize: 10,
           fontWeight: 700,
-          color: T.ink400,
+          color: T.ink500,
           textTransform: "uppercase",
           letterSpacing: "0.1em",
           fontFamily: T.font,
@@ -804,7 +777,7 @@ function TabHistory({ item, tenantId }) {
               key={m.id}
               style={{
                 background: "#fff",
-                border: `1px solid ${T.ink150}`,
+                border: `1px solid ${T.border}`,
                 borderRadius: 6,
                 padding: "10px 12px",
                 borderLeft: `3px solid ${pos ? T.successBd : T.dangerBd}`,
@@ -832,7 +805,7 @@ function TabHistory({ item, tenantId }) {
                 <span
                   style={{
                     fontSize: 13,
-                    fontFamily: T.mono,
+                    fontFamily: MONO,
                     fontWeight: 700,
                     color: pos ? T.success : T.danger,
                   }}
@@ -843,12 +816,12 @@ function TabHistory({ item, tenantId }) {
               </div>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 <span
-                  style={{ fontSize: 10, color: T.ink300, fontFamily: T.mono }}
+                  style={{ fontSize: 10, color: T.ink300, fontFamily: MONO }}
                 >
                   {fmtDateTime(m.created_at)}
                 </span>
                 {m.reference && (
-                  <span style={{ fontSize: 10, color: T.ink400 }}>
+                  <span style={{ fontSize: 10, color: T.ink500 }}>
                     {m.reference}
                   </span>
                 )}
@@ -856,8 +829,8 @@ function TabHistory({ item, tenantId }) {
                   <span
                     style={{
                       fontSize: 10,
-                      color: T.ink400,
-                      fontFamily: T.mono,
+                      color: T.ink500,
+                      fontFamily: MONO,
                     }}
                   >
                     {fmt(m.unit_cost)}/unit
@@ -951,7 +924,7 @@ function TabQRLoyalty({ item, onSave }) {
           style={{
             fontSize: 10,
             fontWeight: 700,
-            color: T.ink400,
+            color: T.ink500,
             textTransform: "uppercase",
             letterSpacing: "0.1em",
             fontFamily: T.font,
@@ -966,7 +939,7 @@ function TabQRLoyalty({ item, onSave }) {
           <div
             style={{
               background: "#fff",
-              border: `1px solid ${T.ink150}`,
+              border: `1px solid ${T.border}`,
               borderRadius: 6,
               padding: "12px 14px",
             }}
@@ -988,7 +961,7 @@ function TabQRLoyalty({ item, onSave }) {
                   fontWeight: 700,
                   padding: "2px 8px",
                   borderRadius: 10,
-                  background: qrData.is_active ? T.successBg : T.dangerBg,
+                  background: qrData.is_active ? T.successLight : T.dangerLight,
                   color: qrData.is_active ? T.success : T.danger,
                   border: `1px solid ${qrData.is_active ? T.successBd : T.dangerBd}`,
                 }}
@@ -999,15 +972,15 @@ function TabQRLoyalty({ item, onSave }) {
             <div
               style={{
                 fontSize: 11,
-                color: T.ink400,
-                fontFamily: T.mono,
+                color: T.ink500,
+                fontFamily: MONO,
                 marginBottom: 4,
               }}
             >
               {qrData.qr_code}
             </div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 10, color: T.ink400 }}>
+              <span style={{ fontSize: 10, color: T.ink500 }}>
                 Created: {fmtDate(qrData.created_at)}
               </span>
               <span
@@ -1019,7 +992,7 @@ function TabQRLoyalty({ item, onSave }) {
                 {qrData.claimed ? "⚠ Claimed" : "✓ Unclaimed"}
               </span>
               {qrData.expires_at && (
-                <span style={{ fontSize: 10, color: T.ink400 }}>
+                <span style={{ fontSize: 10, color: T.ink500 }}>
                   Expires: {fmtDate(qrData.expires_at)}
                 </span>
               )}
@@ -1028,7 +1001,7 @@ function TabQRLoyalty({ item, onSave }) {
         ) : (
           <div
             style={{
-              background: T.warningBg,
+              background: T.warningLight,
               border: `1px solid ${T.warningBd}`,
               borderRadius: 6,
               padding: "12px 14px",
@@ -1059,7 +1032,7 @@ function TabQRLoyalty({ item, onSave }) {
           style={{
             fontSize: 10,
             fontWeight: 700,
-            color: T.ink400,
+            color: T.ink500,
             textTransform: "uppercase",
             letterSpacing: "0.1em",
             fontFamily: T.font,
@@ -1070,8 +1043,8 @@ function TabQRLoyalty({ item, onSave }) {
         </div>
         <div
           style={{
-            background: T.purpleBg,
-            border: `1px solid ${T.purpleBd}`,
+            background: PURPLE_BG,
+            border: `1px solid ${PURPLE_BD}`,
             borderRadius: 6,
             padding: "14px",
           }}
@@ -1081,7 +1054,7 @@ function TabQRLoyalty({ item, onSave }) {
               style={{
                 fontSize: 10,
                 fontWeight: 700,
-                color: T.purple,
+                color: PURPLE,
                 textTransform: "uppercase",
                 letterSpacing: "0.06em",
                 display: "block",
@@ -1091,7 +1064,7 @@ function TabQRLoyalty({ item, onSave }) {
               Loyalty Category
             </label>
             <select
-              style={{ ...sSelect, border: `1px solid ${T.purpleBd}` }}
+              style={{ ...sSelect, border: `1px solid ${PURPLE_BD}` }}
               value={loyaltyCategory}
               onChange={(e) => setLoyaltyCategory(e.target.value)}
             >
@@ -1108,7 +1081,7 @@ function TabQRLoyalty({ item, onSave }) {
               style={{
                 fontSize: 10,
                 fontWeight: 700,
-                color: T.purple,
+                color: PURPLE,
                 textTransform: "uppercase",
                 letterSpacing: "0.06em",
                 display: "block",
@@ -1120,7 +1093,7 @@ function TabQRLoyalty({ item, onSave }) {
                 style={{
                   textTransform: "none",
                   fontWeight: 400,
-                  color: T.ink400,
+                  color: T.ink500,
                 }}
               >
                 (leave blank to use category rate)
@@ -1134,7 +1107,7 @@ function TabQRLoyalty({ item, onSave }) {
               value={ptsOverride}
               onChange={(e) => setPtsOverride(e.target.value)}
               placeholder="e.g. 3.0 for a launch promo"
-              style={{ ...sInput, border: `1px solid ${T.purpleBd}` }}
+              style={{ ...sInput, border: `1px solid ${PURPLE_BD}` }}
             />
           </div>
 
@@ -1144,18 +1117,18 @@ function TabQRLoyalty({ item, onSave }) {
               borderRadius: 4,
               padding: "8px 12px",
               marginBottom: 12,
-              border: `1px solid ${T.purpleBd}`,
+              border: `1px solid ${PURPLE_BD}`,
             }}
           >
-            <div style={{ fontSize: 10, color: T.ink400, fontFamily: T.font }}>
+            <div style={{ fontSize: 10, color: T.ink500, fontFamily: T.font }}>
               Effective multiplier for <strong>{item.name}</strong>:
             </div>
             <div
               style={{
                 fontSize: 14,
                 fontWeight: 800,
-                color: T.purple,
-                fontFamily: T.mono,
+                color: PURPLE,
+                fontFamily: MONO,
                 marginTop: 2,
               }}
             >
@@ -1172,7 +1145,7 @@ function TabQRLoyalty({ item, onSave }) {
               fontSize: 11,
               fontFamily: T.font,
               fontWeight: 600,
-              background: T.purple,
+              background: PURPLE,
               color: "#fff",
               border: "none",
               borderRadius: 4,
@@ -1270,8 +1243,8 @@ Be specific, use Rands (ZAR), reference SA cannabis market context where relevan
       {/* Item context summary */}
       <div
         style={{
-          background: T.ink075,
-          border: `1px solid ${T.ink150}`,
+          background: T.bg,
+          border: `1px solid ${T.border}`,
           borderRadius: 6,
           padding: "12px 14px",
         }}
@@ -1280,7 +1253,7 @@ Be specific, use Rands (ZAR), reference SA cannabis market context where relevan
           style={{
             fontSize: 10,
             fontWeight: 700,
-            color: T.ink400,
+            color: T.ink500,
             textTransform: "uppercase",
             letterSpacing: "0.08em",
             marginBottom: 6,
@@ -1307,7 +1280,7 @@ Be specific, use Rands (ZAR), reference SA cannabis market context where relevan
             <Chip
               label={`${margin}% margin`}
               color={parseFloat(margin) >= 50 ? T.success : T.warning}
-              bg={parseFloat(margin) >= 50 ? T.successBg : T.warningBg}
+              bg={parseFloat(margin) >= 50 ? T.successLight : T.warningLight}
               border={parseFloat(margin) >= 50 ? T.successBd : T.warningBd}
             />
           )}
@@ -1321,7 +1294,7 @@ Be specific, use Rands (ZAR), reference SA cannabis market context where relevan
           style={{
             fontSize: 10,
             fontWeight: 700,
-            color: T.ink400,
+            color: T.ink500,
             textTransform: "uppercase",
             letterSpacing: "0.1em",
             fontFamily: T.font,
@@ -1343,9 +1316,9 @@ Be specific, use Rands (ZAR), reference SA cannabis market context where relevan
                 fontFamily: T.font,
                 textAlign: "left",
                 cursor: aiLoading ? "default" : "pointer",
-                border: `1.5px solid ${selectedQ === q && aiResponse ? T.accentBd : T.ink150}`,
+                border: `1.5px solid ${selectedQ === q && aiResponse ? T.accentBd : T.border}`,
                 background:
-                  selectedQ === q && aiResponse ? T.accentLit : "#fff",
+                  selectedQ === q && aiResponse ? T.accentLight : "#fff",
                 color: T.ink700,
                 opacity: aiLoading && selectedQ !== q ? 0.5 : 1,
               }}
@@ -1391,7 +1364,7 @@ Be specific, use Rands (ZAR), reference SA cannabis market context where relevan
       {aiLoading && (
         <div
           style={{
-            background: T.accentLit,
+            background: T.accentLight,
             border: `1px solid ${T.accentBd}`,
             borderRadius: 6,
             padding: "14px",
@@ -1420,7 +1393,7 @@ Be specific, use Rands (ZAR), reference SA cannabis market context where relevan
       {aiError && (
         <div
           style={{
-            background: T.dangerBg,
+            background: T.dangerLight,
             border: `1px solid ${T.dangerBd}`,
             borderRadius: 6,
             padding: "12px 14px",
@@ -1526,8 +1499,8 @@ export default function StockItemPanel({ item, onClose, onEdit, onRefresh }) {
         <div
           style={{
             padding: "16px 20px",
-            borderBottom: `1px solid ${T.ink150}`,
-            background: T.ink050,
+            borderBottom: `1px solid ${T.border}`,
+            background: T.surface,
           }}
         >
           <div
@@ -1567,7 +1540,7 @@ export default function StockItemPanel({ item, onClose, onEdit, onRefresh }) {
                       fontWeight: 700,
                       padding: "2px 6px",
                       borderRadius: 3,
-                      background: T.dangerBg,
+                      background: T.dangerLight,
                       color: T.danger,
                       border: `1px solid ${T.dangerBd}`,
                       whiteSpace: "nowrap",
@@ -1583,7 +1556,7 @@ export default function StockItemPanel({ item, onClose, onEdit, onRefresh }) {
                       fontWeight: 700,
                       padding: "2px 6px",
                       borderRadius: 3,
-                      background: T.warningBg,
+                      background: T.warningLight,
                       color: T.warning,
                       border: `1px solid ${T.warningBd}`,
                       whiteSpace: "nowrap",
@@ -1599,9 +1572,9 @@ export default function StockItemPanel({ item, onClose, onEdit, onRefresh }) {
                       fontWeight: 700,
                       padding: "2px 6px",
                       borderRadius: 3,
-                      background: T.ink075,
-                      color: T.ink400,
-                      border: `1px solid ${T.ink150}`,
+                      background: T.bg,
+                      color: T.ink500,
+                      border: `1px solid ${T.border}`,
                       whiteSpace: "nowrap",
                     }}
                   >
@@ -1618,12 +1591,12 @@ export default function StockItemPanel({ item, onClose, onEdit, onRefresh }) {
                 }}
               >
                 <span
-                  style={{ fontSize: 10, color: T.ink300, fontFamily: T.mono }}
+                  style={{ fontSize: 10, color: T.ink300, fontFamily: MONO }}
                 >
                   {item.sku}
                 </span>
                 {item.brand && (
-                  <span style={{ fontSize: 10, color: T.ink400 }}>
+                  <span style={{ fontSize: 10, color: T.ink500 }}>
                     {item.brand}
                   </span>
                 )}
@@ -1668,7 +1641,7 @@ export default function StockItemPanel({ item, onClose, onEdit, onRefresh }) {
               style={{
                 padding: "5px 10px",
                 background: "#fff",
-                border: `1px solid ${T.ink150}`,
+                border: `1px solid ${T.border}`,
                 borderRadius: 4,
                 textAlign: "center",
               }}
@@ -1677,7 +1650,7 @@ export default function StockItemPanel({ item, onClose, onEdit, onRefresh }) {
                 style={{
                   fontSize: 13,
                   fontWeight: 700,
-                  fontFamily: T.mono,
+                  fontFamily: MONO,
                   color: isOut ? T.danger : isLow ? T.warning : T.ink700,
                 }}
               >
@@ -1686,7 +1659,7 @@ export default function StockItemPanel({ item, onClose, onEdit, onRefresh }) {
               <div
                 style={{
                   fontSize: 9,
-                  color: T.ink400,
+                  color: T.ink500,
                   textTransform: "uppercase",
                   letterSpacing: "0.06em",
                 }}
@@ -1699,7 +1672,7 @@ export default function StockItemPanel({ item, onClose, onEdit, onRefresh }) {
                 style={{
                   padding: "5px 10px",
                   background: "#fff",
-                  border: `1px solid ${T.ink150}`,
+                  border: `1px solid ${T.border}`,
                   borderRadius: 4,
                   textAlign: "center",
                 }}
@@ -1708,7 +1681,7 @@ export default function StockItemPanel({ item, onClose, onEdit, onRefresh }) {
                   style={{
                     fontSize: 13,
                     fontWeight: 700,
-                    fontFamily: T.mono,
+                    fontFamily: MONO,
                     color: T.accentMid,
                   }}
                 >
@@ -1717,7 +1690,7 @@ export default function StockItemPanel({ item, onClose, onEdit, onRefresh }) {
                 <div
                   style={{
                     fontSize: 9,
-                    color: T.ink400,
+                    color: T.ink500,
                     textTransform: "uppercase",
                     letterSpacing: "0.06em",
                   }}
@@ -1731,7 +1704,7 @@ export default function StockItemPanel({ item, onClose, onEdit, onRefresh }) {
                 style={{
                   padding: "5px 10px",
                   background: "#fff",
-                  border: `1px solid ${T.ink150}`,
+                  border: `1px solid ${T.border}`,
                   borderRadius: 4,
                   textAlign: "center",
                 }}
@@ -1740,7 +1713,7 @@ export default function StockItemPanel({ item, onClose, onEdit, onRefresh }) {
                   style={{
                     fontSize: 13,
                     fontWeight: 700,
-                    fontFamily: T.mono,
+                    fontFamily: MONO,
                     color: T.success,
                   }}
                 >
@@ -1753,7 +1726,7 @@ export default function StockItemPanel({ item, onClose, onEdit, onRefresh }) {
                 <div
                   style={{
                     fontSize: 9,
-                    color: T.ink400,
+                    color: T.ink500,
                     textTransform: "uppercase",
                     letterSpacing: "0.06em",
                   }}
@@ -1766,7 +1739,7 @@ export default function StockItemPanel({ item, onClose, onEdit, onRefresh }) {
         </div>
 
         {/* Tab bar */}
-        <div style={{ display: "flex", borderBottom: `1px solid ${T.ink150}` }}>
+        <div style={{ display: "flex", borderBottom: `1px solid ${T.border}` }}>
           {TABS.map((tab) => (
             <button
               key={tab.id}
@@ -1784,7 +1757,7 @@ export default function StockItemPanel({ item, onClose, onEdit, onRefresh }) {
                 fontFamily: T.font,
                 fontSize: 10,
                 fontWeight: activeTab === tab.id ? 700 : 500,
-                color: activeTab === tab.id ? T.accentMid : T.ink400,
+                color: activeTab === tab.id ? T.accentMid : T.ink500,
                 letterSpacing: "0.06em",
                 textTransform: "uppercase",
                 marginBottom: "-1px",

@@ -3,36 +3,8 @@
 // Profile-adaptive report: cannabis / food_beverage / general_retail
 
 import React, { useState, useEffect } from "react";
-
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
-  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
+import { T } from "../../styles/tokens";
+const MONO = "'DM Mono','Courier New',monospace";
 
 const PROFILE_CONTEXT = {
   cannabis_retail:
@@ -206,16 +178,16 @@ Rules:
   }, [item.id]);
 
   const statusColors = {
-    healthy: { bg: T.successBg, border: T.successBd, color: T.success },
-    warning: { bg: T.warningBg, border: T.warningBd, color: T.warning },
-    critical: { bg: T.dangerBg, border: T.dangerBd, color: T.danger },
+    healthy: { bg: T.successLight, border: T.successBd, color: T.success },
+    warning: { bg: T.warningLight, border: T.warningBd, color: T.warning },
+    critical: { bg: T.dangerLight, border: T.dangerBd, color: T.danger },
   };
 
   const insightColors = {
-    stock: { bg: T.infoBg, color: T.info },
+    stock: { bg: T.infoLight, color: T.info },
     cost: { bg: "#FFF8E1", color: "#F57F17" },
-    sales: { bg: T.accentLit, color: T.accentMid },
-    expiry: { bg: T.warningBg, color: T.warning },
+    sales: { bg: T.accentLight, color: T.accentMid },
+    expiry: { bg: T.warningLight, color: T.warning },
     compliance: { bg: "#F3E5F5", color: "#6A1B9A" },
   };
 
@@ -246,15 +218,15 @@ Rules:
           flexDirection: "column",
           boxShadow: "-4px 0 32px rgba(0,0,0,0.15)",
           overflowY: "auto",
-          fontFamily: T.fontUi,
+          fontFamily: T.font,
         }}
       >
         {/* Header */}
         <div
           style={{
             padding: "20px 24px",
-            borderBottom: `1px solid ${T.ink150}`,
-            background: T.accentLit,
+            borderBottom: `1px solid ${T.border}`,
+            background: T.accentLight,
             position: "sticky",
             top: 0,
             zIndex: 1,
@@ -287,7 +259,7 @@ Rules:
                 style={{
                   fontSize: 11,
                   color: T.accentMid,
-                  fontFamily: T.fontData,
+                  fontFamily: T.font,
                   marginTop: 2,
                 }}
               >
@@ -302,7 +274,7 @@ Rules:
                 border: "none",
                 cursor: "pointer",
                 fontSize: 20,
-                color: T.ink400,
+                color: T.ink500,
                 padding: 4,
               }}
             >
@@ -325,7 +297,7 @@ Rules:
                 style={{
                   width: 28,
                   height: 28,
-                  border: `2px solid ${T.ink150}`,
+                  border: `2px solid ${T.border}`,
                   borderTopColor: T.accentMid,
                   borderRadius: "50%",
                   animation: "spin 0.8s linear infinite",
@@ -338,7 +310,7 @@ Rules:
               >
                 Analysing stock intelligence…
               </div>
-              <div style={{ fontSize: 11, color: T.ink400, marginTop: 6 }}>
+              <div style={{ fontSize: 11, color: T.ink500, marginTop: 6 }}>
                 Reviewing movements, margins and trends
               </div>
             </div>
@@ -348,7 +320,7 @@ Rules:
             <div
               style={{
                 padding: "16px",
-                background: T.dangerBg,
+                background: T.dangerLight,
                 border: `1px solid ${T.dangerBd}`,
                 borderRadius: 6,
                 fontSize: 13,
@@ -380,8 +352,8 @@ Rules:
               <div
                 style={{
                   padding: "16px 18px",
-                  background: statusColors[report.status]?.bg || T.ink075,
-                  border: `1px solid ${statusColors[report.status]?.border || T.ink150}`,
+                  background: statusColors[report.status]?.bg || T.bg,
+                  border: `1px solid ${statusColors[report.status]?.border || T.border}`,
                   borderRadius: 8,
                   marginBottom: 16,
                 }}
@@ -431,7 +403,7 @@ Rules:
                     fontWeight: 700,
                     letterSpacing: "0.1em",
                     textTransform: "uppercase",
-                    color: T.ink400,
+                    color: T.ink500,
                     marginBottom: 10,
                   }}
                 >
@@ -439,7 +411,7 @@ Rules:
                 </div>
                 {(report.insights || []).map((insight, i) => {
                   const ic = insightColors[insight.type] || {
-                    bg: T.ink075,
+                    bg: T.bg,
                     color: T.ink700,
                   };
                   return (
@@ -484,7 +456,7 @@ Rules:
               <div
                 style={{
                   padding: "14px 16px",
-                  background: T.accentLit,
+                  background: T.accentLight,
                   border: `1px solid ${T.accentBd}`,
                   borderRadius: 8,
                   marginBottom: 16,
@@ -520,10 +492,10 @@ Rules:
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr 1fr",
                   gap: 1,
-                  background: T.ink150,
+                  background: T.border,
                   borderRadius: 6,
                   overflow: "hidden",
-                  border: `1px solid ${T.ink150}`,
+                  border: `1px solid ${T.border}`,
                   marginBottom: 16,
                 }}
               >
@@ -571,7 +543,7 @@ Rules:
                       ? `${(((item.sell_price - item.cost_price) / item.sell_price) * 100).toFixed(1)}%`
                       : "—",
                     (() => {
-                      if (!item.sell_price || !item.cost_price) return T.ink400;
+                      if (!item.sell_price || !item.cost_price) return T.ink500;
                       const m =
                         ((item.sell_price - item.cost_price) /
                           item.sell_price) *
@@ -594,7 +566,7 @@ Rules:
                         fontWeight: 700,
                         letterSpacing: "0.1em",
                         textTransform: "uppercase",
-                        color: T.ink400,
+                        color: T.ink500,
                         marginBottom: 4,
                       }}
                     >
@@ -602,7 +574,7 @@ Rules:
                     </div>
                     <div
                       style={{
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         fontSize: 15,
                         fontWeight: 600,
                         color,
@@ -627,7 +599,7 @@ Rules:
                   fontWeight: 700,
                   color: T.accentMid,
                   cursor: "pointer",
-                  fontFamily: T.fontUi,
+                  fontFamily: T.font,
                   letterSpacing: "0.06em",
                   textTransform: "uppercase",
                 }}

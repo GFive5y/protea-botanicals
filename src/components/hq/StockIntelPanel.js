@@ -15,35 +15,8 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { CATEGORY_LABELS } from "./ProductWorlds";
-
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  mono: "'DM Mono','Courier New',monospace",
-};
+import { T } from "../../styles/tokens";
+const MONO = "'DM Mono','Courier New',monospace";
 
 // CATEGORY_LABELS imported from ProductWorlds.js
 
@@ -63,7 +36,7 @@ const SectionLabel = ({ children }) => (
       fontWeight: 700,
       letterSpacing: "0.1em",
       textTransform: "uppercase",
-      color: T.ink400,
+      color: T.ink500,
       fontFamily: T.font,
     }}
   >
@@ -107,7 +80,7 @@ function IntelPanel({
     <div
       style={{
         background: "#fff",
-        border: "1px solid " + T.ink150,
+        border: "1px solid " + T.border,
         borderRadius: 6,
         overflow: "hidden",
         display: "flex",
@@ -117,11 +90,11 @@ function IntelPanel({
       <div
         style={{
           padding: "10px 14px",
-          borderBottom: "1px solid " + T.ink150,
+          borderBottom: "1px solid " + T.border,
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          background: T.ink075,
+          background: T.bg,
         }}
       >
         <span
@@ -141,7 +114,7 @@ function IntelPanel({
               fontWeight: 700,
               padding: "1px 6px",
               borderRadius: 3,
-              background: badgeColor?.bg || T.accentLit,
+              background: badgeColor?.bg || T.accentLight,
               color: badgeColor?.color || T.accentMid,
               border: `1px solid ${badgeColor?.bd || T.accentBd}`,
             }}
@@ -193,11 +166,11 @@ function IntelPanel({
                 padding: "7px 14px",
                 cursor: row.onClick ? "pointer" : "default",
                 borderBottom:
-                  idx < rows.length - 1 ? "1px solid " + T.ink075 : "none",
+                  idx < rows.length - 1 ? "1px solid " + T.bg : "none",
                 transition: "background .1s",
               }}
               onMouseEnter={(e) => {
-                if (row.onClick) e.currentTarget.style.background = T.accentLit;
+                if (row.onClick) e.currentTarget.style.background = T.accentLight;
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "transparent";
@@ -209,7 +182,7 @@ function IntelPanel({
                     fontSize: 10,
                     fontWeight: 700,
                     color: idx === 0 ? T.accentMid : T.ink300,
-                    fontFamily: T.mono,
+                    fontFamily: MONO,
                     width: 14,
                     flexShrink: 0,
                     textAlign: "right",
@@ -244,7 +217,7 @@ function IntelPanel({
                   <div
                     style={{
                       height: 3,
-                      background: T.ink150,
+                      background: T.border,
                       borderRadius: 2,
                       overflow: "hidden",
                     }}
@@ -264,7 +237,7 @@ function IntelPanel({
                   style={{
                     fontSize: 11,
                     fontWeight: 700,
-                    fontFamily: T.mono,
+                    fontFamily: MONO,
                     fontVariantNumeric: "tabular-nums",
                     color: row.valueColor || T.ink700,
                     flexShrink: 0,
@@ -279,7 +252,7 @@ function IntelPanel({
                 <div
                   style={{
                     fontSize: 10,
-                    color: T.ink400,
+                    color: T.ink500,
                     fontFamily: T.font,
                     marginLeft: 22,
                     marginTop: 1,
@@ -294,7 +267,7 @@ function IntelPanel({
       </div>
       {footerLabel && (
         <div
-          style={{ borderTop: "1px solid " + T.ink150, padding: "8px 14px" }}
+          style={{ borderTop: "1px solid " + T.border, padding: "8px 14px" }}
         >
           <button
             onClick={onFooter}
@@ -454,7 +427,7 @@ function StockGlossary() {
     <div
       style={{
         background: "#fff",
-        border: "1px solid " + T.ink150,
+        border: "1px solid " + T.border,
         borderRadius: 6,
         overflow: "hidden",
       }}
@@ -481,7 +454,7 @@ function StockGlossary() {
               fontWeight: 700,
               letterSpacing: "0.1em",
               textTransform: "uppercase",
-              color: T.ink400,
+              color: T.ink500,
             }}
           >
             📖 Stock Terms Explained
@@ -502,12 +475,12 @@ function StockGlossary() {
       </button>
 
       {open && (
-        <div style={{ borderTop: "1px solid " + T.ink150 }}>
+        <div style={{ borderTop: "1px solid " + T.border }}>
           {/* Search */}
           <div
             style={{
               padding: "10px 20px",
-              borderBottom: "1px solid " + T.ink075,
+              borderBottom: "1px solid " + T.bg,
             }}
           >
             <input
@@ -520,12 +493,12 @@ function StockGlossary() {
                 padding: "6px 10px",
                 fontSize: 12,
                 fontFamily: T.font,
-                border: "1px solid " + T.ink150,
+                border: "1px solid " + T.border,
                 borderRadius: 4,
                 outline: "none",
                 boxSizing: "border-box",
                 color: T.ink700,
-                background: T.ink075,
+                background: T.bg,
               }}
             />
           </div>
@@ -536,7 +509,7 @@ function StockGlossary() {
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
               gap: "1px",
-              background: T.ink150,
+              background: T.border,
               maxHeight: 420,
               overflowY: "auto",
             }}
@@ -577,7 +550,7 @@ function StockGlossary() {
                         fontSize: 12,
                         fontWeight: 700,
                         color: T.accentMid,
-                        fontFamily: T.mono,
+                        fontFamily: MONO,
                       }}
                     >
                       {item.term}
@@ -585,7 +558,7 @@ function StockGlossary() {
                     <span
                       style={{
                         fontSize: 10,
-                        color: T.ink400,
+                        color: T.ink500,
                         fontFamily: T.font,
                       }}
                     >
@@ -613,7 +586,7 @@ function StockGlossary() {
               fontSize: 10,
               color: T.ink300,
               fontFamily: T.font,
-              borderTop: "1px solid " + T.ink150,
+              borderTop: "1px solid " + T.border,
             }}
           >
             These terms are standard across the cannabis and retail industry.
@@ -641,20 +614,20 @@ function Zone6AIInsights({ context, onNavigate }) {
   const SEV = {
     critical: {
       dot: T.danger,
-      bg: T.dangerBg,
+      bg: T.dangerLight,
       bd: T.dangerBd,
       label: "Critical",
     },
     warning: {
       dot: T.warning,
-      bg: T.warningBg,
+      bg: T.warningLight,
       bd: T.warningBd,
       label: "Watch",
     },
-    info: { dot: T.info, bg: T.infoBg, bd: T.infoBd, label: "Info" },
+    info: { dot: T.info, bg: T.infoLight, bd: T.infoBd, label: "Info" },
     positive: {
       dot: T.success,
-      bg: T.successBg,
+      bg: T.successLight,
       bd: T.successBd,
       label: "Good",
     },
@@ -735,7 +708,7 @@ Return ONLY a valid JSON array of exactly 3 objects, no markdown, no explanation
     <div
       style={{
         background: "#fff",
-        border: "1px solid " + T.ink150,
+        border: "1px solid " + T.border,
         borderRadius: 6,
         overflow: "hidden",
       }}
@@ -744,7 +717,7 @@ Return ONLY a valid JSON array of exactly 3 objects, no markdown, no explanation
       <div
         style={{
           padding: "12px 20px",
-          borderBottom: "1px solid " + T.ink150,
+          borderBottom: "1px solid " + T.border,
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
@@ -768,7 +741,7 @@ Return ONLY a valid JSON array of exactly 3 objects, no markdown, no explanation
             padding: "4px 10px",
             fontSize: 10,
             fontWeight: 600,
-            border: "1px solid " + T.ink150,
+            border: "1px solid " + T.border,
             borderRadius: 4,
             cursor: loading ? "default" : "pointer",
             background: "transparent",
@@ -800,7 +773,7 @@ Return ONLY a valid JSON array of exactly 3 objects, no markdown, no explanation
                   width: 8,
                   height: 8,
                   borderRadius: "50%",
-                  background: T.ink150,
+                  background: T.border,
                   marginTop: 5,
                   flexShrink: 0,
                 }}
@@ -809,7 +782,7 @@ Return ONLY a valid JSON array of exactly 3 objects, no markdown, no explanation
                 <div
                   style={{
                     height: 11,
-                    background: T.ink075,
+                    background: T.bg,
                     borderRadius: 3,
                     marginBottom: 6,
                     width: w + "%",
@@ -818,7 +791,7 @@ Return ONLY a valid JSON array of exactly 3 objects, no markdown, no explanation
                 <div
                   style={{
                     height: 9,
-                    background: T.ink075,
+                    background: T.bg,
                     borderRadius: 3,
                     width: "38%",
                   }}
@@ -843,7 +816,7 @@ Return ONLY a valid JSON array of exactly 3 objects, no markdown, no explanation
               height: 28,
               borderRadius: "50%",
               flexShrink: 0,
-              background: T.warningBg,
+              background: T.warningLight,
               border: "1px solid " + T.warningBd,
               display: "flex",
               alignItems: "center",
@@ -868,7 +841,7 @@ Return ONLY a valid JSON array of exactly 3 objects, no markdown, no explanation
             <div
               style={{
                 fontSize: 11,
-                color: T.ink400,
+                color: T.ink500,
                 fontFamily: T.font,
                 marginBottom: 8,
                 lineHeight: 1.4,
@@ -904,7 +877,7 @@ Return ONLY a valid JSON array of exactly 3 objects, no markdown, no explanation
               style={{
                 padding: "13px 20px",
                 borderBottom:
-                  idx < insights.length - 1 ? "1px solid " + T.ink075 : "none",
+                  idx < insights.length - 1 ? "1px solid " + T.bg : "none",
                 display: "flex",
                 gap: 12,
                 alignItems: "flex-start",
@@ -1029,7 +1002,7 @@ export default function StockIntelPanel({
       barColor: T.accentMid,
       badge:
         idx === 0
-          ? { label: "HOT", color: T.danger, bg: T.dangerBg, bd: T.dangerBd }
+          ? { label: "HOT", color: T.danger, bg: T.dangerLight, bd: T.dangerBd }
           : null,
       onClick: () => onOpenItem(item),
     }));
@@ -1065,7 +1038,7 @@ export default function StockIntelPanel({
           ? {
               label: "PUSH",
               color: T.success,
-              bg: T.successBg,
+              bg: T.successLight,
               bd: T.successBd,
             }
           : null,
@@ -1110,7 +1083,7 @@ export default function StockIntelPanel({
             ? {
                 label: urgent ? "REORDER" : "WATCH",
                 color: urgent ? T.danger : T.warning,
-                bg: urgent ? T.dangerBg : T.warningBg,
+                bg: urgent ? T.dangerLight : T.warningLight,
                 bd: urgent ? T.dangerBd : T.warningBd,
               }
             : null,
@@ -1156,7 +1129,7 @@ export default function StockIntelPanel({
           ? {
               label: "IDLE",
               color: T.warning,
-              bg: T.warningBg,
+              bg: T.warningLight,
               bd: T.warningBd,
             }
           : null,
@@ -1200,7 +1173,7 @@ export default function StockIntelPanel({
       valueColor: T.success,
       badge:
         idx === 0
-          ? { label: "TOP", color: T.success, bg: T.successBg, bd: T.successBd }
+          ? { label: "TOP", color: T.success, bg: T.successLight, bd: T.successBd }
           : null,
       onClick: () => onOpenItem(item),
     }));
@@ -1245,7 +1218,7 @@ export default function StockIntelPanel({
           ? {
               label: "FIX PRICE",
               color: T.danger,
-              bg: T.dangerBg,
+              bg: T.dangerLight,
               bd: T.dangerBd,
             }
           : null,
@@ -1309,7 +1282,7 @@ export default function StockIntelPanel({
           ? {
               label: "REVIEW",
               color: T.warning,
-              bg: T.warningBg,
+              bg: T.warningLight,
               bd: T.warningBd,
             }
           : null,
@@ -1319,7 +1292,7 @@ export default function StockIntelPanel({
 
   // Heatmap
   const HEATMAP_COLORS = [
-    T.ink150,
+    T.border,
     T.accentBd,
     "#6aab85",
     T.accentMid,
@@ -1462,7 +1435,7 @@ export default function StockIntelPanel({
                   fontSize: 11,
                   fontWeight: active ? 700 : 500,
                   fontFamily: T.font,
-                  border: "1.5px solid " + (active ? T.accentMid : T.ink150),
+                  border: "1.5px solid " + (active ? T.accentMid : T.border),
                   background: active ? T.accentMid : "#fff",
                   color: active ? "#fff" : T.ink700,
                   cursor: "pointer",
@@ -1500,7 +1473,7 @@ export default function StockIntelPanel({
             badge={
               marginHeroes.length > 0 ? `${marginHeroes.length} priced` : null
             }
-            badgeColor={{ color: T.success, bg: T.successBg, bd: T.successBd }}
+            badgeColor={{ color: T.success, bg: T.successLight, bd: T.successBd }}
             rows={marginHeroes}
             emptyMsg="Set prices and receive a delivery to see real margins"
             footerLabel="Open pricing"
@@ -1523,7 +1496,7 @@ export default function StockIntelPanel({
             title="Dead Stock"
             icon="📦"
             badge={deadStock.length > 0 ? `${DEAD_THRESHOLD}d+ idle` : null}
-            badgeColor={{ color: T.warning, bg: T.warningBg, bd: T.warningBd }}
+            badgeColor={{ color: T.warning, bg: T.warningLight, bd: T.warningBd }}
             rows={deadStock}
             emptyMsg={`No items idle for ${DEAD_THRESHOLD}+ days — your stock is moving`}
             footerLabel="Get strategy"
@@ -1540,7 +1513,7 @@ export default function StockIntelPanel({
           title="Making You Money"
           icon="💵"
           badge={revenueLeaders.length > 0 ? "last 30 days" : null}
-          badgeColor={{ color: T.success, bg: T.successBg, bd: T.successBd }}
+          badgeColor={{ color: T.success, bg: T.successLight, bd: T.successBd }}
           rows={revenueLeaders}
           emptyMsg="Your top revenue items will appear here after your first sale"
           emptyCta="Open shop to sell"
@@ -1553,7 +1526,7 @@ export default function StockIntelPanel({
           title="Selling Fast, Earning Little"
           icon="⚠️"
           badge={marginAtRisk.length > 0 ? "under 25% profit" : null}
-          badgeColor={{ color: T.danger, bg: T.dangerBg, bd: T.dangerBd }}
+          badgeColor={{ color: T.danger, bg: T.dangerLight, bd: T.dangerBd }}
           rows={marginAtRisk}
           emptyMsg="All your fast-selling items have healthy profit margins — great work"
           footerLabel="Review prices"
@@ -1564,7 +1537,7 @@ export default function StockIntelPanel({
           title="Prices Worth Checking"
           icon="🗓"
           badge={priceReview.length > 0 ? "60+ days old" : null}
-          badgeColor={{ color: T.warning, bg: T.warningBg, bd: T.warningBd }}
+          badgeColor={{ color: T.warning, bg: T.warningLight, bd: T.warningBd }}
           rows={priceReview}
           emptyMsg={
             !priceAgeLoaded
@@ -1580,7 +1553,7 @@ export default function StockIntelPanel({
       <div
         style={{
           background: "#fff",
-          border: "1px solid " + T.ink150,
+          border: "1px solid " + T.border,
           borderRadius: 6,
           overflow: "hidden",
         }}
@@ -1588,14 +1561,14 @@ export default function StockIntelPanel({
         <div
           style={{
             padding: "12px 20px",
-            borderBottom: "1px solid " + T.ink150,
+            borderBottom: "1px solid " + T.border,
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
           }}
         >
           <SectionLabel>Movement Velocity — 12 weeks</SectionLabel>
-          <span style={{ fontSize: 11, color: T.ink400, fontFamily: T.font }}>
+          <span style={{ fontSize: 11, color: T.ink500, fontFamily: T.font }}>
             {totalMovements} movements in window
           </span>
         </div>
@@ -1702,7 +1675,7 @@ export default function StockIntelPanel({
               marginTop: 12,
             }}
           >
-            <span style={{ fontSize: 10, color: T.ink400, fontFamily: T.font }}>
+            <span style={{ fontSize: 10, color: T.ink500, fontFamily: T.font }}>
               Less
             </span>
             {HEATMAP_COLORS.map((color, i) => (
@@ -1716,7 +1689,7 @@ export default function StockIntelPanel({
                 }}
               />
             ))}
-            <span style={{ fontSize: 10, color: T.ink400, fontFamily: T.font }}>
+            <span style={{ fontSize: 10, color: T.ink500, fontFamily: T.font }}>
               More
             </span>
             <span

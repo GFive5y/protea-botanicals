@@ -25,40 +25,13 @@ import {
   CATEGORY_LABELS,
   CATEGORY_ICONS,
 } from "./ProductWorlds";
-
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  mono: "'DM Mono','Courier New',monospace",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
+import { T } from "../../styles/tokens";
+const MONO = "'DM Mono','Courier New',monospace";
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
 const sInput = {
   padding: "8px 12px",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: "4px",
   fontSize: "13px",
   fontFamily: T.font,
@@ -70,8 +43,8 @@ const sInput = {
 };
 const sSelect = { ...sInput, cursor: "pointer" };
 const sCard = {
-  background: T.ink050,
-  border: "1px solid " + T.ink150,
+  background: T.surface,
+  border: "1px solid " + T.border,
   borderRadius: "4px",
   padding: "12px 14px",
   marginBottom: "6px",
@@ -89,16 +62,16 @@ const sTh = {
   fontSize: "10px",
   letterSpacing: "0.1em",
   textTransform: "uppercase",
-  color: T.ink400,
-  borderBottom: `2px solid ${T.ink150}`,
+  color: T.ink500,
+  borderBottom: `2px solid ${T.border}`,
   fontWeight: 700,
   fontFamily: T.font,
   whiteSpace: "nowrap",
-  background: T.ink050,
+  background: T.surface,
 };
 const sTd = {
   padding: "10px 12px",
-  borderBottom: `1px solid ${T.ink150}`,
+  borderBottom: `1px solid ${T.border}`,
   fontSize: "13px",
   fontFamily: T.font,
   verticalAlign: "middle",
@@ -108,8 +81,8 @@ const sPanelHead = {
   alignItems: "center",
   justifyContent: "space-between",
   padding: "10px 14px",
-  background: T.ink075,
-  border: "1px solid " + T.ink150,
+  background: T.bg,
+  border: "1px solid " + T.border,
   borderRadius: "4px",
   marginBottom: "4px",
   cursor: "pointer",
@@ -133,32 +106,32 @@ const sBtn = (v = "primary") => ({
 const sMetric = (variant) => {
   const map = {
     default: {
-      background: T.ink075,
-      border: "1px solid " + T.ink150,
+      background: T.bg,
+      border: "1px solid " + T.border,
       color: T.ink500,
     },
     danger: {
-      background: T.dangerBg,
+      background: T.dangerLight,
       border: "1px solid " + T.dangerBd,
       color: T.danger,
     },
     warning: {
-      background: T.warningBg,
+      background: T.warningLight,
       border: "1px solid " + T.warningBd,
       color: T.warning,
     },
     success: {
-      background: T.successBg,
+      background: T.successLight,
       border: "1px solid " + T.successBd,
       color: T.success,
     },
     accent: {
-      background: T.accentLit,
+      background: T.accentLight,
       border: "1px solid " + T.accentBd,
       color: T.accentMid,
     },
     info: {
-      background: T.infoBg,
+      background: T.infoLight,
       border: "1px solid " + T.infoBd,
       color: T.info,
     },
@@ -178,34 +151,34 @@ const sBadge = (v) => ({
   ...sBadgeBase,
   ...(v === "danger"
     ? {
-        background: T.dangerBg,
+        background: T.dangerLight,
         color: T.danger,
         border: "1px solid " + T.dangerBd,
       }
     : {}),
   ...(v === "warning"
     ? {
-        background: T.warningBg,
+        background: T.warningLight,
         color: T.warning,
         border: "1px solid " + T.warningBd,
       }
     : {}),
   ...(v === "accent"
     ? {
-        background: T.accentLit,
+        background: T.accentLight,
         color: T.accentMid,
         border: "1px solid " + T.accentBd,
       }
     : {}),
   ...(v === "info"
-    ? { background: T.infoBg, color: T.info, border: "1px solid " + T.infoBd }
+    ? { background: T.infoLight, color: T.info, border: "1px solid " + T.infoBd }
     : {}),
   ...(v === "default"
-    ? { background: T.ink075, color: T.ink500, border: "1px solid " + T.ink150 }
+    ? { background: T.bg, color: T.ink500, border: "1px solid " + T.border }
     : {}),
   ...(v === "success"
     ? {
-        background: T.successBg,
+        background: T.successLight,
         color: T.success,
         border: "1px solid " + T.successBd,
       }
@@ -330,7 +303,7 @@ const expiryStatus = (item) => {
     label: fmtDate(item.expiry_date),
     variant: "ok",
     days,
-    color: T.ink400,
+    color: T.ink500,
   };
 };
 
@@ -348,7 +321,7 @@ const tempInfo = (zone) =>
       color: "#166534",
       border: "#BBF7D0",
     },
-    ambient: { label: "AMB", bg: T.ink075, color: T.ink500, border: T.ink150 },
+    ambient: { label: "AMB", bg: T.bg, color: T.ink500, border: T.border },
   })[zone] || null;
 
 const countAllergens = (flags) =>
@@ -479,17 +452,17 @@ function ShopTab({ items, tenantId, onRefresh }) {
           display: "grid",
           gridTemplateColumns: "repeat(4,1fr)",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: 8,
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
+          border: `1px solid ${T.border}`,
           marginBottom: 20,
         }}
       >
         {[
           ["Live in Shop", shopLive, T.success],
           ["Sold Out (visible)", soldOut, T.warning],
-          ["Hidden", hidden, T.ink400],
+          ["Hidden", hidden, T.ink500],
           ["No Photo Yet", noPhoto, T.danger],
         ].map(([label, val, color]) => (
           <div
@@ -508,7 +481,7 @@ function ShopTab({ items, tenantId, onRefresh }) {
             <div
               style={{
                 fontSize: 9,
-                color: T.ink400,
+                color: T.ink500,
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
                 marginTop: 4,
@@ -536,7 +509,7 @@ function ShopTab({ items, tenantId, onRefresh }) {
           placeholder="Search products…"
           style={{
             padding: "7px 10px",
-            border: `1px solid ${T.ink150}`,
+            border: `1px solid ${T.border}`,
             borderRadius: 6,
             fontSize: 12,
             fontFamily: T.font,
@@ -554,7 +527,7 @@ function ShopTab({ items, tenantId, onRefresh }) {
             </option>
           ))}
         </select>
-        <div style={{ marginLeft: "auto", fontSize: 11, color: T.ink400 }}>
+        <div style={{ marginLeft: "auto", fontSize: 11, color: T.ink500 }}>
           {filtered.length} products · items without sell price are excluded
         </div>
       </div>
@@ -588,7 +561,7 @@ function ShopTab({ items, tenantId, onRefresh }) {
               key={item.id}
               style={{
                 background: "#fff",
-                border: `1px solid ${T.ink150}`,
+                border: `1px solid ${T.border}`,
                 borderRadius: 10,
                 overflow: "hidden",
                 opacity: isHidden ? 0.65 : 1,
@@ -776,10 +749,10 @@ function ShopTab({ items, tenantId, onRefresh }) {
                       padding: "5px 8px",
                       fontSize: 10,
                       fontWeight: 600,
-                      border: `1px solid ${item.is_featured ? "#b5935a" : T.ink150}`,
+                      border: `1px solid ${item.is_featured ? "#b5935a" : T.border}`,
                       borderRadius: 5,
                       background: item.is_featured ? "#FFF8F0" : "transparent",
-                      color: item.is_featured ? "#b5935a" : T.ink400,
+                      color: item.is_featured ? "#b5935a" : T.ink500,
                       cursor: "pointer",
                     }}
                   >
@@ -794,7 +767,7 @@ function ShopTab({ items, tenantId, onRefresh }) {
                         fontSize: 10,
                         border: `1px solid ${T.dangerBd}`,
                         borderRadius: 5,
-                        background: T.dangerBg,
+                        background: T.dangerLight,
                         color: T.danger,
                         cursor: "pointer",
                       }}
@@ -1074,7 +1047,7 @@ export default function HQStock() {
             width: "420px",
             height: "100vh",
             background: "#fff",
-            borderLeft: "1px solid " + T.ink150,
+            borderLeft: "1px solid " + T.border,
             boxShadow: "-4px 0 24px rgba(0,0,0,0.08)",
             zIndex: 1000,
             display: "flex",
@@ -1085,7 +1058,7 @@ export default function HQStock() {
           <div
             style={{
               padding: "16px 20px",
-              borderBottom: "1px solid " + T.ink150,
+              borderBottom: "1px solid " + T.border,
               display: "flex",
               justifyContent: "space-between",
               alignItems: "flex-start",
@@ -1119,8 +1092,8 @@ export default function HQStock() {
           <div
             style={{
               padding: "10px 20px",
-              background: T.ink075,
-              borderBottom: "1px solid " + T.ink150,
+              background: T.bg,
+              borderBottom: "1px solid " + T.border,
               display: "flex",
               gap: "10px",
               flexWrap: "wrap",
@@ -1179,7 +1152,7 @@ export default function HQStock() {
                       <span
                         style={{
                           fontSize: "12px",
-                          fontFamily: T.mono,
+                          fontFamily: MONO,
                           color: pos ? T.success : T.danger,
                           fontWeight: 600,
                         }}
@@ -1200,7 +1173,7 @@ export default function HQStock() {
                         {fmtDate(m.created_at)}
                       </span>
                       {m.reference && (
-                        <span style={{ fontSize: "11px", color: T.ink400 }}>
+                        <span style={{ fontSize: "11px", color: T.ink500 }}>
                           {m.reference}
                         </span>
                       )}
@@ -1213,7 +1186,7 @@ export default function HQStock() {
                         <span
                           style={{
                             fontSize: "11px",
-                            color: T.ink400,
+                            color: T.ink500,
                             fontStyle: "italic",
                           }}
                         >
@@ -1238,7 +1211,7 @@ export default function HQStock() {
         style={{
           marginTop: "10px",
           padding: "12px 14px",
-          background: T.warningBg,
+          background: T.warningLight,
           border: "1px solid " + T.warningBd,
           borderRadius: "4px",
         }}
@@ -1377,35 +1350,35 @@ export default function HQStock() {
             display: "grid",
             gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))",
             gap: "1px",
-            background: T.ink150,
+            background: T.border,
             borderRadius: "6px",
             overflow: "hidden",
-            border: "1px solid " + T.ink150,
+            border: "1px solid " + T.border,
           }}
         >
           {[
             {
               label: "Expired",
               value: foodKPIs.expired,
-              top: foodKPIs.expired > 0 ? T.danger : T.ink150,
+              top: foodKPIs.expired > 0 ? T.danger : T.border,
               note: "remove immediately",
             },
             {
               label: "Expiring <7d",
               value: foodKPIs.exp7,
-              top: foodKPIs.exp7 > 0 ? T.danger : T.ink150,
+              top: foodKPIs.exp7 > 0 ? T.danger : T.border,
               note: "urgent action",
             },
             {
               label: "Expiring <30d",
               value: foodKPIs.exp30,
-              top: foodKPIs.exp30 > 0 ? T.warning : T.ink150,
+              top: foodKPIs.exp30 > 0 ? T.warning : T.border,
               note: "use first (FEFO)",
             },
             {
               label: "No Expiry Set",
               value: foodKPIs.noExp,
-              top: foodKPIs.noExp > 0 ? T.warning : T.ink150,
+              top: foodKPIs.noExp > 0 ? T.warning : T.border,
               note: "edit items to add",
             },
             {
@@ -1423,13 +1396,13 @@ export default function HQStock() {
             {
               label: "Low Stock",
               value: foodKPIs.low,
-              top: foodKPIs.low > 0 ? T.warning : T.ink150,
+              top: foodKPIs.low > 0 ? T.warning : T.border,
               note: "below reorder level",
             },
             {
               label: "Total Value",
               value: fmt(foodKPIs.cost),
-              top: T.ink150,
+              top: T.border,
               note: "AVCO-weighted",
             },
           ].map((k) => (
@@ -1446,7 +1419,7 @@ export default function HQStock() {
                   fontSize: "22px",
                   fontWeight: 400,
                   color: T.ink900,
-                  fontFamily: T.mono,
+                  fontFamily: MONO,
                   lineHeight: 1,
                   marginBottom: "4px",
                   letterSpacing: "-0.02em",
@@ -1458,7 +1431,7 @@ export default function HQStock() {
                 style={{
                   fontSize: "10px",
                   fontWeight: 700,
-                  color: T.ink400,
+                  color: T.ink500,
                   textTransform: "uppercase",
                   letterSpacing: "0.1em",
                 }}
@@ -1476,7 +1449,7 @@ export default function HQStock() {
         {expiring.length > 0 && (
           <div
             style={{
-              background: T.warningBg,
+              background: T.warningLight,
               border: "1px solid " + T.warningBd,
               borderRadius: "6px",
               padding: "14px 18px",
@@ -1560,7 +1533,7 @@ export default function HQStock() {
                         style={{
                           padding: "7px 10px",
                           borderBottom: "1px solid " + T.warningBd,
-                          fontFamily: T.mono,
+                          fontFamily: MONO,
                         }}
                       >
                         {fmtQty(item.quantity_on_hand, item.unit)}
@@ -1569,7 +1542,7 @@ export default function HQStock() {
                         style={{
                           padding: "7px 10px",
                           borderBottom: "1px solid " + T.warningBd,
-                          fontFamily: T.mono,
+                          fontFamily: MONO,
                           color: ex?.color,
                         }}
                       >
@@ -1612,7 +1585,7 @@ export default function HQStock() {
         {coldItems.length > 0 && (
           <div
             style={{
-              background: T.infoBg,
+              background: T.infoLight,
               border: "1px solid " + T.infoBd,
               borderRadius: "6px",
               padding: "14px 18px",
@@ -1709,7 +1682,7 @@ export default function HQStock() {
         {lowItems.length > 0 && (
           <div
             style={{
-              background: T.warningBg,
+              background: T.warningLight,
               border: "1px solid " + T.warningBd,
               borderRadius: "6px",
               padding: "14px 18px",
@@ -1753,7 +1726,7 @@ export default function HQStock() {
                     <span
                       style={{
                         fontSize: "11px",
-                        color: T.ink400,
+                        color: T.ink500,
                         marginLeft: "8px",
                       }}
                     >
@@ -1767,14 +1740,14 @@ export default function HQStock() {
                   <span
                     style={{
                       fontSize: "12px",
-                      fontFamily: T.mono,
+                      fontFamily: MONO,
                       color: T.danger,
                       fontWeight: 700,
                     }}
                   >
                     {fmtQty(item.quantity_on_hand, item.unit)}
                   </span>
-                  <span style={{ fontSize: "11px", color: T.ink400 }}>
+                  <span style={{ fontSize: "11px", color: T.ink500 }}>
                     min {fmtQty(item.reorder_level, item.unit)}
                   </span>
                   {item.reorder_qty && (
@@ -1786,7 +1759,7 @@ export default function HQStock() {
                     <span
                       style={{
                         ...sBadgeBase,
-                        background: T.infoBg,
+                        background: T.infoLight,
                         color: T.info,
                         border: "1px solid " + T.infoBd,
                       }}
@@ -1802,7 +1775,7 @@ export default function HQStock() {
         {drifted.length > 0 && (
           <div
             style={{
-              background: T.warningBg,
+              background: T.warningLight,
               border: "1px solid " + T.warningBd,
               borderRadius: "6px",
               padding: "14px 18px",
@@ -1856,8 +1829,8 @@ export default function HQStock() {
                     <span
                       style={{
                         fontSize: "12px",
-                        color: T.ink400,
-                        fontFamily: T.mono,
+                        color: T.ink500,
+                        fontFamily: MONO,
                       }}
                     >
                       Recorded: {fmt(item.cost_price)}
@@ -1867,7 +1840,7 @@ export default function HQStock() {
                         fontSize: "13px",
                         fontWeight: 700,
                         color: T.warning,
-                        fontFamily: T.mono,
+                        fontFamily: MONO,
                       }}
                     >
                       AVCO: {fmt(item.weighted_avg_cost)}
@@ -1877,7 +1850,7 @@ export default function HQStock() {
                         fontSize: "11px",
                         fontWeight: 700,
                         color: drift > 0 ? T.danger : T.success,
-                        fontFamily: T.mono,
+                        fontFamily: MONO,
                       }}
                     >
                       {drift > 0 ? "↑" : "↓"} {Math.abs(drift).toFixed(1)}%
@@ -1993,7 +1966,7 @@ export default function HQStock() {
             <option value="avco">Sort: AVCO High–Low</option>
           </select>
           <div style={{ flex: 1 }} />
-          <span style={{ fontSize: "12px", color: T.ink400 }}>
+          <span style={{ fontSize: "12px", color: T.ink500 }}>
             {filtered.length} item{filtered.length !== 1 ? "s" : ""}
           </span>
           <button style={sBtn()} onClick={() => setModalItem(null)}>
@@ -2003,10 +1976,10 @@ export default function HQStock() {
         <div
           style={{
             background: "#fff",
-            border: "1px solid " + T.ink150,
+            border: "1px solid " + T.border,
             borderRadius: "6px",
             overflow: "auto",
-            boxShadow: T.shadow,
+            boxShadow: T.shadow.sm,
           }}
         >
           <table
@@ -2087,7 +2060,7 @@ export default function HQStock() {
                             style={{
                               fontSize: "10px",
                               color: T.ink300,
-                              fontFamily: T.mono,
+                              fontFamily: MONO,
                               marginTop: "2px",
                             }}
                           >
@@ -2111,7 +2084,7 @@ export default function HQStock() {
                               fontSize: "9px",
                               padding: "2px 7px",
                               borderRadius: "3px",
-                              background: T.ink075,
+                              background: T.bg,
                               color: T.ink500,
                               letterSpacing: "0.1em",
                               textTransform: "uppercase",
@@ -2144,7 +2117,7 @@ export default function HQStock() {
                           style={{
                             ...sTd,
                             textAlign: "right",
-                            fontFamily: T.mono,
+                            fontFamily: MONO,
                             fontWeight: 600,
                             color: low ? T.danger : T.ink700,
                           }}
@@ -2155,7 +2128,7 @@ export default function HQStock() {
                           style={{
                             ...sTd,
                             textAlign: "right",
-                            fontFamily: T.mono,
+                            fontFamily: MONO,
                             fontWeight: 700,
                             color: avail <= 0 ? T.danger : T.success,
                           }}
@@ -2178,7 +2151,7 @@ export default function HQStock() {
                           style={{
                             ...sTd,
                             textAlign: "right",
-                            fontFamily: T.mono,
+                            fontFamily: MONO,
                             fontSize: "12px",
                             color: T.ink500,
                           }}
@@ -2201,8 +2174,8 @@ export default function HQStock() {
                               <span
                                 style={{
                                   fontSize: "12px",
-                                  color: T.ink400,
-                                  fontFamily: T.mono,
+                                  color: T.ink500,
+                                  fontFamily: MONO,
                                 }}
                               >
                                 {fmtDate(item.expiry_date)}
@@ -2263,8 +2236,8 @@ export default function HQStock() {
                                     borderRadius: 8,
                                     background:
                                       active.length > 0
-                                        ? T.successBg
-                                        : T.warningBg,
+                                        ? T.successLight
+                                        : T.warningLight,
                                     color:
                                       active.length > 0 ? T.success : T.warning,
                                   }}
@@ -2273,7 +2246,7 @@ export default function HQStock() {
                                 </span>
                                 {scans > 0 && (
                                   <span
-                                    style={{ fontSize: 8, color: T.ink400 }}
+                                    style={{ fontSize: 8, color: T.ink500 }}
                                   >
                                     {scans} scans
                                   </span>
@@ -2286,8 +2259,8 @@ export default function HQStock() {
                           style={{
                             ...sTd,
                             fontSize: "11px",
-                            color: T.ink400,
-                            fontFamily: T.mono,
+                            color: T.ink500,
+                            fontFamily: MONO,
                           }}
                         >
                           {item.batch_lot_number || (
@@ -2296,7 +2269,7 @@ export default function HQStock() {
                         </td>
                         <td style={{ ...sTd, fontSize: "11px" }}>
                           {item.reorder_level != null ? (
-                            <span style={{ color: low ? T.danger : T.ink400 }}>
+                            <span style={{ color: low ? T.danger : T.ink500 }}>
                               {fmtQty(item.reorder_level, item.unit)}
                               {item.reorder_qty && (
                                 <span style={{ color: T.warning }}>
@@ -2309,7 +2282,7 @@ export default function HQStock() {
                           )}
                         </td>
                         <td
-                          style={{ ...sTd, fontSize: "11px", color: T.ink400 }}
+                          style={{ ...sTd, fontSize: "11px", color: T.ink500 }}
                         >
                           {item.suppliers?.name || (
                             <span style={{ color: T.ink300 }}>—</span>
@@ -2363,7 +2336,7 @@ export default function HQStock() {
                                 fontSize: "10px",
                                 fontFamily: T.font,
                                 fontWeight: 600,
-                                border: "1px solid " + T.ink150,
+                                border: "1px solid " + T.border,
                                 color: T.ink500,
                                 background: "transparent",
                                 borderRadius: "3px",
@@ -2432,17 +2405,17 @@ export default function HQStock() {
             onChange={(e) => setSearch(e.target.value)}
             style={{ ...sInput, width: "280px" }}
           />
-          <span style={{ fontSize: "12px", color: T.ink400 }}>
+          <span style={{ fontSize: "12px", color: T.ink500 }}>
             {filtered.length} record{filtered.length !== 1 ? "s" : ""}
           </span>
         </div>
         <div
           style={{
             background: "#fff",
-            border: "1px solid " + T.ink150,
+            border: "1px solid " + T.border,
             borderRadius: "6px",
             overflow: "auto",
-            boxShadow: T.shadow,
+            boxShadow: T.shadow.sm,
           }}
         >
           <table
@@ -2454,7 +2427,7 @@ export default function HQStock() {
             }}
           >
             <thead>
-              <tr style={{ background: T.ink050 }}>
+              <tr style={{ background: T.surface }}>
                 {[
                   "Date",
                   "Item",
@@ -2496,8 +2469,8 @@ export default function HQStock() {
                         style={{
                           ...sTd,
                           fontSize: "11px",
-                          color: T.ink400,
-                          fontFamily: T.mono,
+                          color: T.ink500,
+                          fontFamily: MONO,
                           whiteSpace: "nowrap",
                         }}
                       >
@@ -2514,7 +2487,7 @@ export default function HQStock() {
                             fontSize: "9px",
                             padding: "2px 7px",
                             borderRadius: "3px",
-                            background: T.ink075,
+                            background: T.bg,
                             color: T.ink500,
                             textTransform: "uppercase",
                             letterSpacing: "0.08em",
@@ -2527,7 +2500,7 @@ export default function HQStock() {
                       <td
                         style={{
                           ...sTd,
-                          fontFamily: T.mono,
+                          fontFamily: MONO,
                           fontWeight: 700,
                           color: pos ? T.success : T.danger,
                         }}
@@ -2538,9 +2511,9 @@ export default function HQStock() {
                       <td
                         style={{
                           ...sTd,
-                          fontFamily: T.mono,
+                          fontFamily: MONO,
                           fontSize: "12px",
-                          color: T.ink400,
+                          color: T.ink500,
                         }}
                       >
                         {m.unit_cost ? fmt(m.unit_cost) : "—"}
@@ -2549,8 +2522,8 @@ export default function HQStock() {
                         style={{
                           ...sTd,
                           fontSize: "11px",
-                          color: T.ink400,
-                          fontFamily: T.mono,
+                          color: T.ink500,
+                          fontFamily: MONO,
                         }}
                       >
                         {m.reference || "—"}
@@ -2559,7 +2532,7 @@ export default function HQStock() {
                         style={{
                           ...sTd,
                           fontSize: "11px",
-                          color: T.ink400,
+                          color: T.ink500,
                           fontStyle: m.notes ? "italic" : "normal",
                         }}
                       >
@@ -2619,7 +2592,7 @@ export default function HQStock() {
                 style={{
                   fontSize: "11px",
                   color: T.ink300,
-                  fontFamily: T.mono,
+                  fontFamily: MONO,
                 }}
               >
                 {item.sku}
@@ -2639,7 +2612,7 @@ export default function HQStock() {
                 fontSize: "11px",
                 fontFamily: T.font,
                 background: "transparent",
-                border: "1px solid " + T.ink150,
+                border: "1px solid " + T.border,
                 borderRadius: "2px",
                 cursor: "pointer",
                 color: T.ink500,
@@ -2669,7 +2642,7 @@ export default function HQStock() {
                 fontSize: "11px",
                 fontFamily: T.font,
                 background: "transparent",
-                border: "1px solid " + (isAdj ? T.dangerBd : T.ink150),
+                border: "1px solid " + (isAdj ? T.dangerBd : T.border),
                 borderRadius: "2px",
                 cursor: "pointer",
                 color: isAdj ? T.danger : T.ink500,
@@ -2711,7 +2684,7 @@ export default function HQStock() {
         </div>
         <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
           {item.suppliers?.name && (
-            <span style={{ fontSize: "11px", color: T.ink400 }}>
+            <span style={{ fontSize: "11px", color: T.ink500 }}>
               Supplier: {item.suppliers.name}
             </span>
           )}
@@ -2769,13 +2742,13 @@ export default function HQStock() {
                 style={{
                   fontSize: "11px",
                   color: T.ink300,
-                  fontFamily: T.mono,
+                  fontFamily: MONO,
                 }}
               >
                 {pItems.length} item{pItems.length !== 1 ? "s" : ""}
               </span>
               {totalVal > 0 && (
-                <span style={{ fontSize: "11px", color: T.ink400 }}>
+                <span style={{ fontSize: "11px", color: T.ink500 }}>
                   {fmt(totalVal)} total value
                 </span>
               )}
@@ -2807,10 +2780,10 @@ export default function HQStock() {
                   fontSize: "12px",
                   color: T.ink300,
                   padding: "14px",
-                  border: "1px dashed " + T.ink150,
+                  border: "1px dashed " + T.border,
                   borderRadius: "4px",
                   textAlign: "center",
-                  background: T.ink050,
+                  background: T.surface,
                 }}
               >
                 No items.{" "}
@@ -2964,7 +2937,7 @@ export default function HQStock() {
         { name: "Healthy >40%", value: healthy, color: T.success },
         { name: "Marginal 20–40%", value: marginal, color: T.warning },
         { name: "Thin <20%", value: thin, color: T.danger },
-        { name: "No price set", value: unpriced, color: T.ink150 },
+        { name: "No price set", value: unpriced, color: T.border },
       ].filter((d) => d.value > 0);
     }, [activeItems, pricedItems]);
 
@@ -3161,7 +3134,7 @@ export default function HQStock() {
           <div
             style={{
               background: "#fff",
-              border: "1px solid " + T.ink150,
+              border: "1px solid " + T.border,
               borderRadius: 6,
               overflow: "hidden",
             }}
@@ -3169,7 +3142,7 @@ export default function HQStock() {
             <div
               style={{
                 padding: "12px 20px",
-                borderBottom: "1px solid " + T.ink150,
+                borderBottom: "1px solid " + T.border,
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
@@ -3181,12 +3154,12 @@ export default function HQStock() {
                   fontWeight: 700,
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  color: T.ink400,
+                  color: T.ink500,
                 }}
               >
                 Action Queue
               </span>
-              <span style={{ fontSize: 10, color: T.ink300, fontFamily: T.mono }}>
+              <span style={{ fontSize: 10, color: T.ink300, fontFamily: MONO }}>
                 {new Date().toLocaleTimeString("en-ZA", {
                   hour: "2-digit",
                   minute: "2-digit",
@@ -3206,7 +3179,7 @@ export default function HQStock() {
                   width: 26,
                   height: 26,
                   borderRadius: "50%",
-                  background: T.successBg,
+                  background: T.successLight,
                   border: "1px solid " + T.successBd,
                   display: "flex",
                   alignItems: "center",
@@ -3224,7 +3197,7 @@ export default function HQStock() {
                 >
                   All good
                 </div>
-                <div style={{ fontSize: 11, color: T.ink400, marginTop: 1 }}>
+                <div style={{ fontSize: 11, color: T.ink500, marginTop: 1 }}>
                   All items in stock · All SKUs priced · No critical holds
                 </div>
               </div>
@@ -3258,7 +3231,7 @@ export default function HQStock() {
               key={tile.label}
               style={{
                 background: "#fff",
-                border: "1px solid " + T.ink150,
+                border: "1px solid " + T.border,
                 borderRadius: 6,
                 padding: "14px 16px",
                 // No coloured top borders — forbidden by WP-VISUAL-SYSTEM v1.0
@@ -3270,7 +3243,7 @@ export default function HQStock() {
                   fontWeight: 700,
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  color: T.ink400,
+                  color: T.ink500,
                   marginBottom: 8,
                 }}
               >
@@ -3288,7 +3261,7 @@ export default function HQStock() {
                     style={{
                       fontSize: 22,
                       fontWeight: 400,
-                      fontFamily: T.mono,
+                      fontFamily: MONO,
                       fontVariantNumeric: "tabular-nums",
                       color: tile.valueColor,
                       lineHeight: 1,
@@ -3330,7 +3303,7 @@ export default function HQStock() {
           <div
             style={{
               background: "#fff",
-              border: "1px solid " + T.ink150,
+              border: "1px solid " + T.border,
               borderRadius: 6,
               overflow: "hidden",
             }}
@@ -3338,7 +3311,7 @@ export default function HQStock() {
             <div
               style={{
                 padding: "12px 20px",
-                borderBottom: "1px solid " + T.ink150,
+                borderBottom: "1px solid " + T.border,
               }}
             >
               <span
@@ -3347,7 +3320,7 @@ export default function HQStock() {
                   fontWeight: 700,
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  color: T.ink400,
+                  color: T.ink500,
                 }}
               >
                 Category Health
@@ -3392,7 +3365,7 @@ export default function HQStock() {
           <div
             style={{
               background: "#fff",
-              border: "1px solid " + T.ink150,
+              border: "1px solid " + T.border,
               borderRadius: 6,
               overflow: "hidden",
             }}
@@ -3400,7 +3373,7 @@ export default function HQStock() {
             <div
               style={{
                 padding: "12px 20px",
-                borderBottom: "1px solid " + T.ink150,
+                borderBottom: "1px solid " + T.border,
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
@@ -3412,7 +3385,7 @@ export default function HQStock() {
                   fontWeight: 700,
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  color: T.ink400,
+                  color: T.ink500,
                 }}
               >
                 Margin Distribution
@@ -3427,7 +3400,7 @@ export default function HQStock() {
                     padding: "2px 8px",
                     borderRadius: 3,
                     cursor: "pointer",
-                    background: T.warningBg,
+                    background: T.warningLight,
                     color: T.warning,
                     border: "1px solid " + T.warningBd,
                     fontFamily: T.font,
@@ -3471,7 +3444,7 @@ export default function HQStock() {
                         contentStyle={{
                           fontSize: 11,
                           fontFamily: T.font,
-                          border: "1px solid " + T.ink150,
+                          border: "1px solid " + T.border,
                           borderRadius: 4,
                         }}
                       />
@@ -3508,7 +3481,7 @@ export default function HQStock() {
                         />
                         <span
                           style={{
-                            fontFamily: T.mono,
+                            fontFamily: MONO,
                             fontVariantNumeric: "tabular-nums",
                             color: T.ink700,
                             fontWeight: 600,
@@ -3543,7 +3516,7 @@ export default function HQStock() {
           <div
             style={{
               background: "#fff",
-              border: "1px solid " + T.ink150,
+              border: "1px solid " + T.border,
               borderRadius: 6,
               overflow: "hidden",
             }}
@@ -3551,7 +3524,7 @@ export default function HQStock() {
             <div
               style={{
                 padding: "12px 20px",
-                borderBottom: "1px solid " + T.ink150,
+                borderBottom: "1px solid " + T.border,
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
@@ -3563,7 +3536,7 @@ export default function HQStock() {
                   fontWeight: 700,
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  color: T.ink400,
+                  color: T.ink500,
                 }}
               >
                 Recent Stock Movements
@@ -3608,14 +3581,14 @@ export default function HQStock() {
                   return (
                     <tr
                       key={m.id}
-                      style={{ background: idx % 2 === 0 ? "#fff" : T.ink075 }}
+                      style={{ background: idx % 2 === 0 ? "#fff" : T.bg }}
                     >
                       <td
                         style={{
                           ...sTd,
                           fontSize: 11,
-                          color: T.ink400,
-                          fontFamily: T.mono,
+                          color: T.ink500,
+                          fontFamily: MONO,
                           whiteSpace: "nowrap",
                         }}
                       >
@@ -3632,9 +3605,9 @@ export default function HQStock() {
                             fontSize: 9,
                             padding: "2px 7px",
                             borderRadius: 3,
-                            background: T.ink075,
+                            background: T.bg,
                             color: T.ink500,
-                            border: "1px solid " + T.ink150,
+                            border: "1px solid " + T.border,
                             textTransform: "uppercase",
                             letterSpacing: "0.08em",
                             fontWeight: 700,
@@ -3646,7 +3619,7 @@ export default function HQStock() {
                       <td
                         style={{
                           ...sTd,
-                          fontFamily: T.mono,
+                          fontFamily: MONO,
                           fontVariantNumeric: "tabular-nums",
                           fontWeight: 700,
                           color: qty >= 0 ? T.success : T.danger,
@@ -3659,8 +3632,8 @@ export default function HQStock() {
                         style={{
                           ...sTd,
                           fontSize: 11,
-                          color: T.ink400,
-                          fontFamily: T.mono,
+                          color: T.ink500,
+                          fontFamily: MONO,
                         }}
                       >
                         {m.reference || "—"}
@@ -3785,7 +3758,7 @@ export default function HQStock() {
         {(noPrice > 0 || outCount > 0) && (
           <div
             style={{
-              background: T.warningBg,
+              background: T.warningLight,
               border: "1px solid " + T.warningBd,
               borderRadius: 6,
               padding: "10px 16px",
@@ -3828,7 +3801,7 @@ export default function HQStock() {
           <div
             style={{
               background: "#fff",
-              border: "1px solid " + T.ink150,
+              border: "1px solid " + T.border,
               borderRadius: 6,
               padding: "8px 0",
               height: "fit-content",
@@ -3839,7 +3812,7 @@ export default function HQStock() {
                 padding: "8px 12px 6px",
                 fontSize: 9,
                 fontWeight: 700,
-                color: T.ink400,
+                color: T.ink500,
                 textTransform: "uppercase",
                 letterSpacing: "0.1em",
                 fontFamily: T.font,
@@ -3867,7 +3840,7 @@ export default function HQStock() {
                     border: "none",
                     cursor: "pointer",
                     textAlign: "left",
-                    background: active ? T.accentLit : "transparent",
+                    background: active ? T.accentLight : "transparent",
                     borderLeft: active
                       ? "3px solid " + T.accentMid
                       : "3px solid transparent",
@@ -3894,7 +3867,7 @@ export default function HQStock() {
                         fontSize: 9,
                         fontWeight: 700,
                         fontFamily: T.font,
-                        background: active ? T.accentMid : T.ink150,
+                        background: active ? T.accentMid : T.border,
                         color: active ? "#fff" : T.ink500,
                         padding: "1px 5px",
                         borderRadius: 8,
@@ -3929,14 +3902,14 @@ export default function HQStock() {
               />
               <div style={{ flex: 1 }} />
               <span
-                style={{ fontSize: 11, color: T.ink400, fontFamily: T.font }}
+                style={{ fontSize: 11, color: T.ink500, fontFamily: T.font }}
               >
                 {filtered.length} item{filtered.length !== 1 ? "s" : ""}
               </span>
               <div
                 style={{
                   display: "flex",
-                  border: "1px solid " + T.ink150,
+                  border: "1px solid " + T.border,
                   borderRadius: 4,
                   overflow: "hidden",
                 }}
@@ -4039,7 +4012,7 @@ export default function HQStock() {
                         fontWeight: active ? 700 : 500,
                         fontFamily: T.font,
                         border:
-                          "1.5px solid " + (active ? T.accentMid : T.ink150),
+                          "1.5px solid " + (active ? T.accentMid : T.border),
                         background: active ? T.accentMid : "#fff",
                         color: active ? "#fff" : T.ink700,
                         cursor: "pointer",
@@ -4071,7 +4044,7 @@ export default function HQStock() {
                         style={{
                           fontSize: 9,
                           fontWeight: 700,
-                          color: T.ink400,
+                          color: T.ink500,
                           textTransform: "uppercase",
                           letterSpacing: "0.1em",
                           marginBottom: 6,
@@ -4136,12 +4109,12 @@ export default function HQStock() {
                                     ? T.accentMid
                                     : inStock
                                       ? T.accentBd
-                                      : T.ink150),
+                                      : T.border),
                                 background: isActive
                                   ? T.accentMid
                                   : inStock
-                                    ? T.accentLit
-                                    : T.ink050,
+                                    ? T.accentLight
+                                    : T.surface,
                                 fontFamily: T.font,
                                 display: "flex",
                                 flexDirection: "column",
@@ -4160,7 +4133,7 @@ export default function HQStock() {
                                     ? "#fff"
                                     : inStock
                                       ? T.accentMid
-                                      : T.ink400,
+                                      : T.ink500,
                                 }}
                               >
                                 {lbl}
@@ -4566,7 +4539,7 @@ export default function HQStock() {
                             border:
                               "1.5px solid " +
                               (isActive ? T.accentMid : T.accentBd),
-                            background: isActive ? T.accentMid : T.accentLit,
+                            background: isActive ? T.accentMid : T.accentLight,
                             fontFamily: T.font,
                             display: "flex",
                             flexDirection: "column",
@@ -4590,7 +4563,7 @@ export default function HQStock() {
                               fontSize: 10,
                               color: isActive
                                 ? "rgba(255,255,255,0.65)"
-                                : T.ink400,
+                                : T.ink500,
                             }}
                           >
                             {count} items
@@ -4612,8 +4585,8 @@ export default function HQStock() {
                         padding: "8px 14px",
                         borderRadius: 6,
                         cursor: "pointer",
-                        border: "1.5px dashed " + T.ink150,
-                        background: T.ink050,
+                        border: "1.5px dashed " + T.border,
+                        background: T.surface,
                         fontFamily: T.font,
                         display: "flex",
                         flexDirection: "column",
@@ -4626,7 +4599,7 @@ export default function HQStock() {
                         style={{
                           fontSize: 11,
                           fontWeight: 700,
-                          color: T.ink400,
+                          color: T.ink500,
                         }}
                       >
                         + Add New
@@ -4690,7 +4663,7 @@ export default function HQStock() {
                         key={item.id}
                         style={{
                           background: "#fff",
-                          border: "1px solid " + (low ? T.dangerBd : T.ink150),
+                          border: "1px solid " + (low ? T.dangerBd : T.border),
                           borderRadius: 8,
                           padding: 14,
                           display: "flex",
@@ -4722,7 +4695,7 @@ export default function HQStock() {
                           style={{
                             fontSize: 10,
                             color: T.ink300,
-                            fontFamily: T.mono,
+                            fontFamily: MONO,
                           }}
                         >
                           {item.sku}
@@ -4731,7 +4704,7 @@ export default function HQStock() {
                           <span
                             style={{
                               fontSize: 10,
-                              color: T.ink400,
+                              color: T.ink500,
                               fontFamily: T.font,
                             }}
                           >
@@ -4766,7 +4739,7 @@ export default function HQStock() {
                               fontSize: 14,
                               fontWeight: 800,
                               color: T.accentMid,
-                              fontFamily: T.mono,
+                              fontFamily: MONO,
                               fontVariantNumeric: "tabular-nums",
                             }}
                           >
@@ -4793,10 +4766,10 @@ export default function HQStock() {
                                 borderRadius: 3,
                                 background:
                                   margin >= 50
-                                    ? T.successBg
+                                    ? T.successLight
                                     : margin >= 30
-                                      ? T.warningBg
-                                      : T.dangerBg,
+                                      ? T.warningLight
+                                      : T.dangerLight,
                                 color:
                                   margin >= 50
                                     ? T.success
@@ -4812,8 +4785,8 @@ export default function HQStock() {
                         <div
                           style={{
                             fontSize: 11,
-                            color: low ? T.danger : T.ink400,
-                            fontFamily: T.mono,
+                            color: low ? T.danger : T.ink500,
+                            fontFamily: MONO,
                           }}
                         >
                           {fmtQty(item.quantity_on_hand, item.unit)} on hand
@@ -4824,7 +4797,7 @@ export default function HQStock() {
                           style={{
                             display: "flex",
                             gap: 5,
-                            borderTop: "1px solid " + T.ink075,
+                            borderTop: "1px solid " + T.bg,
                             paddingTop: 8,
                           }}
                         >
@@ -4836,7 +4809,7 @@ export default function HQStock() {
                               fontSize: 10,
                               fontWeight: 600,
                               fontFamily: T.font,
-                              border: "1px solid " + T.ink150,
+                              border: "1px solid " + T.border,
                               color: T.ink500,
                               background: "transparent",
                               borderRadius: 3,
@@ -4913,7 +4886,7 @@ export default function HQStock() {
                   marginBottom: 8,
                 }}
               >
-                <span style={{ fontSize: 11, color: T.ink400 }}>
+                <span style={{ fontSize: 11, color: T.ink500 }}>
                   Filtered by:
                 </span>
                 <span
@@ -4945,7 +4918,7 @@ export default function HQStock() {
                     ×
                   </button>
                 </span>
-                <span style={{ fontSize: 11, color: T.ink400 }}>
+                <span style={{ fontSize: 11, color: T.ink500 }}>
                   {filtered.length} item{filtered.length !== 1 ? "s" : ""}
                 </span>
               </div>
@@ -4970,7 +4943,7 @@ export default function HQStock() {
               <div
                 style={{
                   background: "#fff",
-                  border: "1px solid " + T.ink150,
+                  border: "1px solid " + T.border,
                   borderRadius: 6,
                   overflow: "auto",
                 }}
@@ -5045,7 +5018,7 @@ export default function HQStock() {
                           <React.Fragment key={item.id}>
                             <tr
                               style={{
-                                background: idx % 2 === 0 ? "#fff" : T.ink050,
+                                background: idx % 2 === 0 ? "#fff" : T.surface,
                                 borderLeft: low
                                   ? "3px solid " + T.danger
                                   : "3px solid transparent",
@@ -5071,7 +5044,7 @@ export default function HQStock() {
                                   style={{
                                     fontSize: 10,
                                     color: T.ink300,
-                                    fontFamily: T.mono,
+                                    fontFamily: MONO,
                                     marginTop: 2,
                                   }}
                                 >
@@ -5081,7 +5054,7 @@ export default function HQStock() {
                                   <div
                                     style={{
                                       fontSize: 10,
-                                      color: T.ink400,
+                                      color: T.ink500,
                                       marginTop: 1,
                                     }}
                                   >
@@ -5122,7 +5095,7 @@ export default function HQStock() {
                               <td
                                 style={{
                                   ...sTd,
-                                  fontFamily: T.mono,
+                                  fontFamily: MONO,
                                   fontWeight: 700,
                                   color: low ? T.danger : T.ink700,
                                   fontVariantNumeric: "tabular-nums",
@@ -5133,7 +5106,7 @@ export default function HQStock() {
                               <td
                                 style={{
                                   ...sTd,
-                                  fontFamily: T.mono,
+                                  fontFamily: MONO,
                                   fontWeight: 700,
                                   color: avail <= 0 ? T.danger : T.success,
                                   fontVariantNumeric: "tabular-nums",
@@ -5156,7 +5129,7 @@ export default function HQStock() {
                               <td
                                 style={{
                                   ...sTd,
-                                  fontFamily: T.mono,
+                                  fontFamily: MONO,
                                   fontWeight: 700,
                                   color: T.accentMid,
                                   fontVariantNumeric: "tabular-nums",
@@ -5186,10 +5159,10 @@ export default function HQStock() {
                                       borderRadius: 3,
                                       background:
                                         margin >= 50
-                                          ? T.successBg
+                                          ? T.successLight
                                           : margin >= 30
-                                            ? T.warningBg
-                                            : T.dangerBg,
+                                            ? T.warningLight
+                                            : T.dangerLight,
                                       color:
                                         margin >= 50
                                           ? T.success
@@ -5207,7 +5180,7 @@ export default function HQStock() {
                               <td
                                 style={{
                                   ...sTd,
-                                  fontFamily: T.mono,
+                                  fontFamily: MONO,
                                   fontSize: 12,
                                   color: T.ink500,
                                   fontVariantNumeric: "tabular-nums",
@@ -5230,7 +5203,7 @@ export default function HQStock() {
                                       fontSize: 10,
                                       fontFamily: T.font,
                                       fontWeight: 600,
-                                      border: "1px solid " + T.ink150,
+                                      border: "1px solid " + T.border,
                                       color: T.ink500,
                                       background: "transparent",
                                       borderRadius: 3,
@@ -5330,7 +5303,7 @@ export default function HQStock() {
       <div
         style={{
           padding: "16px",
-          background: T.dangerBg,
+          background: T.dangerLight,
           border: "1px solid " + T.dangerBd,
           borderRadius: "4px",
           color: T.danger,
@@ -5410,7 +5383,7 @@ export default function HQStock() {
             style={{
               padding: "6px 14px",
               background: "transparent",
-              border: "1px solid " + T.ink150,
+              border: "1px solid " + T.border,
               borderRadius: "3px",
               cursor: "pointer",
               fontSize: "12px",
@@ -5429,7 +5402,7 @@ export default function HQStock() {
           style={{
             display: "flex",
             gap: 0,
-            borderBottom: "1px solid " + T.ink150,
+            borderBottom: "1px solid " + T.border,
             marginBottom: "24px",
             marginTop: "16px",
           }}
@@ -5482,7 +5455,7 @@ export default function HQStock() {
                     letterSpacing: "0.08em",
                     padding: "1px 5px",
                     borderRadius: 3,
-                    background: T.infoBg,
+                    background: T.infoLight,
                     color: T.info,
                     border: "1px solid " + T.infoBd,
                     textTransform: "uppercase",
@@ -5530,7 +5503,7 @@ export default function HQStock() {
               bottom: 24,
               left: "50%",
               transform: "translateX(-50%)",
-              background: T.warningBg,
+              background: T.warningLight,
               border: `1px solid ${T.warningBd}`,
               borderRadius: 8,
               padding: "14px 20px",
@@ -5683,7 +5656,7 @@ export default function HQStock() {
                 >
                   What are you adding?
                 </div>
-                <div style={{ fontSize: 12, color: T.ink400 }}>
+                <div style={{ fontSize: 12, color: T.ink500 }}>
                   Choose a product type — the form adapts with the right fields
                 </div>
               </div>
@@ -5694,7 +5667,7 @@ export default function HQStock() {
                   border: "none",
                   fontSize: 20,
                   cursor: "pointer",
-                  color: T.ink400,
+                  color: T.ink500,
                 }}
               >
                 ×
@@ -5723,7 +5696,7 @@ export default function HQStock() {
                   style={{
                     padding: "14px 12px",
                     borderRadius: 8,
-                    border: `1px solid ${T.ink150}`,
+                    border: `1px solid ${T.border}`,
                     cursor: "pointer",
                     textAlign: "center",
                     background: "#fff",
@@ -5731,10 +5704,10 @@ export default function HQStock() {
                   }}
                   onMouseOver={(e) => {
                     e.currentTarget.style.borderColor = T.accent;
-                    e.currentTarget.style.background = T.accentLit;
+                    e.currentTarget.style.background = T.accentLight;
                   }}
                   onMouseOut={(e) => {
-                    e.currentTarget.style.borderColor = T.ink150;
+                    e.currentTarget.style.borderColor = T.border;
                     e.currentTarget.style.background = "#fff";
                   }}
                 >
@@ -5752,7 +5725,7 @@ export default function HQStock() {
                     {world.label}
                   </div>
                   <div
-                    style={{ fontSize: 10, color: T.ink400, lineHeight: 1.4 }}
+                    style={{ fontSize: 10, color: T.ink500, lineHeight: 1.4 }}
                   >
                     {world.desc || world.enums?.[0]?.replace(/_/g, " ") || ""}
                   </div>

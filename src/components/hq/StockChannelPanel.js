@@ -7,72 +7,44 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
-
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  mono: "'DM Mono','Courier New',monospace",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
+import { T } from "../../styles/tokens";
+const MONO = "'DM Mono','Courier New',monospace";
 
 // Channel display config
 const CHANNEL = {
   online: {
     label: "Online Shop",
     color: T.info,
-    bg: T.infoBg,
+    bg: T.infoLight,
     bd: T.infoBd,
     icon: "🌐",
   },
   wholesale: {
     label: "Wholesale",
     color: T.warning,
-    bg: T.warningBg,
+    bg: T.warningLight,
     bd: T.warningBd,
     icon: "📦",
   },
   retail: {
     label: "Physical Store",
     color: T.accentMid,
-    bg: T.accentLit,
+    bg: T.accentLight,
     bd: T.accentBd,
     icon: "🏪",
   },
   transfer: {
     label: "Transfer Hold",
     color: T.ink500,
-    bg: T.ink075,
-    bd: T.ink150,
+    bg: T.bg,
+    bd: T.border,
     icon: "🔄",
   },
   unknown: {
     label: "Untagged",
-    color: T.ink400,
-    bg: T.ink075,
-    bd: T.ink150,
+    color: T.ink500,
+    bg: T.bg,
+    bd: T.border,
     icon: "?",
   },
 };
@@ -83,16 +55,16 @@ const sTh = {
   fontSize: "10px",
   letterSpacing: "0.1em",
   textTransform: "uppercase",
-  color: T.ink400,
-  borderBottom: `2px solid ${T.ink150}`,
+  color: T.ink500,
+  borderBottom: `2px solid ${T.border}`,
   fontWeight: 700,
   fontFamily: T.font,
   whiteSpace: "nowrap",
-  background: T.ink050,
+  background: T.surface,
 };
 const sTd = {
   padding: "9px 12px",
-  borderBottom: `1px solid ${T.ink150}`,
+  borderBottom: `1px solid ${T.border}`,
   fontSize: "13px",
   fontFamily: T.font,
   color: T.ink700,
@@ -214,10 +186,10 @@ export default function StockChannelPanel({ tenantId }) {
       <div
         style={{
           background: "#fff",
-          border: `1px solid ${T.ink150}`,
+          border: `1px solid ${T.border}`,
           borderRadius: 6,
           padding: "20px",
-          boxShadow: T.shadow,
+          boxShadow: T.shadow.sm,
         }}
       >
         <p
@@ -237,16 +209,16 @@ export default function StockChannelPanel({ tenantId }) {
     <div
       style={{
         background: "#fff",
-        border: `1px solid ${T.ink150}`,
+        border: `1px solid ${T.border}`,
         borderRadius: 6,
-        boxShadow: T.shadow,
+        boxShadow: T.shadow.sm,
       }}
     >
       {/* Header */}
       <div
         style={{
           padding: "14px 20px",
-          borderBottom: `1px solid ${T.ink150}`,
+          borderBottom: `1px solid ${T.border}`,
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
@@ -261,7 +233,7 @@ export default function StockChannelPanel({ tenantId }) {
               fontWeight: 700,
               letterSpacing: "0.1em",
               textTransform: "uppercase",
-              color: T.ink400,
+              color: T.ink500,
               fontFamily: T.font,
             }}
           >
@@ -283,7 +255,7 @@ export default function StockChannelPanel({ tenantId }) {
             onClick={load}
             style={{
               padding: "5px 12px",
-              border: `1px solid ${T.ink150}`,
+              border: `1px solid ${T.border}`,
               borderRadius: 3,
               background: "transparent",
               color: T.ink500,
@@ -323,7 +295,7 @@ export default function StockChannelPanel({ tenantId }) {
           <div
             style={{
               padding: "14px 20px",
-              borderBottom: `1px solid ${T.ink150}`,
+              borderBottom: `1px solid ${T.border}`,
               display: "flex",
               gap: 8,
               flexWrap: "wrap",
@@ -357,7 +329,7 @@ export default function StockChannelPanel({ tenantId }) {
                       fontSize: 20,
                       fontWeight: 400,
                       color: cfg.color,
-                      fontFamily: T.mono,
+                      fontFamily: MONO,
                       lineHeight: 1,
                       letterSpacing: "-0.02em",
                     }}
@@ -383,7 +355,7 @@ export default function StockChannelPanel({ tenantId }) {
             {totals.unknown > 0 && (
               <div
                 style={{
-                  background: T.warningBg,
+                  background: T.warningLight,
                   border: `1px solid ${T.warningBd}`,
                   borderRadius: 6,
                   padding: "10px 14px",
@@ -406,7 +378,7 @@ export default function StockChannelPanel({ tenantId }) {
           <div
             style={{
               padding: "10px 20px",
-              background: T.infoBg,
+              background: T.infoLight,
               borderBottom: `1px solid ${T.infoBd}`,
               display: "flex",
               gap: 20,
@@ -497,10 +469,10 @@ export default function StockChannelPanel({ tenantId }) {
                         key={id}
                         style={{
                           background: isRisky
-                            ? T.dangerBg
+                            ? T.dangerLight
                             : idx % 2 === 0
                               ? "#fff"
-                              : T.ink050,
+                              : T.surface,
                           borderLeft: isRisky
                             ? `3px solid ${T.danger}`
                             : isLow
@@ -517,7 +489,7 @@ export default function StockChannelPanel({ tenantId }) {
                             style={{
                               fontSize: 10,
                               color: T.ink300,
-                              fontFamily: T.mono,
+                              fontFamily: MONO,
                               marginTop: 2,
                             }}
                           >
@@ -529,7 +501,7 @@ export default function StockChannelPanel({ tenantId }) {
                                 fontSize: 9,
                                 padding: "1px 6px",
                                 borderRadius: 2,
-                                background: T.dangerBg,
+                                background: T.dangerLight,
                                 color: T.danger,
                                 border: `1px solid ${T.dangerBd}`,
                                 fontWeight: 700,
@@ -548,7 +520,7 @@ export default function StockChannelPanel({ tenantId }) {
                           style={{
                             ...sTd,
                             textAlign: "right",
-                            fontFamily: T.mono,
+                            fontFamily: MONO,
                             fontWeight: 600,
                             color: T.ink700,
                             fontVariantNumeric: "tabular-nums",
@@ -567,7 +539,7 @@ export default function StockChannelPanel({ tenantId }) {
                               style={{
                                 ...sTd,
                                 textAlign: "right",
-                                fontFamily: T.mono,
+                                fontFamily: MONO,
                                 fontVariantNumeric: "tabular-nums",
                               }}
                             >
@@ -578,7 +550,7 @@ export default function StockChannelPanel({ tenantId }) {
                                   {fmtN(held)}
                                 </span>
                               ) : (
-                                <span style={{ color: T.ink150 }}>—</span>
+                                <span style={{ color: T.border }}>—</span>
                               )}
                             </td>
                           );
@@ -589,7 +561,7 @@ export default function StockChannelPanel({ tenantId }) {
                           style={{
                             ...sTd,
                             textAlign: "right",
-                            fontFamily: T.mono,
+                            fontFamily: MONO,
                             fontWeight: 700,
                             color: isRisky
                               ? T.danger
@@ -604,7 +576,7 @@ export default function StockChannelPanel({ tenantId }) {
                             <div
                               style={{
                                 fontSize: 9,
-                                color: T.ink400,
+                                color: T.ink500,
                                 fontWeight: 400,
                               }}
                             >
@@ -636,7 +608,7 @@ export default function StockChannelPanel({ tenantId }) {
                                       color: cfg.color,
                                       border: `1px solid ${cfg.bd}`,
                                       fontWeight: 600,
-                                      fontFamily: T.mono,
+                                      fontFamily: MONO,
                                     }}
                                   >
                                     {r.ref}
@@ -650,7 +622,7 @@ export default function StockChannelPanel({ tenantId }) {
                               )}
                             </div>
                           ) : (
-                            <span style={{ color: T.ink150 }}>—</span>
+                            <span style={{ color: T.border }}>—</span>
                           )}
                         </td>
                       </tr>
@@ -665,13 +637,13 @@ export default function StockChannelPanel({ tenantId }) {
           <div
             style={{
               padding: "10px 20px",
-              borderTop: `1px solid ${T.ink150}`,
+              borderTop: `1px solid ${T.border}`,
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
             }}
           >
-            <span style={{ fontSize: 11, color: T.ink400, fontFamily: T.font }}>
+            <span style={{ fontSize: 11, color: T.ink500, fontFamily: T.font }}>
               {itemList.length} item{itemList.length !== 1 ? "s" : ""} with
               active holds · {fmtN(totalHeld)} total units reserved
             </span>

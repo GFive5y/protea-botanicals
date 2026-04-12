@@ -10,38 +10,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { PRODUCT_WORLDS } from "./ProductWorlds";
-
-// ── Design tokens (mirrors HQStock palette) ─────────────────────────────────
-const T = {
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  mono: "'DM Mono','Courier New',monospace",
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-  shadowLg: "0 8px 32px rgba(0,0,0,0.12)",
-};
+import { T } from "../../styles/tokens";
+const MONO = "'DM Mono','Courier New',monospace";
 
 const fmt = (n) =>
   n == null || isNaN(n)
@@ -362,7 +332,7 @@ export default function StockOpeningCalibration({
             fontSize: 13,
             fontFamily: T.font,
             fontWeight: 500,
-            boxShadow: T.shadowLg,
+            boxShadow: T.shadow.lg,
             zIndex: 1000,
             whiteSpace: "nowrap",
           }}
@@ -378,7 +348,7 @@ export default function StockOpeningCalibration({
           background: "#fff",
           display: "flex",
           flexDirection: "column",
-          boxShadow: T.shadowLg,
+          boxShadow: T.shadow.lg,
           overflow: "hidden",
         }}
       >
@@ -386,7 +356,7 @@ export default function StockOpeningCalibration({
         <div
           style={{
             padding: "20px 24px 16px",
-            borderBottom: `1px solid ${T.ink150}`,
+            borderBottom: `1px solid ${T.border}`,
             background: "#fff",
             flexShrink: 0,
           }}
@@ -405,7 +375,7 @@ export default function StockOpeningCalibration({
                   fontWeight: 700,
                   letterSpacing: "0.12em",
                   textTransform: "uppercase",
-                  color: T.ink400,
+                  color: T.ink500,
                   fontFamily: T.font,
                   marginBottom: 4,
                 }}
@@ -442,7 +412,7 @@ export default function StockOpeningCalibration({
                 border: "none",
                 cursor: "pointer",
                 fontSize: 20,
-                color: T.ink400,
+                color: T.ink500,
                 lineHeight: 1,
                 padding: "4px 8px",
               }}
@@ -471,7 +441,7 @@ export default function StockOpeningCalibration({
                   <div
                     style={{
                       fontSize: 18,
-                      fontFamily: T.mono,
+                      fontFamily: MONO,
                       fontWeight: 400,
                       color: s.color,
                     }}
@@ -484,7 +454,7 @@ export default function StockOpeningCalibration({
                       fontWeight: 700,
                       letterSpacing: "0.08em",
                       textTransform: "uppercase",
-                      color: T.ink400,
+                      color: T.ink500,
                       fontFamily: T.font,
                     }}
                   >
@@ -512,7 +482,7 @@ export default function StockOpeningCalibration({
                   padding: "8px 16px",
                   borderRadius: 4,
                   border: "none",
-                  background: aiLoading ? T.ink150 : T.accent,
+                  background: aiLoading ? T.border : T.accent,
                   color: "#fff",
                   fontFamily: T.font,
                   fontSize: 12,
@@ -549,7 +519,7 @@ export default function StockOpeningCalibration({
                   padding: "8px 16px",
                   borderRadius: 4,
                   border: `1px solid ${T.accentBd}`,
-                  background: T.accentLit,
+                  background: T.accentLight,
                   color: T.accent,
                   fontFamily: T.font,
                   fontSize: 12,
@@ -565,7 +535,7 @@ export default function StockOpeningCalibration({
                   style={{
                     padding: "8px 14px",
                     borderRadius: 4,
-                    border: `1px solid ${T.ink150}`,
+                    border: `1px solid ${T.border}`,
                     background: "none",
                     color: T.ink500,
                     fontFamily: T.font,
@@ -604,7 +574,7 @@ export default function StockOpeningCalibration({
               style={{
                 textAlign: "center",
                 padding: 60,
-                color: T.ink400,
+                color: T.ink500,
                 fontFamily: T.font,
                 fontSize: 13,
               }}
@@ -648,7 +618,7 @@ export default function StockOpeningCalibration({
               <div
                 style={{
                   fontSize: 12,
-                  color: T.ink400,
+                  color: T.ink500,
                   fontFamily: T.font,
                   marginTop: 6,
                 }}
@@ -663,7 +633,7 @@ export default function StockOpeningCalibration({
               {Object.keys(aiReviews).length > 0 && (
                 <div
                   style={{
-                    background: T.infoBg,
+                    background: T.infoLight,
                     border: `1px solid ${T.infoBd}`,
                     borderRadius: 6,
                     padding: "10px 14px",
@@ -702,7 +672,7 @@ export default function StockOpeningCalibration({
                     key={worldId}
                     style={{
                       marginBottom: 8,
-                      border: `1px solid ${T.ink150}`,
+                      border: `1px solid ${T.border}`,
                       borderRadius: 8,
                       overflow: "hidden",
                     }}
@@ -713,7 +683,7 @@ export default function StockOpeningCalibration({
                       style={{
                         width: "100%",
                         padding: "10px 14px",
-                        background: isOpen ? T.accentLit : T.ink050,
+                        background: isOpen ? T.accentLight : T.surface,
                         border: "none",
                         cursor: "pointer",
                         display: "flex",
@@ -739,7 +709,7 @@ export default function StockOpeningCalibration({
                       <span
                         style={{
                           fontSize: 11,
-                          color: T.ink400,
+                          color: T.ink500,
                           fontFamily: T.font,
                         }}
                       >
@@ -753,7 +723,7 @@ export default function StockOpeningCalibration({
                             fontWeight: 700,
                             padding: "2px 7px",
                             borderRadius: 3,
-                            background: T.warningBg,
+                            background: T.warningLight,
                             color: T.warning,
                             letterSpacing: "0.06em",
                             textTransform: "uppercase",
@@ -777,7 +747,7 @@ export default function StockOpeningCalibration({
                         }}
                       >
                         <thead>
-                          <tr style={{ background: T.ink050 }}>
+                          <tr style={{ background: T.surface }}>
                             {[
                               "Item",
                               "Variant",
@@ -797,8 +767,8 @@ export default function StockOpeningCalibration({
                                       fontWeight: 700,
                                       letterSpacing: "0.1em",
                                       textTransform: "uppercase",
-                                      color: T.ink400,
-                                      borderBottom: `1px solid ${T.ink150}`,
+                                      color: T.ink500,
+                                      borderBottom: `1px solid ${T.border}`,
                                     }}
                                   >
                                     {h}
@@ -825,7 +795,7 @@ export default function StockOpeningCalibration({
                               <tr
                                 key={item.id}
                                 style={{
-                                  borderBottom: `1px solid ${T.ink075}`,
+                                  borderBottom: `1px solid ${T.bg}`,
                                 }}
                               >
                                 <td style={{ padding: "9px 12px" }}>
@@ -841,8 +811,8 @@ export default function StockOpeningCalibration({
                                   <div
                                     style={{
                                       fontSize: 10,
-                                      color: T.ink400,
-                                      fontFamily: T.mono,
+                                      color: T.ink500,
+                                      fontFamily: MONO,
                                     }}
                                   >
                                     {item.sku}
@@ -863,7 +833,7 @@ export default function StockOpeningCalibration({
                                   style={{
                                     padding: "9px 12px",
                                     fontSize: 12,
-                                    fontFamily: T.mono,
+                                    fontFamily: MONO,
                                     color: T.ink700,
                                   }}
                                 >
@@ -898,14 +868,14 @@ export default function StockOpeningCalibration({
                                       style={{
                                         width: 80,
                                         padding: "4px 8px",
-                                        border: `1px solid ${review?.flag && review.flag !== "ok" ? T.warningBd : T.ink150}`,
+                                        border: `1px solid ${review?.flag && review.flag !== "ok" ? T.warningBd : T.border}`,
                                         borderRadius: 3,
-                                        fontFamily: T.mono,
+                                        fontFamily: MONO,
                                         fontSize: 12,
                                         color: T.ink900,
                                         background:
                                           review?.flag && review.flag !== "ok"
-                                            ? T.warningBg
+                                            ? T.warningLight
                                             : "#fff",
                                       }}
                                     />
@@ -919,16 +889,16 @@ export default function StockOpeningCalibration({
                                       borderRadius: 3,
                                       fontSize: 11,
                                       fontWeight: 700,
-                                      fontFamily: T.mono,
+                                      fontFamily: MONO,
                                       color: marginColor(margin),
                                       background:
                                         margin == null
-                                          ? T.ink075
+                                          ? T.bg
                                           : margin >= 55
-                                            ? T.successBg
+                                            ? T.successLight
                                             : margin >= 35
-                                              ? T.warningBg
-                                              : T.dangerBg,
+                                              ? T.warningLight
+                                              : T.dangerLight,
                                     }}
                                   >
                                     {margin == null ? "—" : fmtPct(margin)}

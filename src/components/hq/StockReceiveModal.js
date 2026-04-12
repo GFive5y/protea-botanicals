@@ -12,35 +12,8 @@ import {
   itemMatchesWorld,
   defaultsForWorld,
 } from "./ProductWorlds";
-
-// ─── Theme tokens (mirrors HQStock palette) ──────────────────────────────────
-const T = {
-  font: "'Inter', 'Helvetica Neue', Arial, sans-serif",
-  bg: "#FAFAF8",
-  surface: "#FFFFFF",
-  border: "#E8E4DC",
-  borderFocus: "#A89B8C",
-  ink900: "#1C1A17",
-  ink600: "#4A4540",
-  ink400: "#8C8680",
-  ink200: "#C8C3BC",
-  ink150: "#DDD9D3",
-  ink075: "#F0EDE8",
-  accentDark: "#2D5016",
-  accentMid: "#4A7C2F",
-  accentLight: "#7AB648",
-  accentBg: "#F0F7E8",
-  danger: "#C0392B",
-  dangerBg: "#FDF2F0",
-  warning: "#D4820A",
-  warningBg: "#FEF8EC",
-  success: "#27AE60",
-  successBg: "#EDFAF3",
-  kpiLg: "22px",
-  kpiSm: "13px",
-  label: "11px",
-  caption: "10px",
-};
+import { T } from "../../styles/tokens";
+const MONO = "'DM Mono','Courier New',monospace";
 
 // ─── AVCO helper ─────────────────────────────────────────────────────────────
 function calcNewAvco(currentQty, currentAvco, incomingQty, incomingCost) {
@@ -103,8 +76,8 @@ function StepDots({ step }) {
                     ? T.accentMid
                     : active
                       ? T.accentDark
-                      : T.ink150,
-                  color: done || active ? "#fff" : T.ink400,
+                      : T.border,
+                  color: done || active ? "#fff" : T.ink500,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -119,7 +92,7 @@ function StepDots({ step }) {
               <span
                 style={{
                   fontSize: "10px",
-                  color: active ? T.accentDark : T.ink400,
+                  color: active ? T.accentDark : T.ink500,
                   fontFamily: T.font,
                   fontWeight: active ? 600 : 400,
                   whiteSpace: "nowrap",
@@ -135,7 +108,7 @@ function StepDots({ step }) {
                   height: 2,
                   margin: "0 4px",
                   marginBottom: 18,
-                  background: done ? T.accentMid : T.ink150,
+                  background: done ? T.accentMid : T.border,
                   transition: "background .2s",
                 }}
               />
@@ -225,7 +198,7 @@ function Step1({ data, onChange, onNext, vatRegistered, supplierVatRegistered, o
 
         if (isImport) {
           return (
-            <div style={{ padding: "10px 12px", background: T.warningBg, border: `1px solid ${T.warning}40`, borderRadius: 4, marginBottom: 14, fontSize: 11, color: T.warning, fontFamily: T.font, lineHeight: 1.5 }}>
+            <div style={{ padding: "10px 12px", background: T.warningLight, border: `1px solid ${T.warning}40`, borderRadius: 4, marginBottom: 14, fontSize: 11, color: T.warning, fontFamily: T.font, lineHeight: 1.5 }}>
               <strong>Import delivery</strong> — supplier VAT does not apply. Record customs clearance VAT (import VAT paid to SARS) via <strong>Expenses Manager</strong> using category <em>Tax</em>.
             </div>
           );
@@ -233,7 +206,7 @@ function Step1({ data, onChange, onNext, vatRegistered, supplierVatRegistered, o
 
         if (supplierNotVat) {
           return (
-            <div style={{ padding: "10px 12px", background: T.ink075, border: `1px solid ${T.ink150}`, borderRadius: 4, marginBottom: 14, fontSize: 11, color: T.ink400, fontFamily: T.font }}>
+            <div style={{ padding: "10px 12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 4, marginBottom: 14, fontSize: 11, color: T.ink500, fontFamily: T.font }}>
               Supplier is not VAT-registered — no input VAT applicable.
             </div>
           );
@@ -246,7 +219,7 @@ function Step1({ data, onChange, onNext, vatRegistered, supplierVatRegistered, o
               <input type="number" min="0" step="0.01" placeholder="0.00" value={data.input_vat_amount} onChange={(e) => onChange("input_vat_amount", e.target.value)} style={{ ...inputStyle, marginBottom: 0, flex: 1 }} />
               <button type="button" title="Enter VAT amount from supplier invoice" style={{ padding: "8px 10px", background: T.accentBg, border: `1px solid ${T.accentLight}40`, borderRadius: 4, cursor: "pointer", fontFamily: T.font, fontSize: 11, fontWeight: 600, color: T.accentDark, whiteSpace: "nowrap", flexShrink: 0 }} onClick={() => {}}>Enter from invoice</button>
             </div>
-            <div style={{ fontSize: 10, color: T.ink400, fontFamily: T.font, marginTop: -10, marginBottom: 14 }}>
+            <div style={{ fontSize: 10, color: T.ink500, fontFamily: T.font, marginTop: -10, marginBottom: 14 }}>
               VAT amount from supplier's tax invoice. Leave 0 if not applicable. Auto-filled by Smart Capture when processing invoices.
             </div>
           </div>
@@ -485,7 +458,7 @@ function Step2({
         style={{
           margin: "0 0 14px",
           fontSize: 12,
-          color: T.ink400,
+          color: T.ink500,
           fontFamily: T.font,
         }}
       >
@@ -595,7 +568,7 @@ function Step2({
                 style={{
                   padding: 16,
                   fontSize: 12,
-                  color: T.ink400,
+                  color: T.ink500,
                   fontFamily: T.font,
                   textAlign: "center",
                 }}
@@ -607,7 +580,7 @@ function Step2({
                 style={{
                   padding: 16,
                   fontSize: 12,
-                  color: T.ink400,
+                  color: T.ink500,
                   fontFamily: T.font,
                   textAlign: "center",
                 }}
@@ -637,7 +610,7 @@ function Step2({
                     onClick={() => !alreadyAdded && addItem(item)}
                     style={{
                       padding: "9px 12px",
-                      borderBottom: `1px solid ${T.ink075}`,
+                      borderBottom: `1px solid ${T.bg}`,
                       cursor: alreadyAdded ? "default" : "pointer",
                       background: alreadyAdded ? T.accentBg : "transparent",
                       fontFamily: T.font,
@@ -709,7 +682,7 @@ function Step2({
                               fontWeight: 700,
                               padding: "1px 5px",
                               borderRadius: 3,
-                              background: T.warningBg,
+                              background: T.warningLight,
                               color: T.warning,
                               border: `1px solid ${T.warning}40`,
                             }}
@@ -717,13 +690,13 @@ function Step2({
                             NO PRICE
                           </span>
                         )}
-                        <span style={{ fontSize: 11, color: T.ink400 }}>
+                        <span style={{ fontSize: 11, color: T.ink500 }}>
                           {item.quantity_on_hand ?? 0} on hand
                         </span>
                       </div>
                     </div>
                     <div
-                      style={{ fontSize: 10, color: T.ink400, marginTop: 2 }}
+                      style={{ fontSize: 10, color: T.ink500, marginTop: 2 }}
                     >
                       {item.sku}
                       {item.brand ? ` · ${item.brand}` : ""}
@@ -752,7 +725,7 @@ function Step2({
                 cursor: "pointer",
                 fontSize: 11,
                 fontWeight: 600,
-                color: T.ink400,
+                color: T.ink500,
                 fontFamily: T.font,
                 letterSpacing: "0.04em",
               }}
@@ -764,7 +737,7 @@ function Step2({
               style={{
                 marginTop: 8,
                 padding: "12px 14px",
-                background: T.warningBg,
+                background: T.warningLight,
                 border: `1px solid ${T.warning}40`,
                 borderRadius: 6,
               }}
@@ -896,7 +869,7 @@ function Step2({
             style={{
               fontSize: 10,
               fontWeight: 700,
-              color: T.ink400,
+              color: T.ink500,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
               marginBottom: 8,
@@ -916,7 +889,7 @@ function Step2({
               <div
                 key={line.item_id}
                 style={{
-                  background: line.is_new ? T.warningBg : T.ink075,
+                  background: line.is_new ? T.warningLight : T.bg,
                   border: `1px solid ${line.is_new ? T.warning + "40" : T.border}`,
                   borderRadius: 6,
                   padding: "12px 14px",
@@ -963,7 +936,7 @@ function Step2({
                     <div
                       style={{
                         fontSize: 11,
-                        color: T.ink400,
+                        color: T.ink500,
                         fontFamily: T.font,
                         marginTop: 2,
                       }}
@@ -1096,7 +1069,7 @@ function Step2({
                       style={{
                         fontSize: 9,
                         fontWeight: 700,
-                        color: T.ink400,
+                        color: T.ink500,
                         textTransform: "uppercase",
                         letterSpacing: "0.08em",
                         marginBottom: 6,
@@ -1258,7 +1231,7 @@ function Step3({ deliveryInfo, lines, onConfirm, onBack, saving }) {
         style={{
           margin: "0 0 16px",
           fontSize: "12px",
-          color: T.ink400,
+          color: T.ink500,
           fontFamily: T.font,
         }}
       >
@@ -1268,7 +1241,7 @@ function Step3({ deliveryInfo, lines, onConfirm, onBack, saving }) {
       {/* Delivery meta */}
       <div
         style={{
-          background: T.ink075,
+          background: T.bg,
           borderRadius: 6,
           padding: "10px 14px",
           marginBottom: 16,
@@ -1302,7 +1275,7 @@ function Step3({ deliveryInfo, lines, onConfirm, onBack, saving }) {
           <span>
             <strong>Input VAT:</strong>{" "}
             R{parseFloat(deliveryInfo.input_vat_amount).toFixed(2)}
-            <span style={{ fontSize: 10, color: T.ink400, marginLeft: 4 }}>
+            <span style={{ fontSize: 10, color: T.ink500, marginLeft: 4 }}>
               (claimed — trigger auto-writes to VAT ledger)
             </span>
           </span>
@@ -1320,7 +1293,7 @@ function Step3({ deliveryInfo, lines, onConfirm, onBack, saving }) {
           }}
         >
           <thead>
-            <tr style={{ background: T.ink075 }}>
+            <tr style={{ background: T.bg }}>
               {[
                 "Item",
                 "Qty",
@@ -1334,7 +1307,7 @@ function Step3({ deliveryInfo, lines, onConfirm, onBack, saving }) {
                   style={{
                     padding: "8px 10px",
                     textAlign: "left",
-                    color: T.ink400,
+                    color: T.ink500,
                     fontWeight: 600,
                     fontSize: "10px",
                     textTransform: "uppercase",
@@ -1365,15 +1338,15 @@ function Step3({ deliveryInfo, lines, onConfirm, onBack, saving }) {
                 <tr
                   key={line.item_id}
                   style={{
-                    borderBottom: `1px solid ${T.ink075}`,
-                    background: i % 2 === 0 ? T.surface : T.ink075 + "60",
+                    borderBottom: `1px solid ${T.bg}`,
+                    background: i % 2 === 0 ? T.surface : T.bg + "60",
                   }}
                 >
                   <td style={{ padding: "9px 10px" }}>
                     <div style={{ fontWeight: 600, color: T.ink900 }}>
                       {line.item.name}
                     </div>
-                    <div style={{ fontSize: "10px", color: T.ink400 }}>
+                    <div style={{ fontSize: "10px", color: T.ink500 }}>
                       {line.item.sku}
                     </div>
                   </td>
@@ -1387,7 +1360,7 @@ function Step3({ deliveryInfo, lines, onConfirm, onBack, saving }) {
                     <span style={{ color: T.accentDark, fontWeight: 600 }}>
                       R{newAvco.toFixed(2)}
                     </span>
-                    <div style={{ fontSize: "10px", color: T.ink400 }}>
+                    <div style={{ fontSize: "10px", color: T.ink500 }}>
                       was R
                       {parseFloat(line.item.weighted_avg_cost || 0).toFixed(2)}
                     </div>
@@ -1441,7 +1414,7 @@ function Step3({ deliveryInfo, lines, onConfirm, onBack, saving }) {
       {/* Warning */}
       <div
         style={{
-          background: T.warningBg,
+          background: T.warningLight,
           border: `1px solid ${T.warning}40`,
           borderRadius: 6,
           padding: "10px 14px",
@@ -1539,7 +1512,7 @@ function Step4({
           width: 64,
           height: 64,
           borderRadius: "50%",
-          background: T.successBg,
+          background: T.successLight,
           border: `2px solid ${T.success}`,
           display: "flex",
           alignItems: "center",
@@ -1566,7 +1539,7 @@ function Step4({
         style={{
           margin: "0 0 20px",
           fontSize: "13px",
-          color: T.ink400,
+          color: T.ink500,
           fontFamily: T.font,
         }}
       >
@@ -1588,7 +1561,7 @@ function Step4({
           style={{
             fontSize: "10px",
             fontFamily: T.font,
-            color: T.ink400,
+            color: T.ink500,
             textTransform: "uppercase",
             letterSpacing: "0.07em",
             marginBottom: 4,
@@ -1611,7 +1584,7 @@ function Step4({
           style={{
             fontSize: "11px",
             fontFamily: T.font,
-            color: T.ink400,
+            color: T.ink500,
             marginTop: 6,
           }}
         >
@@ -1650,7 +1623,7 @@ function Step4({
               key={l.item_id}
               style={{
                 padding: "8px 0",
-                borderBottom: `1px solid ${T.ink075}`,
+                borderBottom: `1px solid ${T.bg}`,
                 fontFamily: T.font,
               }}
             >
@@ -1680,7 +1653,7 @@ function Step4({
                     alignItems: "center",
                   }}
                 >
-                  <span style={{ color: T.ink400 }}>
+                  <span style={{ color: T.ink500 }}>
                     AVCO{" "}
                     <span
                       style={{
@@ -1692,7 +1665,7 @@ function Step4({
                     </span>
                   </span>
                   <span style={{ color: T.ink300 }}>→</span>
-                  <span style={{ color: T.ink400 }}>
+                  <span style={{ color: T.ink500 }}>
                     Sell{" "}
                     <span
                       style={{
@@ -1759,7 +1732,7 @@ function Step4({
                 marginTop: 12,
                 padding: "10px 14px",
                 borderRadius: 6,
-                background: compressed > 0 ? T.warningBg : T.successBg,
+                background: compressed > 0 ? T.warningLight : T.successLight,
                 border: `1px solid ${compressed > 0 ? T.warningBd : T.successBd}`,
                 display: "flex",
                 gap: 20,
@@ -1787,7 +1760,7 @@ function Step4({
               )}
               {lines.filter((l) => !(parseFloat(l.item.sell_price || 0) > 0))
                 .length > 0 && (
-                <span style={{ color: T.ink400 }}>
+                <span style={{ color: T.ink500 }}>
                   {
                     lines.filter(
                       (l) => !(parseFloat(l.item.sell_price || 0) > 0),
@@ -1805,7 +1778,7 @@ function Step4({
       {newProductCount > 0 && (
         <div
           style={{
-            background: T.warningBg,
+            background: T.warningLight,
             border: `1px solid ${T.warning}40`,
             borderRadius: 6,
             padding: "12px 16px",
@@ -2109,7 +2082,7 @@ export default function StockReceiveModal({
               style={{
                 fontSize: "10px",
                 fontFamily: T.font,
-                color: T.ink400,
+                color: T.ink500,
                 textTransform: "uppercase",
                 letterSpacing: "0.07em",
                 marginBottom: 2,
@@ -2137,7 +2110,7 @@ export default function StockReceiveModal({
                 border: "none",
                 cursor: "pointer",
                 fontSize: "20px",
-                color: T.ink400,
+                color: T.ink500,
                 lineHeight: 1,
                 padding: 4,
               }}
@@ -2152,7 +2125,7 @@ export default function StockReceiveModal({
         {error && (
           <div
             style={{
-              background: T.dangerBg,
+              background: T.dangerLight,
               border: `1px solid ${T.danger}40`,
               borderRadius: 6,
               padding: "10px 14px",

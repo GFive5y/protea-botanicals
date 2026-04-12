@@ -8,38 +8,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
-
-// ─── T Tokens ──────────────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  mono: "'DM Mono','Courier New',monospace",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-  shadowMd: "0 4px 12px rgba(0,0,0,0.10)",
-};
+import { T } from "../../styles/tokens";
+const MONO = "'DM Mono','Courier New',monospace";
 
 const Ty = {
   label: {
@@ -54,7 +24,7 @@ const Ty = {
   data: {
     fontSize: "12px",
     fontWeight: 400,
-    fontFamily: T.mono,
+    fontFamily: MONO,
     fontVariantNumeric: "tabular-nums",
   },
 };
@@ -64,13 +34,13 @@ const sTh = {
   padding: "10px 12px",
   ...Ty.label,
   color: T.ink500,
-  borderBottom: `2px solid ${T.ink150}`,
-  background: T.ink050,
+  borderBottom: `2px solid ${T.border}`,
+  background: T.surface,
   whiteSpace: "nowrap",
 };
 const sTd = {
   padding: "9px 12px",
-  borderBottom: `1px solid ${T.ink150}`,
+  borderBottom: `1px solid ${T.border}`,
   ...Ty.body,
   color: T.ink700,
   verticalAlign: "middle",
@@ -97,7 +67,7 @@ const sBtn = (v = "primary", dis = false) => ({
     ? {
         background: "transparent",
         color: T.ink500,
-        border: `1px solid ${T.ink150}`,
+        border: `1px solid ${T.border}`,
       }
     : {}),
   ...(v === "danger"
@@ -221,29 +191,29 @@ function marginBadge(margin) {
   // Owner must use Receive Delivery to establish cost basis.
   if (margin === NO_COST)
     return {
-      bg: T.ink075,
-      bd: T.ink150,
-      color: T.ink400,
+      bg: T.bg,
+      bd: T.border,
+      color: T.ink500,
       label: "NO COST",
       tooltip:
         "Receive a delivery to set cost basis. Margin calculates automatically.",
     };
   if (margin < 20)
     return {
-      bg: T.dangerBg,
+      bg: T.dangerLight,
       bd: T.dangerBd,
       color: T.danger,
       label: `${margin.toFixed(1)}%`,
     };
   if (margin < 40)
     return {
-      bg: T.warningBg,
+      bg: T.warningLight,
       bd: T.warningBd,
       color: T.warning,
       label: `${margin.toFixed(1)}%`,
     };
   return {
-    bg: T.successBg,
+    bg: T.successLight,
     bd: T.successBd,
     color: T.success,
     label: `${margin.toFixed(1)}%`,
@@ -350,7 +320,7 @@ function AuditDrawer({ item, onClose }) {
           width: 480,
           height: "100vh",
           background: "#fff",
-          borderLeft: `1px solid ${T.ink150}`,
+          borderLeft: `1px solid ${T.border}`,
           boxShadow: "-4px 0 24px rgba(0,0,0,0.09)",
           zIndex: 1000,
           display: "flex",
@@ -362,7 +332,7 @@ function AuditDrawer({ item, onClose }) {
         <div
           style={{
             padding: "16px 20px",
-            borderBottom: `1px solid ${T.ink150}`,
+            borderBottom: `1px solid ${T.border}`,
           }}
         >
           <div
@@ -442,14 +412,14 @@ function AuditDrawer({ item, onClose }) {
                   key={i}
                   title={k.tooltip || undefined}
                   style={{
-                    background: k.bg || T.ink075,
-                    border: `1px solid ${k.bd || T.ink150}`,
+                    background: k.bg || T.bg,
+                    border: `1px solid ${k.bd || T.border}`,
                     borderRadius: 4,
                     padding: "6px 10px",
                     cursor: k.tooltip ? "help" : "default",
                   }}
                 >
-                  <div style={{ ...Ty.caption, color: k.color || T.ink400 }}>
+                  <div style={{ ...Ty.caption, color: k.color || T.ink500 }}>
                     {k.label}
                   </div>
                   <div
@@ -467,7 +437,7 @@ function AuditDrawer({ item, onClose }) {
         </div>
 
         {/* Tab bar */}
-        <div style={{ display: "flex", borderBottom: `1px solid ${T.ink150}` }}>
+        <div style={{ display: "flex", borderBottom: `1px solid ${T.border}` }}>
           {[
             { id: "prices", label: `Price History (${prices.length})` },
             { id: "movements", label: `Stock Movements (${movs.length})` },
@@ -484,7 +454,7 @@ function AuditDrawer({ item, onClose }) {
                     ? `2px solid ${T.accentMid}`
                     : "2px solid transparent",
                 ...Ty.label,
-                color: tab === t.id ? T.accentMid : T.ink400,
+                color: tab === t.id ? T.accentMid : T.ink500,
                 cursor: "pointer",
                 marginBottom: -1,
               }}
@@ -511,7 +481,7 @@ function AuditDrawer({ item, onClose }) {
               >
                 <div style={{ fontSize: 28, marginBottom: 8 }}>📋</div>
                 <div style={{ ...Ty.body }}>No price changes recorded yet.</div>
-                <div style={{ ...Ty.caption, color: T.ink400, marginTop: 4 }}>
+                <div style={{ ...Ty.caption, color: T.ink500, marginTop: 4 }}>
                   Price changes logged here from v1.3 onwards.
                 </div>
               </div>
@@ -525,8 +495,8 @@ function AuditDrawer({ item, onClose }) {
                     style={{
                       padding: "12px 14px",
                       marginBottom: 8,
-                      background: i === 0 ? T.accentLit : T.ink050,
-                      border: `1px solid ${i === 0 ? T.accentBd : T.ink150}`,
+                      background: i === 0 ? T.accentLight : T.surface,
+                      border: `1px solid ${i === 0 ? T.accentBd : T.border}`,
                       borderRadius: 6,
                     }}
                   >
@@ -550,14 +520,14 @@ function AuditDrawer({ item, onClose }) {
                           <span
                             style={{
                               ...Ty.data,
-                              color: T.ink400,
+                              color: T.ink500,
                               textDecoration: "line-through",
                             }}
                           >
                             {fmtR(ph.old_price)}
                           </span>
                         ) : (
-                          <span style={{ ...Ty.caption, color: T.ink400 }}>
+                          <span style={{ ...Ty.caption, color: T.ink500 }}>
                             First price →
                           </span>
                         )}
@@ -595,10 +565,10 @@ function AuditDrawer({ item, onClose }) {
                           letterSpacing: "0.08em",
                           textTransform: "uppercase",
                           background:
-                            ph.source === "target_margin" ? T.infoBg : T.ink075,
+                            ph.source === "target_margin" ? T.infoLight : T.bg,
                           color:
                             ph.source === "target_margin" ? T.info : T.ink500,
-                          border: `1px solid ${ph.source === "target_margin" ? T.infoBd : T.ink150}`,
+                          border: `1px solid ${ph.source === "target_margin" ? T.infoBd : T.border}`,
                           whiteSpace: "nowrap",
                         }}
                       >
@@ -640,8 +610,8 @@ function AuditDrawer({ item, onClose }) {
                   style={{
                     padding: "10px 14px",
                     marginBottom: 6,
-                    background: T.ink050,
-                    border: `1px solid ${T.ink150}`,
+                    background: T.surface,
+                    border: `1px solid ${T.border}`,
                     borderLeft: `3px solid ${typeColor}`,
                     borderRadius: 6,
                   }}
@@ -661,9 +631,9 @@ function AuditDrawer({ item, onClose }) {
                         fontWeight: 700,
                         letterSpacing: "0.08em",
                         textTransform: "uppercase",
-                        background: T.ink075,
+                        background: T.bg,
                         color: typeColor,
-                        border: `1px solid ${T.ink150}`,
+                        border: `1px solid ${T.border}`,
                       }}
                     >
                       {(m.movement_type || "").replace(/_/g, " ")}
@@ -698,7 +668,7 @@ function AuditDrawer({ item, onClose }) {
                     )}
                     {m.reference && (
                       <span
-                        style={{ ...Ty.data, fontSize: 10, color: T.ink400 }}
+                        style={{ ...Ty.data, fontSize: 10, color: T.ink500 }}
                       >
                         Ref: {m.reference}
                       </span>
@@ -726,8 +696,8 @@ function AuditDrawer({ item, onClose }) {
         <div
           style={{
             padding: "10px 20px",
-            borderTop: `1px solid ${T.ink150}`,
-            background: T.ink050,
+            borderTop: `1px solid ${T.border}`,
+            background: T.surface,
           }}
         >
           <span style={{ ...Ty.caption, color: T.ink300 }}>
@@ -991,7 +961,7 @@ export default function StockPricingPanel({ tenantId }) {
       {result && (
         <div
           style={{
-            background: result.errors.length ? T.dangerBg : T.successBg,
+            background: result.errors.length ? T.dangerLight : T.successLight,
             border: `1px solid ${result.errors.length ? T.dangerBd : T.successBd}`,
             color: result.errors.length ? T.danger : T.success,
             borderRadius: 6,
@@ -1016,7 +986,7 @@ export default function StockPricingPanel({ tenantId }) {
       {calcOpen && (
         <div
           style={{
-            background: T.infoBg,
+            background: T.infoLight,
             border: `1px solid ${T.infoBd}`,
             borderRadius: 6,
             padding: "14px 18px",
@@ -1035,7 +1005,7 @@ export default function StockPricingPanel({ tenantId }) {
             }}
           >
             <div>
-              <div style={{ ...Ty.caption, color: T.ink400, marginBottom: 4 }}>
+              <div style={{ ...Ty.caption, color: T.ink500, marginBottom: 4 }}>
                 Target margin %
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -1058,11 +1028,11 @@ export default function StockPricingPanel({ tenantId }) {
                     outline: "none",
                   }}
                 />
-                <span style={{ ...Ty.caption, color: T.ink400 }}>%</span>
+                <span style={{ ...Ty.caption, color: T.ink500 }}>%</span>
               </div>
             </div>
             <div>
-              <div style={{ ...Ty.caption, color: T.ink400, marginBottom: 4 }}>
+              <div style={{ ...Ty.caption, color: T.ink500, marginBottom: 4 }}>
                 Applies to
               </div>
               <div style={{ ...Ty.body, color: T.info, fontWeight: 600 }}>
@@ -1075,7 +1045,7 @@ export default function StockPricingPanel({ tenantId }) {
               parseFloat(targetMargin) < 100 && (
                 <div>
                   <div
-                    style={{ ...Ty.caption, color: T.ink400, marginBottom: 4 }}
+                    style={{ ...Ty.caption, color: T.ink500, marginBottom: 4 }}
                   >
                     Preview (first 3)
                   </div>
@@ -1128,7 +1098,7 @@ export default function StockPricingPanel({ tenantId }) {
               Cancel
             </button>
           </div>
-          <p style={{ ...Ty.caption, color: T.ink400, margin: "10px 0 0" }}>
+          <p style={{ ...Ty.caption, color: T.ink500, margin: "10px 0 0" }}>
             Formula: sell = AVCO ÷ (1 − margin%). Logged to audit trail as
             "Margin Calc". Items with no AVCO skipped.
           </p>
@@ -1153,7 +1123,7 @@ export default function StockPricingPanel({ tenantId }) {
                 borderRadius: 16,
                 ...Ty.caption,
                 fontWeight: active ? 700 : 500,
-                border: `1.5px solid ${active ? T.accentMid : T.ink150}`,
+                border: `1.5px solid ${active ? T.accentMid : T.border}`,
                 background: active ? T.accentMid : "#fff",
                 color: active ? "#fff" : T.ink700,
                 cursor: count === 0 && key !== "all" ? "default" : "pointer",
@@ -1184,7 +1154,7 @@ export default function StockPricingPanel({ tenantId }) {
           onChange={(e) => setSearch(e.target.value)}
           style={{
             padding: "7px 12px",
-            border: `1px solid ${T.ink150}`,
+            border: `1px solid ${T.border}`,
             borderRadius: 4,
             ...Ty.body,
             background: "#fff",
@@ -1211,7 +1181,7 @@ export default function StockPricingPanel({ tenantId }) {
           onChange={(e) => setSortBy(e.target.value)}
           style={{
             padding: "7px 10px",
-            border: `1px solid ${T.ink150}`,
+            border: `1px solid ${T.border}`,
             borderRadius: 4,
             ...Ty.body,
             background: "#fff",
@@ -1228,7 +1198,7 @@ export default function StockPricingPanel({ tenantId }) {
         </select>
         <div style={{ flex: 1 }} />
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <span style={{ ...Ty.label, color: T.ink400 }}>MARGIN</span>
+          <span style={{ ...Ty.label, color: T.ink500 }}>MARGIN</span>
           {[
             { l: "< 20%", c: T.danger },
             { l: "20–40%", c: T.warning },
@@ -1239,7 +1209,7 @@ export default function StockPricingPanel({ tenantId }) {
             </span>
           ))}
         </div>
-        <span style={{ ...Ty.caption, color: T.ink400 }}>
+        <span style={{ ...Ty.caption, color: T.ink500 }}>
           {filtered.length} of {items.length}
         </span>
       </div>
@@ -1248,10 +1218,10 @@ export default function StockPricingPanel({ tenantId }) {
       <div
         style={{
           background: "#fff",
-          border: `1px solid ${T.ink150}`,
+          border: `1px solid ${T.border}`,
           borderRadius: 6,
           overflow: "auto",
-          boxShadow: T.shadow,
+          boxShadow: T.shadow.sm,
           marginBottom: 12,
         }}
       >
@@ -1330,12 +1300,12 @@ export default function StockPricingPanel({ tenantId }) {
                 const margin = getMargin(item);
                 const mb = marginBadge(margin);
                 const rowBg = focused
-                  ? T.accentLit
+                  ? T.accentLight
                   : edited
                     ? "#FFFEF0"
                     : idx % 2 === 0
                       ? "#fff"
-                      : T.ink050;
+                      : T.surface;
                 const lowStock = (item.quantity_on_hand ?? 0) <= 0;
 
                 return (
@@ -1393,7 +1363,7 @@ export default function StockPricingPanel({ tenantId }) {
                           fontSize: 9,
                           padding: "2px 6px",
                           borderRadius: 3,
-                          background: T.ink075,
+                          background: T.bg,
                           color: T.ink500,
                           letterSpacing: "0.08em",
                           textTransform: "uppercase",
@@ -1449,7 +1419,7 @@ export default function StockPricingPanel({ tenantId }) {
                           gap: 3,
                         }}
                       >
-                        <span style={{ ...Ty.caption, color: T.ink400 }}>
+                        <span style={{ ...Ty.caption, color: T.ink500 }}>
                           R
                         </span>
                         <div>
@@ -1467,7 +1437,7 @@ export default function StockPricingPanel({ tenantId }) {
                             style={{
                               width: 80,
                               padding: "5px 8px",
-                              border: `1px solid ${focused ? T.accent : edited ? T.accentMid : T.ink150}`,
+                              border: `1px solid ${focused ? T.accent : edited ? T.accentMid : T.border}`,
                               borderRadius: 3,
                               ...Ty.data,
                               color: T.ink900,
@@ -1587,7 +1557,7 @@ export default function StockPricingPanel({ tenantId }) {
           alignItems: "center",
         }}
       >
-        <span style={{ ...Ty.caption, color: T.ink400 }}>
+        <span style={{ ...Ty.caption, color: T.ink500 }}>
           {filtered.length} of {items.length} items shown
         </span>
         {visUnpriced > 0 && !unpricedOnly && (
@@ -1634,7 +1604,7 @@ export default function StockPricingPanel({ tenantId }) {
             <span
               style={{
                 ...Ty.label,
-                background: T.warningBg,
+                background: T.warningLight,
                 border: `1px solid ${T.warningBd}`,
                 color: T.warning,
                 padding: "4px 10px",
@@ -1643,7 +1613,7 @@ export default function StockPricingPanel({ tenantId }) {
             >
               {changedCount} unsaved change{changedCount !== 1 ? "s" : ""}
             </span>
-            <span style={{ ...Ty.caption, color: T.ink400 }}>
+            <span style={{ ...Ty.caption, color: T.ink500 }}>
               Ctrl+S · not yet written · audit trail written on save
             </span>
           </div>
