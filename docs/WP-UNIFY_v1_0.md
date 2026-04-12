@@ -673,9 +673,9 @@ that doesn't feel like it was designed in the same room on the same day.
 | AINSBar.js | COMPLETE — profileOverrides, T tokens | 1c2d51e | 13 Apr 2026 |
 | HQDashboard.js | COMPLETE — WP-DS-6 Phase 1 | cf9241e | 13 Apr 2026 |
 | GroupPortal.js + all group/ | COMPLETE — built inside T from start | various | Apr 2026 |
-| **P1: Demo path (before 12 May)** | | | |
+| **P1: ALL COMPLETE (13 Apr 2026)** | | | |
 | HQOverview.js | COMPLETE | dbb3e95 | 13 Apr 2026 |
-| HQStock.js + 8 sub-panels | NOT STARTED | — | — |
+| HQStock.js + 8 sub-panels | COMPLETE | 8b3ef58 | 13 Apr 2026 |
 | HQProfitLoss.js | COMPLETE | cb6e625 | 13 Apr 2026 |
 | HQBalanceSheet.js | COMPLETE | fc49b07 | 13 Apr 2026 |
 | HQDocuments.js | COMPLETE | 42402b0 | 13 Apr 2026 |
