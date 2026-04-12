@@ -1,6 +1,6 @@
 # SESSION STATE v253
 ## Produced: 13 April 2026 — end of session
-## HEAD: `04e9004` (pre doc-commit — final HEAD will be the doc-commit SHA)
+## HEAD: `2df028f` (pre doc-commit — final HEAD will be the doc-commit SHA)
 
 ### CURRENT PRIORITY
 CA business rescue demo — ~4 weeks away (meeting ~12 May 2026)
@@ -37,13 +37,13 @@ This was a pivotal session. Three major workstreams completed:
 | Phase | Name | Status | Commit |
 |---|---|---|---|
 | Phase 1 | Shell Unification | COMPLETE | cf9241e |
-| Phase 2 | AINS Bar Unification | COMPLETE | 04e9004 |
+| Phase 2 | AINS Bar Unification | COMPLETE | 2df028f |
 | Phase 3 | Profile-Aware Tokens | NOT STARTED | — |
 | Phase 4 | Notification Badges | NOT STARTED | — |
 
 ### KNOWN ISSUES
-- **AI drawer streaming:** needs browser confirmation that full response renders
-  (not just "Analysing..." spinner). Check if SSE parsing completes.
+- **AI drawer streaming:** CONFIRMED WORKING (2df028f). SSE fix: buffer pattern +
+  `{ token }` field + `res.ok` check. Streams CA-grade rescue analysis correctly.
 - **Tenant Portal AINSBar:** wired but not yet browser-verified on tenant side.
   HQ confirmed working. Tenant portal may need `intelData` prop verification.
 - Balance sheet equation checker (`balanced2`) may show false negatives — deferred.
@@ -76,7 +76,9 @@ This was a pivotal session. Three major workstreams completed:
 - `cf9241e` — DS-6 Phase 1c: HQOverview root container fill fix
 - `60b7a5d` — DS-6 Phase 2: AINSBar + useHQIntelStrip
 - `04e9004` — WP-DS-6 Phase 2 status update
-- `[this commit]` — SESSION-STATE v253
+- `5fe36f6` — SESSION-STATE v253 + NEXT-SESSION-PROMPT v253
+- `2df028f` — AINSBar SSE stream fix (buffer + token field + res.ok)
+- `[this commit]` — SESSION-STATE v253 final update + WP status SHA
 
 ### RULES ACTIVE THIS SESSION
 - LL-203, LL-205, LL-206, LL-221, LL-231, LL-238
