@@ -679,7 +679,7 @@ that doesn't feel like it was designed in the same room on the same day.
 | HQProfitLoss.js | COMPLETE | cb6e625 | 13 Apr 2026 |
 | HQBalanceSheet.js | COMPLETE | fc49b07 | 13 Apr 2026 |
 | HQDocuments.js | COMPLETE | 42402b0 | 13 Apr 2026 |
-| ExpenseManager.js | NOT STARTED | — | — |
+| ExpenseManager.js | COMPLETE | b04fc7e | 13 Apr 2026 |
 | **P2: Post-demo sessions 1-5** | | | |
 | HQAnalytics.js | NOT STARTED | — | — |
 | HQTradingDashboard.js | NOT STARTED | — | — |
