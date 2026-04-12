@@ -680,7 +680,7 @@ that doesn't feel like it was designed in the same room on the same day.
 | HQBalanceSheet.js | COMPLETE | fc49b07 | 13 Apr 2026 |
 | HQDocuments.js | COMPLETE | 42402b0 | 13 Apr 2026 |
 | ExpenseManager.js | COMPLETE | b04fc7e | 13 Apr 2026 |
-| **P2: Post-demo sessions 1-5** | | | |
+| **P2: ALL COMPLETE (13 Apr 2026)** | | | |
 | HQAnalytics.js | COMPLETE | fe241e6 | 13 Apr 2026 |
 | HQTradingDashboard.js | COMPLETE | 7395330 | 13 Apr 2026 |
 | HQFraud.js | COMPLETE | 629a7d5 | 13 Apr 2026 |
@@ -691,7 +691,24 @@ that doesn't feel like it was designed in the same room on the same day.
 | HQJournals.js | COMPLETE | d1ff59d | 13 Apr 2026 |
 | HQForecast.js | COMPLETE | d1ff59d | 13 Apr 2026 |
 | HQYearEnd.js | COMPLETE | d1ff59d | 13 Apr 2026 |
-| + 18 more P2 files | NOT STARTED | — | — |
+| HQInvoices.js | COMPLETE | a543305 | 13 Apr 2026 |
+| HQPricing.js | COMPLETE | a543305 | 13 Apr 2026 |
+| HQMedical.js | COMPLETE | a543305 | 13 Apr 2026 |
+| HQTenants.js | COMPLETE | a543305 | 13 Apr 2026 |
+| HQEmailLogs.js | COMPLETE | b7febaf | 13 Apr 2026 |
+| HQFinancialNotes.js | COMPLETE | b7febaf | 13 Apr 2026 |
+| HQFinancialSetup.js | COMPLETE (no-op) | — | 13 Apr 2026 |
+| HQFinancialStatements.js | COMPLETE | 3e3daef | 13 Apr 2026 |
+| HQWholesaleOrders.js | COMPLETE | 3e3daef | 13 Apr 2026 |
+| HQReorderScoring.js | COMPLETE | 3e3daef | 13 Apr 2026 |
+| HQSmartCapture.js | COMPLETE | 3e3daef | 13 Apr 2026 |
+| GeoAnalyticsDashboard.js | COMPLETE (T→GEO_T) | b455820 | 13 Apr 2026 |
+| RetailerHealth.js | COMPLETE | b455820 | 13 Apr 2026 |
+| Distribution.js | COMPLETE | b455820 | 13 Apr 2026 |
+| SupplyChain.js | COMPLETE | 35b3b55 | 13 Apr 2026 |
+| HQTransfer.js | COMPLETE (no-op) | — | 13 Apr 2026 |
+| EODCashUp.js | COMPLETE | 35b3b55 | 13 Apr 2026 |
+| POSScreen.js | COMPLETE (T→POS_T) | 35b3b55 | 13 Apr 2026 |
 | **P3: Protected + large + F&B** | | | |
 | HQCogs.js (PROTECTED) | NOT STARTED | — | — |
 | HQProduction.js (307KB) | NOT STARTED | — | — |
