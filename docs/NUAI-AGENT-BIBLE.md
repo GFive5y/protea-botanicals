@@ -148,6 +148,16 @@ NOTE: LL-223 — Deno EFs cannot call sibling EFs via internal fetch. sim-pos-sa
 **Never suggest a feature as "pending build" without first reading the source file.**
 **Never ask the owner to run PowerShell/bash commands Claude can run via GitHub MCP.**
 
+**WP-UNIFY MANDATORY READ:** If ANY UI component will be touched this session,
+read docs/WP-UNIFY_v1_0.md after step 3 above. This document contains:
+  - The neuroscience research behind why visual consistency closes deals
+  - The full blast zone audit (Tier 1/2/3 components by demo priority)
+  - The 8 UNIFY rules that govern all new and migrated UI code
+  - The exact migration pattern (step by step for Claude Code)
+  - The NuAi design personality definition
+Agents who skip this produce components that look like the old HQ tabs.
+Agents who read this produce components that look like the Group Portal.
+
 ---
 
 # SECTION 4 — FOUR USER TIERS
@@ -624,6 +634,80 @@ Read once. Used throughout this Bible and BUILD-LOG.md.
 
 ## Pre-Build Audit Rules (added v229 — 11 April 2026)
 
+## WP-UNIFY Rules (13 April 2026 — design system unification)
+
+Read docs/WP-UNIFY_v1_0.md for the full research, blast zone audit, and context.
+The rules below are the operational summary only.
+
+- **UNIFY-1 — NO LOCAL T DEFINITION EVER**:
+  Every new component imports T from tokens.js. A local const T = {...} or
+  const C = {...} at module level is a violation. Catch before commit.
+  Pattern: import { T } from "../../styles/tokens"; (adjust path for depth)
+
+- **UNIFY-2 — MIGRATE ON TOUCH**:
+  Every file opened for any reason gets its local token object migrated in
+  the same commit. No session ends with a local T definition that was there
+  before. This compounds across sessions until every file is clean.
+
+- **UNIFY-3 — TWO WEIGHTS ONLY IN NEW/MIGRATED COMPONENTS**:
+  400 = body text and table data.
+  500 = primary labels, active nav, card titles.
+  600 = section headers, KPI values, emphasis.
+  700 = ONLY for labels at <=11px uppercase where weight compensates for size.
+  Never 300. Never 800. Never 700 on anything above 11px.
+
+- **UNIFY-4 — ONE BORDER STYLE**:
+  All card and table borders: border: `1px solid ${T.border}`
+  All input focus: borderColor: T.accent
+  Never rgba(), never custom hex, never mixed border weights in same component.
+
+- **UNIFY-5 — SEMANTIC COLOUR BY TOKEN ONLY**:
+  Red=T.danger · Amber=T.warning · Green=T.success · Blue=T.info · Grey=T.neutral
+  Never a custom hex for a semantic moment. Use getSeverityTokens() from tokens.js.
+
+- **UNIFY-6 — INTER IN PORTALS, JOST ON CONSUMER PAGES ONLY**:
+  /hq /tenant-portal /admin /hr /staff /group-portal -> fontFamily: T.font (Inter)
+  /shop /loyalty /scan /account /welcome -> Jost permitted, kept intentionally.
+  Jost in an authenticated portal reads as "marketing." Inter reads as "data."
+
+- **UNIFY-7 — SHARED COMPONENTS FIRST**:
+  Any UI pattern appearing in 2+ components belongs in src/components/shared/.
+  Priority order to build: SharedDataTable · SharedStatCard · SharedBadge
+  SharedSectionHeader · SharedTabBar · SharedModalShell · SharedEmptyState
+
+- **UNIFY-8 — DEMO PATH TIER 1 MUST MATCH GROUP PORTAL BY 12 MAY 2026**:
+  Tier 1 = HQOverview · HQStock · HQProfitLoss · HQBalanceSheet
+           HQDocuments · ExpenseManager
+  Test: does this component look like it was built in the same room
+  as the Group Portal? If not, it fails the standard.
+
+## NUAI DESIGN PERSONALITY (WP-UNIFY definition)
+
+**Sophisticated density.** Information-forward. Every pixel earns its place.
+Restrained typography (two weights, one font, one scale). Disciplined colour
+(one accent, semantic tokens only). Light borders (T.border). Minimal shadows
+(T.shadow.sm at most). The data is the hero. The container is invisible.
+This is the Linear/Stripe register — not Notion, not legacy Salesforce.
+
+## BLAST ZONE PRIORITIES (WP-UNIFY — full audit in WP-UNIFY_v1_0.md)
+
+TIER 1 (demo critical — must match Group Portal by 12 May 2026):
+  HQOverview.js · HQStock.js (7 sub-tabs) · HQProfitLoss.js
+  HQBalanceSheet.js · HQDocuments.js · ExpenseManager.js
+
+TIER 2 (migrate first 3 sessions post-demo):
+  HQAnalytics.js · HQVat.js · HQLoyalty.js (10 tabs)
+  SmartInventory.js · HQProduction.js · AdminQRCodes.js
+
+TIER 3 (systematic — one per session alongside feature work):
+  All 13 HR modules · HQCogs.js (read LL-233 first) · AdminDashboard.js
+
+## MIGRATION COMMIT FORMAT
+
+  refactor(UNIFY): migrate [ComponentName].js to tokens.js — [brief note]
+
+---
+
 - **LL-221 — PRE-BUILD AUDIT IS MANDATORY BEFORE EVERY WP STAGE**:
   Before any file is opened in Claude Code, the agent must answer these five
   questions from the actual source code — not the spec or session docs:
@@ -814,7 +898,8 @@ All docs live in `docs/` in the repo. Read via GitHub:get_file_contents.
 1. NUAI-AGENT-BIBLE.md (this file)
 2. SESSION-STATE_vNNN (latest — for current priorities)
 3. VIOLATION_LOG (to know what rules are being broken)
-4. Source file for build target (verify state from disk before planning)
+4. WP-UNIFY_v1_0.md (MANDATORY if any UI component will be touched)
+5. Source file for build target (verify state from disk before planning)
 
 ---
 

@@ -415,3 +415,42 @@ provides the strategic framing and the quality standard every new commit
 is measured against. NUAI-STRAT-INTEL is never replaced — only addended.
 
 *Appended: 12 April 2026 · NUAI-STRAT-INTEL v1.0 landed in the handover loop*
+
+---
+
+## UPDATE — 13 April 2026
+
+### WP-UNIFY initiated — design system unification is now governing policy
+
+The platform now has two distinct visual tiers:
+  - Components built inside tokens.js (Group Portal, Tenant Portal shell,
+    AINSBar, TokenContext) -> look like a Series A product
+  - Components built before the design system existed (HQStock, HQProduction,
+    most of the 41 HQ tabs) -> look like a capable internal tool
+
+This gap is documented with full neuroscience and UX research in:
+  docs/WP-UNIFY_v1_0.md
+
+Every agent MUST read WP-UNIFY_v1_0.md before touching any UI component.
+This is as mandatory as reading this PLATFORM-OVERVIEW.
+
+The 8 governing UNIFY rules are in that document. The short version:
+  1. No local T definition ever — import { T } from tokens.js
+  2. Migrate on touch — every opened file gets its local T migrated
+  3. Two font weights only (400/500 body, 600/700 labels)
+  4. One border style — border: `1px solid ${T.border}`
+  5. Semantic colour by token only (T.danger/T.warning/T.success/T.info)
+  6. Inter in portals, Jost on consumer pages only
+  7. Shared components first — src/components/shared/
+  8. Demo path Tier 1 components match Group Portal by 12 May 2026
+
+WP-DS-6 (all 4 phases) is complete as of this update:
+  Phase 1 Shell Unification cf9241e
+  Phase 2 AINS Bar 2df028f
+  Phase 3 Profile-Aware Tokens 1c2d51e
+  Phase 4 Notification Badges 0b62ca1
+
+Group Portal (/group-portal) added — 7th portal, franchise/network view.
+Demo group "NuAi Business Rescue Portfolio" seeded with all 4 CA demo stores.
+
+*Update by: Claude.ai + George Fivaz · 13 April 2026*

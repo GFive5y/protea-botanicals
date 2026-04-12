@@ -45,6 +45,13 @@ two-agent operating procedure. See docs/CLAUDE-COLLABORATION-PROTOCOL.md.
 3. Read docs/NUAI-AGENT-BIBLE.md
    → all rules (240+ LLs) — this is the canonical rule source
 
+3.5. If ANY UI component will be touched this session:
+     Read docs/WP-UNIFY_v1_0.md IN FULL before writing a single line.
+     This is not optional. The research, the blast zones, the 8 UNIFY rules,
+     and the migration pattern are all in that document.
+     Skipping it produces components that look like the old HQ tabs.
+     Reading it produces components that look like the Group Portal.
+
 4. Read docs/VIOLATION_LOG_v1_1.md
    → what broke before
 
@@ -136,7 +143,46 @@ For rules LL-001 through LL-237+: read docs/NUAI-AGENT-BIBLE.md
 
 ---
 
-## DESIGN SYSTEM — WP-DS-6 (MANDATORY FOR ALL NEW FEATURES)
+## DESIGN SYSTEM — WP-DS-6 + WP-UNIFY (MANDATORY FOR ALL FEATURES)
+
+READ docs/WP-UNIFY_v1_0.md before touching any UI component.
+That document contains the full research + blast zone audit + migration pattern.
+
+THE 8 UNIFY RULES (summary — full detail in WP-UNIFY_v1_0.md):
+
+UNIFY-1: No local T definition ever.
+  import { T } from "../../styles/tokens" in EVERY new component.
+  A local const T = {...} or const C = {...} is a violation. Fix before commit.
+
+UNIFY-2: Migrate on touch.
+  Every file opened for any reason gets its local token object migrated
+  in the same commit. No session ends with a local T that was there before.
+
+UNIFY-3: Two weights only in new/migrated components.
+  400 body/data · 500 primary labels · 600 section headers/KPIs
+  700 ONLY for <=11px uppercase labels. Never 300. Never 800.
+
+UNIFY-4: One border style.
+  border: `1px solid ${T.border}` for all cards and tables. Nothing else.
+
+UNIFY-5: Semantic colour by token only.
+  Red=T.danger · Amber=T.warning · Green=T.success · Blue=T.info
+  Never a custom hex for a semantic moment.
+
+UNIFY-6: Inter in portals, Jost on consumer pages only.
+  Every authenticated route uses T.font. Jost stays on /shop /loyalty /scan.
+
+UNIFY-7: Shared components first.
+  If a UI pattern appears in 2+ components, build it in src/components/shared/.
+  Priority: SharedDataTable · SharedStatCard · SharedBadge · SharedModalShell
+
+UNIFY-8: Demo path (Tier 1 blast zones) must match Group Portal standard by 12 May.
+  Tier 1: HQOverview · HQStock · HQProfitLoss · HQBalanceSheet
+          HQDocuments · ExpenseManager
+
+THE NUAI DESIGN PERSONALITY: Sophisticated density.
+Information-forward. Restrained. The data is the hero. The container is invisible.
+Test: does this look like it was built in the same room as the Group Portal?
 
 import { T } from "../../styles/tokens" in every new component.
 Never hardcode px values that match a token.
@@ -208,6 +254,7 @@ version in this file. This file is intentionally version-free.
 For current state:      read docs/SESSION-STATE_[latest].md
 For current priorities: read docs/NEXT-SESSION-PROMPT_[latest].md
 For all rules:          read docs/NUAI-AGENT-BIBLE.md
+For UI/design rules:    read docs/WP-UNIFY_v1_0.md (MANDATORY if touching UI)
 For EF versions:        query Supabase MCP or read SESSION-STATE
 For HEAD:               run git log --oneline -1
 
@@ -224,7 +271,7 @@ Claude.ai must confirm the state is accurate before session close.
 
 ---
 
-*CLAUDE.md v2.0 · NuAi · 11 April 2026*
+*CLAUDE.md v2.1 · NuAi · 13 April 2026*
 *Replaces: CLAUDE.md v1.0 (09 April 2026, HEAD 9939421)*
 *Rule source:     docs/NUAI-AGENT-BIBLE.md*
 *State source:    docs/SESSION-STATE_v[latest].md*
