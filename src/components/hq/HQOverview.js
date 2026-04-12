@@ -1311,7 +1311,7 @@ export default function HQOverview({ onNavigate }) {
   };
 
   return (
-    <div style={{ fontFamily: T.fontUi, maxWidth: 1400, margin: "0 auto" }}>
+    <div style={{ fontFamily: T.fontUi, width: "100%" }}>
       <WorkflowGuide
         context={ctx}
         title="HQ Command Centre"
