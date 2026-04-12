@@ -9,22 +9,24 @@ import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
 import WorkflowGuide from "../WorkflowGuide";
 import InfoTooltip from "../InfoTooltip";
+import { T } from "../../styles/tokens";
 
+// WP-UNIFY: F&B local palette mapped to tokens.js T where equivalent
 const C = {
-  bg: "#F8F7F4",
-  surface: "#FFFFFF",
-  border: "#E8E4DC",
-  ink: "#1A1A18",
-  inkMid: "#4A4740",
-  inkLight: "#8A8680",
-  accent: "#2D6A4F",
-  accentBg: "#EBF5EF",
-  amber: "#92400E",
-  amberBg: "#FEF3C7",
-  red: "#991B1B",
-  redBg: "#FEF2F2",
+  bg: T.surface,
+  surface: "#ffffff",
+  border: T.border,
+  ink: T.ink900,
+  inkMid: T.ink700,
+  inkLight: T.ink500,
+  accent: T.accentMid,
+  accentBg: T.accentLight,
+  amber: T.warning,
+  amberBg: T.warningLight,
+  red: T.danger,
+  redBg: T.dangerLight,
   blue: "#1D4ED8",
-  blueBg: "#EFF6FF",
+  blueBg: T.infoLight,
   purple: "#5B21B6",
   purpleBg: "#F5F3FF",
 };
