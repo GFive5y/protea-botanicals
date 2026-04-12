@@ -27,41 +27,13 @@ import { usePageContext } from "../hooks/usePageContext";
 import InfoTooltip from "./InfoTooltip";
 import { ChartCard, ChartTooltip } from "./viz";
 import { useTenant } from "../services/tenantService";
+import { T } from "../styles/tokens";
 
 const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
   "https://uvicrqapgzcdvozxrreo.supabase.co/functions/v1";
 
-// ─── THEME ────────────────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 // Legacy aliases
 const C = {
   green: T.accent,
@@ -70,18 +42,18 @@ const C = {
   gold: "#b5935a",
   blue: T.info,
   brown: "#7c3a10",
-  cream: T.ink050,
-  warm: T.ink075,
-  border: T.ink150,
-  muted: T.ink400,
+  cream: T.surface,
+  warm: T.bg,
+  border: T.border,
+  muted: T.ink500,
   white: "#fff",
   text: T.ink700,
   error: T.danger,
   success: T.success,
   warning: T.warning,
-  lightGreen: T.accentLit,
-  lightRed: T.dangerBg,
-  lightGold: T.warningBg,
+  lightGreen: T.accentLight,
+  lightRed: T.dangerLight,
+  lightGold: T.warningLight,
 };
 const FONTS = { heading: T.font, body: T.font };
 
@@ -142,7 +114,7 @@ const TYPE_MAP = Object.fromEntries(QR_TYPES.map((t) => [t.value, t]));
 const mkBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
   background: disabled ? T.ink300 : bg,
   color,
-  border: bg === "transparent" ? `1px solid ${T.ink150}` : "none",
+  border: bg === "transparent" ? `1px solid ${T.border}` : "none",
   borderRadius: 4,
   padding: "9px 18px",
   fontSize: 11,
@@ -157,7 +129,7 @@ const mkBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
 const inputStyle = {
   width: "100%",
   padding: "8px 12px",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: 4,
   fontSize: 13,
   fontFamily: T.font,
@@ -171,17 +143,17 @@ const sectionLabel = {
   fontWeight: 700,
   letterSpacing: "0.1em",
   textTransform: "uppercase",
-  color: T.ink400,
+  color: T.ink500,
   fontFamily: T.font,
   marginBottom: 8,
   display: "block",
 };
 const cardBase = (extra = {}) => ({
   background: "#fff",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: 8,
   padding: 20,
-  boxShadow: T.shadow,
+  boxShadow: T.shadow.sm,
   ...extra,
 });
 
@@ -353,7 +325,7 @@ function DetailPanel({
           width: 380,
           height: "100vh",
           background: "#fff",
-          borderLeft: `1px solid ${T.ink150}`,
+          borderLeft: `1px solid ${T.border}`,
           overflowY: "auto",
           zIndex: 201,
           padding: 24,
@@ -375,7 +347,7 @@ function DetailPanel({
               {typeInfo.icon} {typeInfo.label}
             </div>
             {code.campaign_name && (
-              <div style={{ fontSize: 12, color: T.ink400, marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: T.ink500, marginTop: 2 }}>
                 {code.campaign_name}
               </div>
             )}
@@ -387,7 +359,7 @@ function DetailPanel({
               border: "none",
               fontSize: 20,
               cursor: "pointer",
-              color: T.ink400,
+              color: T.ink500,
               padding: 0,
             }}
           >
@@ -404,7 +376,7 @@ function DetailPanel({
             cursor: "zoom-in",
             marginBottom: 16,
             padding: 16,
-            background: T.ink075,
+            background: T.bg,
             borderRadius: 8,
           }}
         >
@@ -419,7 +391,7 @@ function DetailPanel({
           <div
             style={{
               fontSize: 10,
-              color: T.ink400,
+              color: T.ink500,
               marginTop: 6,
               letterSpacing: "0.08em",
               fontFamily: T.font,
@@ -439,21 +411,21 @@ function DetailPanel({
           }}
         >
           {code.hmac_signed && (
-            <Badge bg={T.successBg} color={T.success} border={T.successBd}>
+            <Badge bg={T.successLight} color={T.success} border={T.successBd}>
               SIGNED
             </Badge>
           )}
           <Badge
-            bg={code.is_active ? T.successBg : T.ink075}
-            color={code.is_active ? T.success : T.ink400}
+            bg={code.is_active ? T.successLight : T.bg}
+            color={code.is_active ? T.success : T.ink500}
           >
             {code.is_active ? "ACTIVE" : "PAUSED"}
           </Badge>
-          <Badge bg={T.infoBg} color={T.info} border={T.infoBd}>
+          <Badge bg={T.infoLight} color={T.info} border={T.infoBd}>
             {code.status || "in_stock"}
           </Badge>
           {code.claimed && (
-            <Badge bg={T.infoBg} color={T.info} border={T.infoBd}>
+            <Badge bg={T.infoLight} color={T.info} border={T.infoBd}>
               CLAIMED
             </Badge>
           )}
@@ -468,9 +440,9 @@ function DetailPanel({
               fontSize: 10,
               wordBreak: "break-all",
               padding: "8px 10px",
-              background: T.ink075,
+              background: T.bg,
               borderRadius: 4,
-              border: `1px solid ${T.ink150}`,
+              border: `1px solid ${T.border}`,
             }}
           >
             {code.qr_code}
@@ -483,10 +455,10 @@ function DetailPanel({
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
             gap: "1px",
-            background: T.ink150,
+            background: T.border,
             borderRadius: 6,
             overflow: "hidden",
-            border: `1px solid ${T.ink150}`,
+            border: `1px solid ${T.border}`,
             marginBottom: 16,
           }}
         >
@@ -510,7 +482,7 @@ function DetailPanel({
                   fontSize: 9,
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  color: T.ink400,
+                  color: T.ink500,
                   fontFamily: T.font,
                 }}
               >
@@ -537,7 +509,7 @@ function DetailPanel({
             style={{
               marginBottom: 16,
               padding: "10px 12px",
-              background: T.accentLit,
+              background: T.accentLight,
               borderRadius: 6,
               border: `1px solid ${T.accentBd}`,
             }}
@@ -557,7 +529,7 @@ function DetailPanel({
             <div style={{ fontSize: 13, color: T.accent, fontWeight: 600 }}>
               {code.batches.product_name}
             </div>
-            <div style={{ fontSize: 11, color: T.ink400 }}>
+            <div style={{ fontSize: 11, color: T.ink500 }}>
               {code.batches.batch_number}
             </div>
           </div>
@@ -574,7 +546,7 @@ function DetailPanel({
                   fontSize: 12,
                   color: T.ink700,
                   padding: "5px 0",
-                  borderBottom: `1px solid ${T.ink075}`,
+                  borderBottom: `1px solid ${T.bg}`,
                   fontFamily: T.font,
                 }}
               >
@@ -676,7 +648,7 @@ function DetailPanel({
               style={{
                 fontFamily: "monospace",
                 fontSize: 10,
-                color: T.ink400,
+                color: T.ink500,
                 marginTop: 4,
                 wordBreak: "break-all",
               }}
@@ -699,7 +671,7 @@ function DetailPanel({
               </button>
               <button
                 onClick={() => setShowFullscreen(false)}
-                style={mkBtn("transparent", T.ink400)}
+                style={mkBtn("transparent", T.ink500)}
               >
                 Close
               </button>
@@ -875,11 +847,11 @@ function RegistryTab({ batches, tenantId }) {
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit,minmax(80px,1fr))",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: 8,
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
-          boxShadow: T.shadow,
+          border: `1px solid ${T.border}`,
+          boxShadow: T.shadow.sm,
           marginBottom: 24,
         }}
       >
@@ -891,7 +863,7 @@ function RegistryTab({ batches, tenantId }) {
             color: T.accentMid,
             tooltipId: "qr-hmac",
           },
-          { label: "Unsigned", value: stats.unsigned, color: T.ink400 },
+          { label: "Unsigned", value: stats.unsigned, color: T.ink500 },
           {
             label: "Claimed",
             value: stats.claimed,
@@ -910,7 +882,7 @@ function RegistryTab({ batches, tenantId }) {
           {
             label: "Expired",
             value: stats.expired,
-            color: stats.expired > 0 ? T.danger : T.ink400,
+            color: stats.expired > 0 ? T.danger : T.ink500,
           },
         ].map(({ label: lbl, value, color, tooltipId }) => (
           <div
@@ -937,7 +909,7 @@ function RegistryTab({ batches, tenantId }) {
             <div
               style={{
                 fontSize: 9,
-                color: T.ink400,
+                color: T.ink500,
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
                 fontFamily: T.font,
@@ -1041,13 +1013,13 @@ function RegistryTab({ batches, tenantId }) {
                     <CartesianGrid
                       horizontal
                       vertical={false}
-                      stroke={T.ink150}
+                      stroke={T.border}
                       strokeWidth={0.5}
                     />
                     <XAxis
                       dataKey="icon"
                       tick={{
-                        fill: T.ink400,
+                        fill: T.ink500,
                         fontSize: 12,
                         fontFamily: T.font,
                       }}
@@ -1057,7 +1029,7 @@ function RegistryTab({ batches, tenantId }) {
                     />
                     <YAxis
                       tick={{
-                        fill: T.ink400,
+                        fill: T.ink500,
                         fontSize: 10,
                         fontFamily: T.font,
                       }}
@@ -1111,7 +1083,7 @@ function RegistryTab({ batches, tenantId }) {
                         style={{
                           flex: 1,
                           height: 16,
-                          background: T.ink075,
+                          background: T.bg,
                           borderRadius: 3,
                           overflow: "hidden",
                         }}
@@ -1150,7 +1122,7 @@ function RegistryTab({ batches, tenantId }) {
                       <span
                         style={{
                           fontSize: 11,
-                          color: T.ink400,
+                          color: T.ink500,
                           fontFamily: T.font,
                           minWidth: 32,
                           textAlign: "right",
@@ -1232,7 +1204,7 @@ function RegistryTab({ batches, tenantId }) {
       {loading && (
         <div
           style={{
-            color: T.ink400,
+            color: T.ink500,
             fontFamily: T.font,
             fontSize: 13,
             padding: 20,
@@ -1246,7 +1218,7 @@ function RegistryTab({ batches, tenantId }) {
       {!loading && (
         <div
           style={{
-            border: `1px solid ${T.ink150}`,
+            border: `1px solid ${T.border}`,
             borderRadius: 8,
             overflow: "hidden",
           }}
@@ -1258,7 +1230,7 @@ function RegistryTab({ batches, tenantId }) {
             return (
               <div
                 key={type.value}
-                style={{ borderBottom: `1px solid ${T.ink150}` }}
+                style={{ borderBottom: `1px solid ${T.border}` }}
               >
                 {/* Type header */}
                 <div
@@ -1268,7 +1240,7 @@ function RegistryTab({ batches, tenantId }) {
                     alignItems: "center",
                     gap: 10,
                     padding: "12px 16px",
-                    background: T.ink075,
+                    background: T.bg,
                     cursor: "pointer",
                     userSelect: "none",
                   }}
@@ -1288,13 +1260,13 @@ function RegistryTab({ batches, tenantId }) {
                   <span
                     style={{
                       fontSize: 11,
-                      color: T.ink400,
+                      color: T.ink500,
                       fontFamily: T.font,
                     }}
                   >
                     ({total} code{total !== 1 ? "s" : ""})
                   </span>
-                  <span style={{ color: T.ink400 }}>
+                  <span style={{ color: T.ink500 }}>
                     {collapsed ? "▸" : "▾"}
                   </span>
                 </div>
@@ -1311,7 +1283,7 @@ function RegistryTab({ batches, tenantId }) {
                     return (
                       <div
                         key={grpKey}
-                        style={{ borderTop: `1px solid ${T.ink150}` }}
+                        style={{ borderTop: `1px solid ${T.border}` }}
                       >
                         <div
                           onClick={() =>
@@ -1341,14 +1313,14 @@ function RegistryTab({ batches, tenantId }) {
                           <span
                             style={{
                               fontSize: 10,
-                              color: T.ink400,
+                              color: T.ink500,
                               fontFamily: T.font,
                             }}
                           >
                             {items.length} codes · {claimedCount} claimed ·{" "}
                             {scanTotal} scans
                           </span>
-                          <span style={{ color: T.ink400, fontSize: 11 }}>
+                          <span style={{ color: T.ink500, fontSize: 11 }}>
                             {grpCollapsed ? "▸" : "▾"}
                           </span>
                         </div>
@@ -1403,7 +1375,7 @@ function RegistryTab({ batches, tenantId }) {
               maxWidth: 380,
               width: "90%",
               textAlign: "center",
-              boxShadow: T.shadowMd,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
               fontFamily: T.font,
             }}
           >
@@ -1417,14 +1389,14 @@ function RegistryTab({ batches, tenantId }) {
             >
               Confirm Delete
             </div>
-            <div style={{ fontSize: 13, color: T.ink400, marginBottom: 8 }}>
+            <div style={{ fontSize: 13, color: T.ink500, marginBottom: 8 }}>
               This will permanently delete:
             </div>
             <code
               style={{
                 fontSize: 11,
                 wordBreak: "break-all",
-                background: T.ink075,
+                background: T.bg,
                 padding: "6px 10px",
                 borderRadius: 4,
                 display: "block",
@@ -1436,7 +1408,7 @@ function RegistryTab({ batches, tenantId }) {
             <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
               <button
                 onClick={() => setDeleteTarget(null)}
-                style={mkBtn("transparent", T.ink400)}
+                style={mkBtn("transparent", T.ink500)}
               >
                 Cancel
               </button>
@@ -1464,17 +1436,17 @@ function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
         alignItems: "center",
         gap: 10,
         padding: "10px 16px 10px 52px",
-        borderTop: `1px solid ${T.ink150}`,
+        borderTop: `1px solid ${T.border}`,
         cursor: "pointer",
-        background: selected ? T.accentLit : isExpired ? "#fafafa" : "#fff",
+        background: selected ? T.accentLight : isExpired ? "#fafafa" : "#fff",
         transition: "background 0.1s",
       }}
       onMouseEnter={(e) => {
-        if (!selected) e.currentTarget.style.background = T.ink075;
+        if (!selected) e.currentTarget.style.background = T.bg;
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = selected
-          ? T.accentLit
+          ? T.accentLight
           : isExpired
             ? "#fafafa"
             : "#fff";
@@ -1504,17 +1476,17 @@ function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
         </div>
       </div>
       {code.hmac_signed && (
-        <Badge bg={T.successBg} color={T.success} border={T.successBd}>
+        <Badge bg={T.successLight} color={T.success} border={T.successBd}>
           SIGNED
         </Badge>
       )}
       {code.claimed && (
-        <Badge bg={T.infoBg} color={T.info} border={T.infoBd}>
+        <Badge bg={T.infoLight} color={T.info} border={T.infoBd}>
           CLAIMED
         </Badge>
       )}
       {isExpired && (
-        <Badge bg={T.dangerBg} color={T.danger} border={T.dangerBd}>
+        <Badge bg={T.dangerLight} color={T.danger} border={T.dangerBd}>
           EXPIRED
         </Badge>
       )}
@@ -1534,7 +1506,7 @@ function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
       <span
         style={{
           fontSize: 11,
-          color: T.ink400,
+          color: T.ink500,
           fontFamily: T.font,
           minWidth: 55,
           textAlign: "right",
@@ -1546,7 +1518,7 @@ function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
       <span
         style={{
           fontSize: 11,
-          color: T.ink400,
+          color: T.ink500,
           fontFamily: T.font,
           minWidth: 70,
           textAlign: "right",
@@ -1561,7 +1533,7 @@ function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
         }}
         style={{
           ...mkBtn(
-            code.is_active ? T.warningBg : T.successBg,
+            code.is_active ? T.warningLight : T.successLight,
             code.is_active ? T.warning : T.success,
           ),
           border: `1px solid ${code.is_active ? T.warningBd : T.successBd}`,
@@ -1577,7 +1549,7 @@ function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
           onDelete();
         }}
         style={{
-          ...mkBtn(T.dangerBg, T.danger),
+          ...mkBtn(T.dangerLight, T.danger),
           border: `1px solid ${T.dangerBd}`,
           padding: "3px 8px",
           fontSize: 9,
@@ -1795,7 +1767,7 @@ function GenerateTab({
         display: "flex",
         gap: 0,
         marginBottom: 28,
-        borderBottom: `2px solid ${T.ink150}`,
+        borderBottom: `2px solid ${T.border}`,
       }}
     >
       {[
@@ -1825,7 +1797,7 @@ function GenerateTab({
                 ? T.accent
                 : step > parseInt(n)
                   ? T.accentMid
-                  : T.ink400,
+                  : T.ink500,
             fontFamily: T.font,
           }}
         >
@@ -1861,8 +1833,8 @@ function GenerateTab({
                     flex: "1 1 140px",
                     cursor: "pointer",
                     minWidth: 130,
-                    border: `2px solid ${selectedType === t.value ? T.accentBd : T.ink150}`,
-                    background: selectedType === t.value ? T.accentLit : "#fff",
+                    border: `2px solid ${selectedType === t.value ? T.accentBd : T.border}`,
+                    background: selectedType === t.value ? T.accentLight : "#fff",
                     borderRadius: 8,
                   }),
                   textAlign: "center",
@@ -1881,7 +1853,7 @@ function GenerateTab({
                   {t.label}
                 </div>
                 <div
-                  style={{ fontSize: 10, color: T.ink400, fontFamily: T.font }}
+                  style={{ fontSize: 10, color: T.ink500, fontFamily: T.font }}
                 >
                   {t.desc}
                 </div>
@@ -1904,7 +1876,7 @@ function GenerateTab({
                   alignItems: "center",
                   gap: 10,
                   padding: "10px 12px",
-                  background: T.accentLit,
+                  background: T.accentLight,
                   border: `1px solid ${T.accentBd}`,
                   borderRadius: 7,
                 }}
@@ -1934,7 +1906,7 @@ function GenerateTab({
                     background: "none",
                     border: "none",
                     cursor: "pointer",
-                    color: T.ink400,
+                    color: T.ink500,
                     fontSize: 16,
                   }}
                 >
@@ -1962,9 +1934,9 @@ function GenerateTab({
                       left: 0,
                       right: 0,
                       background: "#fff",
-                      border: `1px solid ${T.ink150}`,
+                      border: `1px solid ${T.border}`,
                       borderRadius: 6,
-                      boxShadow: T.shadowMd,
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                       zIndex: 50,
                       maxHeight: 200,
                       overflowY: "auto",
@@ -1996,10 +1968,10 @@ function GenerateTab({
                             gap: 10,
                             padding: "8px 12px",
                             cursor: "pointer",
-                            borderBottom: `1px solid ${T.ink075}`,
+                            borderBottom: `1px solid ${T.bg}`,
                           }}
                           onMouseOver={(e) =>
-                            (e.currentTarget.style.background = T.accentLit)
+                            (e.currentTarget.style.background = T.accentLight)
                           }
                           onMouseOut={(e) =>
                             (e.currentTarget.style.background = "transparent")
@@ -2018,7 +1990,7 @@ function GenerateTab({
                             >
                               {i.name}
                             </div>
-                            <div style={{ fontSize: 10, color: T.ink400 }}>
+                            <div style={{ fontSize: 10, color: T.ink500 }}>
                               {CAT_LABEL[i.category] || i.category} · {i.sku} ·
                               R{parseFloat(i.sell_price).toFixed(2)}
                             </div>
@@ -2038,7 +2010,7 @@ function GenerateTab({
                         style={{
                           padding: "12px",
                           fontSize: 11,
-                          color: T.ink400,
+                          color: T.ink500,
                           textAlign: "center",
                         }}
                       >
@@ -2082,7 +2054,7 @@ function GenerateTab({
               <button
                 onClick={() => setIsBulk(false)}
                 style={mkBtn(
-                  isBulk ? T.ink075 : T.accent,
+                  isBulk ? T.bg : T.accent,
                   isBulk ? T.ink700 : "#fff",
                 )}
               >
@@ -2091,7 +2063,7 @@ function GenerateTab({
               <button
                 onClick={() => setIsBulk(true)}
                 style={mkBtn(
-                  !isBulk ? T.ink075 : T.accent,
+                  !isBulk ? T.bg : T.accent,
                   !isBulk ? T.ink700 : "#fff",
                 )}
               >
@@ -2109,7 +2081,7 @@ function GenerateTab({
               )}
               {isBulk && (
                 <span
-                  style={{ fontSize: 11, color: T.ink400, fontFamily: T.font }}
+                  style={{ fontSize: 11, color: T.ink500, fontFamily: T.font }}
                 >
                   codes (max 200)
                 </span>
@@ -2349,7 +2321,7 @@ function GenerateTab({
           <div style={{ display: "flex", gap: 10 }}>
             <button
               onClick={() => setStep(1)}
-              style={mkBtn("transparent", T.ink400)}
+              style={mkBtn("transparent", T.ink500)}
             >
               ← Back
             </button>
@@ -2393,7 +2365,7 @@ function GenerateTab({
                 <div
                   style={{
                     fontSize: 10,
-                    color: T.ink400,
+                    color: T.ink500,
                     marginTop: 4,
                     fontFamily: T.font,
                   }}
@@ -2501,7 +2473,7 @@ function GenerateTab({
           {genError && (
             <div
               style={{
-                background: T.dangerBg,
+                background: T.dangerLight,
                 border: `1px solid ${T.dangerBd}`,
                 borderRadius: 6,
                 padding: "12px 16px",
@@ -2518,7 +2490,7 @@ function GenerateTab({
           <div style={{ display: "flex", gap: 10, marginBottom: 24 }}>
             <button
               onClick={() => setStep(2)}
-              style={mkBtn("transparent", T.ink400)}
+              style={mkBtn("transparent", T.ink500)}
             >
               ← Back
             </button>
@@ -2581,7 +2553,7 @@ function GenerateTab({
                     <div
                       style={{
                         fontSize: 9,
-                        color: T.ink400,
+                        color: T.ink500,
                         marginTop: 6,
                         fontFamily: "monospace",
                         wordBreak: "break-all",
@@ -2608,7 +2580,7 @@ function GenerateTab({
                   <div
                     style={{
                       fontSize: 12,
-                      color: T.ink400,
+                      color: T.ink500,
                       alignSelf: "center",
                       fontFamily: T.font,
                     }}
@@ -2629,11 +2601,11 @@ function ActionToggle({ label: lbl, checked, onChange, children }) {
   return (
     <div
       style={{
-        border: `1px solid ${checked ? T.accentBd : T.ink150}`,
+        border: `1px solid ${checked ? T.accentBd : T.border}`,
         borderRadius: 6,
         padding: 14,
         marginBottom: 10,
-        background: checked ? T.accentLit : "#fff",
+        background: checked ? T.accentLight : "#fff",
         transition: "all 0.15s",
       }}
     >
@@ -2742,7 +2714,7 @@ function BannersTab({ banners, onRefresh }) {
               setEditBanner(null);
               setCreating(false);
             }}
-            style={mkBtn("transparent", T.ink400)}
+            style={mkBtn("transparent", T.ink500)}
           >
             ← Back
           </button>
@@ -2797,7 +2769,7 @@ function BannersTab({ banners, onRefresh }) {
                       style={{
                         width: 40,
                         height: 34,
-                        border: `1px solid ${T.ink150}`,
+                        border: `1px solid ${T.border}`,
                         borderRadius: 4,
                         cursor: "pointer",
                       }}
@@ -2867,12 +2839,12 @@ function BannersTab({ banners, onRefresh }) {
       {banners.length === 0 && (
         <div
           style={{
-            color: T.ink400,
+            color: T.ink500,
             fontFamily: T.font,
             fontSize: 13,
             padding: 40,
             textAlign: "center",
-            border: `1px dashed ${T.ink150}`,
+            border: `1px dashed ${T.border}`,
             borderRadius: 8,
           }}
         >
@@ -2895,7 +2867,7 @@ function BannersTab({ banners, onRefresh }) {
               style={{
                 width: 200,
                 padding: 16,
-                borderLeft: `1px solid ${T.ink150}`,
+                borderLeft: `1px solid ${T.border}`,
                 display: "flex",
                 flexDirection: "column",
                 gap: 8,
@@ -2924,7 +2896,7 @@ function BannersTab({ banners, onRefresh }) {
                 <span
                   style={{
                     fontSize: 11,
-                    color: b.is_active ? T.success : T.ink400,
+                    color: b.is_active ? T.success : T.ink500,
                     fontFamily: T.font,
                   }}
                 >
@@ -2972,7 +2944,7 @@ function BannersTab({ banners, onRefresh }) {
               padding: 28,
               maxWidth: 360,
               textAlign: "center",
-              boxShadow: T.shadowMd,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
               fontFamily: T.font,
             }}
           >
@@ -2986,13 +2958,13 @@ function BannersTab({ banners, onRefresh }) {
             >
               Delete Banner?
             </div>
-            <div style={{ fontSize: 13, color: T.ink400, marginBottom: 20 }}>
+            <div style={{ fontSize: 13, color: T.ink500, marginBottom: 20 }}>
               "{deleteTarget.name}" will be permanently deleted.
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
               <button
                 onClick={() => setDeleteTarget(null)}
-                style={mkBtn("transparent", T.ink400)}
+                style={mkBtn("transparent", T.ink500)}
               >
                 Cancel
               </button>
@@ -3337,7 +3309,7 @@ function PrintTab({ tenantId }) {
 
   const sCard = {
     background: "#fff",
-    border: `1px solid ${T.ink150}`,
+    border: `1px solid ${T.border}`,
     borderRadius: 10,
     overflow: "hidden",
     fontFamily: T.font,
@@ -3378,7 +3350,7 @@ function PrintTab({ tenantId }) {
               flex: 1,
               minWidth: 160,
               padding: "7px 10px",
-              border: `1px solid ${T.ink150}`,
+              border: `1px solid ${T.border}`,
               borderRadius: 6,
               fontSize: 12,
               fontFamily: T.font,
@@ -3389,7 +3361,7 @@ function PrintTab({ tenantId }) {
             onChange={(e) => setCatFilter(e.target.value)}
             style={{
               padding: "7px 10px",
-              border: `1px solid ${T.ink150}`,
+              border: `1px solid ${T.border}`,
               borderRadius: 6,
               fontSize: 12,
               fontFamily: T.font,
@@ -3428,11 +3400,11 @@ function PrintTab({ tenantId }) {
             marginBottom: 8,
           }}
         >
-          <div style={{ fontSize: 11, color: T.ink400 }}>
+          <div style={{ fontSize: 11, color: T.ink500 }}>
             {filtered.length} products · {selected.size} selected
           </div>
           <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={toggleAll} style={sBtnSm(T.ink150, T.ink700)}>
+            <button onClick={toggleAll} style={sBtnSm(T.border, T.ink700)}>
               {filtered.every((i) => selected.has(i.id))
                 ? "Deselect all"
                 : "Select all"}
@@ -3476,9 +3448,9 @@ function PrintTab({ tenantId }) {
                     alignItems: "center",
                     gap: 12,
                     padding: "10px 14px",
-                    borderBottom: `1px solid ${T.ink075}`,
+                    borderBottom: `1px solid ${T.bg}`,
                     cursor: "pointer",
-                    background: sel ? T.accentLit : "transparent",
+                    background: sel ? T.accentLight : "transparent",
                     transition: "background 0.15s",
                   }}
                 >
@@ -3520,7 +3492,7 @@ function PrintTab({ tenantId }) {
                     >
                       {item.name}
                     </div>
-                    <div style={{ fontSize: 10, color: T.ink400 }}>
+                    <div style={{ fontSize: 10, color: T.ink500 }}>
                       {CAT_LABEL[item.category] || item.category} · {item.sku}
                     </div>
                   </div>
@@ -3543,7 +3515,7 @@ function PrintTab({ tenantId }) {
                           fontWeight: 700,
                           padding: "2px 7px",
                           borderRadius: 8,
-                          background: activeQr ? T.successBg : T.warningBg,
+                          background: activeQr ? T.successLight : T.warningLight,
                           color: activeQr ? T.success : T.warning,
                         }}
                       >
@@ -3556,8 +3528,8 @@ function PrintTab({ tenantId }) {
                           fontWeight: 700,
                           padding: "2px 7px",
                           borderRadius: 8,
-                          background: T.ink075,
-                          color: T.ink400,
+                          background: T.bg,
+                          color: T.ink500,
                         }}
                       >
                         NO QR
@@ -3586,7 +3558,7 @@ function PrintTab({ tenantId }) {
           <div
             style={{
               padding: "12px 14px",
-              borderBottom: `1px solid ${T.ink150}`,
+              borderBottom: `1px solid ${T.border}`,
               fontSize: 11,
               fontWeight: 700,
               letterSpacing: "0.08em",
@@ -3605,9 +3577,9 @@ function PrintTab({ tenantId }) {
                 alignItems: "flex-start",
                 gap: 10,
                 padding: "10px 14px",
-                borderBottom: `1px solid ${T.ink075}`,
+                borderBottom: `1px solid ${T.bg}`,
                 cursor: "pointer",
-                background: layout === l.key ? T.accentLit : "transparent",
+                background: layout === l.key ? T.accentLight : "transparent",
               }}
             >
               <div style={{ fontSize: 18, flexShrink: 0 }}>{l.icon}</div>
@@ -3621,7 +3593,7 @@ function PrintTab({ tenantId }) {
                 >
                   {l.label}
                 </div>
-                <div style={{ fontSize: 10, color: T.ink400, lineHeight: 1.4 }}>
+                <div style={{ fontSize: 10, color: T.ink500, lineHeight: 1.4 }}>
                   {l.desc}
                 </div>
               </div>
@@ -3658,7 +3630,7 @@ function PrintTab({ tenantId }) {
               <div
                 key={k}
                 style={{
-                  background: T.ink050,
+                  background: T.surface,
                   borderRadius: 6,
                   padding: "8px 10px",
                 }}
@@ -3676,7 +3648,7 @@ function PrintTab({ tenantId }) {
                 <div
                   style={{
                     fontSize: 9,
-                    color: T.ink400,
+                    color: T.ink500,
                     letterSpacing: "0.08em",
                     textTransform: "uppercase",
                     marginTop: 3,
@@ -3696,8 +3668,8 @@ function PrintTab({ tenantId }) {
             disabled={!selected.size || generating}
             style={{
               ...sBtnSm(
-                selected.size ? T.accent : T.ink150,
-                selected.size ? "#fff" : T.ink400,
+                selected.size ? T.accent : T.border,
+                selected.size ? "#fff" : T.ink500,
               ),
               padding: "12px 16px",
               fontSize: 13,
@@ -3749,7 +3721,7 @@ function PrintTab({ tenantId }) {
             <button
               onClick={() => setShowPreview(false)}
               style={{
-                ...sBtnSm(T.ink050, T.ink500),
+                ...sBtnSm(T.surface, T.ink500),
                 padding: "10px 16px",
                 fontSize: 11,
                 borderRadius: 8,
@@ -3766,7 +3738,7 @@ function PrintTab({ tenantId }) {
             <div
               style={{
                 padding: "10px 14px",
-                borderBottom: `1px solid ${T.ink150}`,
+                borderBottom: `1px solid ${T.border}`,
                 fontSize: 10,
                 fontWeight: 700,
                 letterSpacing: "0.08em",
@@ -3779,7 +3751,7 @@ function PrintTab({ tenantId }) {
             <div
               style={{
                 padding: 10,
-                background: T.ink050,
+                background: T.surface,
                 display: "grid",
                 gridTemplateColumns: `repeat(${Math.min(lyt.cols, 3)},1fr)`,
                 gap: 6,
@@ -3792,7 +3764,7 @@ function PrintTab({ tenantId }) {
                     key={item.id}
                     style={{
                       background: "#fff",
-                      border: `1px solid ${T.ink150}`,
+                      border: `1px solid ${T.border}`,
                       borderRadius: 6,
                       padding: "8px 6px",
                       display: "flex",
@@ -3850,7 +3822,7 @@ function PrintTab({ tenantId }) {
                     alignItems: "center",
                     justifyContent: "center",
                     fontSize: 10,
-                    color: T.ink400,
+                    color: T.ink500,
                     fontStyle: "italic",
                   }}
                 >
@@ -4024,7 +3996,7 @@ function SecurityTab({ tenantId }) {
 
   const sSec = {
     background: "#fff",
-    border: `1px solid ${T.ink150}`,
+    border: `1px solid ${T.border}`,
     borderRadius: 10,
     marginBottom: 20,
     overflow: "hidden",
@@ -4032,7 +4004,7 @@ function SecurityTab({ tenantId }) {
   };
   const sSecH = {
     padding: "12px 16px",
-    borderBottom: `1px solid ${T.ink150}`,
+    borderBottom: `1px solid ${T.border}`,
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
@@ -4049,14 +4021,14 @@ function SecurityTab({ tenantId }) {
     justifyContent: "space-between",
     alignItems: "center",
     padding: "10px 16px",
-    borderBottom: `1px solid ${T.ink075}`,
+    borderBottom: `1px solid ${T.bg}`,
   };
   const sLabel = { fontSize: 12, color: T.ink700, fontWeight: 500 };
-  const sSub = { fontSize: 10, color: T.ink400, marginTop: 2 };
+  const sSub = { fontSize: 10, color: T.ink500, marginTop: 2 };
   const sNum = {
     width: 72,
     padding: "5px 8px",
-    border: `1px solid ${T.ink150}`,
+    border: `1px solid ${T.border}`,
     borderRadius: 5,
     fontSize: 12,
     fontFamily: "monospace",
@@ -4066,7 +4038,7 @@ function SecurityTab({ tenantId }) {
     width: 36,
     height: 20,
     borderRadius: 10,
-    background: on ? T.accent : T.ink150,
+    background: on ? T.accent : T.border,
     position: "relative",
     cursor: "pointer",
     transition: "background 0.2s",
@@ -4105,14 +4077,14 @@ function SecurityTab({ tenantId }) {
                   fontWeight: 700,
                   padding: "2px 8px",
                   borderRadius: 8,
-                  background: T.dangerBg,
+                  background: T.dangerLight,
                   color: T.danger,
                 }}
               >
                 LIVE
               </span>
             </div>
-            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.bg}` }}>
               <div>
                 <div style={sLabel}>Velocity window</div>
                 <div style={sSub}>
@@ -4128,10 +4100,10 @@ function SecurityTab({ tenantId }) {
                   }
                   style={sNum}
                 />
-                <span style={{ fontSize: 10, color: T.ink400 }}>seconds</span>
+                <span style={{ fontSize: 10, color: T.ink500 }}>seconds</span>
               </div>
             </div>
-            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.bg}` }}>
               <div>
                 <div style={sLabel}>Rapid scan threshold</div>
                 <div style={sSub}>Scans within window before anomaly flags</div>
@@ -4145,10 +4117,10 @@ function SecurityTab({ tenantId }) {
                   }
                   style={sNum}
                 />
-                <span style={{ fontSize: 10, color: T.ink400 }}>scans</span>
+                <span style={{ fontSize: 10, color: T.ink500 }}>scans</span>
               </div>
             </div>
-            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.bg}` }}>
               <div>
                 <div style={sLabel}>Anomaly score increment</div>
                 <div style={sSub}>
@@ -4164,7 +4136,7 @@ function SecurityTab({ tenantId }) {
                 style={sNum}
               />
             </div>
-            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.bg}` }}>
               <div>
                 <div style={sLabel}>Flag threshold</div>
                 <div style={sSub}>
@@ -4192,7 +4164,7 @@ function SecurityTab({ tenantId }) {
                   onChange={(e) => upd("pool_low_threshold", +e.target.value)}
                   style={sNum}
                 />
-                <span style={{ fontSize: 10, color: T.ink400 }}>codes</span>
+                <span style={{ fontSize: 10, color: T.ink500 }}>codes</span>
               </div>
             </div>
           </div>
@@ -4202,7 +4174,7 @@ function SecurityTab({ tenantId }) {
             <div style={sSecH}>
               <span style={sSecHT}>🔥 Streak Bonus</span>
             </div>
-            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.bg}` }}>
               <div>
                 <div style={sLabel}>Streak bonus enabled</div>
                 <div style={sSub}>
@@ -4214,7 +4186,7 @@ function SecurityTab({ tenantId }) {
                 onChange={(v) => upd("streak_bonus_enabled", v)}
               />
             </div>
-            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.bg}` }}>
               <div>
                 <div style={sLabel}>Streak interval</div>
                 <div style={sSub}>Scans per week to trigger bonus</div>
@@ -4226,7 +4198,7 @@ function SecurityTab({ tenantId }) {
                   onChange={(e) => upd("streak_interval", +e.target.value)}
                   style={sNum}
                 />
-                <span style={{ fontSize: 10, color: T.ink400 }}>scans</span>
+                <span style={{ fontSize: 10, color: T.ink500 }}>scans</span>
               </div>
             </div>
             <div style={sRow}>
@@ -4248,7 +4220,7 @@ function SecurityTab({ tenantId }) {
             <div style={sSecH}>
               <span style={sSecHT}>📲 Automated Notifications</span>
             </div>
-            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.bg}` }}>
               <div>
                 <div style={sLabel}>WhatsApp on tier upgrade</div>
                 <div style={sSub}>
@@ -4260,7 +4232,7 @@ function SecurityTab({ tenantId }) {
                 onChange={(v) => upd("tier_upgrade_whatsapp", v)}
               />
             </div>
-            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.bg}` }}>
               <div>
                 <div style={sLabel}>In-app tier upgrade message</div>
                 <div style={sSub}>
@@ -4272,7 +4244,7 @@ function SecurityTab({ tenantId }) {
                 onChange={(v) => upd("tier_upgrade_message", v)}
               />
             </div>
-            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.bg}` }}>
               <div>
                 <div style={sLabel}>GPS location prompt</div>
                 <div style={sSub}>Ask mobile users for GPS 2.5s after scan</div>
@@ -4296,7 +4268,7 @@ function SecurityTab({ tenantId }) {
                   onChange={(e) => upd("gps_prompt_delay_ms", +e.target.value)}
                   style={sNum}
                 />
-                <span style={{ fontSize: 10, color: T.ink400 }}>ms</span>
+                <span style={{ fontSize: 10, color: T.ink500 }}>ms</span>
               </div>
             </div>
           </div>
@@ -4308,7 +4280,7 @@ function SecurityTab({ tenantId }) {
           <div style={sSec}>
             <div style={sSecH}>
               <span style={sSecHT}>✨ Category Point Multipliers</span>
-              <span style={{ fontSize: 9, color: T.ink400 }}>
+              <span style={{ fontSize: 9, color: T.ink500 }}>
                 Applied silently at scan time
               </span>
             </div>
@@ -4329,11 +4301,11 @@ function SecurityTab({ tenantId }) {
                     ? T.warning
                     : val < 1
                       ? T.danger
-                      : T.ink400;
+                      : T.ink500;
               return (
                 <div
                   key={key}
-                  style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}
+                  style={{ ...sRow, borderBottom: `1px solid ${T.bg}` }}
                 >
                   <div style={sLabel}>{label}</div>
                   <div
@@ -4371,7 +4343,7 @@ function SecurityTab({ tenantId }) {
             <div style={sSecH}>
               <span style={sSecHT}>⚙️ Scan Defaults</span>
             </div>
-            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.bg}` }}>
               <div>
                 <div style={sLabel}>Default points per scan</div>
                 <div style={sSub}>
@@ -4385,7 +4357,7 @@ function SecurityTab({ tenantId }) {
                 style={sNum}
               />
             </div>
-            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.bg}` }}>
               <div>
                 <div style={sLabel}>Default one-time scan</div>
                 <div style={sSub}>New codes default to single-use</div>
@@ -4407,7 +4379,7 @@ function SecurityTab({ tenantId }) {
                   onChange={(e) => upd("default_cooldown_hrs", +e.target.value)}
                   style={sNum}
                 />
-                <span style={{ fontSize: 10, color: T.ink400 }}>hrs</span>
+                <span style={{ fontSize: 10, color: T.ink500 }}>hrs</span>
               </div>
             </div>
           </div>
@@ -4452,7 +4424,7 @@ function SecurityTab({ tenantId }) {
                 fontWeight: 700,
                 padding: "2px 8px",
                 borderRadius: 8,
-                background: T.dangerBg,
+                background: T.dangerLight,
                 color: T.danger,
               }}
             >
@@ -4474,7 +4446,7 @@ function SecurityTab({ tenantId }) {
                 <div
                   style={{
                     fontSize: 10,
-                    color: T.ink400,
+                    color: T.ink500,
                     marginTop: 2,
                     lineHeight: 1.5,
                   }}
@@ -4491,7 +4463,7 @@ function SecurityTab({ tenantId }) {
                   marginLeft: 12,
                   padding: "4px 10px",
                   fontSize: 10,
-                  background: T.ink075,
+                  background: T.bg,
                   border: "none",
                   borderRadius: 5,
                   cursor: "pointer",
@@ -4511,14 +4483,14 @@ function SecurityTab({ tenantId }) {
         <div style={sSec}>
           <div style={sSecH}>
             <span style={sSecHT}>⚠ Anomaly Scores — Flagged Users</span>
-            <span style={{ fontSize: 10, color: T.ink400 }}>
+            <span style={{ fontSize: 10, color: T.ink500 }}>
               Score &gt; 0 · sorted highest first
             </span>
           </div>
           {flaggedUsers.map((u) => {
             const score = u.anomaly_score || 0;
             const color =
-              score >= 70 ? T.danger : score >= 40 ? T.warning : T.ink400;
+              score >= 70 ? T.danger : score >= 40 ? T.warning : T.ink500;
             return (
               <div key={u.id} style={{ ...sRow, alignItems: "center" }}>
                 <div style={{ flex: 1 }}>
@@ -4539,7 +4511,7 @@ function SecurityTab({ tenantId }) {
                       style={{
                         width: 120,
                         height: 6,
-                        background: T.ink150,
+                        background: T.border,
                         borderRadius: 3,
                         overflow: "hidden",
                       }}
@@ -4570,7 +4542,7 @@ function SecurityTab({ tenantId }) {
                           fontWeight: 700,
                           padding: "1px 6px",
                           borderRadius: 8,
-                          background: T.dangerBg,
+                          background: T.dangerLight,
                           color: T.danger,
                         }}
                       >
@@ -4586,7 +4558,7 @@ function SecurityTab({ tenantId }) {
                     style={{
                       padding: "4px 10px",
                       fontSize: 10,
-                      background: T.infoBg,
+                      background: T.infoLight,
                       border: `1px solid ${T.infoBd}`,
                       borderRadius: 5,
                       cursor: "pointer",
@@ -4601,7 +4573,7 @@ function SecurityTab({ tenantId }) {
                     style={{
                       padding: "4px 10px",
                       fontSize: 10,
-                      background: u.is_suspended ? T.successBg : T.dangerBg,
+                      background: u.is_suspended ? T.successLight : T.dangerLight,
                       border: `1px solid ${u.is_suspended ? T.successBd : T.dangerBd}`,
                       borderRadius: 5,
                       cursor: "pointer",
@@ -4694,7 +4666,7 @@ export default function AdminQRCodes({
         >
           QR Engine v2.0
         </h2>
-        <div style={{ fontSize: 13, color: T.ink400, marginBottom: 24 }}>
+        <div style={{ fontSize: 13, color: T.ink500, marginBottom: 24 }}>
           6 QR types · HMAC-signed · Action stack · Smart print · Fraud
           detection · Velocity anomaly scoring · Category multipliers · Streak
           engine
@@ -4707,7 +4679,7 @@ export default function AdminQRCodes({
           display: "flex",
           gap: 0,
           marginBottom: 28,
-          borderBottom: `2px solid ${T.ink150}`,
+          borderBottom: `2px solid ${T.border}`,
         }}
       >
         {TABS.map((t) => (
@@ -4728,7 +4700,7 @@ export default function AdminQRCodes({
               fontWeight: tab === t.key ? 700 : 400,
               letterSpacing: "0.07em",
               textTransform: "uppercase",
-              color: tab === t.key ? T.accent : T.ink400,
+              color: tab === t.key ? T.accent : T.ink500,
               fontFamily: T.font,
             }}
           >

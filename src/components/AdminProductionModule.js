@@ -12,8 +12,9 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
+import { T } from "../styles/tokens";
 
-// ─── Design Tokens ────────────────────────────────────────────────────────────
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 const C = {
   green: "#1b4332",
   mid: "#2d6a4f",

@@ -21,55 +21,27 @@ import { supabase } from "../services/supabaseClient";
 import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
 import { ChartCard, ChartTooltip } from "./viz";
+import { T } from "../styles/tokens";
 
-// ─── THEME ────────────────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 // Legacy aliases
 const C = {
   green: T.accent,
   mid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
-  cream: T.ink050,
-  border: T.ink150,
-  muted: T.ink400,
+  cream: T.surface,
+  border: T.border,
+  muted: T.ink500,
   text: T.ink700,
   white: "#fff",
   red: T.danger,
-  lightRed: T.dangerBg,
+  lightRed: T.dangerLight,
   orange: T.warning,
-  lightOrange: T.warningBg,
-  lightGreen: T.accentLit,
+  lightOrange: T.warningLight,
+  lightGreen: T.accentLight,
   blue: T.info,
-  lightBlue: T.infoBg,
+  lightBlue: T.infoLight,
 };
 const FONTS = { heading: T.font, body: T.font };
 
@@ -77,38 +49,38 @@ const FONTS = { heading: T.font, body: T.font };
 const STATUS = {
   preparing: {
     label: "Preparing",
-    color: T.ink400,
-    bg: T.ink075,
+    color: T.ink500,
+    bg: T.bg,
     next: "shipped",
   },
   shipped: {
     label: "Shipped",
     color: T.info,
-    bg: T.infoBg,
+    bg: T.infoLight,
     next: "in_transit",
   },
   in_transit: {
     label: "In Transit",
     color: T.warning,
-    bg: T.warningBg,
+    bg: T.warningLight,
     next: "delivered",
   },
   delivered: {
     label: "Delivered",
     color: T.success,
-    bg: T.successBg,
+    bg: T.successLight,
     next: "confirmed",
   },
   confirmed: {
     label: "Confirmed",
     color: T.accentMid,
-    bg: T.accentLit,
+    bg: T.accentLight,
     next: null,
   },
   cancelled: {
     label: "Cancelled",
     color: T.danger,
-    bg: T.dangerBg,
+    bg: T.dangerLight,
     next: null,
   },
 };
@@ -124,7 +96,7 @@ const STATUS_ORDER = [
 const inputStyle = {
   width: "100%",
   padding: "8px 12px",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: 4,
   fontSize: 13,
   fontFamily: T.font,
@@ -137,7 +109,7 @@ const makeBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
   padding: "9px 18px",
   backgroundColor: disabled ? "#ccc" : bg,
   color,
-  border: bg === "transparent" ? `1px solid ${T.ink150}` : "none",
+  border: bg === "transparent" ? `1px solid ${T.border}` : "none",
   borderRadius: 4,
   fontSize: 11,
   fontWeight: 700,
@@ -205,7 +177,7 @@ function StatusPipeline({ status }) {
             <div
               style={{
                 height: 4,
-                background: active ? STATUS[s].color : T.ink150,
+                background: active ? STATUS[s].color : T.border,
                 borderRadius: 2,
                 transition: "background 0.3s",
               }}
@@ -254,7 +226,7 @@ function ShipmentCard({
     ? T.dangerBd
     : shipment.status === "in_transit"
       ? T.warningBd
-      : T.ink150;
+      : T.border;
 
   return (
     <div
@@ -266,11 +238,11 @@ function ShipmentCard({
         display: "flex",
         flexDirection: "column",
         gap: 10,
-        boxShadow: T.shadow,
+        boxShadow: T.shadow.sm,
         transition: "box-shadow 0.15s",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.boxShadow = T.shadowMd)}
-      onMouseLeave={(e) => (e.currentTarget.style.boxShadow = T.shadow)}
+      onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)")}
+      onMouseLeave={(e) => (e.currentTarget.style.boxShadow = T.shadow.sm)}
     >
       {/* Header */}
       <div
@@ -315,7 +287,7 @@ function ShipmentCard({
           display: "flex",
           gap: 12,
           fontSize: 12,
-          color: T.ink400,
+          color: T.ink500,
           flexWrap: "wrap",
           fontFamily: T.font,
         }}
@@ -339,7 +311,7 @@ function ShipmentCard({
           display: "flex",
           gap: 14,
           fontSize: 11,
-          color: T.ink400,
+          color: T.ink500,
           flexWrap: "wrap",
           fontFamily: T.font,
         }}
@@ -354,7 +326,7 @@ function ShipmentCard({
                 ? T.danger
                 : eta !== null && eta <= 2
                   ? T.warning
-                  : T.ink400,
+                  : T.ink500,
             }}
           >
             ETA: {fmtDate(shipment.estimated_arrival)}
@@ -575,7 +547,7 @@ function CreateShipmentForm({
         fontWeight: 600,
         letterSpacing: "0.07em",
         textTransform: "uppercase",
-        color: T.ink400,
+        color: T.ink500,
         marginBottom: 5,
         fontFamily: T.font,
       }}
@@ -590,11 +562,11 @@ function CreateShipmentForm({
         fontWeight: 700,
         letterSpacing: "0.1em",
         textTransform: "uppercase",
-        color: T.ink400,
+        color: T.ink500,
         marginBottom: 12,
         marginTop: 8,
         paddingBottom: 8,
-        borderBottom: `1px solid ${T.ink150}`,
+        borderBottom: `1px solid ${T.border}`,
         fontFamily: T.font,
       }}
     >
@@ -661,7 +633,7 @@ function CreateShipmentForm({
           <div
             style={{
               padding: "10px 14px",
-              background: T.dangerBg,
+              background: T.dangerLight,
               border: `1px solid ${T.dangerBd}`,
               borderRadius: 4,
               color: T.danger,
@@ -761,7 +733,7 @@ function CreateShipmentForm({
           <div
             key={i}
             style={{
-              border: `1px solid ${T.ink150}`,
+              border: `1px solid ${T.border}`,
               borderRadius: 6,
               padding: 12,
               marginBottom: 10,
@@ -772,7 +744,7 @@ function CreateShipmentForm({
                 <div
                   style={{
                     fontSize: 10,
-                    color: T.ink400,
+                    color: T.ink500,
                     marginBottom: 3,
                     fontFamily: T.font,
                   }}
@@ -799,11 +771,11 @@ function CreateShipmentForm({
                   onClick={() => removeLine(i)}
                   style={{
                     background: "none",
-                    border: `1px solid ${T.ink150}`,
+                    border: `1px solid ${T.border}`,
                     borderRadius: 4,
                     padding: "6px 10px",
                     cursor: "pointer",
-                    color: T.ink400,
+                    color: T.ink500,
                     alignSelf: "flex-end",
                   }}
                 >
@@ -816,7 +788,7 @@ function CreateShipmentForm({
                 <div
                   style={{
                     fontSize: 10,
-                    color: T.ink400,
+                    color: T.ink500,
                     marginBottom: 3,
                     fontFamily: T.font,
                   }}
@@ -834,7 +806,7 @@ function CreateShipmentForm({
                 <div
                   style={{
                     fontSize: 10,
-                    color: T.ink400,
+                    color: T.ink500,
                     marginBottom: 3,
                     fontFamily: T.font,
                   }}
@@ -852,7 +824,7 @@ function CreateShipmentForm({
                 <div
                   style={{
                     fontSize: 10,
-                    color: T.ink400,
+                    color: T.ink500,
                     marginBottom: 3,
                     fontFamily: T.font,
                   }}
@@ -872,7 +844,7 @@ function CreateShipmentForm({
                 <div
                   style={{
                     fontSize: 10,
-                    color: T.ink400,
+                    color: T.ink500,
                     marginBottom: 3,
                     fontFamily: T.font,
                   }}
@@ -909,7 +881,7 @@ function CreateShipmentForm({
           <div
             style={{
               padding: "12px 16px",
-              background: T.ink075,
+              background: T.bg,
               borderRadius: 4,
               marginBottom: 20,
               display: "flex",
@@ -918,7 +890,7 @@ function CreateShipmentForm({
               fontFamily: T.font,
             }}
           >
-            <span style={{ color: T.ink400 }}>
+            <span style={{ color: T.ink500 }}>
               Total:{" "}
               <strong
                 style={{ color: T.ink900, fontVariantNumeric: "tabular-nums" }}
@@ -927,7 +899,7 @@ function CreateShipmentForm({
               </strong>
             </span>
             {totalValue > 0 && (
-              <span style={{ color: T.ink400 }}>
+              <span style={{ color: T.ink500 }}>
                 Value:{" "}
                 <strong
                   style={{
@@ -947,7 +919,7 @@ function CreateShipmentForm({
             display: "flex",
             gap: 12,
             paddingTop: 12,
-            borderTop: `1px solid ${T.ink150}`,
+            borderTop: `1px solid ${T.border}`,
           }}
         >
           <button
@@ -960,8 +932,8 @@ function CreateShipmentForm({
           <button
             onClick={onCancel}
             style={{
-              ...makeBtn("transparent", T.ink400),
-              border: `1px solid ${T.ink150}`,
+              ...makeBtn("transparent", T.ink500),
+              border: `1px solid ${T.border}`,
             }}
           >
             Cancel
@@ -1063,14 +1035,14 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
                 key={r.label}
                 style={{
                   padding: "10px 12px",
-                  background: T.ink075,
+                  background: T.bg,
                   borderRadius: 4,
                 }}
               >
                 <div
                   style={{
                     fontSize: 10,
-                    color: T.ink400,
+                    color: T.ink500,
                     letterSpacing: "0.08em",
                     textTransform: "uppercase",
                     marginBottom: 3,
@@ -1101,10 +1073,10 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
                 fontWeight: 700,
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                color: T.ink400,
+                color: T.ink500,
                 marginBottom: 10,
                 paddingBottom: 8,
-                borderBottom: `1px solid ${T.ink150}`,
+                borderBottom: `1px solid ${T.border}`,
                 fontFamily: T.font,
               }}
             >
@@ -1127,9 +1099,9 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
                       style={{
                         textAlign: "left",
                         padding: "6px 8px",
-                        borderBottom: `1px solid ${T.ink150}`,
+                        borderBottom: `1px solid ${T.border}`,
                         fontSize: 10,
-                        color: T.ink400,
+                        color: T.ink500,
                         textTransform: "uppercase",
                         letterSpacing: "0.07em",
                       }}
@@ -1145,7 +1117,7 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
                     <td
                       style={{
                         padding: "8px",
-                        borderBottom: `1px solid ${T.ink075}`,
+                        borderBottom: `1px solid ${T.bg}`,
                         fontWeight: 500,
                       }}
                     >
@@ -1154,10 +1126,10 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
                     <td
                       style={{
                         padding: "8px",
-                        borderBottom: `1px solid ${T.ink075}`,
+                        borderBottom: `1px solid ${T.bg}`,
                         fontFamily: "monospace",
                         fontSize: 11,
-                        color: T.ink400,
+                        color: T.ink500,
                       }}
                     >
                       {item.sku || "—"}
@@ -1165,7 +1137,7 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
                     <td
                       style={{
                         padding: "8px",
-                        borderBottom: `1px solid ${T.ink075}`,
+                        borderBottom: `1px solid ${T.bg}`,
                         fontWeight: 600,
                         fontVariantNumeric: "tabular-nums",
                       }}
@@ -1175,8 +1147,8 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
                     <td
                       style={{
                         padding: "8px",
-                        borderBottom: `1px solid ${T.ink075}`,
-                        color: T.ink400,
+                        borderBottom: `1px solid ${T.bg}`,
+                        color: T.ink500,
                         fontVariantNumeric: "tabular-nums",
                       }}
                     >
@@ -1185,7 +1157,7 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
                     <td
                       style={{
                         padding: "8px",
-                        borderBottom: `1px solid ${T.ink075}`,
+                        borderBottom: `1px solid ${T.bg}`,
                         fontWeight: 600,
                         color: T.accent,
                         fontVariantNumeric: "tabular-nums",
@@ -1204,7 +1176,7 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
                 display: "flex",
                 justifyContent: "space-between",
                 padding: "10px 8px",
-                background: T.ink075,
+                background: T.bg,
                 borderRadius: 4,
                 fontSize: 13,
                 marginBottom: 16,
@@ -1240,10 +1212,10 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
                 fontWeight: 700,
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                color: T.ink400,
+                color: T.ink500,
                 marginBottom: 8,
                 paddingBottom: 8,
-                borderBottom: `1px solid ${T.ink150}`,
+                borderBottom: `1px solid ${T.border}`,
                 fontFamily: T.font,
               }}
             >
@@ -1252,7 +1224,7 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
             <div
               style={{
                 fontSize: 13,
-                color: T.ink400,
+                color: T.ink500,
                 fontStyle: "italic",
                 marginBottom: 16,
                 fontFamily: T.font,
@@ -1281,8 +1253,8 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
           <button
             onClick={onClose}
             style={{
-              ...makeBtn("transparent", T.ink400),
-              border: `1px solid ${T.ink150}`,
+              ...makeBtn("transparent", T.ink500),
+              border: `1px solid ${T.border}`,
               flex: s.next ? 0 : 1,
             }}
           >
@@ -1492,7 +1464,7 @@ export default function AdminShipments() {
             fontSize: 13,
             fontWeight: 600,
             zIndex: 2000,
-            boxShadow: T.shadowMd,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
             fontFamily: T.font,
           }}
         >
@@ -1523,7 +1495,7 @@ export default function AdminShipments() {
           >
             Shipments
           </h2>
-          <div style={{ fontSize: 13, color: T.ink400 }}>
+          <div style={{ fontSize: 13, color: T.ink500 }}>
             Distribute stock to retailers · Track in transit · Confirm delivery
           </div>
         </div>
@@ -1538,11 +1510,11 @@ export default function AdminShipments() {
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: 6,
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
-          boxShadow: T.shadow,
+          border: `1px solid ${T.border}`,
+          boxShadow: T.shadow.sm,
           marginBottom: 24,
         }}
       >
@@ -1550,12 +1522,12 @@ export default function AdminShipments() {
           {
             label: "Active",
             value: activeShipments,
-            color: activeShipments > 0 ? T.info : T.ink400,
+            color: activeShipments > 0 ? T.info : T.ink500,
           },
           {
             label: "In Transit",
             value: inTransit,
-            color: inTransit > 0 ? T.warning : T.ink400,
+            color: inTransit > 0 ? T.warning : T.ink500,
           },
           {
             label: "Delivered (Month)",
@@ -1578,7 +1550,7 @@ export default function AdminShipments() {
                 fontWeight: 700,
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                color: T.ink400,
+                color: T.ink500,
                 marginBottom: 6,
                 fontFamily: T.font,
               }}
@@ -1615,7 +1587,7 @@ export default function AdminShipments() {
             {
               name: "Preparing",
               value: statusCounts["preparing"] || 0,
-              color: T.ink400,
+              color: T.ink500,
             },
             {
               name: "Shipped",
@@ -1717,7 +1689,7 @@ export default function AdminShipments() {
                       justifyContent: "center",
                       height: "100%",
                       fontSize: 13,
-                      color: T.ink400,
+                      color: T.ink500,
                       fontFamily: T.font,
                     }}
                   >
@@ -1746,7 +1718,7 @@ export default function AdminShipments() {
                         <span
                           style={{
                             fontSize: 10,
-                            color: T.ink400,
+                            color: T.ink500,
                             fontFamily: T.font,
                             width: 72,
                             flexShrink: 0,
@@ -1761,7 +1733,7 @@ export default function AdminShipments() {
                           style={{
                             flex: 1,
                             height: 14,
-                            background: T.ink075,
+                            background: T.bg,
                             borderRadius: 3,
                             overflow: "hidden",
                           }}
@@ -1795,7 +1767,7 @@ export default function AdminShipments() {
                         <span
                           style={{
                             fontSize: 10,
-                            color: T.ink400,
+                            color: T.ink500,
                             fontFamily: T.font,
                             minWidth: 24,
                             textAlign: "right",
@@ -1820,19 +1792,19 @@ export default function AdminShipments() {
                     <CartesianGrid
                       horizontal
                       vertical={false}
-                      stroke={T.ink150}
+                      stroke={T.border}
                       strokeWidth={0.5}
                     />
                     <XAxis
                       dataKey="name"
-                      tick={{ fill: T.ink400, fontSize: 9, fontFamily: T.font }}
+                      tick={{ fill: T.ink500, fontSize: 9, fontFamily: T.font }}
                       axisLine={false}
                       tickLine={false}
                       dy={4}
                     />
                     <YAxis
                       tick={{
-                        fill: T.ink400,
+                        fill: T.ink500,
                         fontSize: 10,
                         fontFamily: T.font,
                       }}
@@ -1869,7 +1841,7 @@ export default function AdminShipments() {
         <div
           style={{
             padding: "12px 16px",
-            background: T.warningBg,
+            background: T.warningLight,
             border: `1px solid ${T.warningBd}`,
             borderRadius: 6,
             marginBottom: 20,
@@ -1902,7 +1874,7 @@ export default function AdminShipments() {
         <div
           style={{
             display: "flex",
-            borderBottom: `2px solid ${T.ink150}`,
+            borderBottom: `2px solid ${T.border}`,
             gap: 0,
           }}
         >
@@ -1923,7 +1895,7 @@ export default function AdminShipments() {
                 fontWeight: filter === f.key ? 700 : 400,
                 letterSpacing: "0.06em",
                 textTransform: "uppercase",
-                color: filter === f.key ? T.accent : T.ink400,
+                color: filter === f.key ? T.accent : T.ink500,
                 cursor: "pointer",
                 marginBottom: -2,
               }}
@@ -1935,7 +1907,7 @@ export default function AdminShipments() {
         <div
           style={{
             fontSize: 12,
-            color: T.ink400,
+            color: T.ink500,
             marginLeft: "auto",
             fontFamily: T.font,
           }}
@@ -1945,8 +1917,8 @@ export default function AdminShipments() {
         <button
           onClick={fetchAll}
           style={{
-            ...makeBtn("transparent", T.ink400),
-            border: `1px solid ${T.ink150}`,
+            ...makeBtn("transparent", T.ink500),
+            border: `1px solid ${T.border}`,
             padding: "7px 14px",
             fontSize: 11,
           }}
@@ -1961,7 +1933,7 @@ export default function AdminShipments() {
           style={{
             padding: 60,
             textAlign: "center",
-            color: T.ink400,
+            color: T.ink500,
             fontFamily: T.font,
           }}
         >
@@ -1972,7 +1944,7 @@ export default function AdminShipments() {
           style={{
             padding: 60,
             textAlign: "center",
-            border: `1px dashed ${T.ink150}`,
+            border: `1px dashed ${T.border}`,
             borderRadius: 8,
           }}
         >
@@ -1990,7 +1962,7 @@ export default function AdminShipments() {
           <div
             style={{
               fontSize: 13,
-              color: T.ink400,
+              color: T.ink500,
               marginBottom: 20,
               fontFamily: T.font,
             }}

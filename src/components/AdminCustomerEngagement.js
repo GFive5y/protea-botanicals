@@ -22,56 +22,28 @@ import { useTenant } from "../services/tenantService";
 import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
 import { ChartCard, ChartTooltip } from "./viz";
+import { T } from "../styles/tokens";
 
-// ─── THEME ────────────────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 const C = {
   green: T.accent,
   mid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
-  cream: T.ink050,
-  border: T.ink150,
-  muted: T.ink400,
+  cream: T.surface,
+  border: T.border,
+  muted: T.ink500,
   text: T.ink700,
   white: "#fff",
   red: T.danger,
-  lightRed: T.dangerBg,
+  lightRed: T.dangerLight,
   orange: T.warning,
-  lightOrange: T.warningBg,
+  lightOrange: T.warningLight,
   blue: T.info,
-  lightBlue: T.infoBg,
+  lightBlue: T.infoLight,
   platinum: "#7b68ee",
   lightPlatinum: "#f0eeff",
-  lightGreen: T.accentLit,
+  lightGreen: T.accentLight,
 };
 const FONTS = { heading: T.font, body: T.font };
 const SUPABASE_FUNCTIONS_URL =
@@ -206,7 +178,7 @@ function isChurnRisk(profile) {
 
 const inputStyle = {
   padding: "8px 12px",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: 4,
   fontSize: 13,
   fontFamily: T.font,
@@ -220,7 +192,7 @@ const makeBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
   backgroundColor: disabled ? "#ccc" : bg,
   color,
   border:
-    bg === "transparent" || bg === "#eee" ? `1px solid ${T.ink150}` : "none",
+    bg === "transparent" || bg === "#eee" ? `1px solid ${T.border}` : "none",
   borderRadius: 4,
   fontSize: 11,
   fontWeight: 700,
@@ -261,7 +233,7 @@ function EngBar({ score }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <div
-        style={{ flex: 1, height: 5, background: T.ink150, borderRadius: 3 }}
+        style={{ flex: 1, height: 5, background: T.border, borderRadius: 3 }}
       >
         <div
           style={{
@@ -296,7 +268,7 @@ function ScoreBadge({ score }) {
         style={{
           width: 50,
           height: 5,
-          background: T.ink150,
+          background: T.border,
           borderRadius: 3,
           overflow: "hidden",
         }}
@@ -323,7 +295,7 @@ function Pill({ label, color, bg }) {
     <span
       style={{
         background: bg || "#eee",
-        color: color || T.ink400,
+        color: color || T.ink500,
         borderRadius: 10,
         padding: "2px 8px",
         fontSize: 10,
@@ -346,7 +318,7 @@ const MSG_META = {
   event: { label: "Event", icon: "🎪", color: "#9b6b9e" },
   response: { label: "Response", icon: "↩️", color: T.accentMid },
   broadcast: { label: "Broadcast", icon: "📣", color: T.accentMid },
-  general: { label: "Message", icon: "📩", color: T.ink400 },
+  general: { label: "Message", icon: "📩", color: T.ink500 },
 };
 function getMsgMeta(type) {
   return MSG_META[type] || MSG_META.general;
@@ -359,7 +331,7 @@ const secHdr = (text) => (
       fontWeight: 700,
       letterSpacing: "0.1em",
       textTransform: "uppercase",
-      color: T.ink400,
+      color: T.ink500,
       marginBottom: 12,
       fontFamily: T.font,
     }}
@@ -872,7 +844,7 @@ export default function AdminCustomerEngagement({
             fontWeight: 600,
             zIndex: 2000,
             fontFamily: T.font,
-            boxShadow: T.shadowMd,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
           }}
         >
           {toast}
@@ -902,7 +874,7 @@ export default function AdminCustomerEngagement({
           >
             Customer Engagement
           </h2>
-          <div style={{ fontSize: 13, color: T.ink400 }}>
+          <div style={{ fontSize: 13, color: T.ink500 }}>
             Live engagement scoring · Churn risk detection · Loyalty tier
             management · 360° profiles
           </div>
@@ -929,8 +901,8 @@ export default function AdminCustomerEngagement({
           <button
             onClick={fetchAll}
             style={{
-              ...makeBtn("transparent", T.ink400),
-              border: `1px solid ${T.ink150}`,
+              ...makeBtn("transparent", T.ink500),
+              border: `1px solid ${T.border}`,
             }}
           >
             ↻ Refresh
@@ -951,11 +923,11 @@ export default function AdminCustomerEngagement({
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit,minmax(105px,1fr))",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: 8,
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
-          boxShadow: T.shadow,
+          border: `1px solid ${T.border}`,
+          boxShadow: T.shadow.sm,
           marginBottom: 20,
         }}
       >
@@ -998,7 +970,7 @@ export default function AdminCustomerEngagement({
                 fontWeight: 700,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                color: T.ink400,
+                color: T.ink500,
                 marginBottom: 6,
                 fontFamily: T.font,
               }}
@@ -1134,7 +1106,7 @@ export default function AdminCustomerEngagement({
                         style={{
                           flex: 1,
                           height: 16,
-                          background: T.ink075,
+                          background: T.bg,
                           borderRadius: 3,
                           overflow: "hidden",
                         }}
@@ -1168,7 +1140,7 @@ export default function AdminCustomerEngagement({
                       <span
                         style={{
                           fontSize: 11,
-                          color: T.ink400,
+                          color: T.ink500,
                           fontFamily: T.font,
                           minWidth: 20,
                           textAlign: "right",
@@ -1193,13 +1165,13 @@ export default function AdminCustomerEngagement({
                     <CartesianGrid
                       horizontal
                       vertical={false}
-                      stroke={T.ink150}
+                      stroke={T.border}
                       strokeWidth={0.5}
                     />
                     <XAxis
                       dataKey="name"
                       tick={{
-                        fill: T.ink400,
+                        fill: T.ink500,
                         fontSize: 10,
                         fontFamily: T.font,
                       }}
@@ -1209,7 +1181,7 @@ export default function AdminCustomerEngagement({
                     />
                     <YAxis
                       tick={{
-                        fill: T.ink400,
+                        fill: T.ink500,
                         fontSize: 10,
                         fontFamily: T.font,
                       }}
@@ -1246,7 +1218,7 @@ export default function AdminCustomerEngagement({
         <div
           style={{
             padding: "12px 16px",
-            background: T.dangerBg,
+            background: T.dangerLight,
             border: `1px solid ${T.dangerBd}`,
             borderRadius: 6,
             marginBottom: 16,
@@ -1280,7 +1252,7 @@ export default function AdminCustomerEngagement({
         <div
           style={{
             display: "flex",
-            borderBottom: `2px solid ${T.ink150}`,
+            borderBottom: `2px solid ${T.border}`,
             gap: 0,
           }}
         >
@@ -1301,7 +1273,7 @@ export default function AdminCustomerEngagement({
                 fontWeight: filter === f.key ? 700 : 400,
                 letterSpacing: "0.06em",
                 textTransform: "uppercase",
-                color: filter === f.key ? T.accent : T.ink400,
+                color: filter === f.key ? T.accent : T.ink500,
                 cursor: "pointer",
                 marginBottom: -2,
               }}
@@ -1337,7 +1309,7 @@ export default function AdminCustomerEngagement({
         <div
           style={{
             fontSize: 12,
-            color: T.ink400,
+            color: T.ink500,
             marginLeft: "auto",
             fontFamily: T.font,
           }}
@@ -1352,7 +1324,7 @@ export default function AdminCustomerEngagement({
           style={{
             padding: 60,
             textAlign: "center",
-            color: T.ink400,
+            color: T.ink500,
             fontFamily: T.font,
           }}
         >
@@ -1363,7 +1335,7 @@ export default function AdminCustomerEngagement({
           style={{
             padding: 60,
             textAlign: "center",
-            border: `1px dashed ${T.ink150}`,
+            border: `1px dashed ${T.border}`,
             borderRadius: 8,
           }}
         >
@@ -1379,7 +1351,7 @@ export default function AdminCustomerEngagement({
           >
             No customers found
           </div>
-          <div style={{ fontSize: 13, color: T.ink400, fontFamily: T.font }}>
+          <div style={{ fontSize: 13, color: T.ink500, fontFamily: T.font }}>
             Customers appear here once they sign up and scan a QR code.
           </div>
         </div>
@@ -1387,10 +1359,10 @@ export default function AdminCustomerEngagement({
         <div
           style={{
             background: "#fff",
-            border: `1px solid ${T.ink150}`,
+            border: `1px solid ${T.border}`,
             borderRadius: 8,
             overflow: "hidden",
-            boxShadow: T.shadow,
+            boxShadow: T.shadow.sm,
           }}
         >
           <table
@@ -1441,8 +1413,8 @@ export default function AdminCustomerEngagement({
                   <tr
                     key={c.id}
                     style={{
-                      borderBottom: `1px solid ${T.ink075}`,
-                      background: i % 2 === 0 ? "#fff" : T.ink050,
+                      borderBottom: `1px solid ${T.bg}`,
+                      background: i % 2 === 0 ? "#fff" : T.surface,
                       cursor: "pointer",
                     }}
                     onClick={() => {
@@ -1452,25 +1424,25 @@ export default function AdminCustomerEngagement({
                       setComposing(false);
                     }}
                     onMouseEnter={(e) =>
-                      (e.currentTarget.style.background = T.accentLit)
+                      (e.currentTarget.style.background = T.accentLight)
                     }
                     onMouseLeave={(e) =>
                       (e.currentTarget.style.background =
-                        i % 2 === 0 ? "#fff" : T.ink050)
+                        i % 2 === 0 ? "#fff" : T.surface)
                     }
                   >
                     <td style={{ padding: "12px 14px" }}>
                       <div style={{ fontWeight: 600, color: T.ink900 }}>
                         {c.full_name || (
-                          <span style={{ color: T.ink400 }}>Anonymous</span>
+                          <span style={{ color: T.ink500 }}>Anonymous</span>
                         )}
                       </div>
-                      <div style={{ fontSize: 11, color: T.ink400 }}>
+                      <div style={{ fontSize: 11, color: T.ink500 }}>
                         {c.city || ""}
                         {c.province ? `, ${c.province}` : ""}
                       </div>
                       {c.phone && (
-                        <div style={{ fontSize: 11, color: T.ink400 }}>
+                        <div style={{ fontSize: 11, color: T.ink500 }}>
                           {c.phone}
                         </div>
                       )}
@@ -1494,7 +1466,7 @@ export default function AdminCustomerEngagement({
                     <td
                       style={{
                         padding: "12px 14px",
-                        color: T.ink400,
+                        color: T.ink500,
                         fontVariantNumeric: "tabular-nums",
                       }}
                     >
@@ -1507,7 +1479,7 @@ export default function AdminCustomerEngagement({
                       style={{
                         padding: "12px 14px",
                         fontSize: 12,
-                        color: days !== null && days > 30 ? T.danger : T.ink400,
+                        color: days !== null && days > 30 ? T.danger : T.ink500,
                       }}
                     >
                       {days !== null
@@ -1523,7 +1495,7 @@ export default function AdminCustomerEngagement({
                             fontSize: 10,
                             padding: "2px 8px",
                             borderRadius: 4,
-                            background: T.dangerBg,
+                            background: T.dangerLight,
                             color: T.danger,
                             fontWeight: 700,
                             textTransform: "uppercase",
@@ -1538,7 +1510,7 @@ export default function AdminCustomerEngagement({
                             fontSize: 10,
                             padding: "2px 8px",
                             borderRadius: 4,
-                            background: T.successBg,
+                            background: T.successLight,
                             color: T.success,
                             fontWeight: 700,
                             textTransform: "uppercase",
@@ -1596,7 +1568,7 @@ export default function AdminCustomerEngagement({
               bottom: 0,
               width: 620,
               maxWidth: "95vw",
-              background: T.ink050,
+              background: T.surface,
               zIndex: 1001,
               overflowY: "auto",
               boxShadow: "-4px 0 24px rgba(0,0,0,0.15)",
@@ -1653,7 +1625,7 @@ export default function AdminCustomerEngagement({
               <div
                 style={{
                   padding: "12px 24px",
-                  background: T.warningBg,
+                  background: T.warningLight,
                   borderBottom: `1px solid ${T.warningBd}`,
                   display: "flex",
                   gap: 10,
@@ -1718,7 +1690,7 @@ export default function AdminCustomerEngagement({
             <div
               style={{
                 display: "flex",
-                borderBottom: `2px solid ${T.ink150}`,
+                borderBottom: `2px solid ${T.border}`,
                 background: "#fff",
                 flexShrink: 0,
                 overflowX: "auto",
@@ -1747,7 +1719,7 @@ export default function AdminCustomerEngagement({
                     cursor: "pointer",
                     border: "none",
                     background: "none",
-                    color: drawerTab === t.id ? T.accent : T.ink400,
+                    color: drawerTab === t.id ? T.accent : T.ink500,
                     borderBottom:
                       drawerTab === t.id
                         ? `2px solid ${T.accent}`
@@ -1772,11 +1744,11 @@ export default function AdminCustomerEngagement({
                       <div
                         style={{
                           background: "#fff",
-                          border: `1px solid ${T.ink150}`,
+                          border: `1px solid ${T.border}`,
                           borderRadius: 8,
                           padding: 20,
                           marginBottom: 16,
-                          boxShadow: T.shadow,
+                          boxShadow: T.shadow.sm,
                         }}
                       >
                         {secHdr("Engagement Score")}
@@ -1798,13 +1770,13 @@ export default function AdminCustomerEngagement({
                                   : eng.total >= 40
                                     ? "#b5935a"
                                     : T.danger,
-                              bg: T.ink075,
+                              bg: T.bg,
                             },
                             {
                               label: "Profile",
                               value: `${profileScore(selected)}%`,
                               color: T.info,
-                              bg: T.ink075,
+                              bg: T.bg,
                             },
                             ...(isChurnRisk(selected)
                               ? [
@@ -1812,7 +1784,7 @@ export default function AdminCustomerEngagement({
                                     label: "Status",
                                     value: "Churn Risk",
                                     color: T.danger,
-                                    bg: T.dangerBg,
+                                    bg: T.dangerLight,
                                   },
                                 ]
                               : []),
@@ -1887,7 +1859,7 @@ export default function AdminCustomerEngagement({
                             <div
                               style={{
                                 height: 4,
-                                background: T.ink150,
+                                background: T.border,
                                 borderRadius: 2,
                               }}
                             >
@@ -1906,10 +1878,10 @@ export default function AdminCustomerEngagement({
                       <div
                         style={{
                           background: "#fff",
-                          border: `1px solid ${T.ink150}`,
+                          border: `1px solid ${T.border}`,
                           borderRadius: 8,
                           padding: 20,
-                          boxShadow: T.shadow,
+                          boxShadow: T.shadow.sm,
                         }}
                       >
                         {secHdr("Identity")}
@@ -1936,7 +1908,7 @@ export default function AdminCustomerEngagement({
                               <div
                                 style={{
                                   fontSize: 10,
-                                  color: T.ink400,
+                                  color: T.ink500,
                                   fontFamily: T.font,
                                   marginBottom: 2,
                                   textTransform: "uppercase",
@@ -1951,7 +1923,7 @@ export default function AdminCustomerEngagement({
                                   color:
                                     val != null && val !== "—"
                                       ? T.ink700
-                                      : T.ink400,
+                                      : T.ink500,
                                   fontFamily: T.font,
                                   fontWeight: 500,
                                 }}
@@ -2024,17 +1996,17 @@ export default function AdminCustomerEngagement({
                   <div
                     style={{
                       background: "#fff",
-                      border: `1px solid ${T.ink150}`,
+                      border: `1px solid ${T.border}`,
                       borderRadius: 8,
                       padding: 20,
-                      boxShadow: T.shadow,
+                      boxShadow: T.shadow.sm,
                     }}
                   >
                     {secHdr("Transaction History")}
                     {drawerLoading && (
                       <div
                         style={{
-                          color: T.ink400,
+                          color: T.ink500,
                           fontFamily: T.font,
                           fontSize: 13,
                         }}
@@ -2045,7 +2017,7 @@ export default function AdminCustomerEngagement({
                     {!drawerLoading && drawerData.txns.length === 0 && (
                       <div
                         style={{
-                          color: T.ink400,
+                          color: T.ink500,
                           fontFamily: T.font,
                           fontSize: 13,
                         }}
@@ -2061,7 +2033,7 @@ export default function AdminCustomerEngagement({
                           justifyContent: "space-between",
                           alignItems: "center",
                           padding: "10px 0",
-                          borderBottom: `1px solid ${T.ink075}`,
+                          borderBottom: `1px solid ${T.bg}`,
                         }}
                       >
                         <div>
@@ -2077,7 +2049,7 @@ export default function AdminCustomerEngagement({
                           <div
                             style={{
                               fontSize: 11,
-                              color: T.ink400,
+                              color: T.ink500,
                               fontFamily: T.font,
                               marginTop: 2,
                             }}
@@ -2111,10 +2083,10 @@ export default function AdminCustomerEngagement({
                       display: "grid",
                       gridTemplateColumns: "repeat(3,1fr)",
                       gap: "1px",
-                      background: T.ink150,
+                      background: T.border,
                       borderRadius: 8,
                       overflow: "hidden",
-                      border: `1px solid ${T.ink150}`,
+                      border: `1px solid ${T.border}`,
                       marginBottom: 16,
                     }}
                   >
@@ -2162,7 +2134,7 @@ export default function AdminCustomerEngagement({
                         <div
                           style={{
                             fontSize: 9,
-                            color: T.ink400,
+                            color: T.ink500,
                             fontFamily: T.font,
                             textTransform: "uppercase",
                             letterSpacing: "0.08em",
@@ -2177,17 +2149,17 @@ export default function AdminCustomerEngagement({
                   <div
                     style={{
                       background: "#fff",
-                      border: `1px solid ${T.ink150}`,
+                      border: `1px solid ${T.border}`,
                       borderRadius: 8,
                       padding: 20,
-                      boxShadow: T.shadow,
+                      boxShadow: T.shadow.sm,
                     }}
                   >
                     {secHdr("Scan Log")}
                     {drawerLoading && (
                       <div
                         style={{
-                          color: T.ink400,
+                          color: T.ink500,
                           fontFamily: T.font,
                           fontSize: 13,
                         }}
@@ -2198,7 +2170,7 @@ export default function AdminCustomerEngagement({
                     {!drawerLoading && drawerData.scans.length === 0 && (
                       <div
                         style={{
-                          color: T.ink400,
+                          color: T.ink500,
                           fontFamily: T.font,
                           fontSize: 13,
                         }}
@@ -2211,7 +2183,7 @@ export default function AdminCustomerEngagement({
                         sc.scan_outcome === "points_awarded"
                           ? T.accentMid
                           : sc.scan_outcome === "already_claimed"
-                            ? T.ink400
+                            ? T.ink500
                             : T.warning;
                       return (
                         <div
@@ -2220,7 +2192,7 @@ export default function AdminCustomerEngagement({
                             display: "flex",
                             gap: 12,
                             padding: "10px 0",
-                            borderBottom: `1px solid ${T.ink075}`,
+                            borderBottom: `1px solid ${T.bg}`,
                             alignItems: "flex-start",
                           }}
                         >
@@ -2260,7 +2232,7 @@ export default function AdminCustomerEngagement({
                               <span
                                 style={{
                                   fontSize: 11,
-                                  color: T.ink400,
+                                  color: T.ink500,
                                   fontFamily: T.font,
                                 }}
                               >
@@ -2291,14 +2263,14 @@ export default function AdminCustomerEngagement({
                                 <Pill
                                   label={sc.ip_city}
                                   color={T.info}
-                                  bg={T.infoBg}
+                                  bg={T.infoLight}
                                 />
                               )}
                               {sc.device_type && (
                                 <Pill
                                   label={sc.device_type}
-                                  color={T.ink400}
-                                  bg={T.ink075}
+                                  color={T.ink500}
+                                  bg={T.bg}
                                 />
                               )}
                             </div>
@@ -2327,7 +2299,7 @@ export default function AdminCustomerEngagement({
                         fontWeight: 700,
                         letterSpacing: "0.1em",
                         textTransform: "uppercase",
-                        color: T.ink400,
+                        color: T.ink500,
                         fontFamily: T.font,
                       }}
                     >
@@ -2351,11 +2323,11 @@ export default function AdminCustomerEngagement({
                     <div
                       style={{
                         background: "#fff",
-                        border: `1px solid ${T.ink150}`,
+                        border: `1px solid ${T.border}`,
                         borderRadius: 8,
                         padding: 18,
                         marginBottom: 16,
-                        boxShadow: T.shadow,
+                        boxShadow: T.shadow.sm,
                       }}
                     >
                       <div
@@ -2371,7 +2343,7 @@ export default function AdminCustomerEngagement({
                             style={{
                               display: "block",
                               fontSize: 10,
-                              color: T.ink400,
+                              color: T.ink500,
                               marginBottom: 4,
                               letterSpacing: "0.08em",
                               textTransform: "uppercase",
@@ -2404,7 +2376,7 @@ export default function AdminCustomerEngagement({
                             style={{
                               display: "block",
                               fontSize: 10,
-                              color: T.ink400,
+                              color: T.ink500,
                               marginBottom: 4,
                               letterSpacing: "0.08em",
                               textTransform: "uppercase",
@@ -2434,7 +2406,7 @@ export default function AdminCustomerEngagement({
                           style={{
                             display: "block",
                             fontSize: 10,
-                            color: T.ink400,
+                            color: T.ink500,
                             marginBottom: 4,
                             letterSpacing: "0.08em",
                             textTransform: "uppercase",
@@ -2462,7 +2434,7 @@ export default function AdminCustomerEngagement({
                           style={{
                             display: "block",
                             fontSize: 10,
-                            color: T.ink400,
+                            color: T.ink500,
                             marginBottom: 4,
                             letterSpacing: "0.08em",
                             textTransform: "uppercase",
@@ -2546,7 +2518,7 @@ export default function AdminCustomerEngagement({
                   {msgsLoading ? (
                     <div
                       style={{
-                        color: T.ink400,
+                        color: T.ink500,
                         fontSize: 13,
                         textAlign: "center",
                         padding: 24,
@@ -2560,9 +2532,9 @@ export default function AdminCustomerEngagement({
                       style={{
                         textAlign: "center",
                         padding: 32,
-                        color: T.ink400,
+                        color: T.ink500,
                         fontSize: 13,
-                        border: `1px dashed ${T.ink150}`,
+                        border: `1px dashed ${T.border}`,
                         borderRadius: 8,
                         fontFamily: T.font,
                       }}
@@ -2579,8 +2551,8 @@ export default function AdminCustomerEngagement({
                           <div
                             key={msg.id}
                             style={{
-                              background: isUnread ? T.warningBg : "#fff",
-                              border: `1px solid ${isUnread ? T.warningBd : T.ink150}`,
+                              background: isUnread ? T.warningLight : "#fff",
+                              border: `1px solid ${isUnread ? T.warningBd : T.border}`,
                               borderLeft: `3px solid ${isInbound ? T.info : m.color}`,
                               borderRadius: 6,
                               padding: "12px 16px",
@@ -2610,7 +2582,7 @@ export default function AdminCustomerEngagement({
                                   style={{
                                     fontSize: 12,
                                     fontWeight: isUnread ? 700 : 500,
-                                    color: isUnread ? T.ink900 : T.ink400,
+                                    color: isUnread ? T.ink900 : T.ink500,
                                     fontFamily: T.font,
                                   }}
                                 >
@@ -2635,7 +2607,7 @@ export default function AdminCustomerEngagement({
                                       style={{
                                         marginLeft: 6,
                                         fontSize: 9,
-                                        background: T.infoBg,
+                                        background: T.infoLight,
                                         color: T.info,
                                         padding: "1px 6px",
                                         borderRadius: 10,
@@ -2649,7 +2621,7 @@ export default function AdminCustomerEngagement({
                                 <span
                                   style={{
                                     fontSize: 10,
-                                    color: T.ink400,
+                                    color: T.ink500,
                                     flexShrink: 0,
                                     fontFamily: T.font,
                                   }}
@@ -2712,11 +2684,11 @@ export default function AdminCustomerEngagement({
                   <div
                     style={{
                       background: "#fff",
-                      border: `1px solid ${T.ink150}`,
+                      border: `1px solid ${T.border}`,
                       borderRadius: 8,
                       padding: 20,
                       marginBottom: 16,
-                      boxShadow: T.shadow,
+                      boxShadow: T.shadow.sm,
                     }}
                   >
                     {secHdr("POPIA Compliance Record")}
@@ -2750,7 +2722,7 @@ export default function AdminCustomerEngagement({
                           <div
                             style={{
                               fontSize: 10,
-                              color: T.ink400,
+                              color: T.ink500,
                               fontFamily: T.font,
                               marginBottom: 2,
                               textTransform: "uppercase",
@@ -2775,7 +2747,7 @@ export default function AdminCustomerEngagement({
                   </div>
                   <div
                     style={{
-                      background: T.dangerBg,
+                      background: T.dangerLight,
                       border: `1px solid ${T.dangerBd}`,
                       borderRadius: 8,
                       padding: 20,
@@ -2836,7 +2808,7 @@ export default function AdminCustomerEngagement({
                           Confirm — Send Request
                         </button>
                         <button
-                          style={{ ...makeBtn("#eee", T.ink400), fontSize: 10 }}
+                          style={{ ...makeBtn("#eee", T.ink500), fontSize: 10 }}
                           onClick={() => setDeleteConfirm(null)}
                         >
                           Cancel
@@ -2878,7 +2850,7 @@ export default function AdminCustomerEngagement({
               padding: 32,
               width: 480,
               maxWidth: "95vw",
-              boxShadow: T.shadowMd,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
               fontFamily: T.font,
             }}
           >
@@ -2895,7 +2867,7 @@ export default function AdminCustomerEngagement({
             <div
               style={{
                 fontSize: 13,
-                color: T.ink400,
+                color: T.ink500,
                 marginBottom: 20,
                 lineHeight: 1.5,
               }}
@@ -2915,7 +2887,7 @@ export default function AdminCustomerEngagement({
                   fontWeight: 600,
                   letterSpacing: "0.08em",
                   textTransform: "uppercase",
-                  color: T.ink400,
+                  color: T.ink500,
                   marginBottom: 5,
                 }}
               >
@@ -2944,7 +2916,7 @@ export default function AdminCustomerEngagement({
                   fontWeight: 600,
                   letterSpacing: "0.08em",
                   textTransform: "uppercase",
-                  color: T.ink400,
+                  color: T.ink500,
                   marginBottom: 5,
                 }}
               >
@@ -2968,7 +2940,7 @@ export default function AdminCustomerEngagement({
                   fontWeight: 600,
                   letterSpacing: "0.08em",
                   textTransform: "uppercase",
-                  color: T.ink400,
+                  color: T.ink500,
                   marginBottom: 5,
                 }}
               >
@@ -3014,12 +2986,12 @@ export default function AdminCustomerEngagement({
                   setShowBroadcast(false);
                   setBroadcastResult(null);
                 }}
-                style={makeBtn("#eee", T.ink400)}
+                style={makeBtn("#eee", T.ink500)}
               >
                 Cancel
               </button>
             </div>
-            <div style={{ fontSize: 11, color: T.ink400, marginTop: 12 }}>
+            <div style={{ fontSize: 11, color: T.ink500, marginTop: 12 }}>
               Only customers with marketing_opt_in = true will receive this
               message.
             </div>
@@ -3047,7 +3019,7 @@ export default function AdminCustomerEngagement({
               padding: 32,
               width: 440,
               maxWidth: "95vw",
-              boxShadow: T.shadowMd,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
               fontFamily: T.font,
             }}
           >
@@ -3064,7 +3036,7 @@ export default function AdminCustomerEngagement({
             <div
               style={{
                 fontSize: 13,
-                color: T.ink400,
+                color: T.ink500,
                 marginBottom: 24,
                 lineHeight: 1.5,
               }}
@@ -3100,7 +3072,7 @@ export default function AdminCustomerEngagement({
                     fontWeight: 600,
                     letterSpacing: "0.08em",
                     textTransform: "uppercase",
-                    color: T.ink400,
+                    color: T.ink500,
                     marginBottom: 5,
                   }}
                 >
@@ -3125,7 +3097,7 @@ export default function AdminCustomerEngagement({
                   fontWeight: 600,
                   letterSpacing: "0.08em",
                   textTransform: "uppercase",
-                  color: T.ink400,
+                  color: T.ink500,
                   marginBottom: 5,
                 }}
               >
@@ -3182,7 +3154,7 @@ export default function AdminCustomerEngagement({
                 {regLoading ? "Registering…" : "Register Customer"}
               </button>
               <button
-                style={makeBtn("#eee", T.ink400)}
+                style={makeBtn("#eee", T.ink500)}
                 onClick={() => {
                   setShowRegister(false);
                   setRegMsg(null);
@@ -3194,7 +3166,7 @@ export default function AdminCustomerEngagement({
             <div
               style={{
                 fontSize: 11,
-                color: T.ink400,
+                color: T.ink500,
                 marginTop: 14,
                 lineHeight: 1.5,
               }}

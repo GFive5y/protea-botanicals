@@ -30,37 +30,9 @@ import { supabase } from "../services/supabaseClient";
 import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
 import { ChartCard, ChartTooltip } from "./viz";
+import { T } from "../styles/tokens";
 
-// ─── THEME ────────────────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
 // Scan outcomes that indicate suspicious activity
 const SUSPICIOUS_OUTCOMES = [
@@ -73,7 +45,7 @@ const isFirstScan = (s) => s.scan_outcome === "points_awarded";
 
 const inputStyle = {
   padding: "8px 12px",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: 4,
   fontSize: 13,
   fontFamily: T.font,
@@ -86,7 +58,7 @@ const makeBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
   padding: "8px 16px",
   backgroundColor: disabled ? "#ccc" : bg,
   color,
-  border: bg === "transparent" ? `1px solid ${T.ink150}` : "none",
+  border: bg === "transparent" ? `1px solid ${T.border}` : "none",
   borderRadius: 4,
   fontSize: 10,
   fontWeight: 700,
@@ -123,12 +95,12 @@ function distanceKm(lat1, lng1, lat2, lng2) {
 
 // ─── FLAG REASON CONFIG ───────────────────────────────────────────────────────
 const FLAG_COLORS = {
-  velocity: { bg: T.dangerBg, color: T.danger },
-  travel: { bg: T.warningBg, color: T.warning },
-  bulk: { bg: T.dangerBg, color: T.danger },
-  distance: { bg: T.infoBg, color: T.info },
+  velocity: { bg: T.dangerLight, color: T.danger },
+  travel: { bg: T.warningLight, color: T.warning },
+  bulk: { bg: T.dangerLight, color: T.danger },
+  distance: { bg: T.infoLight, color: T.info },
   foreign: { bg: "#f5e6fa", color: "#7b2d8b" },
-  manual: { bg: T.ink075, color: T.ink400 },
+  manual: { bg: T.bg, color: T.ink500 },
 };
 function FlagBadge({ reason }) {
   const key = reason
@@ -161,12 +133,12 @@ function OutcomeBadge({ outcome }) {
     ? T.danger
     : outcome === "points_awarded"
       ? T.success
-      : T.ink400;
+      : T.ink500;
   const bg = suspicious
-    ? T.dangerBg
+    ? T.dangerLight
     : outcome === "points_awarded"
-      ? T.successBg
-      : T.ink075;
+      ? T.successLight
+      : T.bg;
   return (
     <span
       style={{
@@ -291,11 +263,11 @@ function Section({ title, children }) {
     <div
       style={{
         background: "#fff",
-        border: `1px solid ${T.ink150}`,
+        border: `1px solid ${T.border}`,
         borderRadius: 8,
         padding: 24,
         marginBottom: 20,
-        boxShadow: T.shadow,
+        boxShadow: T.shadow.sm,
       }}
     >
       <div
@@ -304,7 +276,7 @@ function Section({ title, children }) {
           fontWeight: 700,
           letterSpacing: "0.1em",
           textTransform: "uppercase",
-          color: T.ink400,
+          color: T.ink500,
           marginBottom: 14,
           fontFamily: T.font,
         }}
@@ -339,7 +311,7 @@ function EraseModal({ customer, onClose, onConfirm }) {
           maxWidth: 440,
           width: "90%",
           fontFamily: T.font,
-          boxShadow: T.shadowMd,
+          boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
         }}
       >
         <div
@@ -375,7 +347,7 @@ function EraseModal({ customer, onClose, onConfirm }) {
         <div style={{ display: "flex", gap: 10 }}>
           <button
             onClick={onClose}
-            style={{ ...makeBtn("transparent", T.ink400), flex: 1 }}
+            style={{ ...makeBtn("transparent", T.ink500), flex: 1 }}
           >
             Cancel
           </button>
@@ -419,7 +391,7 @@ function BreakdownBar({ entries, color, total }) {
               style={{
                 width: 80,
                 height: 5,
-                background: T.ink150,
+                background: T.border,
                 borderRadius: 3,
               }}
             >
@@ -448,7 +420,7 @@ function BreakdownBar({ entries, color, total }) {
         </div>
       ))}
       {entries.length === 0 && (
-        <div style={{ fontSize: 12, color: T.ink400, fontFamily: T.font }}>
+        <div style={{ fontSize: 12, color: T.ink500, fontFamily: T.font }}>
           No data
         </div>
       )}
@@ -708,7 +680,7 @@ export default function AdminFraudSecurity() {
             fontWeight: 600,
             zIndex: 2000,
             fontFamily: T.font,
-            boxShadow: T.shadowMd,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
           }}
         >
           {toast}
@@ -738,15 +710,15 @@ export default function AdminFraudSecurity() {
           >
             Fraud &amp; Security
           </h2>
-          <div style={{ fontSize: 13, color: T.ink400 }}>
+          <div style={{ fontSize: 13, color: T.ink500 }}>
             Automated fraud detection · Scan audit · POPIA compliance management
           </div>
         </div>
         <button
           onClick={fetchAll}
           style={{
-            ...makeBtn("transparent", T.ink400),
-            border: `1px solid ${T.ink150}`,
+            ...makeBtn("transparent", T.ink500),
+            border: `1px solid ${T.border}`,
           }}
         >
           ↻ Refresh
@@ -756,10 +728,10 @@ export default function AdminFraudSecurity() {
       {/* Fraud alert banners */}
       {fraudAlerts.map((a) => {
         const sev = {
-          critical: { bg: T.dangerBg, bd: T.dangerBd, color: T.danger },
-          warning: { bg: T.warningBg, bd: T.warningBd, color: T.warning },
-          info: { bg: T.infoBg, bd: T.infoBd, color: T.info },
-        }[a.severity] || { bg: T.ink075, bd: T.ink150, color: T.ink700 };
+          critical: { bg: T.dangerLight, bd: T.dangerBd, color: T.danger },
+          warning: { bg: T.warningLight, bd: T.warningBd, color: T.warning },
+          info: { bg: T.infoLight, bd: T.infoBd, color: T.info },
+        }[a.severity] || { bg: T.bg, bd: T.border, color: T.ink700 };
         return (
           <div
             key={a.id}
@@ -826,11 +798,11 @@ export default function AdminFraudSecurity() {
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: 8,
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
-          boxShadow: T.shadow,
+          border: `1px solid ${T.border}`,
+          boxShadow: T.shadow.sm,
           marginBottom: 20,
         }}
       >
@@ -873,7 +845,7 @@ export default function AdminFraudSecurity() {
                 fontWeight: 700,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                color: T.ink400,
+                color: T.ink500,
                 marginBottom: 6,
                 fontFamily: T.font,
               }}
@@ -935,7 +907,7 @@ export default function AdminFraudSecurity() {
             .map((r) => ({
               name: r.charAt(0).toUpperCase() + r.slice(1),
               detected: detections.filter((d) => d.reason === r).length,
-              color: FLAG_COLORS[r]?.color || T.ink400,
+              color: FLAG_COLORS[r]?.color || T.ink500,
             }))
             .filter((d) => d.detected > 0);
 
@@ -1010,13 +982,13 @@ export default function AdminFraudSecurity() {
                       <CartesianGrid
                         horizontal
                         vertical={false}
-                        stroke={T.ink150}
+                        stroke={T.border}
                         strokeWidth={0.5}
                       />
                       <XAxis
                         dataKey="name"
                         tick={{
-                          fill: T.ink400,
+                          fill: T.ink500,
                           fontSize: 10,
                           fontFamily: T.font,
                         }}
@@ -1026,7 +998,7 @@ export default function AdminFraudSecurity() {
                       />
                       <YAxis
                         tick={{
-                          fill: T.ink400,
+                          fill: T.ink500,
                           fontSize: 10,
                           fontFamily: T.font,
                         }}
@@ -1061,7 +1033,7 @@ export default function AdminFraudSecurity() {
                       justifyContent: "center",
                       height: "100%",
                       fontSize: 13,
-                      color: T.ink400,
+                      color: T.ink500,
                       fontFamily: T.font,
                     }}
                   >
@@ -1114,13 +1086,13 @@ export default function AdminFraudSecurity() {
                       <CartesianGrid
                         horizontal
                         vertical={false}
-                        stroke={T.ink150}
+                        stroke={T.border}
                         strokeWidth={0.5}
                       />
                       <XAxis
                         dataKey="date"
                         tick={{
-                          fill: T.ink400,
+                          fill: T.ink500,
                           fontSize: 9,
                           fontFamily: T.font,
                         }}
@@ -1132,7 +1104,7 @@ export default function AdminFraudSecurity() {
                       />
                       <YAxis
                         tick={{
-                          fill: T.ink400,
+                          fill: T.ink500,
                           fontSize: 9,
                           fontFamily: T.font,
                         }}
@@ -1186,7 +1158,7 @@ export default function AdminFraudSecurity() {
         style={{
           display: "flex",
           gap: 0,
-          borderBottom: `2px solid ${T.ink150}`,
+          borderBottom: `2px solid ${T.border}`,
           marginBottom: 24,
         }}
       >
@@ -1209,7 +1181,7 @@ export default function AdminFraudSecurity() {
               fontWeight: activeTab === t.id ? 700 : 400,
               letterSpacing: "0.07em",
               textTransform: "uppercase",
-              color: activeTab === t.id ? T.accent : T.ink400,
+              color: activeTab === t.id ? T.accent : T.ink500,
             }}
           >
             {t.label}
@@ -1226,7 +1198,7 @@ export default function AdminFraudSecurity() {
               alignItems: "center",
               justifyContent: "space-between",
               padding: "14px 18px",
-              background: autoDetected > 0 ? T.dangerBg : T.successBg,
+              background: autoDetected > 0 ? T.dangerLight : T.successLight,
               border: `1px solid ${autoDetected > 0 ? T.dangerBd : T.successBd}`,
               borderRadius: 8,
               marginBottom: 20,
@@ -1250,7 +1222,7 @@ export default function AdminFraudSecurity() {
               <div
                 style={{
                   fontSize: 12,
-                  color: T.ink400,
+                  color: T.ink500,
                   marginTop: 2,
                   fontFamily: T.font,
                 }}
@@ -1342,7 +1314,7 @@ export default function AdminFraudSecurity() {
               <div
                 style={{
                   display: "flex",
-                  borderBottom: `2px solid ${T.ink150}`,
+                  borderBottom: `2px solid ${T.border}`,
                   gap: 0,
                 }}
               >
@@ -1372,7 +1344,7 @@ export default function AdminFraudSecurity() {
                       fontWeight: scanFilter === f.key ? 700 : 400,
                       letterSpacing: "0.07em",
                       textTransform: "uppercase",
-                      color: scanFilter === f.key ? T.accent : T.ink400,
+                      color: scanFilter === f.key ? T.accent : T.ink500,
                       cursor: "pointer",
                     }}
                   >
@@ -1383,7 +1355,7 @@ export default function AdminFraudSecurity() {
               <div
                 style={{
                   fontSize: 12,
-                  color: T.ink400,
+                  color: T.ink500,
                   marginLeft: "auto",
                   fontFamily: T.font,
                 }}
@@ -1397,7 +1369,7 @@ export default function AdminFraudSecurity() {
                 style={{
                   padding: 40,
                   textAlign: "center",
-                  color: T.ink400,
+                  color: T.ink500,
                   fontFamily: T.font,
                 }}
               >
@@ -1408,7 +1380,7 @@ export default function AdminFraudSecurity() {
                 style={{
                   padding: 40,
                   textAlign: "center",
-                  color: T.ink400,
+                  color: T.ink500,
                   fontFamily: T.font,
                 }}
               >
@@ -1444,10 +1416,10 @@ export default function AdminFraudSecurity() {
                             padding: "8px 10px",
                             textAlign: "left",
                             fontSize: 9,
-                            color: T.ink400,
+                            color: T.ink500,
                             letterSpacing: "0.08em",
                             textTransform: "uppercase",
-                            borderBottom: `1px solid ${T.ink150}`,
+                            borderBottom: `1px solid ${T.border}`,
                             whiteSpace: "nowrap",
                           }}
                         >
@@ -1463,8 +1435,8 @@ export default function AdminFraudSecurity() {
                         <tr
                           key={s.id}
                           style={{
-                            background: i % 2 === 0 ? "#fff" : T.ink050,
-                            borderBottom: `1px solid ${T.ink075}`,
+                            background: i % 2 === 0 ? "#fff" : T.surface,
+                            borderBottom: `1px solid ${T.bg}`,
                           }}
                         >
                           <td
@@ -1472,7 +1444,7 @@ export default function AdminFraudSecurity() {
                               padding: "9px 10px",
                               whiteSpace: "nowrap",
                               fontSize: 11,
-                              color: T.ink400,
+                              color: T.ink500,
                             }}
                           >
                             {fmtDate(s.scanned_at)}
@@ -1491,7 +1463,7 @@ export default function AdminFraudSecurity() {
                             style={{
                               padding: "9px 10px",
                               fontSize: 11,
-                              color: T.ink400,
+                              color: T.ink500,
                               fontFamily: "monospace",
                             }}
                           >
@@ -1501,7 +1473,7 @@ export default function AdminFraudSecurity() {
                             style={{
                               padding: "9px 10px",
                               fontSize: 11,
-                              color: T.ink400,
+                              color: T.ink500,
                               whiteSpace: "nowrap",
                             }}
                           >
@@ -1512,7 +1484,7 @@ export default function AdminFraudSecurity() {
                             style={{
                               padding: "9px 10px",
                               fontSize: 11,
-                              color: T.ink400,
+                              color: T.ink500,
                             }}
                           >
                             {s.device_type || "—"}
@@ -1526,7 +1498,7 @@ export default function AdminFraudSecurity() {
                                 style={{
                                   fontSize: 10,
                                   padding: "2px 8px",
-                                  background: T.warningBg,
+                                  background: T.warningLight,
                                   color: T.warning,
                                   fontWeight: 700,
                                   borderRadius: 20,
@@ -1643,7 +1615,7 @@ export default function AdminFraudSecurity() {
                   );
                 })}
               {Object.keys(countryBreakdown).length === 0 && (
-                <div style={{ fontSize: 12, color: T.ink400 }}>No data</div>
+                <div style={{ fontSize: 12, color: T.ink500 }}>No data</div>
               )}
             </Section>
           </div>
@@ -1678,10 +1650,10 @@ export default function AdminFraudSecurity() {
                           padding: "7px 10px",
                           textAlign: "left",
                           fontSize: 9,
-                          color: T.ink400,
+                          color: T.ink500,
                           letterSpacing: "0.08em",
                           textTransform: "uppercase",
-                          borderBottom: `1px solid ${T.ink150}`,
+                          borderBottom: `1px solid ${T.border}`,
                           whiteSpace: "nowrap",
                         }}
                       >
@@ -1695,15 +1667,15 @@ export default function AdminFraudSecurity() {
                     <tr
                       key={s.id}
                       style={{
-                        background: i % 2 === 0 ? "#fff" : T.ink050,
-                        borderBottom: `1px solid ${T.ink075}`,
+                        background: i % 2 === 0 ? "#fff" : T.surface,
+                        borderBottom: `1px solid ${T.bg}`,
                       }}
                     >
                       <td
                         style={{
                           padding: "7px 10px",
                           whiteSpace: "nowrap",
-                          color: T.ink400,
+                          color: T.ink500,
                         }}
                       >
                         {fmtDate(s.scanned_at)}
@@ -1721,7 +1693,7 @@ export default function AdminFraudSecurity() {
                       <td style={{ padding: "7px 10px" }}>
                         <OutcomeBadge outcome={s.scan_outcome} />
                       </td>
-                      <td style={{ padding: "7px 10px", color: T.ink400 }}>
+                      <td style={{ padding: "7px 10px", color: T.ink500 }}>
                         {s.ip_city || "—"}
                       </td>
                       <td
@@ -1730,15 +1702,15 @@ export default function AdminFraudSecurity() {
                           color:
                             s.ip_country && s.ip_country !== "ZA"
                               ? T.danger
-                              : T.ink400,
+                              : T.ink500,
                         }}
                       >
                         {s.ip_country || "—"}
                       </td>
-                      <td style={{ padding: "7px 10px", color: T.ink400 }}>
+                      <td style={{ padding: "7px 10px", color: T.ink500 }}>
                         {s.device_type || "—"}
                       </td>
-                      <td style={{ padding: "7px 10px", color: T.ink400 }}>
+                      <td style={{ padding: "7px 10px", color: T.ink500 }}>
                         {s.browser || "—"}
                       </td>
                       <td style={{ padding: "7px 10px" }}>
@@ -1767,11 +1739,11 @@ export default function AdminFraudSecurity() {
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))",
               gap: "1px",
-              background: T.ink150,
+              background: T.border,
               borderRadius: 8,
               overflow: "hidden",
-              border: `1px solid ${T.ink150}`,
-              boxShadow: T.shadow,
+              border: `1px solid ${T.border}`,
+              boxShadow: T.shadow.sm,
               marginBottom: 20,
             }}
           >
@@ -1812,7 +1784,7 @@ export default function AdminFraudSecurity() {
                     fontWeight: 700,
                     letterSpacing: "0.08em",
                     textTransform: "uppercase",
-                    color: T.ink400,
+                    color: T.ink500,
                     marginBottom: 6,
                     fontFamily: T.font,
                   }}
@@ -1840,7 +1812,7 @@ export default function AdminFraudSecurity() {
             <div
               style={{
                 padding: "12px 16px",
-                background: T.dangerBg,
+                background: T.dangerLight,
                 border: `1px solid ${T.dangerBd}`,
                 borderRadius: 6,
                 marginBottom: 20,
@@ -1882,10 +1854,10 @@ export default function AdminFraudSecurity() {
                           padding: "8px 12px",
                           textAlign: "left",
                           fontSize: 9,
-                          color: T.ink400,
+                          color: T.ink500,
                           letterSpacing: "0.08em",
                           textTransform: "uppercase",
-                          borderBottom: `1px solid ${T.ink150}`,
+                          borderBottom: `1px solid ${T.border}`,
                         }}
                       >
                         {h}
@@ -1898,8 +1870,8 @@ export default function AdminFraudSecurity() {
                     <tr
                       key={c.id}
                       style={{
-                        background: i % 2 === 0 ? "#fff" : T.ink050,
-                        borderBottom: `1px solid ${T.ink075}`,
+                        background: i % 2 === 0 ? "#fff" : T.surface,
+                        borderBottom: `1px solid ${T.bg}`,
                       }}
                     >
                       <td
@@ -1933,7 +1905,7 @@ export default function AdminFraudSecurity() {
                         style={{
                           padding: "10px 12px",
                           fontSize: 11,
-                          color: T.ink400,
+                          color: T.ink500,
                         }}
                       >
                         {c.popia_date ? fmtDate(c.popia_date) : "—"}
@@ -1971,7 +1943,7 @@ export default function AdminFraudSecurity() {
                         style={{
                           padding: 40,
                           textAlign: "center",
-                          color: T.ink400,
+                          color: T.ink500,
                         }}
                       >
                         No customers found
@@ -1986,7 +1958,7 @@ export default function AdminFraudSecurity() {
           <div
             style={{
               padding: 16,
-              background: T.infoBg,
+              background: T.infoLight,
               border: `1px solid ${T.infoBd}`,
               borderRadius: 8,
             }}
