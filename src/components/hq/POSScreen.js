@@ -24,7 +24,7 @@ import {
 } from "./ProductWorlds";
 
 // ── Design tokens (mirrors TenantPortal.js) ───────────────────────────────
-const T = {
+const POS_T = {
   bg: "#FAFAF9",
   border: "#ECEAE6",
   accent: "#1A3D2B",
@@ -408,8 +408,8 @@ export default function POSScreen({ tenantId }) {
       style={{
         display: "flex",
         height: "calc(100vh - 120px)",
-        background: T.bg,
-        fontFamily: T.font,
+        background: POS_T.bg,
+        fontFamily: POS_T.font,
         overflow: "hidden",
         gap: 0,
       }}
@@ -423,14 +423,14 @@ export default function POSScreen({ tenantId }) {
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
-          borderRight: `1px solid ${T.border}`,
+          borderRight: `1px solid ${POS_T.border}`,
         }}
       >
         {/* Header */}
         <div
           style={{
             padding: "14px 18px 10px",
-            borderBottom: `1px solid ${T.border}`,
+            borderBottom: `1px solid ${POS_T.border}`,
             background: "#fff",
           }}
         >
@@ -443,7 +443,7 @@ export default function POSScreen({ tenantId }) {
             }}
           >
             <span style={{ fontSize: 20 }}>🛒</span>
-            <span style={{ fontWeight: 700, fontSize: 17, color: T.ink900 }}>
+            <span style={{ fontWeight: 700, fontSize: 17, color: POS_T.ink900 }}>
               POS Till
             </span>
             {sessionChecked && (
@@ -453,8 +453,8 @@ export default function POSScreen({ tenantId }) {
                   fontWeight: 600,
                   padding: "2px 8px",
                   borderRadius: 99,
-                  background: activeSession ? T.accentLit : T.amberLit,
-                  color: activeSession ? T.accentMid : T.amber,
+                  background: activeSession ? POS_T.accentLit : POS_T.amberLit,
+                  color: activeSession ? POS_T.accentMid : POS_T.amber,
                 }}
               >
                 {activeSession ? "● Session open" : "⚠ No session"}
@@ -464,8 +464,8 @@ export default function POSScreen({ tenantId }) {
               style={{
                 marginLeft: "auto",
                 fontSize: 12,
-                color: T.ink400,
-                background: T.accentLit,
+                color: POS_T.ink400,
+                background: POS_T.accentLit,
                 padding: "2px 8px",
                 borderRadius: 99,
               }}
@@ -483,11 +483,11 @@ export default function POSScreen({ tenantId }) {
             style={{
               width: "100%",
               padding: "8px 12px",
-              border: `1px solid ${T.border}`,
+              border: `1px solid ${POS_T.border}`,
               borderRadius: 8,
               fontSize: 14,
-              fontFamily: T.font,
-              color: T.ink900,
+              fontFamily: POS_T.font,
+              color: POS_T.ink900,
               outline: "none",
               boxSizing: "border-box",
             }}
@@ -510,14 +510,14 @@ export default function POSScreen({ tenantId }) {
                 style={{
                   padding: "4px 12px",
                   borderRadius: 99,
-                  border: `1.5px solid ${catFilter === fc.id ? T.accent : T.border}`,
-                  background: catFilter === fc.id ? T.accent : "#fff",
-                  color: catFilter === fc.id ? "#fff" : T.ink500,
+                  border: `1.5px solid ${catFilter === fc.id ? POS_T.accent : POS_T.border}`,
+                  background: catFilter === fc.id ? POS_T.accent : "#fff",
+                  color: catFilter === fc.id ? "#fff" : POS_T.ink500,
                   fontSize: 12,
                   fontWeight: catFilter === fc.id ? 600 : 400,
                   cursor: "pointer",
                   whiteSpace: "nowrap",
-                  fontFamily: T.font,
+                  fontFamily: POS_T.font,
                 }}
               >
                 {fc.icon} {fc.label}
@@ -544,7 +544,7 @@ export default function POSScreen({ tenantId }) {
                 gridColumn: "1/-1",
                 textAlign: "center",
                 padding: 48,
-                color: T.ink400,
+                color: POS_T.ink400,
               }}
             >
               Loading products…
@@ -555,7 +555,7 @@ export default function POSScreen({ tenantId }) {
                 gridColumn: "1/-1",
                 textAlign: "center",
                 padding: 48,
-                color: T.ink400,
+                color: POS_T.ink400,
                 fontSize: 14,
               }}
             >
@@ -572,7 +572,7 @@ export default function POSScreen({ tenantId }) {
                   soldOut={soldOut}
                   inCart={inCart}
                   onTap={() => (soldOut ? null : openQtyModal(item))}
-                  T={T}
+                  T={POS_T}
                 />
               );
             })
@@ -596,13 +596,13 @@ export default function POSScreen({ tenantId }) {
         <div
           style={{
             padding: "14px 16px 10px",
-            borderBottom: `1px solid ${T.border}`,
+            borderBottom: `1px solid ${POS_T.border}`,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
           }}
         >
-          <span style={{ fontWeight: 700, fontSize: 15, color: T.ink900 }}>
+          <span style={{ fontWeight: 700, fontSize: 15, color: POS_T.ink900 }}>
             🧾 Cart{cartCount > 0 && ` (${cartCount})`}
           </span>
           {cart.length > 0 && (
@@ -611,10 +611,10 @@ export default function POSScreen({ tenantId }) {
               style={{
                 background: "none",
                 border: "none",
-                color: T.danger,
+                color: POS_T.danger,
                 fontSize: 12,
                 cursor: "pointer",
-                fontFamily: T.font,
+                fontFamily: POS_T.font,
               }}
             >
               Clear
@@ -629,7 +629,7 @@ export default function POSScreen({ tenantId }) {
               style={{
                 padding: 32,
                 textAlign: "center",
-                color: T.ink300,
+                color: POS_T.ink300,
                 fontSize: 13,
               }}
             >
@@ -644,19 +644,19 @@ export default function POSScreen({ tenantId }) {
                 qty={qty}
                 onQtyChange={(v) => updateQty(item.id, v)}
                 onRemove={() => removeFromCart(item.id)}
-                T={T}
+                T={POS_T}
               />
             ))
           )}
         </div>
 
         {/* Customer lookup */}
-        <div style={{ borderTop: `1px solid ${T.border}`, padding: "10px 14px" }}>
+        <div style={{ borderTop: `1px solid ${POS_T.border}`, padding: "10px 14px" }}>
           <div
             style={{
               fontSize: 11,
               fontWeight: 600,
-              color: T.ink400,
+              color: POS_T.ink400,
               letterSpacing: "0.05em",
               textTransform: "uppercase",
               marginBottom: 6,
@@ -667,8 +667,8 @@ export default function POSScreen({ tenantId }) {
           {customer ? (
             <div
               style={{
-                background: T.accentLit,
-                border: `1px solid ${T.accentMid}30`,
+                background: POS_T.accentLit,
+                border: `1px solid ${POS_T.accentMid}30`,
                 borderRadius: 8,
                 padding: "8px 10px",
                 display: "flex",
@@ -677,13 +677,13 @@ export default function POSScreen({ tenantId }) {
               }}
             >
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: T.accent }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: POS_T.accent }}>
                   {customer.full_name || customer.phone}
                 </div>
-                <div style={{ fontSize: 11, color: T.accentMid }}>
+                <div style={{ fontSize: 11, color: POS_T.accentMid }}>
                   {customer.loyalty_tier || "Bronze"} · {customer.loyalty_points || 0} pts
                   {cart.length > 0 && (
-                    <span style={{ color: T.accent, fontWeight: 700 }}>
+                    <span style={{ color: POS_T.accent, fontWeight: 700 }}>
                       {" "}+{calcPoints(cartTotal)} this sale
                     </span>
                   )}
@@ -693,7 +693,7 @@ export default function POSScreen({ tenantId }) {
                 onClick={clearCustomer}
                 style={{
                   background: "none", border: "none",
-                  color: T.ink300, cursor: "pointer", fontSize: 14, padding: "0 2px",
+                  color: POS_T.ink300, cursor: "pointer", fontSize: 14, padding: "0 2px",
                 }}
               >
                 ✕
@@ -709,11 +709,11 @@ export default function POSScreen({ tenantId }) {
                 style={{
                   flex: 1,
                   padding: "7px 10px",
-                  border: `1px solid ${customerNotFound ? "#FCA5A5" : T.border}`,
+                  border: `1px solid ${customerNotFound ? "#FCA5A5" : POS_T.border}`,
                   borderRadius: 7,
                   fontSize: 13,
-                  fontFamily: T.font,
-                  color: T.ink900,
+                  fontFamily: POS_T.font,
+                  color: POS_T.ink900,
                   outline: "none",
                 }}
               />
@@ -724,12 +724,12 @@ export default function POSScreen({ tenantId }) {
                   padding: "7px 12px",
                   borderRadius: 7,
                   border: "none",
-                  background: T.accent,
+                  background: POS_T.accent,
                   color: "#fff",
                   fontSize: 12,
                   fontWeight: 600,
                   cursor: "pointer",
-                  fontFamily: T.font,
+                  fontFamily: POS_T.font,
                   opacity: customerSearching ? 0.6 : 1,
                 }}
               >
@@ -738,7 +738,7 @@ export default function POSScreen({ tenantId }) {
             </div>
           )}
           {customerNotFound && (
-            <div style={{ fontSize: 11, color: T.amber, marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: POS_T.amber, marginTop: 4 }}>
               Not found — proceeding as walk-in
             </div>
           )}
@@ -747,7 +747,7 @@ export default function POSScreen({ tenantId }) {
         {/* Payment method selector */}
         <div
           style={{
-            borderTop: `1px solid ${T.border}`,
+            borderTop: `1px solid ${POS_T.border}`,
             padding: "12px 14px 8px",
           }}
         >
@@ -755,7 +755,7 @@ export default function POSScreen({ tenantId }) {
             style={{
               fontSize: 11,
               fontWeight: 600,
-              color: T.ink400,
+              color: POS_T.ink400,
               letterSpacing: "0.05em",
               textTransform: "uppercase",
               marginBottom: 8,
@@ -773,14 +773,14 @@ export default function POSScreen({ tenantId }) {
                   padding: "8px 4px",
                   borderRadius: 8,
                   border: `1.5px solid ${
-                    payMethod === pm.id ? pm.color : T.border
+                    payMethod === pm.id ? pm.color : POS_T.border
                   }`,
                   background: payMethod === pm.id ? pm.color + "15" : "#fff",
-                  color: payMethod === pm.id ? pm.color : T.ink500,
+                  color: payMethod === pm.id ? pm.color : POS_T.ink500,
                   fontWeight: payMethod === pm.id ? 700 : 400,
                   fontSize: 12,
                   cursor: "pointer",
-                  fontFamily: T.font,
+                  fontFamily: POS_T.font,
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
@@ -797,7 +797,7 @@ export default function POSScreen({ tenantId }) {
         {/* Total + complete sale */}
         <div
           style={{
-            borderTop: `1px solid ${T.border}`,
+            borderTop: `1px solid ${POS_T.border}`,
             padding: "12px 14px",
           }}
         >
@@ -809,14 +809,14 @@ export default function POSScreen({ tenantId }) {
               marginBottom: 10,
             }}
           >
-            <span style={{ fontWeight: 600, fontSize: 14, color: T.ink500 }}>
+            <span style={{ fontWeight: 600, fontSize: 14, color: POS_T.ink500 }}>
               Total
             </span>
             <span
               style={{
                 fontWeight: 800,
                 fontSize: 22,
-                color: T.ink900,
+                color: POS_T.ink900,
                 letterSpacing: "-0.03em",
               }}
             >
@@ -828,7 +828,7 @@ export default function POSScreen({ tenantId }) {
           {payMethod === "cash" && cart.length > 0 && (
             <div style={{ marginBottom: 10 }}>
               <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
-                <span style={{ fontSize: 12, color: T.ink400, fontWeight: 600, whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 12, color: POS_T.ink400, fontWeight: 600, whiteSpace: "nowrap" }}>
                   Tendered R
                 </span>
                 <input
@@ -841,12 +841,12 @@ export default function POSScreen({ tenantId }) {
                   style={{
                     flex: 1,
                     padding: "6px 10px",
-                    border: `1px solid ${T.border}`,
+                    border: `1px solid ${POS_T.border}`,
                     borderRadius: 7,
                     fontSize: 14,
-                    fontFamily: T.font,
+                    fontFamily: POS_T.font,
                     fontWeight: 700,
-                    color: T.ink900,
+                    color: POS_T.ink900,
                     outline: "none",
                     fontVariantNumeric: "tabular-nums",
                   }}
@@ -876,12 +876,12 @@ export default function POSScreen({ tenantId }) {
           {error && (
             <div
               style={{
-                background: T.dangerLit,
+                background: POS_T.dangerLit,
                 border: `1px solid #FCA5A5`,
                 borderRadius: 6,
                 padding: "6px 10px",
                 fontSize: 12,
-                color: T.danger,
+                color: POS_T.danger,
                 marginBottom: 8,
               }}
             >
@@ -899,14 +899,14 @@ export default function POSScreen({ tenantId }) {
               border: "none",
               background:
                 cart.length === 0
-                  ? T.ink150
+                  ? POS_T.ink150
                   : PAYMENT_METHODS.find((p) => p.id === payMethod)?.color ||
-                    T.accent,
-              color: cart.length === 0 ? T.ink400 : "#fff",
+                    POS_T.accent,
+              color: cart.length === 0 ? POS_T.ink400 : "#fff",
               fontWeight: 700,
               fontSize: 15,
               cursor: cart.length === 0 ? "not-allowed" : "pointer",
-              fontFamily: T.font,
+              fontFamily: POS_T.font,
               letterSpacing: "0.01em",
               transition: "opacity 0.15s",
               opacity: submitting ? 0.7 : 1,
@@ -944,14 +944,14 @@ export default function POSScreen({ tenantId }) {
               padding: 28,
               width: 300,
               boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
-              fontFamily: T.font,
+              fontFamily: POS_T.font,
             }}
             onClick={(e) => e.stopPropagation()}
           >
             <div
               style={{
                 fontSize: 13,
-                color: T.ink400,
+                color: POS_T.ink400,
                 marginBottom: 4,
                 fontWeight: 600,
               }}
@@ -963,7 +963,7 @@ export default function POSScreen({ tenantId }) {
               style={{
                 fontWeight: 700,
                 fontSize: 17,
-                color: T.ink900,
+                color: POS_T.ink900,
                 marginBottom: 6,
               }}
             >
@@ -972,7 +972,7 @@ export default function POSScreen({ tenantId }) {
             <div
               style={{
                 fontSize: 15,
-                color: T.accentMid,
+                color: POS_T.accentMid,
                 fontWeight: 700,
                 marginBottom: 18,
               }}
@@ -982,7 +982,7 @@ export default function POSScreen({ tenantId }) {
                 style={{
                   marginLeft: 10,
                   fontSize: 12,
-                  color: T.ink400,
+                  color: POS_T.ink400,
                   fontWeight: 400,
                 }}
               >
@@ -994,7 +994,7 @@ export default function POSScreen({ tenantId }) {
               <label
                 style={{
                   fontSize: 12,
-                  color: T.ink400,
+                  color: POS_T.ink400,
                   fontWeight: 600,
                   display: "block",
                   marginBottom: 6,
@@ -1007,7 +1007,7 @@ export default function POSScreen({ tenantId }) {
                   onClick={() =>
                     setQtyInput((v) => String(Math.max(1, parseInt(v, 10) - 1)))
                   }
-                  style={qtyBtnStyle(T)}
+                  style={qtyBtnStyle(POS_T)}
                 >
                   −
                 </button>
@@ -1020,13 +1020,13 @@ export default function POSScreen({ tenantId }) {
                   style={{
                     width: 64,
                     textAlign: "center",
-                    border: `1.5px solid ${T.border}`,
+                    border: `1.5px solid ${POS_T.border}`,
                     borderRadius: 8,
                     padding: "8px 0",
                     fontSize: 18,
                     fontWeight: 700,
-                    fontFamily: T.font,
-                    color: T.ink900,
+                    fontFamily: POS_T.font,
+                    color: POS_T.ink900,
                     outline: "none",
                   }}
                 />
@@ -1041,7 +1041,7 @@ export default function POSScreen({ tenantId }) {
                       ),
                     )
                   }
-                  style={qtyBtnStyle(T)}
+                  style={qtyBtnStyle(POS_T)}
                 >
                   +
                 </button>
@@ -1051,7 +1051,7 @@ export default function POSScreen({ tenantId }) {
                   style={{
                     marginTop: 8,
                     fontSize: 13,
-                    color: T.accentMid,
+                    color: POS_T.accentMid,
                     fontWeight: 600,
                   }}
                 >
@@ -1068,13 +1068,13 @@ export default function POSScreen({ tenantId }) {
                   flex: 1,
                   padding: "10px",
                   borderRadius: 8,
-                  border: `1px solid ${T.border}`,
+                  border: `1px solid ${POS_T.border}`,
                   background: "#fff",
-                  color: T.ink500,
+                  color: POS_T.ink500,
                   fontWeight: 600,
                   fontSize: 14,
                   cursor: "pointer",
-                  fontFamily: T.font,
+                  fontFamily: POS_T.font,
                 }}
               >
                 Cancel
@@ -1086,12 +1086,12 @@ export default function POSScreen({ tenantId }) {
                   padding: "10px",
                   borderRadius: 8,
                   border: "none",
-                  background: T.accent,
+                  background: POS_T.accent,
                   color: "#fff",
                   fontWeight: 700,
                   fontSize: 14,
                   cursor: "pointer",
-                  fontFamily: T.font,
+                  fontFamily: POS_T.font,
                 }}
               >
                 Add to Cart
@@ -1123,7 +1123,7 @@ export default function POSScreen({ tenantId }) {
               padding: "28px 28px 22px",
               width: 320,
               boxShadow: "0 24px 80px rgba(0,0,0,0.22)",
-              fontFamily: T.font,
+              fontFamily: POS_T.font,
             }}
           >
             {/* Success header */}
@@ -1133,13 +1133,13 @@ export default function POSScreen({ tenantId }) {
                 style={{
                   fontWeight: 800,
                   fontSize: 18,
-                  color: T.ink900,
+                  color: POS_T.ink900,
                   marginBottom: 4,
                 }}
               >
                 Sale Complete
               </div>
-              <div style={{ fontSize: 12, color: T.ink400 }}>
+              <div style={{ fontSize: 12, color: POS_T.ink400 }}>
                 {receipt.orderRef}
               </div>
             </div>
@@ -1163,14 +1163,14 @@ export default function POSScreen({ tenantId }) {
                     padding: "4px 0",
                     borderBottom:
                       i < receipt.items.length - 1
-                        ? `1px solid ${T.border}`
+                        ? `1px solid ${POS_T.border}`
                         : "none",
                   }}
                 >
-                  <span style={{ color: T.ink500 }}>
+                  <span style={{ color: POS_T.ink500 }}>
                     {it.qty}× {it.name}
                   </span>
-                  <span style={{ color: T.ink900, fontWeight: 600 }}>
+                  <span style={{ color: POS_T.ink900, fontWeight: 600 }}>
                     {zar(it.price * it.qty)}
                   </span>
                 </div>
@@ -1186,14 +1186,14 @@ export default function POSScreen({ tenantId }) {
                 marginBottom: 6,
               }}
             >
-              <span style={{ fontWeight: 600, color: T.ink500, fontSize: 14 }}>
+              <span style={{ fontWeight: 600, color: POS_T.ink500, fontSize: 14 }}>
                 Total
               </span>
               <span
                 style={{
                   fontWeight: 800,
                   fontSize: 24,
-                  color: T.ink900,
+                  color: POS_T.ink900,
                   letterSpacing: "-0.03em",
                 }}
               >
@@ -1205,8 +1205,8 @@ export default function POSScreen({ tenantId }) {
             {receipt.customer?.pointsEarned > 0 && (
               <div
                 style={{
-                  background: T.accentLit,
-                  border: `1px solid ${T.accentMid}30`,
+                  background: POS_T.accentLit,
+                  border: `1px solid ${POS_T.accentMid}30`,
                   borderRadius: 8,
                   padding: "8px 12px",
                   marginBottom: 10,
@@ -1216,14 +1216,14 @@ export default function POSScreen({ tenantId }) {
                 }}
               >
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: T.accent }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: POS_T.accent }}>
                     🌿 {receipt.customer.name || "Customer"} earned points
                   </div>
-                  <div style={{ fontSize: 11, color: T.accentMid, marginTop: 1 }}>
+                  <div style={{ fontSize: 11, color: POS_T.accentMid, marginTop: 1 }}>
                     New balance: {receipt.customer.newBalance} pts
                   </div>
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: T.accent }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: POS_T.accent }}>
                   +{receipt.customer.pointsEarned}
                 </div>
               </div>
@@ -1237,7 +1237,7 @@ export default function POSScreen({ tenantId }) {
                   fontWeight: 600,
                   color:
                     PAYMENT_METHODS.find((p) => p.id === receipt.payMethod)
-                      ?.color || T.accent,
+                      ?.color || POS_T.accent,
                   background: "#F0FDF4",
                   padding: "2px 10px",
                   borderRadius: 99,
@@ -1254,7 +1254,7 @@ export default function POSScreen({ tenantId }) {
               <div
                 style={{
                   fontSize: 11,
-                  color: T.ink400,
+                  color: POS_T.ink400,
                   textAlign: "center",
                   marginBottom: 10,
                 }}
@@ -1269,12 +1269,12 @@ export default function POSScreen({ tenantId }) {
                 padding: "12px",
                 borderRadius: 10,
                 border: "none",
-                background: T.accent,
+                background: POS_T.accent,
                 color: "#fff",
                 fontWeight: 700,
                 fontSize: 15,
                 cursor: "pointer",
-                fontFamily: T.font,
+                fontFamily: POS_T.font,
               }}
             >
               New Sale
@@ -1295,7 +1295,7 @@ function ProductCard({ item, soldOut, inCart, onTap, T }) {
       style={{
         background: soldOut ? "#F9FAFB" : "#fff",
         border: `1.5px solid ${
-          inCart ? T.accent : soldOut ? T.ink150 : T.border
+          inCart ? POS_T.accent : soldOut ? POS_T.ink150 : POS_T.border
         }`,
         borderRadius: 10,
         padding: "12px 10px 10px",
@@ -1303,7 +1303,7 @@ function ProductCard({ item, soldOut, inCart, onTap, T }) {
         opacity: soldOut ? 0.55 : 1,
         position: "relative",
         transition: "border-color 0.15s, box-shadow 0.15s",
-        boxShadow: inCart ? `0 0 0 2px ${T.accentLit}` : "none",
+        boxShadow: inCart ? `0 0 0 2px ${POS_T.accentLit}` : "none",
         userSelect: "none",
       }}
     >
@@ -1317,7 +1317,7 @@ function ProductCard({ item, soldOut, inCart, onTap, T }) {
         style={{
           fontWeight: 600,
           fontSize: 12,
-          color: T.ink900,
+          color: POS_T.ink900,
           lineHeight: 1.3,
           marginBottom: 4,
           textAlign: "center",
@@ -1336,7 +1336,7 @@ function ProductCard({ item, soldOut, inCart, onTap, T }) {
         style={{
           fontWeight: 800,
           fontSize: 14,
-          color: T.accentMid,
+          color: POS_T.accentMid,
           textAlign: "center",
           marginBottom: 4,
         }}
@@ -1351,7 +1351,7 @@ function ProductCard({ item, soldOut, inCart, onTap, T }) {
             style={{
               fontSize: 10,
               background: "#FEF2F2",
-              color: T.danger,
+              color: POS_T.danger,
               padding: "2px 7px",
               borderRadius: 99,
               fontWeight: 700,
@@ -1363,8 +1363,8 @@ function ProductCard({ item, soldOut, inCart, onTap, T }) {
           <span
             style={{
               fontSize: 10,
-              background: T.amberLit,
-              color: T.amber,
+              background: POS_T.amberLit,
+              color: POS_T.amber,
               padding: "2px 7px",
               borderRadius: 99,
               fontWeight: 700,
@@ -1376,8 +1376,8 @@ function ProductCard({ item, soldOut, inCart, onTap, T }) {
           <span
             style={{
               fontSize: 10,
-              background: T.accentLit,
-              color: T.accentMid,
+              background: POS_T.accentLit,
+              color: POS_T.accentMid,
               padding: "2px 7px",
               borderRadius: 99,
             }}
@@ -1394,7 +1394,7 @@ function ProductCard({ item, soldOut, inCart, onTap, T }) {
             position: "absolute",
             top: 6,
             right: 6,
-            background: T.accent,
+            background: POS_T.accent,
             color: "#fff",
             borderRadius: 99,
             width: 18,
@@ -1421,7 +1421,7 @@ function CartLine({ item, qty, onQtyChange, onRemove, T }) {
         display: "flex",
         alignItems: "center",
         padding: "9px 14px",
-        borderBottom: `1px solid ${T.border}`,
+        borderBottom: `1px solid ${POS_T.border}`,
         gap: 8,
       }}
     >
@@ -1436,7 +1436,7 @@ function CartLine({ item, qty, onQtyChange, onRemove, T }) {
           style={{
             fontSize: 12,
             fontWeight: 600,
-            color: T.ink900,
+            color: POS_T.ink900,
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
@@ -1444,9 +1444,9 @@ function CartLine({ item, qty, onQtyChange, onRemove, T }) {
         >
           {item.name}
         </div>
-        <div style={{ fontSize: 11, color: T.ink400 }}>
+        <div style={{ fontSize: 11, color: POS_T.ink400 }}>
           {zar(item.sell_price)} ×{" "}
-          <span style={{ fontWeight: 700, color: T.accentMid }}>
+          <span style={{ fontWeight: 700, color: POS_T.accentMid }}>
             {zar(item.sell_price * qty)}
           </span>
         </div>
@@ -1454,7 +1454,7 @@ function CartLine({ item, qty, onQtyChange, onRemove, T }) {
 
       {/* Qty stepper */}
       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-        <button onClick={() => onQtyChange(qty - 1)} style={miniBtn(T)}>
+        <button onClick={() => onQtyChange(qty - 1)} style={miniBtn(POS_T)}>
           −
         </button>
         <span
@@ -1463,12 +1463,12 @@ function CartLine({ item, qty, onQtyChange, onRemove, T }) {
             fontWeight: 700,
             minWidth: 18,
             textAlign: "center",
-            color: T.ink900,
+            color: POS_T.ink900,
           }}
         >
           {qty}
         </span>
-        <button onClick={() => onQtyChange(qty + 1)} style={miniBtn(T)}>
+        <button onClick={() => onQtyChange(qty + 1)} style={miniBtn(POS_T)}>
           +
         </button>
       </div>
@@ -1479,7 +1479,7 @@ function CartLine({ item, qty, onQtyChange, onRemove, T }) {
         style={{
           background: "none",
           border: "none",
-          color: T.ink300,
+          color: POS_T.ink300,
           cursor: "pointer",
           fontSize: 14,
           padding: "0 2px",
@@ -1493,39 +1493,39 @@ function CartLine({ item, qty, onQtyChange, onRemove, T }) {
 }
 
 // ── Micro-style helpers ───────────────────────────────────────────────────
-function qtyBtnStyle(T) {
+function qtyBtnStyle(POS_T) {
   return {
     width: 36,
     height: 36,
     borderRadius: 8,
-    border: `1.5px solid ${T.border}`,
+    border: `1.5px solid ${POS_T.border}`,
     background: "#fff",
-    color: T.ink900,
+    color: POS_T.ink900,
     fontSize: 18,
     fontWeight: 700,
     cursor: "pointer",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontFamily: T.font,
+    fontFamily: POS_T.font,
   };
 }
 
-function miniBtn(T) {
+function miniBtn(POS_T) {
   return {
     width: 22,
     height: 22,
     borderRadius: 6,
-    border: `1px solid ${T.border}`,
+    border: `1px solid ${POS_T.border}`,
     background: "#fff",
-    color: T.ink900,
+    color: POS_T.ink900,
     fontSize: 14,
     fontWeight: 700,
     cursor: "pointer",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontFamily: T.font,
+    fontFamily: POS_T.font,
     padding: 0,
     lineHeight: 1,
   };

@@ -15,41 +15,15 @@ import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
 import { usePageContext } from "../../hooks/usePageContext";
+import { T } from "../../styles/tokens";
+const MONO = "'DM Mono','Courier New',monospace";
 
-// ── Design tokens — mirrors HQStock.js v3.1 ──────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  mono: "'DM Mono','Courier New',monospace",
-};
+// Design tokens: imported from ../../styles/tokens
 
 // ── Style helpers ─────────────────────────────────────────────────────────────
 const sCard = {
   background: "#fff",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: "4px",
   padding: "20px",
   marginBottom: "16px",
@@ -59,17 +33,17 @@ const sLabel = {
   fontWeight: 700,
   letterSpacing: "0.1em",
   textTransform: "uppercase",
-  color: T.ink400,
+  color: T.ink500,
   fontFamily: T.font,
   marginBottom: "6px",
   display: "block",
 };
 const sInput = {
   padding: "8px 12px",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: "4px",
   fontSize: "15px",
-  fontFamily: T.mono,
+  fontFamily: MONO,
   color: T.ink900,
   outline: "none",
   width: "100%",
@@ -93,7 +67,7 @@ const sBtn = (variant = "primary") => ({
         ? T.danger
         : variant === "ghost"
           ? "transparent"
-          : T.ink075,
+          : T.bg,
   color:
     variant === "primary"
       ? "#fff"
@@ -102,7 +76,7 @@ const sBtn = (variant = "primary") => ({
         : variant === "ghost"
           ? T.ink500
           : T.ink700,
-  ...(variant === "ghost" ? { border: `1px solid ${T.ink150}` } : {}),
+  ...(variant === "ghost" ? { border: `1px solid ${T.border}` } : {}),
 });
 
 // ── SA denomination config ────────────────────────────────────────────────────
@@ -140,19 +114,19 @@ function fmtDate(d) {
 function statusStyle(status) {
   if (status === "balanced")
     return {
-      background: T.successBg,
+      background: T.successLight,
       color: T.success,
       border: `1px solid ${T.successBd}`,
     };
   if (status === "flagged")
     return {
-      background: T.warningBg,
+      background: T.warningLight,
       color: T.warning,
       border: `1px solid ${T.warningBd}`,
     };
   if (status === "escalated")
     return {
-      background: T.dangerBg,
+      background: T.dangerLight,
       color: T.danger,
       border: `1px solid ${T.dangerBd}`,
     };
@@ -384,7 +358,7 @@ export default function EODCashUp() {
           padding: "40px 20px",
           textAlign: "center",
           fontFamily: T.font,
-          color: T.ink400,
+          color: T.ink500,
         }}
       >
         Loading cash-up data…
@@ -469,7 +443,7 @@ export default function EODCashUp() {
           {error && (
             <div
               style={{
-                background: T.dangerBg,
+                background: T.dangerLight,
                 border: `1px solid ${T.dangerBd}`,
                 borderRadius: 4,
                 padding: "10px 14px",
@@ -504,7 +478,7 @@ export default function EODCashUp() {
                 value={zar(cardTotal)}
               />
               <div
-                style={{ height: 1, background: T.ink150, margin: "16px 0" }}
+                style={{ height: 1, background: T.border, margin: "16px 0" }}
               />
               <label style={sLabel}>
                 Opening float (cash in drawer at start of day)
@@ -518,7 +492,7 @@ export default function EODCashUp() {
                 }}
               >
                 <span
-                  style={{ color: T.ink500, fontFamily: T.mono, fontSize: 15 }}
+                  style={{ color: T.ink500, fontFamily: MONO, fontSize: 15 }}
                 >
                   R
                 </span>
@@ -535,7 +509,7 @@ export default function EODCashUp() {
               <p
                 style={{
                   fontSize: 11,
-                  color: T.ink400,
+                  color: T.ink500,
                   marginTop: 6,
                   fontFamily: T.font,
                 }}
@@ -605,7 +579,7 @@ export default function EODCashUp() {
                     <span
                       style={{
                         color: T.ink500,
-                        fontFamily: T.mono,
+                        fontFamily: MONO,
                         fontSize: 15,
                       }}
                     >
@@ -654,8 +628,8 @@ export default function EODCashUp() {
 
               <div
                 style={{
-                  background: T.ink050,
-                  border: `1px solid ${T.ink150}`,
+                  background: T.surface,
+                  border: `1px solid ${T.border}`,
                   borderRadius: 4,
                   padding: 16,
                   marginBottom: 16,
@@ -664,7 +638,7 @@ export default function EODCashUp() {
                 <RecRow label="Cash sales (system)" value={zar(systemCash)} />
                 <RecRow label="Opening float" value={zar(float)} />
                 <div
-                  style={{ height: 1, background: T.ink150, margin: "10px 0" }}
+                  style={{ height: 1, background: T.border, margin: "10px 0" }}
                 />
                 <RecRow
                   label="Expected in drawer"
@@ -673,7 +647,7 @@ export default function EODCashUp() {
                 />
                 <RecRow label="You counted" value={zar(countedCash)} bold />
                 <div
-                  style={{ height: 1, background: T.ink150, margin: "10px 0" }}
+                  style={{ height: 1, background: T.border, margin: "10px 0" }}
                 />
                 <div
                   style={{
@@ -695,7 +669,7 @@ export default function EODCashUp() {
                   <span
                     style={{
                       fontSize: 20,
-                      fontFamily: T.mono,
+                      fontFamily: MONO,
                       fontWeight: 600,
                       color: varColour,
                     }}
@@ -741,7 +715,7 @@ export default function EODCashUp() {
               <div
                 style={{
                   fontSize: 12,
-                  color: T.ink400,
+                  color: T.ink500,
                   marginBottom: 16,
                   fontFamily: T.font,
                 }}
@@ -838,7 +812,7 @@ function StepIndicator({ current }) {
                   width: 28,
                   height: 28,
                   borderRadius: "50%",
-                  background: done ? T.accentMid : active ? T.accent : T.ink150,
+                  background: done ? T.accentMid : active ? T.accent : T.border,
                   color: done || active ? "#fff" : T.ink500,
                   display: "flex",
                   alignItems: "center",
@@ -852,7 +826,7 @@ function StepIndicator({ current }) {
               <span
                 style={{
                   fontSize: 10,
-                  color: active ? T.accentMid : T.ink400,
+                  color: active ? T.accentMid : T.ink500,
                   fontFamily: T.font,
                   fontWeight: active ? 700 : 400,
                   textTransform: "uppercase",
@@ -868,7 +842,7 @@ function StepIndicator({ current }) {
                 style={{
                   flex: 1,
                   height: 1,
-                  background: current > n ? T.accentMid : T.ink150,
+                  background: current > n ? T.accentMid : T.border,
                   margin: "0 8px",
                   marginBottom: 16,
                 }}
@@ -893,7 +867,7 @@ function InfoRow({ label, value }) {
       }}
     >
       <span style={{ color: T.ink500 }}>{label}</span>
-      <span style={{ fontFamily: T.mono, color: T.ink900, fontWeight: 600 }}>
+      <span style={{ fontFamily: MONO, color: T.ink900, fontWeight: 600 }}>
         {value}
       </span>
     </div>
@@ -921,7 +895,7 @@ function RecRow({ label, value, bold }) {
       </span>
       <span
         style={{
-          fontFamily: T.mono,
+          fontFamily: MONO,
           color: T.ink900,
           fontWeight: bold ? 700 : 500,
         }}
@@ -936,7 +910,7 @@ function ConfigBadge({ label, value }) {
   return (
     <div
       style={{
-        background: T.infoBg,
+        background: T.infoLight,
         border: `1px solid ${T.infoBd}`,
         borderRadius: 3,
         padding: "3px 8px",
@@ -946,7 +920,7 @@ function ConfigBadge({ label, value }) {
       }}
     >
       <span style={{ fontWeight: 400 }}>{label}: </span>
-      <span style={{ fontWeight: 700, fontFamily: T.mono }}>{value}</span>
+      <span style={{ fontWeight: 700, fontFamily: MONO }}>{value}</span>
     </div>
   );
 }
@@ -958,7 +932,7 @@ function ModeBtn({ active, onClick, label }) {
       style={{
         padding: "5px 12px",
         borderRadius: 3,
-        border: `1px solid ${active ? T.accentMid : T.ink150}`,
+        border: `1px solid ${active ? T.accentMid : T.border}`,
         background: active ? T.accentMid : "transparent",
         color: active ? "#fff" : T.ink500,
         fontSize: 11,
@@ -984,7 +958,7 @@ function DenomInput({ counts, onChange, total }) {
       <div
         style={{
           fontSize: 11,
-          color: T.ink400,
+          color: T.ink500,
           fontFamily: T.font,
           textTransform: "uppercase",
           letterSpacing: "0.08em",
@@ -1004,7 +978,7 @@ function DenomInput({ counts, onChange, total }) {
       <div
         style={{
           fontSize: 11,
-          color: T.ink400,
+          color: T.ink500,
           fontFamily: T.font,
           textTransform: "uppercase",
           letterSpacing: "0.08em",
@@ -1028,7 +1002,7 @@ function DenomInput({ counts, onChange, total }) {
           alignItems: "center",
           marginTop: 16,
           padding: "10px 12px",
-          background: T.accentLit,
+          background: T.accentLight,
           border: `1px solid ${T.accentBd}`,
           borderRadius: 4,
         }}
@@ -1048,7 +1022,7 @@ function DenomInput({ counts, onChange, total }) {
         <span
           style={{
             fontSize: 20,
-            fontFamily: T.mono,
+            fontFamily: MONO,
             fontWeight: 600,
             color: T.accent,
           }}
@@ -1073,7 +1047,7 @@ function DenomRow({ denom, count, onChange }) {
         style={{
           width: 40,
           fontSize: 13,
-          fontFamily: T.mono,
+          fontFamily: MONO,
           fontWeight: 600,
           color: T.ink700,
         }}
@@ -1081,7 +1055,7 @@ function DenomRow({ denom, count, onChange }) {
         {denom.label}
       </span>
       <span
-        style={{ fontSize: 11, color: T.ink400, width: 20, fontFamily: T.font }}
+        style={{ fontSize: 11, color: T.ink500, width: 20, fontFamily: T.font }}
       >
         ×
       </span>
@@ -1095,13 +1069,13 @@ function DenomRow({ denom, count, onChange }) {
         placeholder="0"
       />
       <span
-        style={{ fontSize: 11, color: T.ink400, width: 12, fontFamily: T.font }}
+        style={{ fontSize: 11, color: T.ink500, width: 12, fontFamily: T.font }}
       >
         =
       </span>
       <span
         style={{
-          fontFamily: T.mono,
+          fontFamily: MONO,
           fontSize: 13,
           color: subtotal > 0 ? T.ink900 : T.ink300,
           minWidth: 80,
@@ -1212,7 +1186,7 @@ function TodayDoneCard({ cashup, systemCash, cardTotal }) {
           style={{
             fontSize: 12,
             color: T.warning,
-            background: T.warningBg,
+            background: T.warningLight,
             border: `1px solid ${T.warningBd}`,
             borderRadius: 4,
             padding: "8px 12px",
@@ -1229,8 +1203,8 @@ function SummaryKPI({ label, value, colour }) {
   return (
     <div
       style={{
-        background: T.ink050,
-        border: `1px solid ${T.ink150}`,
+        background: T.surface,
+        border: `1px solid ${T.border}`,
         borderRadius: 4,
         padding: "10px 12px",
       }}
@@ -1241,7 +1215,7 @@ function SummaryKPI({ label, value, colour }) {
           fontWeight: 700,
           letterSpacing: "0.08em",
           textTransform: "uppercase",
-          color: T.ink400,
+          color: T.ink500,
           fontFamily: T.font,
           marginBottom: 4,
         }}
@@ -1251,7 +1225,7 @@ function SummaryKPI({ label, value, colour }) {
       <div
         style={{
           fontSize: 16,
-          fontFamily: T.mono,
+          fontFamily: MONO,
           fontWeight: 600,
           color: colour || T.ink900,
         }}
@@ -1269,7 +1243,7 @@ function HistoryPanel({ loading, history }) {
         style={{
           padding: "24px 0",
           textAlign: "center",
-          color: T.ink400,
+          color: T.ink500,
           fontSize: 13,
           fontFamily: T.font,
         }}
@@ -1283,7 +1257,7 @@ function HistoryPanel({ loading, history }) {
         style={{
           padding: "24px 0",
           textAlign: "center",
-          color: T.ink400,
+          color: T.ink500,
           fontSize: 13,
           fontFamily: T.font,
         }}
@@ -1295,7 +1269,7 @@ function HistoryPanel({ loading, history }) {
     <div style={{ marginBottom: 20 }}>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
-          <tr style={{ background: T.ink050 }}>
+          <tr style={{ background: T.surface }}>
             {[
               "Date",
               "System Cash",
@@ -1313,8 +1287,8 @@ function HistoryPanel({ loading, history }) {
                   fontWeight: 700,
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  color: T.ink400,
-                  borderBottom: `2px solid ${T.ink150}`,
+                  color: T.ink500,
+                  borderBottom: `2px solid ${T.border}`,
                   fontFamily: T.font,
                   whiteSpace: "nowrap",
                 }}
@@ -1330,7 +1304,7 @@ function HistoryPanel({ loading, history }) {
             return (
               <tr
                 key={row.id}
-                style={{ background: i % 2 === 0 ? "#fff" : T.ink050 }}
+                style={{ background: i % 2 === 0 ? "#fff" : T.surface }}
               >
                 <td
                   style={{
@@ -1346,14 +1320,14 @@ function HistoryPanel({ loading, history }) {
                   style={{
                     padding: "9px 12px",
                     fontSize: 13,
-                    fontFamily: T.mono,
+                    fontFamily: MONO,
                   }}
                 >{`R${Number(row.system_cash_total).toLocaleString("en-ZA")}`}</td>
                 <td
                   style={{
                     padding: "9px 12px",
                     fontSize: 13,
-                    fontFamily: T.mono,
+                    fontFamily: MONO,
                     color: T.ink500,
                   }}
                 >{`R${Number(row.opening_float).toLocaleString("en-ZA")}`}</td>
@@ -1361,14 +1335,14 @@ function HistoryPanel({ loading, history }) {
                   style={{
                     padding: "9px 12px",
                     fontSize: 13,
-                    fontFamily: T.mono,
+                    fontFamily: MONO,
                   }}
                 >{`R${Number(row.counted_cash).toLocaleString("en-ZA")}`}</td>
                 <td
                   style={{
                     padding: "9px 12px",
                     fontSize: 13,
-                    fontFamily: T.mono,
+                    fontFamily: MONO,
                     fontWeight: 600,
                     color: Math.abs(v) <= 50 ? T.success : T.warning,
                   }}
