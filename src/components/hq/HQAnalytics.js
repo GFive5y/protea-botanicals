@@ -27,90 +27,30 @@ import InfoTooltip from "../InfoTooltip";
 import { ChartCard, ChartTooltip } from "../viz";
 import GeoAnalyticsDashboard from "./GeoAnalyticsDashboard";
 import { useTenant } from "../../services/tenantService";
+import { T } from "../../styles/tokens";
 
-// ── Design tokens ────────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
-  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
-  label: {
-    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-    fontSize: 11,
-    fontWeight: 600,
-    letterSpacing: "0.07em",
-    textTransform: "uppercase",
-  },
-  kpi: {
-    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-    fontSize: 24,
-    fontWeight: 400,
-    letterSpacing: "-0.02em",
-    fontVariantNumeric: "tabular-nums",
-  },
-  body: {
-    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-    fontSize: 13,
-    fontWeight: 400,
-  },
-  caption: {
-    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-    fontSize: 11,
-    fontWeight: 400,
-  },
-  data: {
-    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-    fontSize: 12,
-    fontWeight: 400,
-    fontVariantNumeric: "tabular-nums",
-  },
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
 // Legacy aliases
 const C = {
-  bg: T.ink050,
+  bg: T.surface,
   primaryDark: T.accent,
   primaryMid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
   text: T.ink900,
   muted: T.ink500,
-  border: T.ink150,
+  border: T.border,
   white: "#fff",
   red: T.danger,
-  lightRed: T.dangerBg,
+  lightRed: T.dangerLight,
   orange: T.warning,
-  lightOrange: T.warningBg,
+  lightOrange: T.warningLight,
   blue: T.info,
-  lightBlue: T.infoBg,
-  lightGreen: T.accentLit,
+  lightBlue: T.infoLight,
+  lightGreen: T.accentLight,
 };
-const F = { heading: T.fontUi, body: T.fontUi };
+const F = { heading: T.font, body: T.font };
 
 // ── Chart colour palette — Indigo Intelligence ──────────────────────────────
 const CHART = {
@@ -126,18 +66,18 @@ const CHART = {
 
 const sCard = {
   background: "#fff",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: "6px",
   padding: "20px",
-  boxShadow: T.shadow,
+  boxShadow: T.shadow.sm,
 };
 const sLabel = {
   fontSize: "10px",
   letterSpacing: "0.1em",
   textTransform: "uppercase",
-  color: T.ink400,
+  color: T.ink500,
   marginBottom: "6px",
-  fontFamily: T.fontUi,
+  fontFamily: T.font,
   fontWeight: 700,
 };
 const sTh = {
@@ -146,13 +86,13 @@ const sTh = {
   fontSize: "9px",
   letterSpacing: "0.15em",
   textTransform: "uppercase",
-  color: T.ink400,
-  borderBottom: `2px solid ${T.ink150}`,
+  color: T.ink500,
+  borderBottom: `2px solid ${T.border}`,
   fontWeight: 700,
 };
 const sTd = {
   padding: "10px 12px",
-  borderBottom: `1px solid ${T.ink075}`,
+  borderBottom: `1px solid ${T.bg}`,
   color: T.ink700,
   verticalAlign: "middle",
   fontSize: "12px",
@@ -449,7 +389,7 @@ export default function HQAnalytics() {
             textTransform: "uppercase",
             fontWeight: 600,
             cursor: "pointer",
-            fontFamily: T.fontUi,
+            fontFamily: T.font,
           }}
         >
           Retry
@@ -458,7 +398,7 @@ export default function HQAnalytics() {
     );
 
   return (
-    <div style={{ fontFamily: T.fontUi }}>
+    <div style={{ fontFamily: T.font }}>
       {/* WorkflowGuide — always first */}
       <WorkflowGuide
         context={ctx}
@@ -482,7 +422,7 @@ export default function HQAnalytics() {
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <h2
               style={{
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
                 fontSize: "22px",
                 fontWeight: 300,
                 color: T.ink900,
@@ -530,11 +470,11 @@ export default function HQAnalytics() {
             onClick={fetchAll}
             style={{
               background: "transparent",
-              border: `1px solid ${T.ink150}`,
+              border: `1px solid ${T.border}`,
               borderRadius: "4px",
               padding: "7px 14px",
               cursor: "pointer",
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
               fontSize: "10px",
               fontWeight: 600,
               letterSpacing: "0.1em",
@@ -553,7 +493,7 @@ export default function HQAnalytics() {
           style={{
             marginBottom: 16,
             padding: "12px 16px",
-            background: T.infoBg,
+            background: T.infoLight,
             border: `1px solid ${T.infoBd}`,
             borderRadius: 6,
           }}
@@ -584,7 +524,7 @@ export default function HQAnalytics() {
                 }}
               >
                 {ev.msg} ·{" "}
-                <span style={{ color: T.ink400 }}>
+                <span style={{ color: T.ink500 }}>
                   {ev.time.toLocaleTimeString("en-ZA", {
                     hour: "2-digit",
                     minute: "2-digit",
@@ -593,7 +533,7 @@ export default function HQAnalytics() {
               </div>
             ))}
             {liveEvents.length > 5 && (
-              <div style={{ fontSize: 12, color: T.ink400, padding: "4px 0" }}>
+              <div style={{ fontSize: 12, color: T.ink500, padding: "4px 0" }}>
                 +{liveEvents.length - 5} more
               </div>
             )}
@@ -606,7 +546,7 @@ export default function HQAnalytics() {
         style={{
           display: "flex",
           gap: 0,
-          borderBottom: `1px solid ${T.ink150}`,
+          borderBottom: `1px solid ${T.border}`,
           marginBottom: "24px",
         }}
       >
@@ -622,7 +562,7 @@ export default function HQAnalytics() {
                 subTab === t.id
                   ? `2px solid ${T.accent}`
                   : "2px solid transparent",
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
               fontSize: "11px",
               fontWeight: subTab === t.id ? 700 : 400,
               letterSpacing: "0.06em",
@@ -644,7 +584,7 @@ export default function HQAnalytics() {
             style={{
               width: 28,
               height: 28,
-              border: `2px solid ${T.ink150}`,
+              border: `2px solid ${T.border}`,
               borderTopColor: T.accent,
               borderRadius: "50%",
               animation: "spin 0.8s linear infinite",
@@ -701,7 +641,7 @@ export default function HQAnalytics() {
             borderRadius: 8,
             fontSize: 13,
             fontWeight: 600,
-            fontFamily: T.fontUi,
+            fontFamily: T.font,
             boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
           }}
         >
@@ -849,10 +789,10 @@ function OverviewAnalytics({ data, industryProfile }) {
     success: T.success,
   };
   const semBg = {
-    danger: T.dangerBg,
-    warning: T.warningBg,
-    info: T.infoBg,
-    success: T.successBg,
+    danger: T.dangerLight,
+    warning: T.warningLight,
+    info: T.infoLight,
+    success: T.successLight,
   };
   const semBd = {
     danger: T.dangerBd,
@@ -943,7 +883,7 @@ function OverviewAnalytics({ data, industryProfile }) {
                   border: `1px solid ${semBd[a.sem]}`,
                   fontSize: 12,
                   fontWeight: 600,
-                  fontFamily: T.fontUi,
+                  fontFamily: T.font,
                 }}
               >
                 {a.msg}
@@ -959,11 +899,11 @@ function OverviewAnalytics({ data, industryProfile }) {
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: 6,
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
-          boxShadow: T.shadow,
+          border: `1px solid ${T.border}`,
+          boxShadow: T.shadow.sm,
         }}
       >
         <KPI
@@ -999,11 +939,11 @@ function OverviewAnalytics({ data, industryProfile }) {
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: 6,
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
-          boxShadow: T.shadow,
+          border: `1px solid ${T.border}`,
+          boxShadow: T.shadow.sm,
         }}
       >
         <KPI
@@ -1042,11 +982,11 @@ function OverviewAnalytics({ data, industryProfile }) {
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: 6,
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
-          boxShadow: T.shadow,
+          border: `1px solid ${T.border}`,
+          boxShadow: T.shadow.sm,
         }}
       >
         <KPI label="Total Scans" value={scans.length} semantic="info" />
@@ -1552,7 +1492,7 @@ function OverviewAnalytics({ data, industryProfile }) {
               borderCollapse: "collapse",
               marginTop: 12,
               fontSize: 12,
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
             }}
           >
             <thead>
@@ -1582,8 +1522,8 @@ function OverviewAnalytics({ data, industryProfile }) {
                         background:
                           m.movement_type?.includes("out") ||
                           m.movement_type?.includes("Out")
-                            ? T.dangerBg
-                            : T.successBg,
+                            ? T.dangerLight
+                            : T.successLight,
                         color:
                           m.movement_type?.includes("out") ||
                           m.movement_type?.includes("Out")
@@ -1600,7 +1540,7 @@ function OverviewAnalytics({ data, industryProfile }) {
                   <td
                     style={{
                       ...sTd,
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       fontWeight: 600,
                       color: m.quantity < 0 ? T.danger : T.success,
                     }}
@@ -1611,7 +1551,7 @@ function OverviewAnalytics({ data, industryProfile }) {
                   <td
                     style={{
                       ...sTd,
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       fontSize: 11,
                       color: T.ink500,
                     }}
@@ -1703,8 +1643,8 @@ function SupplyChainAnalytics({ data, industryProfile }) {
                 key={cat}
                 style={{
                   padding: 14,
-                  background: T.ink075,
-                  border: `1px solid ${T.ink150}`,
+                  background: T.bg,
+                  border: `1px solid ${T.border}`,
                   borderRadius: 6,
                   borderLeft: `3px solid ${CATEGORY_COLORS[cat] || T.ink500}`,
                 }}
@@ -1716,7 +1656,7 @@ function SupplyChainAnalytics({ data, industryProfile }) {
                     textTransform: "uppercase",
                     color: CATEGORY_COLORS[cat] || T.ink500,
                     marginBottom: 4,
-                    fontFamily: T.fontUi,
+                    fontFamily: T.font,
                     fontWeight: 700,
                   }}
                 >
@@ -1724,7 +1664,7 @@ function SupplyChainAnalytics({ data, industryProfile }) {
                 </div>
                 <div
                   style={{
-                    fontFamily: T.fontData,
+                    fontFamily: T.font,
                     fontSize: 20,
                     fontWeight: 400,
                     color: T.ink900,
@@ -1737,7 +1677,7 @@ function SupplyChainAnalytics({ data, industryProfile }) {
                     fontSize: 11,
                     color: T.ink500,
                     marginTop: 4,
-                    fontFamily: T.fontUi,
+                    fontFamily: T.font,
                   }}
                 >
                   Value: R{d.value.toLocaleString()} · Margin: {margin}%
@@ -1843,7 +1783,7 @@ function SupplyChainAnalytics({ data, industryProfile }) {
                     justifyContent: "space-between",
                     alignItems: "center",
                     padding: "6px 0",
-                    borderBottom: `1px solid ${T.ink075}`,
+                    borderBottom: `1px solid ${T.bg}`,
                   }}
                 >
                   <span
@@ -1853,14 +1793,14 @@ function SupplyChainAnalytics({ data, industryProfile }) {
                       letterSpacing: "0.1em",
                       color: poStatusColors[status] || T.ink500,
                       fontWeight: 700,
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                     }}
                   >
                     {status}
                   </span>
                   <span
                     style={{
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       fontSize: 18,
                       fontWeight: 400,
                       color: poStatusColors[status] || T.ink500,
@@ -1881,7 +1821,7 @@ function SupplyChainAnalytics({ data, industryProfile }) {
                 fontSize: 13,
                 color: T.ink500,
                 marginTop: 12,
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
               }}
             >
               No received POs yet
@@ -1896,21 +1836,21 @@ function SupplyChainAnalytics({ data, industryProfile }) {
                     justifyContent: "space-between",
                     alignItems: "center",
                     padding: "6px 0",
-                    borderBottom: `1px solid ${T.ink075}`,
+                    borderBottom: `1px solid ${T.bg}`,
                   }}
                 >
                   <span
                     style={{
                       fontSize: 12,
                       fontWeight: 500,
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                     }}
                   >
                     {s.name}
                   </span>
                   <span
                     style={{
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       fontSize: 16,
                       fontWeight: 400,
                       color: T.accent,
@@ -1931,7 +1871,7 @@ function SupplyChainAnalytics({ data, industryProfile }) {
             borderCollapse: "collapse",
             marginTop: 12,
             fontSize: 12,
-            fontFamily: T.fontUi,
+            fontFamily: T.font,
           }}
         >
           <thead>
@@ -1964,7 +1904,7 @@ function SupplyChainAnalytics({ data, industryProfile }) {
                 <td
                   style={{
                     ...sTd,
-                    fontFamily: T.fontData,
+                    fontFamily: T.font,
                     fontSize: 11,
                     color: T.ink500,
                   }}
@@ -1977,7 +1917,7 @@ function SupplyChainAnalytics({ data, industryProfile }) {
                       fontSize: 9,
                       padding: "2px 6px",
                       borderRadius: 3,
-                      background: T.ink075,
+                      background: T.bg,
                       color: CATEGORY_COLORS[i.category] || T.ink500,
                       textTransform: "uppercase",
                       letterSpacing: "0.1em",
@@ -1988,12 +1928,12 @@ function SupplyChainAnalytics({ data, industryProfile }) {
                   </span>
                 </td>
                 <td
-                  style={{ ...sTd, textAlign: "right", fontFamily: T.fontData }}
+                  style={{ ...sTd, textAlign: "right", fontFamily: T.font }}
                 >
                   {i.quantity_on_hand} {i.unit}
                 </td>
                 <td
-                  style={{ ...sTd, textAlign: "right", fontFamily: T.fontData }}
+                  style={{ ...sTd, textAlign: "right", fontFamily: T.font }}
                 >
                   R{(i.sell_price || 0).toFixed(2)}
                 </td>
@@ -2001,7 +1941,7 @@ function SupplyChainAnalytics({ data, industryProfile }) {
                   style={{
                     ...sTd,
                     textAlign: "right",
-                    fontFamily: T.fontData,
+                    fontFamily: T.font,
                     fontWeight: 600,
                     color: T.accent,
                   }}
@@ -2060,11 +2000,11 @@ function ProductionAnalytics({ data, industryProfile }) {
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: 6,
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
-          boxShadow: T.shadow,
+          border: `1px solid ${T.border}`,
+          boxShadow: T.shadow.sm,
         }}
       >
         <KPI label="Total Runs" value={runs.length} semantic={null} />
@@ -2113,7 +2053,7 @@ function ProductionAnalytics({ data, industryProfile }) {
               borderCollapse: "collapse",
               marginTop: 12,
               fontSize: 12,
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
             }}
           >
             <thead>
@@ -2155,7 +2095,7 @@ function ProductionAnalytics({ data, industryProfile }) {
                       <td
                         style={{
                           ...sTd,
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                           fontWeight: 600,
                           fontSize: 11,
                         }}
@@ -2167,7 +2107,7 @@ function ProductionAnalytics({ data, industryProfile }) {
                           ...sTd,
                           fontSize: 11,
                           color: T.ink500,
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                         }}
                       >
                         {r.batchName}
@@ -2195,7 +2135,7 @@ function ProductionAnalytics({ data, industryProfile }) {
                         style={{
                           ...sTd,
                           textAlign: "right",
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                         }}
                       >
                         {r.planned_units ?? "—"}
@@ -2204,7 +2144,7 @@ function ProductionAnalytics({ data, industryProfile }) {
                         style={{
                           ...sTd,
                           textAlign: "right",
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                           fontWeight: 600,
                           color: T.success,
                         }}
@@ -2215,7 +2155,7 @@ function ProductionAnalytics({ data, industryProfile }) {
                         style={{
                           ...sTd,
                           textAlign: "right",
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                         }}
                       >
                         {yld !== "—" ? `${yld}%` : "—"}
@@ -2310,13 +2250,13 @@ function DistributionAnalytics({ data }) {
         <div
           style={{
             padding: "12px 16px",
-            background: T.dangerBg,
+            background: T.dangerLight,
             border: `1px solid ${T.dangerBd}`,
             borderRadius: 6,
             fontSize: 13,
             color: T.danger,
             fontWeight: 600,
-            fontFamily: T.fontUi,
+            fontFamily: T.font,
           }}
         >
           {overdue.length} shipment{overdue.length > 1 ? "s" : ""} overdue:{" "}
@@ -2328,11 +2268,11 @@ function DistributionAnalytics({ data }) {
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: 6,
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
-          boxShadow: T.shadow,
+          border: `1px solid ${T.border}`,
+          boxShadow: T.shadow.sm,
         }}
       >
         <KPI label="Total Shipments" value={shipments.length} semantic={null} />
@@ -2372,7 +2312,7 @@ function DistributionAnalytics({ data }) {
               borderCollapse: "collapse",
               marginTop: 12,
               fontSize: 12,
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
             }}
           >
             <thead>
@@ -2399,7 +2339,7 @@ function DistributionAnalytics({ data }) {
                     style={{
                       ...sTd,
                       textAlign: "right",
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                     }}
                   >
                     {d.count}
@@ -2408,7 +2348,7 @@ function DistributionAnalytics({ data }) {
                     style={{
                       ...sTd,
                       textAlign: "right",
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       fontWeight: 600,
                     }}
                   >
@@ -2418,7 +2358,7 @@ function DistributionAnalytics({ data }) {
                     style={{
                       ...sTd,
                       textAlign: "right",
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       color: T.accent,
                       fontWeight: 600,
                     }}
@@ -2504,7 +2444,7 @@ function ScansAnalytics({ data, industryProfile }) {
     o === "points_awarded"
       ? T.success
       : o === "already_claimed"
-        ? T.ink400
+        ? T.ink500
         : T.warning;
 
   // ── CHART #14: Conversion Funnel — scan → points awarded → orders ──
@@ -2554,8 +2494,8 @@ function ScansAnalytics({ data, industryProfile }) {
                       style={{
                         textAlign: "center",
                         fontSize: 10,
-                        color: T.ink400,
-                        fontFamily: T.fontUi,
+                        color: T.ink500,
+                        fontFamily: T.font,
                         fontWeight: 600,
                         letterSpacing: "0.06em",
                         marginBottom: 4,
@@ -2571,7 +2511,7 @@ function ScansAnalytics({ data, industryProfile }) {
                       style={{
                         fontSize: 11,
                         fontWeight: 600,
-                        fontFamily: T.fontUi,
+                        fontFamily: T.font,
                         color: T.ink500,
                         width: 110,
                         flexShrink: 0,
@@ -2583,7 +2523,7 @@ function ScansAnalytics({ data, industryProfile }) {
                       <div
                         style={{
                           height: 32,
-                          background: T.ink075,
+                          background: T.bg,
                           borderRadius: 4,
                           overflow: "hidden",
                         }}
@@ -2607,7 +2547,7 @@ function ScansAnalytics({ data, industryProfile }) {
                                 fontSize: 11,
                                 fontWeight: 700,
                                 color: "#fff",
-                                fontFamily: T.fontUi,
+                                fontFamily: T.font,
                                 fontVariantNumeric: "tabular-nums",
                               }}
                             >
@@ -2622,7 +2562,7 @@ function ScansAnalytics({ data, industryProfile }) {
                         fontSize: 13,
                         fontWeight: 600,
                         color: stage.color,
-                        fontFamily: T.fontUi,
+                        fontFamily: T.font,
                         fontVariantNumeric: "tabular-nums",
                         minWidth: 60,
                         textAlign: "right",
@@ -2632,7 +2572,7 @@ function ScansAnalytics({ data, industryProfile }) {
                       <span
                         style={{
                           fontSize: 10,
-                          color: T.ink400,
+                          color: T.ink500,
                           fontWeight: 400,
                           marginLeft: 4,
                         }}
@@ -2829,11 +2769,11 @@ function ScansAnalytics({ data, industryProfile }) {
           display: "grid",
           gridTemplateColumns: "repeat(5,1fr)",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: 6,
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
-          boxShadow: T.shadow,
+          border: `1px solid ${T.border}`,
+          boxShadow: T.shadow.sm,
         }}
       >
         {periods.map((p) => (
@@ -2855,7 +2795,7 @@ function ScansAnalytics({ data, industryProfile }) {
                 fontSize: 13,
                 color: T.ink500,
                 marginTop: 12,
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
               }}
             >
               No scan data yet
@@ -2882,7 +2822,7 @@ function ScansAnalytics({ data, industryProfile }) {
                           fontWeight: 700,
                           textTransform: "uppercase",
                           letterSpacing: "0.1em",
-                          fontFamily: T.fontUi,
+                          fontFamily: T.font,
                         }}
                       >
                         {s.qrType}
@@ -2891,7 +2831,7 @@ function ScansAnalytics({ data, industryProfile }) {
                         style={{
                           fontSize: 11,
                           color: T.ink500,
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                         }}
                       >
                         {s.count} ({pct}%)
@@ -2900,7 +2840,7 @@ function ScansAnalytics({ data, industryProfile }) {
                     <div
                       style={{
                         height: 4,
-                        background: T.ink150,
+                        background: T.border,
                         borderRadius: 2,
                       }}
                     >
@@ -2927,7 +2867,7 @@ function ScansAnalytics({ data, industryProfile }) {
                 fontSize: 13,
                 color: T.ink500,
                 marginTop: 12,
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
               }}
             >
               No scan data yet
@@ -2942,7 +2882,7 @@ function ScansAnalytics({ data, industryProfile }) {
                     justifyContent: "space-between",
                     alignItems: "center",
                     padding: "6px 0",
-                    borderBottom: `1px solid ${T.ink075}`,
+                    borderBottom: `1px solid ${T.bg}`,
                   }}
                 >
                   <div
@@ -2951,10 +2891,10 @@ function ScansAnalytics({ data, industryProfile }) {
                     <span
                       style={{
                         fontSize: 10,
-                        color: T.ink400,
+                        color: T.ink500,
                         fontWeight: 700,
                         minWidth: 20,
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                       }}
                     >
                       #{i + 1}
@@ -2962,7 +2902,7 @@ function ScansAnalytics({ data, industryProfile }) {
                     <span
                       style={{
                         fontSize: 11,
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         color: T.ink500,
                       }}
                     >
@@ -2971,7 +2911,7 @@ function ScansAnalytics({ data, industryProfile }) {
                   </div>
                   <span
                     style={{
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       fontSize: 16,
                       fontWeight: 400,
                       color: T.ink900,
@@ -2995,7 +2935,7 @@ function ScansAnalytics({ data, industryProfile }) {
                 fontSize: 13,
                 color: T.ink500,
                 marginTop: 12,
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
               }}
             >
               No geo data yet
@@ -3021,7 +2961,7 @@ function ScansAnalytics({ data, industryProfile }) {
                           fontSize: 12,
                           color: T.ink900,
                           fontWeight: 500,
-                          fontFamily: T.fontUi,
+                          fontFamily: T.font,
                         }}
                       >
                         {row.province}
@@ -3030,7 +2970,7 @@ function ScansAnalytics({ data, industryProfile }) {
                         style={{
                           fontSize: 11,
                           color: T.ink500,
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                         }}
                       >
                         {row.count} · {pct}%
@@ -3039,7 +2979,7 @@ function ScansAnalytics({ data, industryProfile }) {
                     <div
                       style={{
                         height: 4,
-                        background: T.ink150,
+                        background: T.border,
                         borderRadius: 2,
                       }}
                     >
@@ -3066,7 +3006,7 @@ function ScansAnalytics({ data, industryProfile }) {
                 fontSize: 13,
                 color: T.ink500,
                 marginTop: 12,
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
               }}
             >
               No data yet
@@ -3095,7 +3035,7 @@ function ScansAnalytics({ data, industryProfile }) {
                           textTransform: "uppercase",
                           letterSpacing: "0.1em",
                           color,
-                          fontFamily: T.fontUi,
+                          fontFamily: T.font,
                         }}
                       >
                         {row.outcome.replace(/_/g, " ")}
@@ -3104,7 +3044,7 @@ function ScansAnalytics({ data, industryProfile }) {
                         style={{
                           fontSize: 11,
                           color: T.ink500,
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                         }}
                       >
                         {row.count} · {pct}%
@@ -3113,7 +3053,7 @@ function ScansAnalytics({ data, industryProfile }) {
                     <div
                       style={{
                         height: 4,
-                        background: T.ink150,
+                        background: T.border,
                         borderRadius: 2,
                       }}
                     >
@@ -3139,11 +3079,11 @@ function ScansAnalytics({ data, industryProfile }) {
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: 6,
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
-          boxShadow: T.shadow,
+          border: `1px solid ${T.border}`,
+          boxShadow: T.shadow.sm,
         }}
       >
         <KPI label="Customers" value={customers} semantic={null} />
@@ -3207,14 +3147,14 @@ function KPI({ label, value, semantic, sub }) {
           textTransform: "uppercase",
           color: "#6B7280",
           marginBottom: 8,
-          fontFamily: T.fontUi,
+          fontFamily: T.font,
         }}
       >
         {label}
       </div>
       <div
         style={{
-          fontFamily: T.fontData,
+          fontFamily: T.font,
           fontSize: "22px",
           fontWeight: 600,
           color,
@@ -3231,7 +3171,7 @@ function KPI({ label, value, semantic, sub }) {
             color: "#9CA3AF",
             fontSize: 10,
             marginTop: 3,
-            fontFamily: T.fontUi,
+            fontFamily: T.font,
           }}
         >
           {sub}
@@ -3245,8 +3185,8 @@ function PipelineCard({ stage, items, color }) {
   return (
     <div
       style={{
-        background: T.ink075,
-        border: `1px solid ${T.ink150}`,
+        background: T.bg,
+        border: `1px solid ${T.border}`,
         borderLeft: `3px solid ${color}`,
         borderRadius: 6,
         padding: 14,
@@ -3261,7 +3201,7 @@ function PipelineCard({ stage, items, color }) {
           textTransform: "uppercase",
           color,
           marginBottom: 8,
-          fontFamily: T.fontUi,
+          fontFamily: T.font,
         }}
       >
         {stage}
@@ -3273,12 +3213,12 @@ function PipelineCard({ stage, items, color }) {
             fontSize: 11,
             color: T.ink500,
             marginBottom: 4,
-            fontFamily: T.fontUi,
+            fontFamily: T.font,
           }}
         >
           {item.label}:{" "}
           <span
-            style={{ fontFamily: T.fontData, fontWeight: 600, color: T.ink900 }}
+            style={{ fontFamily: T.font, fontWeight: 600, color: T.ink900 }}
           >
             {item.value}
           </span>
