@@ -20,45 +20,17 @@ import {
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
 import { ChartCard, ChartTooltip } from "../viz";
+import { T } from "../../styles/tokens";
 
-// ── Design tokens (matches HQCogs/HQPricing) ──────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
 const sCard = {
   background: "#fff",
   borderRadius: 8,
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   padding: 24,
   marginBottom: 20,
-  boxShadow: T.shadow,
+  boxShadow: T.shadow.sm,
 };
 
 const mkBtn = (variant = "primary", extra = {}) => {
@@ -81,7 +53,7 @@ const mkBtn = (variant = "primary", extra = {}) => {
       border: `1px solid ${T.accentBd}`,
     },
     small: {
-      background: T.ink075,
+      background: T.bg,
       color: T.ink700,
       padding: "5px 12px",
       fontSize: 12,
@@ -172,9 +144,9 @@ function BSRow({
         justifyContent: "space-between",
         alignItems: "center",
         padding: `${bold || total ? 12 : 9}px ${16 + indent * 24}px`,
-        borderTop: borderTop ? `2px solid ${T.ink150}` : undefined,
-        borderBottom: total ? `2px solid ${T.ink150}` : undefined,
-        background: total ? T.ink075 : "transparent",
+        borderTop: borderTop ? `2px solid ${T.border}` : undefined,
+        borderBottom: total ? `2px solid ${T.border}` : undefined,
+        background: total ? T.bg : "transparent",
       }}
     >
       <div>
@@ -192,7 +164,7 @@ function BSRow({
           <div
             style={{
               fontSize: 11,
-              color: T.ink400,
+              color: T.ink500,
               marginTop: 2,
               fontFamily: T.font,
             }}
@@ -203,7 +175,7 @@ function BSRow({
       </div>
       <div
         style={{
-          fontFamily: T.fontData,
+          fontFamily: T.font,
           fontSize: bold || total ? 16 : 14,
           fontWeight: bold || total ? 700 : 400,
           color: colour,
@@ -246,10 +218,10 @@ function KPI({ label, value, sub, color }) {
     <div
       style={{
         background: "#fff",
-        border: `1px solid ${T.ink150}`,
+        border: `1px solid ${T.border}`,
         borderRadius: 8,
         padding: "18px 20px",
-        boxShadow: T.shadow,
+        boxShadow: T.shadow.sm,
         flex: 1,
         minWidth: 160,
       }}
@@ -258,7 +230,7 @@ function KPI({ label, value, sub, color }) {
         style={{
           fontSize: 10,
           fontWeight: 700,
-          color: T.ink400,
+          color: T.ink500,
           textTransform: "uppercase",
           letterSpacing: "0.08em",
           marginBottom: 8,
@@ -269,7 +241,7 @@ function KPI({ label, value, sub, color }) {
       </div>
       <div
         style={{
-          fontFamily: T.fontData,
+          fontFamily: T.font,
           fontSize: 26,
           fontWeight: 400,
           color: color || T.accent,
@@ -282,7 +254,7 @@ function KPI({ label, value, sub, color }) {
         <div
           style={{
             fontSize: 11,
-            color: T.ink400,
+            color: T.ink500,
             marginTop: 6,
             fontFamily: T.font,
           }}
@@ -806,7 +778,7 @@ export default function HQBalanceSheet() {
       <div
         style={{
           display: "flex",
-          borderBottom: `1px solid ${T.ink150}`,
+          borderBottom: `1px solid ${T.border}`,
           marginBottom: 28,
         }}
       >
@@ -843,7 +815,7 @@ export default function HQBalanceSheet() {
       {activeTab === "balance" && (
         <>
           {loading ? (
-            <div style={{ textAlign: "center", padding: 60, color: T.ink400 }}>
+            <div style={{ textAlign: "center", padding: 60, color: T.ink500 }}>
               Loading balance sheet…
             </div>
           ) : (
@@ -860,7 +832,7 @@ export default function HQBalanceSheet() {
               >
                 <div
                   style={{
-                    background: T.accentLit,
+                    background: T.accentLight,
                     border: `1px solid ${T.accentBd}`,
                     borderRadius: 4,
                     padding: "8px 14px",
@@ -874,7 +846,7 @@ export default function HQBalanceSheet() {
                 </div>
                 <div
                   style={{
-                    background: balanced ? T.successBg : T.dangerBg,
+                    background: balanced ? T.successLight : T.dangerLight,
                     border: `1px solid ${balanced ? T.successBd : T.dangerBd}`,
                     borderRadius: 4,
                     padding: "8px 14px",
@@ -909,7 +881,7 @@ export default function HQBalanceSheet() {
                   label="Total Liabilities"
                   value={fmtZar(totalLiabilities)}
                   sub={`${payablesCount} open PO${payablesCount !== 1 ? "s" : ""}`}
-                  color={totalLiabilities > 0 ? T.danger : T.ink400}
+                  color={totalLiabilities > 0 ? T.danger : T.ink500}
                 />
                 <KPI
                   label="Net Equity"
@@ -973,9 +945,9 @@ export default function HQBalanceSheet() {
                         margin={{ top: 8, right: 16, bottom: 8, left: 0 }}
                         barCategoryGap="40%"
                       >
-                        <CartesianGrid horizontal vertical={false} stroke={T.ink150} strokeWidth={0.5} />
-                        <XAxis dataKey="name" tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }} axisLine={false} tickLine={false} />
-                        <YAxis tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }} axisLine={false} tickLine={false} width={62} tickFormatter={(v) => `R${(v/1000).toFixed(0)}k`} />
+                        <CartesianGrid horizontal vertical={false} stroke={T.border} strokeWidth={0.5} />
+                        <XAxis dataKey="name" tick={{ fill: T.ink500, fontSize: 10, fontFamily: T.font }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fill: T.ink500, fontSize: 10, fontFamily: T.font }} axisLine={false} tickLine={false} width={62} tickFormatter={(v) => `R${(v/1000).toFixed(0)}k`} />
                         <Tooltip content={<ChartTooltip formatter={(v) => `R${v.toLocaleString("en-ZA")}`} />} />
                         <Legend iconSize={8} iconType="square" formatter={(v) => <span style={{ fontSize: 11, color: T.ink500, fontFamily: T.font }}>{v}</span>} />
                         <Bar dataKey="Assets" fill="#1A3D2B" radius={[4,4,0,0]} maxBarSize={48} isAnimationActive={true} animationDuration={700} />
@@ -1038,9 +1010,9 @@ export default function HQBalanceSheet() {
                       <div style={{
                         display:"grid", gridTemplateColumns:"1fr 90px 90px 90px",
                         padding:"6px 16px 6px 40px",
-                        fontSize:10, fontWeight:700, color:T.ink400,
+                        fontSize:10, fontWeight:700, color:T.ink500,
                         letterSpacing:"0.07em", textTransform:"uppercase",
-                        borderBottom:`1px solid ${T.ink150}`, fontFamily:T.font,
+                        borderBottom:`1px solid ${T.border}`, fontFamily:T.font,
                       }}>
                         <span>Asset</span>
                         <span style={{ textAlign:"right" }}>Cost</span>
@@ -1060,7 +1032,7 @@ export default function HQBalanceSheet() {
                           }}>
                             <div>
                               <div style={{ fontSize:13, color:T.ink700 }}>{asset.asset_name}</div>
-                              <div style={{ fontSize:11, color:T.ink400, marginTop:2 }}>
+                              <div style={{ fontSize:11, color:T.ink500, marginTop:2 }}>
                                 {asset.asset_category}{asset.purchase_date ? ` \u00b7 ${fmtDate(asset.purchase_date)}` : ""}
                               </div>
                             </div>
@@ -1074,8 +1046,8 @@ export default function HQBalanceSheet() {
                         <div style={{
                           display:"grid", gridTemplateColumns:"1fr 90px 90px 90px",
                           padding:"10px 16px 10px 40px",
-                          borderTop:`1px solid ${T.ink150}`,
-                          background:T.ink075, fontFamily:T.font,
+                          borderTop:`1px solid ${T.border}`,
+                          background:T.bg, fontFamily:T.font,
                         }}>
                           <div style={{ fontSize:13, fontWeight:700, color:T.ink700 }}>PPE Totals</div>
                           <div style={{ fontSize:13, fontWeight:600, color:T.ink500, textAlign:"right", fontVariantNumeric:"tabular-nums" }}>{fmtZar(totalFARCost)}</div>
@@ -1195,7 +1167,7 @@ export default function HQBalanceSheet() {
                     <div
                       style={{
                         padding: "10px 16px",
-                        background: balanced2 ? T.successBg : T.dangerBg,
+                        background: balanced2 ? T.successLight : T.dangerLight,
                         fontSize: 12,
                         color: balanced2 ? T.success : T.danger,
                         fontWeight: 600,
@@ -1215,12 +1187,12 @@ export default function HQBalanceSheet() {
               <div
                 style={{
                   marginTop: 8,
-                  background: T.ink075,
+                  background: T.bg,
                   borderRadius: 6,
                   padding: "14px 18px",
                   fontSize: 12,
                   color: T.ink500,
-                  border: `1px solid ${T.ink150}`,
+                  border: `1px solid ${T.border}`,
                   lineHeight: 1.7,
                   fontFamily: T.font,
                 }}
@@ -1259,7 +1231,7 @@ export default function HQBalanceSheet() {
               style={{
                 fontSize: 11,
                 fontWeight: 700,
-                color: T.ink400,
+                color: T.ink500,
                 textTransform: "uppercase",
                 letterSpacing: "0.08em",
                 fontFamily: T.font,
@@ -1291,21 +1263,21 @@ export default function HQBalanceSheet() {
                   onChange={(e) => setCfCustomFrom(e.target.value)}
                   style={{
                     padding: "7px 10px",
-                    border: `1px solid ${T.ink150}`,
+                    border: `1px solid ${T.border}`,
                     borderRadius: 4,
                     fontFamily: T.font,
                     fontSize: 13,
                     color: T.ink900,
                   }}
                 />
-                <span style={{ color: T.ink400, fontSize: 12 }}>to</span>
+                <span style={{ color: T.ink500, fontSize: 12 }}>to</span>
                 <input
                   type="date"
                   value={cfCustomTo}
                   onChange={(e) => setCfCustomTo(e.target.value)}
                   style={{
                     padding: "7px 10px",
-                    border: `1px solid ${T.ink150}`,
+                    border: `1px solid ${T.border}`,
                     borderRadius: 4,
                     fontFamily: T.font,
                     fontSize: 13,
@@ -1317,7 +1289,7 @@ export default function HQBalanceSheet() {
           </div>
 
           {!cfData ? (
-            <div style={{ textAlign: "center", padding: 60, color: T.ink400 }}>
+            <div style={{ textAlign: "center", padding: 60, color: T.ink500 }}>
               Loading cash flow…
             </div>
           ) : (
@@ -1367,11 +1339,11 @@ export default function HQBalanceSheet() {
                         ]}
                         margin={{ top: 8, right: 16, bottom: 8, left: 0 }}
                       >
-                        <CartesianGrid horizontal vertical={false} stroke={T.ink150} strokeWidth={0.5} />
-                        <XAxis dataKey="label" tick={{ fill: T.ink400, fontSize: 11, fontFamily: T.font }} axisLine={false} tickLine={false} dy={6} />
-                        <YAxis tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }} axisLine={false} tickLine={false} width={62} tickFormatter={(v) => `R${(v/1000).toFixed(0)}k`} />
+                        <CartesianGrid horizontal vertical={false} stroke={T.border} strokeWidth={0.5} />
+                        <XAxis dataKey="label" tick={{ fill: T.ink500, fontSize: 11, fontFamily: T.font }} axisLine={false} tickLine={false} dy={6} />
+                        <YAxis tick={{ fill: T.ink500, fontSize: 10, fontFamily: T.font }} axisLine={false} tickLine={false} width={62} tickFormatter={(v) => `R${(v/1000).toFixed(0)}k`} />
                         <Tooltip content={<ChartTooltip formatter={(v, n) => n === "display" ? `R${v.toLocaleString("en-ZA")}` : null} labelFormatter={(l) => l} />} />
-                        <ReferenceLine y={0} stroke={T.ink150} strokeWidth={1} />
+                        <ReferenceLine y={0} stroke={T.border} strokeWidth={1} />
                         <Bar dataKey="offset" stackId="cf" fill="transparent" isAnimationActive={false} />
                         <Bar dataKey="display" stackId="cf" isAnimationActive={true} animationDuration={700} maxBarSize={56}
                           shape={(props) => {
@@ -1492,7 +1464,7 @@ export default function HQBalanceSheet() {
                       style={{
                         padding: "10px 16px",
                         background:
-                          cfData.netCash >= 0 ? T.successBg : T.dangerBg,
+                          cfData.netCash >= 0 ? T.successLight : T.dangerLight,
                         fontSize: 12,
                         color: cfData.netCash >= 0 ? T.success : T.danger,
                         fontWeight: 600,
@@ -1512,12 +1484,12 @@ export default function HQBalanceSheet() {
               <div
                 style={{
                   marginTop: 8,
-                  background: T.ink075,
+                  background: T.bg,
                   borderRadius: 6,
                   padding: "14px 18px",
                   fontSize: 12,
                   color: T.ink500,
-                  border: `1px solid ${T.ink150}`,
+                  border: `1px solid ${T.border}`,
                   lineHeight: 1.7,
                   fontFamily: T.font,
                 }}
