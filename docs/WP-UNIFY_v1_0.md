@@ -709,13 +709,25 @@ that doesn't feel like it was designed in the same room on the same day.
 | HQTransfer.js | COMPLETE (no-op) | — | 13 Apr 2026 |
 | EODCashUp.js | COMPLETE | 35b3b55 | 13 Apr 2026 |
 | POSScreen.js | COMPLETE (T→POS_T) | 35b3b55 | 13 Apr 2026 |
+| HQSuppliers.js | COMPLETE | 5ba14e6 | 13 Apr 2026 |
+| HQPurchaseOrders.js | COMPLETE | 5ba14e6 | 13 Apr 2026 |
+| ShopManager.js | COMPLETE | 35b3b55 | 13 Apr 2026 |
 | **P3: Protected + large + F&B** | | | |
 | HQCogs.js (PROTECTED) | NOT STARTED | — | — |
 | HQProduction.js (307KB) | NOT STARTED | — | — |
 | SmartInventory.js (180KB) | NOT STARTED | — | — |
-| + 18 more P3 files | NOT STARTED | — | — |
+| + remaining P3 F&B files | NOT STARTED | — | — |
 | **P4: HR Suite + Admin + Staff** | | | |
-| 14 HR modules + 4 Admin + 1 Staff | NOT STARTED | — | — |
+| AdminBatchManager.js | COMPLETE | 3f650bc | 13 Apr 2026 |
+| AdminCommsCenter.js | COMPLETE | 3f650bc | 13 Apr 2026 |
+| AdminCustomerEngagement.js | COMPLETE | 5ba14e6 | 13 Apr 2026 |
+| AdminFraudSecurity.js | COMPLETE | 5ba14e6 | 13 Apr 2026 |
+| AdminHRPanel.js | COMPLETE | 3f650bc | 13 Apr 2026 |
+| AdminNotifications.js | COMPLETE | 3f650bc | 13 Apr 2026 |
+| AdminProductionModule.js | COMPLETE | 5ba14e6 | 13 Apr 2026 |
+| AdminQRCodes.js | COMPLETE | 5ba14e6 | 13 Apr 2026 |
+| AdminShipments.js | COMPLETE | 5ba14e6 | 13 Apr 2026 |
+| 14 HR modules + 1 Staff | NOT STARTED | — | — |
 | **P5: Consumer pages** | | | |
 | Shop.js + Loyalty.js + Account.js + CheckoutPage.js | NOT STARTED | — | — |
 
