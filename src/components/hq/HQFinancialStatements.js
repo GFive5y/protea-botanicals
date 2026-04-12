@@ -15,18 +15,11 @@ import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
 import HQFinancialSetup from "./HQFinancialSetup";
 import { sendStatementEmail } from "../../services/emailService";
+import { T } from "../../styles/tokens";
 
-// ── Design tokens ─────────────────────────────────────────────────────────────
-const C = {
-  accent: "#1A3D2B", accentMid: "#2D6A4F", accentLit: "#E8F5EE", accentBd: "#A7D9B8",
-  success: "#166534", successBg: "#F0FDF4", successBd: "#BBF7D0",
-  danger: "#991B1B", dangerBg: "#FEF2F2", dangerBd: "#FECACA",
-  warning: "#92400E", warningBg: "#FFFBEB", warningBd: "#FDE68A",
-  info: "#1E3A5F", infoBg: "#EFF6FF", infoBd: "#BFDBFE",
-  ink900: "#0D0D0D", ink700: "#2C2C2C", ink500: "#5A5A5A", ink400: "#474747",
-  ink300: "#999999", ink150: "#E2E2E2", ink075: "#F4F4F3",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
+// C is a pure alias for T — no shadow or local overrides required
+const C = T;
 
 const fmtZar = (n) => `R${(parseFloat(n) || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtDate = (d) => new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" });
@@ -56,15 +49,15 @@ function SRow({ label, current, prior = null, indent = 0, bold = false, total = 
   const fmt = (v) => { if (v === null || v === undefined) return "\u2014"; if (negative && v > 0) return `(${fmtZar(Math.abs(v))})`; return fmtZar(v); };
   const col = total ? (current >= 0 ? C.accent : C.danger) : C.ink700;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px", padding: `${bold || total ? 11 : 8}px ${16 + indent * 20}px`, borderBottom: total ? `2px solid ${C.ink150}` : `1px solid #F8FAFC`, background: shade || total ? C.ink075 : "transparent", alignItems: "center" }}>
-      <div><div style={{ fontSize: bold || total ? 14 : 13, fontWeight: bold || total ? 700 : 400, color: C.ink700, fontFamily: C.font }}>{label}</div>{sub && <div style={{ fontSize: 11, color: C.ink400, marginTop: 2, fontFamily: C.font }}>{sub}</div>}</div>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px", padding: `${bold || total ? 11 : 8}px ${16 + indent * 20}px`, borderBottom: total ? `2px solid ${C.border}` : `1px solid #F8FAFC`, background: shade || total ? C.bg : "transparent", alignItems: "center" }}>
+      <div><div style={{ fontSize: bold || total ? 14 : 13, fontWeight: bold || total ? 700 : 400, color: C.ink700, fontFamily: C.font }}>{label}</div>{sub && <div style={{ fontSize: 11, color: C.ink500, marginTop: 2, fontFamily: C.font }}>{sub}</div>}</div>
       <div style={{ textAlign: "right", fontSize: bold || total ? 15 : 13, fontWeight: bold || total ? 700 : 400, color: col, fontFamily: C.font, fontVariantNumeric: "tabular-nums" }}>{fmt(current)}</div>
       <div style={{ textAlign: "right", fontSize: 13, color: C.ink300, fontFamily: C.font, fontVariantNumeric: "tabular-nums", fontStyle: "italic" }}>{prior !== null ? fmt(prior) : "\u2014 prior period"}</div>
     </div>
   );
 }
 function SSection({ label }) { return <div style={{ padding: "8px 16px", background: "#F0EDE8", fontSize: 10, fontWeight: 700, color: C.ink500, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: C.font }}>{label}</div>; }
-function SHeader() { return <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px", padding: "10px 16px", borderBottom: `2px solid ${C.accent}`, fontSize: 10, fontWeight: 700, color: C.ink400, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: C.font }}><span>Note</span><span style={{ textAlign: "right" }}>Current Period (ZAR)</span><span style={{ textAlign: "right" }}>Prior Period (ZAR)</span></div>; }
+function SHeader() { return <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px", padding: "10px 16px", borderBottom: `2px solid ${C.accent}`, fontSize: 10, fontWeight: 700, color: C.ink500, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: C.font }}><span>Note</span><span style={{ textAlign: "right" }}>Current Period (ZAR)</span><span style={{ textAlign: "right" }}>Prior Period (ZAR)</span></div>; }
 
 function Letterhead({ tenantName, statementTitle, statementSubtitle, periodLabel, status, financialYear }) {
   return (
@@ -83,14 +76,14 @@ function Letterhead({ tenantName, statementTitle, statementSubtitle, periodLabel
 }
 
 function StatementNote({ text }) {
-  return <div style={{ margin: "0 16px 20px", padding: "10px 14px", background: C.ink075, borderRadius: 6, fontSize: 11, color: C.ink400, lineHeight: 1.6, fontFamily: C.font, borderLeft: `3px solid ${C.accentBd}` }}>{text}</div>;
+  return <div style={{ margin: "0 16px 20px", padding: "10px 14px", background: C.bg, borderRadius: 6, fontSize: 11, color: C.ink500, lineHeight: 1.6, fontFamily: C.font, borderLeft: `3px solid ${C.accentBd}` }}>{text}</div>;
 }
 
 // ── Statement 1: Income Statement ─────────────────────────────────────────────
 function IncomeStatement({ data, tenantName, periodLabel, financialYear, status }) {
   const { revenue, cogs, grossProfit, grossMarginPct, opexLines, totalOpex, depreciationTotal, netProfit, netMarginPct } = data;
   return (
-    <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C.ink150}`, overflow: "hidden", marginBottom: 24 }}>
+    <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C.border}`, overflow: "hidden", marginBottom: 24 }}>
       <Letterhead tenantName={tenantName} statementTitle="Statement 1 of 4" statementSubtitle="Statement of Comprehensive Income" periodLabel={periodLabel} status={status} financialYear={financialYear} />
       <div style={{ padding: "0 0 8px" }}>
         <SHeader />
@@ -120,13 +113,13 @@ function BalanceSheetStatement({ data, tenantName, asAtLabel, financialYear, sta
   const totalAssets = totalCurrentAssets + fixedAssetsNBV;
   const totalLiabilities = payables + vatLiability;
   return (
-    <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C.ink150}`, overflow: "hidden", marginBottom: 24 }}>
+    <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C.border}`, overflow: "hidden", marginBottom: 24 }}>
       <Letterhead tenantName={tenantName} statementTitle="Statement 2 of 4" statementSubtitle="Statement of Financial Position" periodLabel={`As at ${asAtLabel}`} status={status} financialYear={financialYear} />
-      <div style={{ padding: "8px 16px", background: balanced ? C.successBg : C.dangerBg, fontSize: 12, fontWeight: 600, color: balanced ? C.success : C.danger, fontFamily: C.font, borderBottom: `1px solid ${balanced ? C.successBd : C.dangerBd}` }}>
+      <div style={{ padding: "8px 16px", background: balanced ? C.successLight : C.dangerLight, fontSize: 12, fontWeight: 600, color: balanced ? C.success : C.danger, fontFamily: C.font, borderBottom: `1px solid ${balanced ? C.successBd : C.dangerBd}` }}>
         {balanced ? "\u2713 Assets = Liabilities + Equity" : `\u26A0 Statement does not balance \u2014 difference: ${fmtZar(Math.abs(totalAssets - totalLiabilities - totalEquity))}`}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
-        <div style={{ borderRight: `1px solid ${C.ink150}` }}>
+        <div style={{ borderRight: `1px solid ${C.border}` }}>
           <SSection label="Assets" />
           <SSection label="Current Assets" />
           <SRow label="Inventories (at AVCO)" current={inventoryValue} indent={1} sub="Weighted average cost per unit" />
@@ -159,7 +152,7 @@ function BalanceSheetStatement({ data, tenantName, asAtLabel, financialYear, sta
 function CashFlowStatement({ data, tenantName, periodLabel, financialYear, status }) {
   const { netProfit, depreciationTotal, netOperating, capexPaid, netInvesting, netCash } = data;
   return (
-    <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C.ink150}`, overflow: "hidden", marginBottom: 24 }}>
+    <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C.border}`, overflow: "hidden", marginBottom: 24 }}>
       <Letterhead tenantName={tenantName} statementTitle="Statement 3 of 4" statementSubtitle="Statement of Cash Flows" periodLabel={periodLabel} status={status} financialYear={financialYear} />
       <div style={{ padding: "0 0 8px" }}>
         <SHeader />
@@ -191,10 +184,10 @@ function ChangesInEquityStatement({ data, tenantName, periodLabel, financialYear
   const openingTotal = shareCapital + openingRetained;
   const colStyle = { textAlign: "right", fontSize: 13, fontFamily: C.font, fontVariantNumeric: "tabular-nums", padding: "0 8px" };
   const cellBold = { ...colStyle, fontWeight: 700, fontSize: 14 };
-  const rowStyle = (shade) => ({ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", padding: "10px 16px", borderBottom: "1px solid #F8FAFC", background: shade ? C.ink075 : "transparent", alignItems: "center" });
-  const hdStyle = { display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", padding: "10px 16px", borderBottom: `2px solid ${C.accent}`, fontSize: 10, fontWeight: 700, color: C.ink400, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: C.font, background: C.ink075 };
+  const rowStyle = (shade) => ({ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", padding: "10px 16px", borderBottom: "1px solid #F8FAFC", background: shade ? C.bg : "transparent", alignItems: "center" });
+  const hdStyle = { display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", padding: "10px 16px", borderBottom: `2px solid ${C.accent}`, fontSize: 10, fontWeight: 700, color: C.ink500, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: C.font, background: C.bg };
   return (
-    <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C.ink150}`, overflow: "hidden", marginBottom: 24 }}>
+    <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C.border}`, overflow: "hidden", marginBottom: 24 }}>
       <Letterhead tenantName={tenantName} statementTitle="Statement 4 of 4" statementSubtitle="Statement of Changes in Equity" periodLabel={periodLabel} status={status} financialYear={financialYear} />
       <div>
         <div style={hdStyle}><span>Movement</span><span style={{ textAlign: "right", padding: "0 8px" }}>Share Capital</span><span style={{ textAlign: "right", padding: "0 8px" }}>Retained Earnings</span><span style={{ textAlign: "right", padding: "0 8px" }}>Total</span></div>
@@ -357,7 +350,7 @@ export default function HQFinancialStatements() {
   }, [loading, incomeData, bsData, cfData, equityData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (setupComplete === false) return <HQFinancialSetup onComplete={() => setSetupComplete(true)} />;
-  if (setupComplete === null) return <div style={{ padding: 60, textAlign: "center", color: C.ink400, fontFamily: C.font }}>Loading{"\u2026"}</div>;
+  if (setupComplete === null) return <div style={{ padding: 60, textAlign: "center", color: C.ink500, fontFamily: C.font }}>Loading{"\u2026"}</div>;
 
   const STATEMENTS = [{ id: "income", label: "Income Statement" }, { id: "balance", label: "Balance Sheet" }, { id: "cashflow", label: "Cash Flow" }, { id: "equity", label: "Changes in Equity" }];
   const FY_OPTIONS = [{ id: currentFY, label: currentFY }, { id: priorFY, label: `${priorFY} (prior year)` }, { id: "custom", label: "Custom range" }];
@@ -382,14 +375,14 @@ export default function HQFinancialStatements() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600, color: C.ink900, letterSpacing: "-0.01em", fontFamily: C.font }}>IFRS Financial Statements</h2>
-          <p style={{ margin: "4px 0 0", color: C.ink400, fontSize: 13 }}>4 IFRS statements {"\u00b7"} status workflow {"\u00b7"} auditor sign-off</p>
+          <p style={{ margin: "4px 0 0", color: C.ink500, fontSize: 13 }}>4 IFRS statements {"\u00b7"} status workflow {"\u00b7"} auditor sign-off</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           {FY_OPTIONS.map(opt => (
-            <button key={opt.id} onClick={() => setSelectedFY(opt.id)} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid", borderColor: selectedFY === opt.id ? C.accent : C.ink150, background: selectedFY === opt.id ? C.accentLit : "#fff", color: selectedFY === opt.id ? C.accent : C.ink500, fontWeight: selectedFY === opt.id ? 700 : 400, cursor: "pointer", fontSize: 12, fontFamily: C.font }}>{opt.label}</button>
+            <button key={opt.id} onClick={() => setSelectedFY(opt.id)} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid", borderColor: selectedFY === opt.id ? C.accent : C.border, background: selectedFY === opt.id ? C.accentLight : "#fff", color: selectedFY === opt.id ? C.accent : C.ink500, fontWeight: selectedFY === opt.id ? 700 : 400, cursor: "pointer", fontSize: 12, fontFamily: C.font }}>{opt.label}</button>
           ))}
           {!loading && incomeData && (
-            <button onClick={handlePrint} disabled={printing} style={{ padding: "7px 16px", borderRadius: 8, border: `1.5px solid ${C.accentMid}`, background: printing ? C.ink075 : C.accentLit, color: printing ? C.ink400 : C.accent, cursor: printing ? "wait" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: C.font, display: "flex", alignItems: "center", gap: 6 }}>
+            <button onClick={handlePrint} disabled={printing} style={{ padding: "7px 16px", borderRadius: 8, border: `1.5px solid ${C.accentMid}`, background: printing ? C.bg : C.accentLight, color: printing ? C.ink500 : C.accent, cursor: printing ? "wait" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: C.font, display: "flex", alignItems: "center", gap: 6 }}>
               {printing ? "Preparing\u2026" : "\uD83D\uDDA8\uFE0F Print / Save PDF"}
             </button>
           )}
@@ -429,34 +422,34 @@ export default function HQFinancialStatements() {
 
       {selectedFY === "custom" && (
         <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16 }}>
-          <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} style={{ padding: "7px 10px", border: `1px solid ${C.ink150}`, borderRadius: 6, fontFamily: C.font, fontSize: 13 }} />
-          <span style={{ color: C.ink400, fontSize: 12 }}>to</span>
-          <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} style={{ padding: "7px 10px", border: `1px solid ${C.ink150}`, borderRadius: 6, fontFamily: C.font, fontSize: 13 }} />
+          <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} style={{ padding: "7px 10px", border: `1px solid ${C.border}`, borderRadius: 6, fontFamily: C.font, fontSize: 13 }} />
+          <span style={{ color: C.ink500, fontSize: 12 }}>to</span>
+          <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} style={{ padding: "7px 10px", border: `1px solid ${C.border}`, borderRadius: 6, fontFamily: C.font, fontSize: 13 }} />
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#fff", border: `1px solid ${C.ink150}`, borderRadius: 10, marginBottom: 20, gap: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#fff", border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 20, gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <StatusBadge status={currentStatus} />
-          {statusRow?.signed_by && <span style={{ fontSize: 12, color: C.ink400, fontFamily: C.font }}>Signed by: <strong>{statusRow.signed_by}</strong>{statusRow.signed_at ? ` on ${new Date(statusRow.signed_at).toLocaleDateString("en-ZA")}` : ""}</span>}
-          {statusRow?.locked_at && <span style={{ fontSize: 12, color: C.ink400, fontFamily: C.font }}>Locked {new Date(statusRow.locked_at).toLocaleDateString("en-ZA")}</span>}
+          {statusRow?.signed_by && <span style={{ fontSize: 12, color: C.ink500, fontFamily: C.font }}>Signed by: <strong>{statusRow.signed_by}</strong>{statusRow.signed_at ? ` on ${new Date(statusRow.signed_at).toLocaleDateString("en-ZA")}` : ""}</span>}
+          {statusRow?.locked_at && <span style={{ fontSize: 12, color: C.ink500, fontFamily: C.font }}>Locked {new Date(statusRow.locked_at).toLocaleDateString("en-ZA")}</span>}
         </div>
         {!isLocked && (
           <div style={{ display: "flex", gap: 8 }}>
-            {currentStatus === "draft" && <button onClick={handleMarkReviewed} disabled={statusSaving} style={{ padding: "7px 16px", borderRadius: 7, border: `1px solid ${C.infoBd}`, background: C.infoBg, color: C.info, cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: C.font }}>{"\u25CE"} Mark Reviewed</button>}
-            {currentStatus === "reviewed" && <button onClick={() => setShowSignModal(true)} disabled={statusSaving} style={{ padding: "7px 16px", borderRadius: 7, border: `1px solid ${C.successBd}`, background: C.successBg, color: C.success, cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: C.font }}>{"\u2713"} Auditor Sign Off{"\u2026"}</button>}
+            {currentStatus === "draft" && <button onClick={handleMarkReviewed} disabled={statusSaving} style={{ padding: "7px 16px", borderRadius: 7, border: `1px solid ${C.infoBd}`, background: C.infoLight, color: C.info, cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: C.font }}>{"\u25CE"} Mark Reviewed</button>}
+            {currentStatus === "reviewed" && <button onClick={() => setShowSignModal(true)} disabled={statusSaving} style={{ padding: "7px 16px", borderRadius: 7, border: `1px solid ${C.successBd}`, background: C.successLight, color: C.success, cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: C.font }}>{"\u2713"} Auditor Sign Off{"\u2026"}</button>}
             {currentStatus === "signed" && <button onClick={handleLock} disabled={statusSaving} style={{ padding: "7px 16px", borderRadius: 7, border: "1px solid #9CA3AF", background: "#F3F4F6", color: "#374151", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: C.font }}>{"\uD83D\uDD12"} Lock Period</button>}
           </div>
         )}
       </div>
 
-      <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: `1px solid ${C.ink150}`, paddingBottom: 0 }}>
+      <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: `1px solid ${C.border}`, paddingBottom: 0 }}>
         {STATEMENTS.map(s => (
           <button key={s.id} onClick={() => setActiveStatement(s.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 18px", fontFamily: C.font, fontSize: 12, fontWeight: activeStatement === s.id ? 700 : 400, color: activeStatement === s.id ? C.accent : C.ink500, letterSpacing: "0.04em", borderBottom: activeStatement === s.id ? `2px solid ${C.accent}` : "2px solid transparent", marginBottom: "-1px" }}>{s.label}</button>
         ))}
       </div>
 
-      {loading ? <div style={{ padding: 60, textAlign: "center", color: C.ink400, fontFamily: C.font }}>Loading financial statements{"\u2026"}</div> : (
+      {loading ? <div style={{ padding: 60, textAlign: "center", color: C.ink500, fontFamily: C.font }}>Loading financial statements{"\u2026"}</div> : (
         <>
           {activeStatement === "income" && incomeData && <IncomeStatement data={incomeData} tenantName={tenantName} periodLabel={periodLabel} financialYear={financialYear} status={currentStatus} />}
           {activeStatement === "balance" && bsData && <BalanceSheetStatement data={bsData} tenantName={tenantName} asAtLabel={asAtLabel} financialYear={financialYear} status={currentStatus} />}
@@ -470,9 +463,9 @@ export default function HQFinancialStatements() {
           <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 380, fontFamily: C.font, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: C.ink900 }}>Auditor Sign-Off</h3>
             <p style={{ margin: "0 0 18px", fontSize: 13, color: C.ink500, lineHeight: 1.5 }}>Enter the auditor or reviewer name. This will be recorded on the statement and cannot be changed after locking.</p>
-            <input autoFocus value={auditorName} onChange={e => setAuditorName(e.target.value)} placeholder="e.g. J. Smith CA(SA) / Smith & Associates" style={{ width: "100%", padding: "10px 12px", border: `1px solid ${C.ink150}`, borderRadius: 7, fontSize: 13, fontFamily: C.font, boxSizing: "border-box", marginBottom: 16 }} />
+            <input autoFocus value={auditorName} onChange={e => setAuditorName(e.target.value)} placeholder="e.g. J. Smith CA(SA) / Smith & Associates" style={{ width: "100%", padding: "10px 12px", border: `1px solid ${C.border}`, borderRadius: 7, fontSize: 13, fontFamily: C.font, boxSizing: "border-box", marginBottom: 16 }} />
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button onClick={() => { setShowSignModal(false); setAuditorName(""); }} style={{ padding: "8px 18px", borderRadius: 7, border: `1px solid ${C.ink150}`, background: "#fff", color: C.ink500, cursor: "pointer", fontSize: 13, fontFamily: C.font }}>Cancel</button>
+              <button onClick={() => { setShowSignModal(false); setAuditorName(""); }} style={{ padding: "8px 18px", borderRadius: 7, border: `1px solid ${C.border}`, background: "#fff", color: C.ink500, cursor: "pointer", fontSize: 13, fontFamily: C.font }}>Cancel</button>
               <button onClick={handleSignOff} disabled={!auditorName.trim()} style={{ padding: "8px 18px", borderRadius: 7, border: "none", background: C.accent, color: "#fff", cursor: auditorName.trim() ? "pointer" : "not-allowed", fontSize: 13, fontWeight: 700, fontFamily: C.font, opacity: auditorName.trim() ? 1 : 0.5 }}>Confirm Sign-Off</button>
             </div>
           </div>
@@ -484,11 +477,11 @@ export default function HQFinancialStatements() {
       {/* Print portal — renders all 4 statements outside #root for clean printing */}
       {printing && createPortal(
         <div className="nuai-print-portal" style={{ position: "fixed", inset: 0, background: "#fff", zIndex: 99999, overflowY: "auto", padding: "24px", fontFamily: C.font }}>
-          <div style={{ textAlign: "center", marginBottom: 32, paddingBottom: 24, borderBottom: `2px solid ${C.ink150}` }}>
-            <div style={{ fontSize: 11, color: C.ink400, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>NuAi Financial Reporting</div>
+          <div style={{ textAlign: "center", marginBottom: 32, paddingBottom: 24, borderBottom: `2px solid ${C.border}` }}>
+            <div style={{ fontSize: 11, color: C.ink500, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>NuAi Financial Reporting</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: C.ink900 }}>{tenantName}</div>
             <div style={{ fontSize: 14, color: C.ink500, marginTop: 4 }}>IFRS Financial Statements {"\u00b7"} {financialYear}</div>
-            <div style={{ fontSize: 12, color: C.ink400, marginTop: 4 }}>{periodLabel}</div>
+            <div style={{ fontSize: 12, color: C.ink500, marginTop: 4 }}>{periodLabel}</div>
             <div style={{ marginTop: 12 }}><StatusBadge status={currentStatus} /></div>
             {statusRow?.signed_by && <div style={{ fontSize: 12, color: C.ink500, marginTop: 8 }}>Signed by: <strong>{statusRow.signed_by}</strong>{statusRow.signed_at ? ` on ${new Date(statusRow.signed_at).toLocaleDateString("en-ZA")}` : ""}</div>}
             <div style={{ fontSize: 11, color: C.ink300, marginTop: 6 }}>Prepared {fmtDate(new Date())} {"\u00b7"} IFRS for SMEs compliant {"\u00b7"} Functional currency: ZAR</div>
@@ -497,7 +490,7 @@ export default function HQFinancialStatements() {
           <div className="nuai-print-page-break">{bsData && <BalanceSheetStatement data={bsData} tenantName={tenantName} asAtLabel={asAtLabel} financialYear={financialYear} status={currentStatus} />}</div>
           <div className="nuai-print-page-break">{cfData && <CashFlowStatement data={cfData} tenantName={tenantName} periodLabel={periodLabel} financialYear={financialYear} status={currentStatus} />}</div>
           <div>{equityData && <ChangesInEquityStatement data={equityData} tenantName={tenantName} periodLabel={periodLabel} financialYear={financialYear} status={currentStatus} />}</div>
-          <div style={{ marginTop: 24, paddingTop: 16, borderTop: `1px solid ${C.ink150}`, fontSize: 11, color: C.ink300, textAlign: "center", lineHeight: 1.7 }}>
+          <div style={{ marginTop: 24, paddingTop: 16, borderTop: `1px solid ${C.border}`, fontSize: 11, color: C.ink300, textAlign: "center", lineHeight: 1.7 }}>
             Generated by NuAi {"\u00b7"} {new Date().toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })} {"\u00b7"} These statements have been prepared in accordance with IFRS for SMEs. {"\u00b7"} Prepared on the historical cost basis. Functional currency: South African Rand (ZAR).
           </div>
         </div>,

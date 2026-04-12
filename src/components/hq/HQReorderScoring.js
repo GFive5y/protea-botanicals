@@ -18,36 +18,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
+import { T } from "../../styles/tokens";
 
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtZar = (n) =>
@@ -84,20 +57,20 @@ function calcReliabilityScore(
 
 function scoreColour(score) {
   if (score === null || score === undefined)
-    return { color: T.ink400, bg: T.ink075, label: "No data" };
+    return { color: T.ink500, bg: T.bg, label: "No data" };
   if (score >= 75)
-    return { color: T.success, bg: T.successBg, label: "Reliable" };
+    return { color: T.success, bg: T.successLight, label: "Reliable" };
   if (score >= 50)
-    return { color: T.warning, bg: T.warningBg, label: "Average" };
-  return { color: T.danger, bg: T.dangerBg, label: "At risk" };
+    return { color: T.warning, bg: T.warningLight, label: "Average" };
+  return { color: T.danger, bg: T.dangerLight, label: "At risk" };
 }
 
 function stockColour(qty, reorder) {
-  if (reorder <= 0) return { color: T.ink400, bg: T.ink075 };
-  if (qty <= 0) return { color: T.danger, bg: T.dangerBg };
-  if (qty <= reorder) return { color: T.danger, bg: T.dangerBg };
-  if (qty <= reorder * 1.5) return { color: T.warning, bg: T.warningBg };
-  return { color: T.success, bg: T.successBg };
+  if (reorder <= 0) return { color: T.ink500, bg: T.bg };
+  if (qty <= 0) return { color: T.danger, bg: T.dangerLight };
+  if (qty <= reorder) return { color: T.danger, bg: T.dangerLight };
+  if (qty <= reorder * 1.5) return { color: T.warning, bg: T.warningLight };
+  return { color: T.success, bg: T.successLight };
 }
 
 // ─── Score Badge ─────────────────────────────────────────────────────────────
@@ -299,10 +272,10 @@ export default function HQReorderScoring({ onNavigate }) {
   const card = {
     background: "#fff",
     borderRadius: 6,
-    border: `1px solid ${T.ink150}`,
+    border: `1px solid ${T.border}`,
     overflow: "hidden",
     marginBottom: 16,
-    boxShadow: T.shadow,
+    boxShadow: T.shadow.sm,
   };
   const btn = (variant = "primary", extra = {}) => ({
     padding: "8px 16px",
@@ -324,11 +297,11 @@ export default function HQReorderScoring({ onNavigate }) {
       : {}),
     ...(variant === "small"
       ? {
-          background: T.ink075,
+          background: T.bg,
           color: T.ink500,
           padding: "6px 12px",
           fontSize: 10,
-          border: `1px solid ${T.ink150}`,
+          border: `1px solid ${T.border}`,
         }
       : {}),
     ...(variant === "alert" ? { background: T.danger, color: "#fff" } : {}),
@@ -425,7 +398,7 @@ export default function HQReorderScoring({ onNavigate }) {
               fontWeight: activeTab === t.id ? 700 : 400,
               letterSpacing: "0.06em",
               textTransform: "uppercase",
-              color: activeTab === t.id ? T.accent : T.ink400,
+              color: activeTab === t.id ? T.accent : T.ink500,
               borderBottom:
                 activeTab === t.id
                   ? `2px solid ${T.accent}`
@@ -454,11 +427,11 @@ export default function HQReorderScoring({ onNavigate }) {
                   display: "grid",
                   gridTemplateColumns: "repeat(3, 1fr)",
                   gap: "1px",
-                  background: T.ink150,
+                  background: T.border,
                   borderRadius: 6,
                   overflow: "hidden",
-                  border: `1px solid ${T.ink150}`,
-                  boxShadow: T.shadow,
+                  border: `1px solid ${T.border}`,
+                  boxShadow: T.shadow.sm,
                   marginBottom: 24,
                 }}
               >
@@ -497,7 +470,7 @@ export default function HQReorderScoring({ onNavigate }) {
                         fontWeight: 700,
                         letterSpacing: "0.1em",
                         textTransform: "uppercase",
-                        color: T.ink400,
+                        color: T.ink500,
                         marginBottom: 6,
                         fontFamily: T.font,
                       }}
@@ -506,7 +479,7 @@ export default function HQReorderScoring({ onNavigate }) {
                     </div>
                     <div
                       style={{
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         fontSize: 26,
                         fontWeight: 400,
                         color: s.colour,

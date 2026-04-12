@@ -9,60 +9,32 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
+import { T } from "../../styles/tokens";
 
-// ── Design tokens ─────────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
-  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
 const sCard = {
   background: "#fff",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: "6px",
   padding: "20px",
-  boxShadow: T.shadow,
+  boxShadow: T.shadow.sm,
 };
 const sLabel = {
   fontSize: "10px",
   letterSpacing: "0.1em",
   textTransform: "uppercase",
-  color: T.ink400,
+  color: T.ink500,
   marginBottom: "6px",
-  fontFamily: T.fontUi,
+  fontFamily: T.font,
   fontWeight: 700,
 };
 const sInput = {
   padding: "8px 12px",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: "4px",
   fontSize: "13px",
-  fontFamily: T.fontUi,
+  fontFamily: T.font,
   background: "#fff",
   outline: "none",
   width: "100%",
@@ -89,7 +61,7 @@ const sBtn = (v = "primary") => ({
   textTransform: "uppercase",
   fontWeight: 600,
   cursor: "pointer",
-  fontFamily: T.fontUi,
+  fontFamily: T.font,
 });
 const sTh = {
   textAlign: "left",
@@ -97,38 +69,38 @@ const sTh = {
   fontSize: "9px",
   letterSpacing: "0.15em",
   textTransform: "uppercase",
-  color: T.ink400,
-  borderBottom: `2px solid ${T.ink150}`,
+  color: T.ink500,
+  borderBottom: `2px solid ${T.border}`,
   fontWeight: 700,
-  fontFamily: T.fontUi,
+  fontFamily: T.font,
 };
 const sTd = {
   padding: "10px 12px",
-  borderBottom: `1px solid ${T.ink075}`,
+  borderBottom: `1px solid ${T.bg}`,
   color: T.ink700,
   verticalAlign: "middle",
   fontSize: "13px",
-  fontFamily: T.fontUi,
+  fontFamily: T.font,
 };
 
 const STATUS_CONFIG = {
-  draft: { color: T.ink500, bg: T.ink075, bd: T.ink150, label: "Draft" },
-  confirmed: { color: T.info, bg: T.infoBg, bd: T.infoBd, label: "Confirmed" },
+  draft: { color: T.ink500, bg: T.bg, bd: T.border, label: "Draft" },
+  confirmed: { color: T.info, bg: T.infoLight, bd: T.infoBd, label: "Confirmed" },
   shipped: {
     color: T.accentMid,
-    bg: T.accentLit,
+    bg: T.accentLight,
     bd: T.accentBd,
     label: "Shipped",
   },
   delivered: {
     color: T.success,
-    bg: T.successBg,
+    bg: T.successLight,
     bd: T.successBd,
     label: "Delivered",
   },
   cancelled: {
     color: T.danger,
-    bg: T.dangerBg,
+    bg: T.dangerLight,
     bd: T.dangerBd,
     label: "Cancelled",
   },
@@ -148,7 +120,7 @@ function StatusBadge({ status }) {
         fontWeight: 700,
         letterSpacing: "0.1em",
         textTransform: "uppercase",
-        fontFamily: T.fontUi,
+        fontFamily: T.font,
         whiteSpace: "nowrap",
       }}
     >
@@ -273,7 +245,7 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
         letterSpacing: "0.08em",
         textTransform: "uppercase",
         cursor: "pointer",
-        fontFamily: T.fontUi,
+        fontFamily: T.font,
       }}
     >
       <span style={{ fontSize: 14 }}>{icon}</span> {label}
@@ -365,7 +337,7 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                 fontSize: 11,
                 fontWeight: 700,
                 cursor: "pointer",
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
               }}
             >
               ✕ Close
@@ -404,7 +376,7 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
               <div style={{ fontSize: 12, color: T.ink500, lineHeight: 1.8 }}>
                 <div>{BRAND.email}</div>
                 <div>{BRAND.address}</div>
-                <div style={{ color: T.ink400 }}>{BRAND.vat}</div>
+                <div style={{ color: T.ink500 }}>{BRAND.vat}</div>
               </div>
             </div>
             <div style={{ textAlign: "right" }}>
@@ -451,7 +423,7 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
           >
             <div
               style={{
-                background: T.accentLit,
+                background: T.accentLight,
                 border: `1px solid ${T.accentBd}`,
                 borderLeft: `4px solid ${T.accent}`,
                 borderRadius: 6,
@@ -498,8 +470,8 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
             </div>
             <div
               style={{
-                background: T.ink075,
-                border: `1px solid ${T.ink150}`,
+                background: T.bg,
+                border: `1px solid ${T.border}`,
                 borderLeft: `4px solid #9CA3AF`,
                 borderRadius: 6,
                 padding: "18px 20px",
@@ -511,7 +483,7 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                   fontWeight: 700,
                   letterSpacing: "0.12em",
                   textTransform: "uppercase",
-                  color: T.ink400,
+                  color: T.ink500,
                   marginBottom: 10,
                 }}
               >
@@ -521,25 +493,25 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                 <div
                   style={{ display: "flex", justifyContent: "space-between" }}
                 >
-                  <span style={{ color: T.ink400 }}>Bank</span>
+                  <span style={{ color: T.ink500 }}>Bank</span>
                   <strong style={{ color: T.ink900 }}>{BRAND.bank}</strong>
                 </div>
                 <div
                   style={{ display: "flex", justifyContent: "space-between" }}
                 >
-                  <span style={{ color: T.ink400 }}>Account</span>
+                  <span style={{ color: T.ink500 }}>Account</span>
                   <strong style={{ color: T.ink900 }}>{BRAND.account}</strong>
                 </div>
                 <div
                   style={{ display: "flex", justifyContent: "space-between" }}
                 >
-                  <span style={{ color: T.ink400 }}>Branch</span>
+                  <span style={{ color: T.ink500 }}>Branch</span>
                   <strong style={{ color: T.ink900 }}>{BRAND.branch}</strong>
                 </div>
                 <div
                   style={{ display: "flex", justifyContent: "space-between" }}
                 >
-                  <span style={{ color: T.ink400 }}>Type</span>
+                  <span style={{ color: T.ink500 }}>Type</span>
                   <strong style={{ color: T.ink900 }}>{BRAND.accType}</strong>
                 </div>
                 <div
@@ -548,10 +520,10 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                     justifyContent: "space-between",
                     marginTop: 6,
                     paddingTop: 6,
-                    borderTop: `1px solid ${T.ink150}`,
+                    borderTop: `1px solid ${T.border}`,
                   }}
                 >
-                  <span style={{ color: T.ink400 }}>Reference</span>
+                  <span style={{ color: T.ink500 }}>Reference</span>
                   <strong style={{ color: T.accent }}>{invNumber}</strong>
                 </div>
               </div>
@@ -588,7 +560,7 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                       color: "#fff",
                       fontWeight: 600,
                       textAlign: i >= 2 ? "right" : "left",
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                     }}
                   >
                     {h}
@@ -607,15 +579,15 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                 return (
                   <tr
                     key={line.id || i}
-                    style={{ background: i % 2 === 0 ? "#fff" : T.ink050 }}
+                    style={{ background: i % 2 === 0 ? "#fff" : T.surface }}
                   >
                     <td
                       style={{
                         padding: "12px 12px",
-                        borderBottom: `1px solid ${T.ink150}`,
+                        borderBottom: `1px solid ${T.border}`,
                         fontSize: 12,
-                        color: T.ink400,
-                        fontFamily: T.fontUi,
+                        color: T.ink500,
+                        fontFamily: T.font,
                       }}
                     >
                       {i + 1}
@@ -623,8 +595,8 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                     <td
                       style={{
                         padding: "12px 12px",
-                        borderBottom: `1px solid ${T.ink150}`,
-                        fontFamily: T.fontUi,
+                        borderBottom: `1px solid ${T.border}`,
+                        fontFamily: T.font,
                       }}
                     >
                       <div
@@ -651,12 +623,12 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                     <td
                       style={{
                         padding: "12px 12px",
-                        borderBottom: `1px solid ${T.ink150}`,
+                        borderBottom: `1px solid ${T.border}`,
                         fontSize: 13,
                         color: T.ink700,
                         textAlign: "right",
                         fontVariantNumeric: "tabular-nums",
-                        fontFamily: T.fontUi,
+                        fontFamily: T.font,
                       }}
                     >
                       {qty}
@@ -664,12 +636,12 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                     <td
                       style={{
                         padding: "12px 12px",
-                        borderBottom: `1px solid ${T.ink150}`,
+                        borderBottom: `1px solid ${T.border}`,
                         fontSize: 13,
                         color: T.ink700,
                         textAlign: "right",
                         fontVariantNumeric: "tabular-nums",
-                        fontFamily: T.fontUi,
+                        fontFamily: T.font,
                       }}
                     >
                       R
@@ -680,11 +652,11 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                     <td
                       style={{
                         padding: "12px 12px",
-                        borderBottom: `1px solid ${T.ink150}`,
+                        borderBottom: `1px solid ${T.border}`,
                         fontSize: 12,
-                        color: T.ink400,
+                        color: T.ink500,
                         textAlign: "right",
-                        fontFamily: T.fontUi,
+                        fontFamily: T.font,
                       }}
                     >
                       15%
@@ -692,13 +664,13 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                     <td
                       style={{
                         padding: "12px 12px",
-                        borderBottom: `1px solid ${T.ink150}`,
+                        borderBottom: `1px solid ${T.border}`,
                         fontSize: 13,
                         fontWeight: 700,
                         color: T.ink900,
                         textAlign: "right",
                         fontVariantNumeric: "tabular-nums",
-                        fontFamily: T.fontUi,
+                        fontFamily: T.font,
                       }}
                     >
                       R
@@ -723,10 +695,10 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
             <div
               style={{
                 width: 300,
-                background: T.ink075,
+                background: T.bg,
                 borderRadius: 6,
                 padding: "16px 20px",
-                border: `1px solid ${T.ink150}`,
+                border: `1px solid ${T.border}`,
               }}
             >
               {[
@@ -739,14 +711,14 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                     display: "flex",
                     justifyContent: "space-between",
                     padding: "7px 0",
-                    borderBottom: `1px solid ${T.ink150}`,
+                    borderBottom: `1px solid ${T.border}`,
                   }}
                 >
                   <span
                     style={{
                       fontSize: 13,
                       color: T.ink500,
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                     }}
                   >
                     {row.label}
@@ -756,7 +728,7 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                       fontSize: 13,
                       color: T.ink700,
                       fontVariantNumeric: "tabular-nums",
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                     }}
                   >
                     R
@@ -779,7 +751,7 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                     fontSize: 16,
                     fontWeight: 700,
                     color: T.accent,
-                    fontFamily: T.fontUi,
+                    fontFamily: T.font,
                   }}
                 >
                   TOTAL DUE
@@ -790,7 +762,7 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                     fontWeight: 700,
                     color: T.accent,
                     fontVariantNumeric: "tabular-nums",
-                    fontFamily: T.fontUi,
+                    fontFamily: T.font,
                   }}
                 >
                   R{total.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
@@ -802,15 +774,15 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
           {/* Notes */}
           <div
             style={{
-              background: T.ink075,
+              background: T.bg,
               borderRadius: 6,
               padding: "14px 18px",
               marginBottom: 28,
               fontSize: 12,
               color: T.ink500,
               lineHeight: 1.7,
-              fontFamily: T.fontUi,
-              border: `1px solid ${T.ink150}`,
+              fontFamily: T.font,
+              border: `1px solid ${T.border}`,
             }}
           >
             <strong style={{ color: T.ink700 }}>Terms & Notes:</strong> Payment
@@ -825,10 +797,10 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
             style={{
               textAlign: "center",
               paddingTop: 20,
-              borderTop: `2px solid ${T.accentLit}`,
+              borderTop: `2px solid ${T.accentLight}`,
               fontSize: 11,
               color: "#6B7280",
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
               lineHeight: 1.8,
             }}
           >
@@ -840,7 +812,7 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
             <div>
               {BRAND.email} · {BRAND.vat}
             </div>
-            <div style={{ marginTop: 6, fontSize: 10, color: T.ink150 }}>
+            <div style={{ marginTop: 6, fontSize: 10, color: T.border }}>
               Generated by Pure Premium ERP ·{" "}
               {new Date().toLocaleDateString("en-ZA")}
             </div>
@@ -970,7 +942,7 @@ function CreateOrderForm({ partners, items, onSaved, onCancel }) {
         color: T.ink500,
         display: "block",
         marginBottom: "4px",
-        fontFamily: T.fontUi,
+        fontFamily: T.font,
       }}
     >
       {t}
@@ -1052,7 +1024,7 @@ function CreateOrderForm({ partners, items, onSaved, onCancel }) {
               <select
                 style={{
                   ...sSelect,
-                  borderColor: overstock ? T.danger : T.ink150,
+                  borderColor: overstock ? T.danger : T.border,
                 }}
                 value={line.item_id}
                 onChange={(e) => setLine(idx, "item_id", e.target.value)}
@@ -1074,7 +1046,7 @@ function CreateOrderForm({ partners, items, onSaved, onCancel }) {
                     fontSize: "10px",
                     color: T.danger,
                     marginTop: "2px",
-                    fontFamily: T.fontUi,
+                    fontFamily: T.font,
                   }}
                 >
                   Only {avail.toFixed(0)} available
@@ -1086,7 +1058,7 @@ function CreateOrderForm({ partners, items, onSaved, onCancel }) {
               <input
                 style={{
                   ...sInput,
-                  borderColor: overstock ? T.danger : T.ink150,
+                  borderColor: overstock ? T.danger : T.border,
                 }}
                 type="number"
                 min="1"
@@ -1142,7 +1114,7 @@ function CreateOrderForm({ partners, items, onSaved, onCancel }) {
         </button>
         <div
           style={{
-            fontFamily: T.fontData,
+            fontFamily: T.font,
             fontSize: "14px",
             fontWeight: 600,
             color: T.ink900,
@@ -1416,8 +1388,8 @@ function OrderCard({
             marginBottom: "12px",
             borderRadius: "4px",
             fontSize: "12px",
-            fontFamily: T.fontUi,
-            background: toast.type === "error" ? T.dangerBg : T.successBg,
+            fontFamily: T.font,
+            background: toast.type === "error" ? T.dangerLight : T.successLight,
             color: toast.type === "error" ? T.danger : T.success,
             border: `1px solid ${toast.type === "error" ? T.dangerBd : T.successBd}`,
           }}
@@ -1440,7 +1412,7 @@ function OrderCard({
         <div>
           <div
             style={{
-              fontFamily: T.fontData,
+              fontFamily: T.font,
               fontSize: "16px",
               fontWeight: 600,
               color: T.ink900,
@@ -1453,7 +1425,7 @@ function OrderCard({
               fontSize: "12px",
               color: T.ink500,
               marginTop: "2px",
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
             }}
           >
             {partner?.business_name || "Unknown partner"}
@@ -1471,7 +1443,7 @@ function OrderCard({
           <StatusBadge status={status} />
           <div
             style={{
-              fontFamily: T.fontData,
+              fontFamily: T.font,
               fontSize: "14px",
               fontWeight: 600,
               color: T.ink900,
@@ -1576,7 +1548,7 @@ function OrderCard({
         <div
           style={{
             marginTop: "16px",
-            borderTop: `1px solid ${T.ink150}`,
+            borderTop: `1px solid ${T.border}`,
             paddingTop: "14px",
           }}
         >
@@ -1585,7 +1557,7 @@ function OrderCard({
               width: "100%",
               borderCollapse: "collapse",
               fontSize: "12px",
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
             }}
           >
             <thead>
@@ -1613,7 +1585,7 @@ function OrderCard({
                       style={{
                         ...sTd,
                         textAlign: "right",
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                       }}
                     >
                       {line.quantity_ordered}
@@ -1622,7 +1594,7 @@ function OrderCard({
                       style={{
                         ...sTd,
                         textAlign: "right",
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                       }}
                     >
                       R{parseFloat(line.unit_cost || 0).toFixed(2)}
@@ -1631,7 +1603,7 @@ function OrderCard({
                       style={{
                         ...sTd,
                         textAlign: "right",
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         fontWeight: 600,
                       }}
                     >
@@ -1644,10 +1616,10 @@ function OrderCard({
                       style={{
                         ...sTd,
                         textAlign: "right",
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         color:
                           avail === null
-                            ? T.ink400
+                            ? T.ink500
                             : avail <= 0
                               ? T.danger
                               : avail < parseFloat(line.quantity_ordered || 0)
@@ -1664,7 +1636,7 @@ function OrderCard({
               })}
             </tbody>
             <tfoot>
-              <tr style={{ background: T.ink075 }}>
+              <tr style={{ background: T.bg }}>
                 <td
                   colSpan={3}
                   style={{ ...sTd, fontWeight: 700, textAlign: "right" }}
@@ -1674,7 +1646,7 @@ function OrderCard({
                 <td
                   style={{
                     ...sTd,
-                    fontFamily: T.fontData,
+                    fontFamily: T.font,
                     fontWeight: 700,
                     textAlign: "right",
                     color: T.accent,
@@ -1699,7 +1671,7 @@ function OrderCard({
             fontSize: "12px",
             color: T.ink500,
             fontStyle: "italic",
-            fontFamily: T.fontUi,
+            fontFamily: T.font,
           }}
         >
           {order.notes}
@@ -1782,7 +1754,7 @@ export default function HQWholesaleOrders() {
   );
 
   return (
-    <div style={{ fontFamily: T.fontUi }}>
+    <div style={{ fontFamily: T.font }}>
       {/* Header */}
       <div
         style={{
@@ -1800,12 +1772,12 @@ export default function HQWholesaleOrders() {
               fontSize: "20px",
               fontWeight: 700,
               color: T.accent,
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
             }}
           >
             Wholesale Orders
           </div>
-          <div style={{ fontSize: "12px", color: T.ink400, marginTop: "2px" }}>
+          <div style={{ fontSize: "12px", color: T.ink500, marginTop: "2px" }}>
             B2B order management · Stock reservation on confirmation · Release
             on shipment
           </div>
@@ -1821,10 +1793,10 @@ export default function HQWholesaleOrders() {
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: "6px",
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
+          border: `1px solid ${T.border}`,
           marginBottom: "20px",
         }}
       >
@@ -1865,9 +1837,9 @@ export default function HQWholesaleOrders() {
                 fontSize: "10px",
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                color: T.ink400,
+                color: T.ink500,
                 marginBottom: "6px",
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
                 fontWeight: 700,
               }}
             >
@@ -1875,7 +1847,7 @@ export default function HQWholesaleOrders() {
             </div>
             <div
               style={{
-                fontFamily: T.fontData,
+                fontFamily: T.font,
                 fontSize: "20px",
                 fontWeight: 600,
                 color: s.color,
@@ -1947,8 +1919,8 @@ export default function HQWholesaleOrders() {
           style={{
             textAlign: "center",
             padding: "60px",
-            color: T.ink400,
-            fontFamily: T.fontUi,
+            color: T.ink500,
+            fontFamily: T.font,
           }}
         >
           Loading orders...
@@ -1959,8 +1931,8 @@ export default function HQWholesaleOrders() {
             ...sCard,
             textAlign: "center",
             padding: "60px",
-            color: T.ink400,
-            fontFamily: T.fontUi,
+            color: T.ink500,
+            fontFamily: T.font,
           }}
         >
           {filterStatus === "active"
@@ -2032,8 +2004,8 @@ export default function HQWholesaleOrders() {
               key={s.step}
               style={{
                 padding: "12px 14px",
-                background: T.ink075,
-                border: `1px solid ${T.ink150}`,
+                background: T.bg,
+                border: `1px solid ${T.border}`,
                 borderRadius: "6px",
                 borderLeft: `3px solid ${s.color}`,
               }}
@@ -2046,7 +2018,7 @@ export default function HQWholesaleOrders() {
                   textTransform: "uppercase",
                   color: s.color,
                   marginBottom: "4px",
-                  fontFamily: T.fontUi,
+                  fontFamily: T.font,
                 }}
               >
                 Step {s.step} — {s.label}
@@ -2055,7 +2027,7 @@ export default function HQWholesaleOrders() {
                 style={{
                   fontSize: "11px",
                   color: T.ink500,
-                  fontFamily: T.fontUi,
+                  fontFamily: T.font,
                   lineHeight: "1.6",
                 }}
               >

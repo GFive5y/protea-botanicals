@@ -6,18 +6,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
+import { T } from "../../styles/tokens";
 
+// WP-UNIFY: D token palette aliased to src/styles/tokens.js
 const D = {
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  ink900:"#0D0D0D", ink700:"#1F2937", ink500:"#6B7280",
-  ink300:"#D1D5DB", ink150:"#E5E7EB", ink075:"#F9FAFB",
-  accent:"#1A3D2B", accentMid:"#2D6A4F", accentLit:"#ECFDF5",
-  success:"#059669", successBg:"#ECFDF5", successBd:"#6EE7B7",
-  danger:"#DC2626", dangerBg:"#FEF2F2", dangerBd:"#FECACA",
-  warning:"#D97706", warningBg:"#FFFBEB", warningBd:"#FDE68A",
-  info:"#2563EB", infoBg:"#EFF6FF", infoBd:"#BFDBFE",
-  shadow:"0 1px 4px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04)",
-  shadowLg:"0 8px 32px rgba(0,0,0,0.12)",
+  ...T,
+  shadow: T.shadow?.sm || "0 1px 4px rgba(0,0,0,0.08)",
+  shadowLg: T.shadow?.lg || "0 8px 32px rgba(0,0,0,0.12)",
 };
 
 const fmtZar = (n) => `R\u202F${(parseFloat(n)||0).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -28,7 +23,7 @@ function SARSBadge({sarsCompliant,vatNumber,inputVatAmount,flags}) {
   if (sarsCompliant===undefined||sarsCompliant===null) return null;
   return (
     <div style={{borderRadius:10,overflow:"hidden",marginBottom:12,border:`1px solid ${sarsCompliant?D.successBd:D.warningBd}`}}>
-      <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,background:sarsCompliant?D.successBg:D.warningBg}}>
+      <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,background:sarsCompliant?D.successLight:D.warningLight}}>
         <span style={{fontSize:18}}>{sarsCompliant?"\u2705":"\u26A0\uFE0F"}</span>
         <div>
           <div style={{fontSize:13,fontWeight:700,color:sarsCompliant?D.success:D.warning}}>{sarsCompliant?"Valid SARS Tax Invoice":"Non-compliant document"}</div>
@@ -59,7 +54,7 @@ function EditableField({label,value,onChange,type="text",placeholder=""}) {
           <button onClick={()=>{onChange(draft);setEditing(false);}} style={{padding:"7px 12px",background:D.accent,color:"#fff",border:"none",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer"}}>{"\u2713"}</button>
         </div>
       ):(
-        <div onClick={()=>setEditing(true)} style={{padding:"9px 12px",border:`1.5px dashed ${D.ink150}`,borderRadius:7,fontSize:14,color:value?D.ink700:D.ink300,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div onClick={()=>setEditing(true)} style={{padding:"9px 12px",border:`1.5px dashed ${D.border}`,borderRadius:7,fontSize:14,color:value?D.ink700:D.ink300,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <span>{value||placeholder||"Tap to edit"}</span>
           <span style={{fontSize:11,color:D.ink300}}>{"\u270F\uFE0F"}</span>
         </div>
@@ -361,7 +356,7 @@ export default function HQSmartCapture() {
         <p style={{margin:"4px 0 0",color:D.ink500,fontSize:13}}>Photograph any business document {"\u2014"} AI reads it and posts it to your books</p>
       </div>
 
-      <div style={{display:"flex",gap:0,marginBottom:24,border:`1px solid ${D.ink150}`,borderRadius:10,overflow:"hidden"}}>
+      <div style={{display:"flex",gap:0,marginBottom:24,border:`1px solid ${D.border}`,borderRadius:10,overflow:"hidden"}}>
         {[["capture","\uD83D\uDCF8 Capture"],["history","\uD83D\uDCCB History"]].map(([id,label])=>(
           <button key={id} onClick={()=>{setMode(id);if(phase!=="idle"&&phase!=="success")resetCapture();}}
             style={{flex:1,padding:"11px 0",border:"none",cursor:"pointer",fontFamily:D.font,fontSize:13,fontWeight:700,background:mode===id?D.accent:"#fff",color:mode===id?"#fff":D.ink500,transition:"all 0.15s"}}>{label}</button>
@@ -393,7 +388,7 @@ export default function HQSmartCapture() {
             </div>
           ):(
             <div onClick={()=>fileRef.current?.click()} onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)} onDrop={handleDrop}
-              style={{borderRadius:16,padding:"48px 24px",textAlign:"center",cursor:"pointer",border:`2px dashed ${dragOver?D.accentMid:D.ink150}`,background:dragOver?D.accentLit:"#fff",boxShadow:D.shadowLg,marginBottom:20,transition:"all 0.2s"}}>
+              style={{borderRadius:16,padding:"48px 24px",textAlign:"center",cursor:"pointer",border:`2px dashed ${dragOver?D.accentMid:D.border}`,background:dragOver?D.accentLight:"#fff",boxShadow:D.shadowLg,marginBottom:20,transition:"all 0.2s"}}>
               <div style={{fontSize:64,marginBottom:16}}>{"\uD83D\uDCF8"}</div>
               <div style={{fontSize:18,fontWeight:700,color:D.accent,marginBottom:6}}>Upload a Document</div>
               <div style={{fontSize:13,color:D.ink500,marginBottom:20}}>Receipts · Invoices · Utility Bills · Petrol Slips</div>
@@ -417,7 +412,7 @@ export default function HQSmartCapture() {
           <div style={{fontSize:16,fontWeight:700,color:D.accent,marginBottom:8}}>Reading your document\u2026</div>
           <div style={{fontSize:13,color:D.ink500,marginBottom:24}}>{processMsg}</div>
           <style>{`@keyframes sc-spin{to{transform:rotate(360deg)}}`}</style>
-          <div style={{width:60,height:60,border:`4px solid ${D.accentLit}`,borderTopColor:D.accent,borderRadius:"50%",margin:"0 auto",animation:"sc-spin 0.8s linear infinite"}}/>
+          <div style={{width:60,height:60,border:`4px solid ${D.accentLight}`,borderTopColor:D.accent,borderRadius:"50%",margin:"0 auto",animation:"sc-spin 0.8s linear infinite"}}/>
         </div>}
 
         {phase==="error"&&<div style={{...card,padding:32,textAlign:"center"}}>
@@ -433,14 +428,14 @@ export default function HQSmartCapture() {
           <SARSBadge sarsCompliant={capture.sars_compliant} vatNumber={capture.sars_vat_number} inputVatAmount={capture.input_vat_amount} flags={capture.sars_flags}/>
           {/* Policy flags */}
           {(capture.policy_flags||[]).map((flag,i)=>{
-            const cs={block:{bg:D.dangerBg,color:D.danger,icon:"\uD83D\uDEAB"},warning:{bg:D.warningBg,color:D.warning,icon:"\u26A0\uFE0F"},info:{bg:D.infoBg,color:D.info,icon:"\u2139\uFE0F"}};
+            const cs={block:{bg:D.dangerLight,color:D.danger,icon:"\uD83D\uDEAB"},warning:{bg:D.warningLight,color:D.warning,icon:"\u26A0\uFE0F"},info:{bg:D.infoLight,color:D.info,icon:"\u2139\uFE0F"}};
             const s=cs[flag.severity]||cs.info;
             return <div key={i} style={{marginBottom:8,padding:"8px 12px",borderRadius:8,background:s.bg,border:`1px solid ${s.color}33`,display:"flex",gap:8,alignItems:"flex-start"}}>
               <span>{s.icon}</span>
               <div><div style={{fontSize:11,fontWeight:700,color:s.color}}>{flag.rule_name}</div><div style={{fontSize:11,color:s.color,opacity:0.9}}>{flag.message}</div></div>
             </div>;
           })}
-          {capture.requires_approval&&<div style={{padding:"10px 12px",background:D.warningBg,border:`1px solid ${D.warningBd}`,borderRadius:8,marginBottom:12,fontSize:12,color:D.warning}}><strong>Approval required:</strong> {capture.approval_reason}</div>}
+          {capture.requires_approval&&<div style={{padding:"10px 12px",background:D.warningLight,border:`1px solid ${D.warningBd}`,borderRadius:8,marginBottom:12,fontSize:12,color:D.warning}}><strong>Approval required:</strong> {capture.approval_reason}</div>}
           <div style={{...card,padding:20}}>
             <div style={{fontSize:11,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:14}}>Extracted Data</div>
             <EditableField label="Vendor" value={capture.vendor_name} onChange={v=>updateCapture("vendor_name",v)} placeholder="Vendor name"/>
@@ -452,9 +447,9 @@ export default function HQSmartCapture() {
           </div>
 
           {capture.line_items?.length>0&&<div style={{...card,padding:0}}>
-            <div style={{padding:"10px 16px",background:D.ink075,borderBottom:`1px solid ${D.ink150}`,fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.08em"}}>Line Items ({capture.line_items.length})</div>
+            <div style={{padding:"10px 16px",background:D.bg,borderBottom:`1px solid ${D.border}`,fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.08em"}}>Line Items ({capture.line_items.length})</div>
             {capture.line_items.map((li,i)=>(
-              <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"10px 16px",borderBottom:`1px solid ${D.ink150}`,fontSize:13}}>
+              <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"10px 16px",borderBottom:`1px solid ${D.border}`,fontSize:13}}>
                 <span style={{color:D.ink700}}>{li.description||li.product_name||"Item "+(i+1)}</span>
                 <span style={{fontWeight:600,fontVariantNumeric:"tabular-nums",color:D.accent}}>{li.total?fmtZar(li.total):li.quantity?`${li.quantity} \u00d7 ${fmtZar(li.unit_price||0)}`:"\u2014"}</span>
               </div>
@@ -463,23 +458,23 @@ export default function HQSmartCapture() {
 
           {/* Stock to Receive panel — supplier_invoice / delivery_note */}
           {isStockCapture&&<div style={{...card,padding:0,marginBottom:12}}>
-            <div style={{padding:"10px 16px",background:D.ink075,borderBottom:`1px solid ${D.ink150}`,fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.08em"}}>
+            <div style={{padding:"10px 16px",background:D.bg,borderBottom:`1px solid ${D.border}`,fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.08em"}}>
               {"\uD83D\uDCE6"} Stock to Receive ({stockActions.reduce((n,u)=>{const items=(u.data?.items||[]);return n+(items.length||1);},0)} {stockActions.some(u=>u.action==="receive_delivery_item")?"line":"SKU"}{stockActions.reduce((n,u)=>(n+(u.data?.items||[]).length||1),0)!==1?"s":""})
             </div>
             {stockActions.map((u,i)=>{
               const lines=u.action==="create_purchase_order"?(u.data?.items||[]):[u.data];
               return lines.map((item,j)=>(
-                <div key={`${i}-${j}`} style={{display:"flex",justifyContent:"space-between",padding:"9px 16px",borderBottom:`1px solid ${D.ink150}`,fontSize:13,alignItems:"center"}}>
+                <div key={`${i}-${j}`} style={{display:"flex",justifyContent:"space-between",padding:"9px 16px",borderBottom:`1px solid ${D.border}`,fontSize:13,alignItems:"center"}}>
                   <div>
                     <div style={{fontWeight:600,color:D.ink700}}>{item?.description||item?.name||item?.item_name||"Item"}</div>
                     <div style={{fontSize:11,color:D.ink500,marginTop:2}}>{item?.quantity||item?.quantity_received||"?"} {"\u00d7"} {item?.unit_cost_zar||item?.unit_cost||item?.unit_price?`R${parseFloat(item?.unit_cost_zar||item?.unit_cost||item?.unit_price||0).toFixed(2)}`:"\u2014"}</div>
                   </div>
-                  <span style={{fontSize:10,padding:"2px 7px",borderRadius:4,background:item?.item_id||item?.matched_id?D.successBg:D.warningBg,color:item?.item_id||item?.matched_id?D.success:D.warning,fontWeight:700}}>{item?.item_id||item?.matched_id?"\u2713 Matched":"\u26A0 Unmatched"}</span>
+                  <span style={{fontSize:10,padding:"2px 7px",borderRadius:4,background:item?.item_id||item?.matched_id?D.successLight:D.warningLight,color:item?.item_id||item?.matched_id?D.success:D.warning,fontWeight:700}}>{item?.item_id||item?.matched_id?"\u2713 Matched":"\u26A0 Unmatched"}</span>
                 </div>
               ));
             })}
             {stockActions.some(u=>u.action==="create_purchase_order"&&(u.data?.items||[]).some(i=>!i.item_id&&!i.matched_id))&&(
-              <div style={{padding:"8px 16px",fontSize:11,color:D.warning,background:D.warningBg}}>
+              <div style={{padding:"8px 16px",fontSize:11,color:D.warning,background:D.warningLight}}>
                 {"\u26A0"} Unmatched items will be skipped {"\u2014"} receive them manually via Stock {"\u2192"} Receive
               </div>
             )}
@@ -494,7 +489,7 @@ export default function HQSmartCapture() {
                 {capture?.is_duplicate?"\u26D4 Blocked \u2014 Duplicate":posting?"Posting\u2026":"\u2713 Approve & Post"}
               </button>
             )}
-            <button onClick={resetCapture} style={{padding:"12px 20px",border:`1px solid ${D.ink150}`,borderRadius:8,background:"#fff",color:D.ink500,fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+            <button onClick={resetCapture} style={{padding:"12px 20px",border:`1px solid ${D.border}`,borderRadius:8,background:"#fff",color:D.ink500,fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
           </div>
         </div>}
 
@@ -511,7 +506,7 @@ export default function HQSmartCapture() {
                 <div key={l}><div style={{fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:3}}>{l}</div><div style={{fontSize:14,fontWeight:700,color:c,fontVariantNumeric:"tabular-nums"}}>{v}</div></div>
               ))}
             </div>
-            <div style={{background:D.ink075,borderRadius:8,padding:14,marginBottom:16}}>
+            <div style={{background:D.bg,borderRadius:8,padding:14,marginBottom:16}}>
               <div style={{fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:8}}>Records created</div>
               {successData.is_stock_receipt?(
                 <>
@@ -547,18 +542,18 @@ export default function HQSmartCapture() {
           <div style={{fontSize:13,color:D.ink500}}>Switch to Capture mode to photograph your first document.</div>
         </div>
         :<div style={card}>
-          <div style={{padding:"10px 20px",background:D.ink075,borderBottom:`1px solid ${D.ink150}`,fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.08em"}}>{history.length} document{history.length!==1?"s":""}</div>
+          <div style={{padding:"10px 20px",background:D.bg,borderBottom:`1px solid ${D.border}`,fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.08em"}}>{history.length} document{history.length!==1?"s":""}</div>
           {history.map((h,i)=>(
-            <div key={h.id} style={{display:"flex",justifyContent:"space-between",padding:"12px 20px",borderBottom:i<history.length-1?`1px solid ${D.ink150}`:"none",alignItems:"center"}}>
+            <div key={h.id} style={{display:"flex",justifyContent:"space-between",padding:"12px 20px",borderBottom:i<history.length-1?`1px solid ${D.border}`:"none",alignItems:"center"}}>
               <div>
                 <div style={{fontSize:13,fontWeight:600,color:D.ink700}}>{h.vendor_name||h.file_name||"Document"}</div>
                 <div style={{fontSize:11,color:D.ink500,marginTop:2,display:"flex",flexWrap:"wrap",gap:4,alignItems:"center"}}>
                   <span>{fmtDate(h.captured_at||h.document_date)}</span>
                   <span>{"\u00b7"} {h.capture_type?.replace(/_/g," ")||"receipt"}</span>
-                  <span style={{padding:"1px 6px",borderRadius:4,fontSize:10,fontWeight:700,background:["approved","auto_posted"].includes(h.status)?D.successBg:h.status==="rejected"?D.dangerBg:D.warningBg,color:["approved","auto_posted"].includes(h.status)?D.success:h.status==="rejected"?D.danger:D.warning}}>{h.status}</span>
-                  {h.sars_compliant===true&&<span style={{padding:"1px 5px",borderRadius:4,fontSize:10,fontWeight:700,background:D.successBg,color:D.success}}>SARS ✓</span>}
-                  {h.sars_compliant===false&&<span style={{padding:"1px 5px",borderRadius:4,fontSize:10,fontWeight:700,background:D.warningBg,color:D.warning}}>Non-SARS</span>}
-                  {h.is_duplicate&&<span style={{padding:"1px 5px",borderRadius:4,fontSize:10,fontWeight:700,background:D.dangerBg,color:D.danger}}>{"\u26A0"} Duplicate</span>}
+                  <span style={{padding:"1px 6px",borderRadius:4,fontSize:10,fontWeight:700,background:["approved","auto_posted"].includes(h.status)?D.successLight:h.status==="rejected"?D.dangerLight:D.warningLight,color:["approved","auto_posted"].includes(h.status)?D.success:h.status==="rejected"?D.danger:D.warning}}>{h.status}</span>
+                  {h.sars_compliant===true&&<span style={{padding:"1px 5px",borderRadius:4,fontSize:10,fontWeight:700,background:D.successLight,color:D.success}}>SARS ✓</span>}
+                  {h.sars_compliant===false&&<span style={{padding:"1px 5px",borderRadius:4,fontSize:10,fontWeight:700,background:D.warningLight,color:D.warning}}>Non-SARS</span>}
+                  {h.is_duplicate&&<span style={{padding:"1px 5px",borderRadius:4,fontSize:10,fontWeight:700,background:D.dangerLight,color:D.danger}}>{"\u26A0"} Duplicate</span>}
                 </div>
               </div>
               <div style={{textAlign:"right"}}>
