@@ -17,8 +17,9 @@ import {
 } from "./ProductWorlds";
 import InfoTooltip from "../InfoTooltip";
 import ReorderPanel from "./ReorderPanel";
+import { T } from "../../styles/tokens";
 
-const T = {
+const SINV_T = {
   bg: "#FAFAF9",
   white: "#ffffff",
   border: "#ECEAE6",
@@ -905,10 +906,10 @@ const margin = (sell, cost) => {
   return ((sell - cost) / sell) * 100;
 };
 function marginColor(m) {
-  if (m === null) return T.ink300;
-  if (m >= 50) return T.accentMid;
-  if (m >= 30) return T.amber;
-  return T.danger;
+  if (m === null) return SINV_T.ink300;
+  if (m >= 50) return SINV_T.accentMid;
+  if (m >= 30) return SINV_T.amber;
+  return SINV_T.danger;
 }
 
 const EDIT_FIELDS = [
@@ -1708,7 +1709,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        fontFamily: T.font,
+        fontFamily: SINV_T.font,
         background: "transparent",
       }}
     >
@@ -1724,8 +1725,8 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
       {/* ── TOP TOOLBAR ─────────────────────────────────────────────── */}
       <div
         style={{
-          background: T.white,
-          borderBottom: `1px solid ${T.border}`,
+          background: SINV_T.white,
+          borderBottom: `1px solid ${SINV_T.border}`,
           padding: "10px 16px 0",
           flexShrink: 0,
           boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
@@ -1739,7 +1740,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
             marginBottom: 8,
           }}
         >
-          <span style={{ fontWeight: 800, fontSize: 17, color: T.ink900 }}>
+          <span style={{ fontWeight: 800, fontSize: 17, color: SINV_T.ink900 }}>
             📦 Inventory
           </span>
           <div style={{ marginLeft: 12 }}>
@@ -1750,14 +1751,14 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
               placeholder="Search… or try price>500, qty:0, brand:RAW"
               style={{
                 padding: "5px 12px",
-                border: `1.5px solid ${search ? T.accent : T.border}`,
+                border: `1.5px solid ${search ? SINV_T.accent : SINV_T.border}`,
                 borderRadius: 99,
                 fontSize: 12.5,
-                fontFamily: T.font,
-                color: T.ink900,
+                fontFamily: SINV_T.font,
+                color: SINV_T.ink900,
                 outline: "none",
                 width: 320,
-                background: T.white,
+                background: SINV_T.white,
               }}
             />
             <InfoTooltip id="sc_search" />
@@ -1769,7 +1770,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
               <span
                 style={{
                   fontSize: 11,
-                  color: T.ink400,
+                  color: SINV_T.ink400,
                   fontWeight: 600,
                   whiteSpace: "nowrap",
                 }}
@@ -1789,14 +1790,14 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                 }}
                 style={{
                   fontSize: 10,
-                  color: T.danger,
-                  background: T.dangerLit,
-                  border: `1px solid ${T.danger}30`,
+                  color: SINV_T.danger,
+                  background: SINV_T.dangerLit,
+                  border: `1px solid ${SINV_T.danger}30`,
                   borderRadius: 99,
                   padding: "2px 8px",
                   cursor: "pointer",
                   fontWeight: 600,
-                  fontFamily: T.font,
+                  fontFamily: SINV_T.font,
                   whiteSpace: "nowrap",
                 }}
               >
@@ -1821,13 +1822,13 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
               <button
                 onClick={() => setMoreOpen((v) => !v)}
                 style={{
-                  background: moreOpen ? T.accentLit : T.white,
-                  border: `1px solid ${moreOpen ? T.accentMid : T.border}`,
-                  borderRadius: T.radius,
+                  background: moreOpen ? SINV_T.accentLit : SINV_T.white,
+                  border: `1px solid ${moreOpen ? SINV_T.accentMid : SINV_T.border}`,
+                  borderRadius: SINV_T.radius,
                   padding: "6px 14px",
                   cursor: "pointer",
                   fontSize: 18,
-                  color: moreOpen ? T.accent : T.ink500,
+                  color: moreOpen ? SINV_T.accent : SINV_T.ink500,
                   letterSpacing: "0.12em",
                   fontWeight: 600,
                   lineHeight: 1,
@@ -1841,7 +1842,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
             {!selectMode && (
               <button
                 onClick={openAdd}
-                style={btnStyle(T.accent, T.white, T.accent, T, true)}
+                style={btnStyle(SINV_T.accent, SINV_T.white, SINV_T.accent, T, true)}
               >
                 + Add Item
               </button>
@@ -1853,10 +1854,10 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                   position: "absolute",
                   top: "calc(100% + 8px)",
                   right: 0,
-                  background: T.white,
-                  border: `1px solid ${T.border}`,
-                  borderRadius: T.radius,
-                  boxShadow: T.shadowMd,
+                  background: SINV_T.white,
+                  border: `1px solid ${SINV_T.border}`,
+                  borderRadius: SINV_T.radius,
+                  boxShadow: SINV_T.shadowMd,
                   padding: "12px 16px",
                   zIndex: 999,
                   minWidth: 280,
@@ -1886,7 +1887,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                     <div
                       style={{
                         display: "flex",
-                        border: `1.5px solid ${T.border}`,
+                        border: `1.5px solid ${SINV_T.border}`,
                         borderRadius: 8,
                         overflow: "hidden",
                       }}
@@ -1898,13 +1899,13 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                           style={{
                             padding: "5px 10px",
                             border: "none",
-                            borderRight: i < 2 ? `1px solid ${T.border}` : "none",
-                            background: tileSize === s ? T.accent : T.white,
-                            color: tileSize === s ? T.white : T.ink500,
+                            borderRight: i < 2 ? `1px solid ${SINV_T.border}` : "none",
+                            background: tileSize === s ? SINV_T.accent : SINV_T.white,
+                            color: tileSize === s ? SINV_T.white : SINV_T.ink500,
                             cursor: "pointer",
                             fontSize: 11,
                             fontWeight: 700,
-                            fontFamily: T.font,
+                            fontFamily: SINV_T.font,
                             transition: "all 0.12s",
                           }}
                         >
@@ -1914,7 +1915,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                     </div>
                   )}
                 </div>
-                <div style={{ height: 1, background: T.border }} />
+                <div style={{ height: 1, background: SINV_T.border }} />
                 {/* Row 2: Filters + Columns */}
                 <div
                   style={{
@@ -1927,9 +1928,9 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                   <button
                     onClick={() => setFilterRowOpen((v) => !v)}
                     style={btnStyle(
-                      filterRowOpen || sortByIssues ? T.accent : T.white,
-                      filterRowOpen || sortByIssues ? T.white : T.ink500,
-                      T.border,
+                      filterRowOpen || sortByIssues ? SINV_T.accent : SINV_T.white,
+                      filterRowOpen || sortByIssues ? SINV_T.white : SINV_T.ink500,
+                      SINV_T.border,
                       T,
                     )}
                   >
@@ -1940,9 +1941,9 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                       <button
                         onClick={() => setColPickerOpen((v) => !v)}
                         style={btnStyle(
-                          colPickerOpen ? T.accent : T.white,
-                          colPickerOpen ? T.white : T.ink500,
-                          T.border,
+                          colPickerOpen ? SINV_T.accent : SINV_T.white,
+                          colPickerOpen ? SINV_T.white : SINV_T.ink500,
+                          SINV_T.border,
                           T,
                         )}
                       >
@@ -1954,8 +1955,8 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                             position: "absolute",
                             top: "calc(100% + 4px)",
                             right: 0,
-                            background: T.white,
-                            border: `1px solid ${T.border}`,
+                            background: SINV_T.white,
+                            border: `1px solid ${SINV_T.border}`,
                             borderRadius: 10,
                             boxShadow: "0 8px 30px rgba(0,0,0,0.12)",
                             zIndex: 500,
@@ -1968,7 +1969,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                               padding: "4px 14px 6px",
                               fontSize: 10,
                               fontWeight: 700,
-                              color: T.ink400,
+                              color: SINV_T.ink400,
                               textTransform: "uppercase",
                               letterSpacing: "0.05em",
                             }}
@@ -1998,10 +1999,10 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                                   padding: "5px 14px",
                                   cursor: "pointer",
                                   fontSize: 13,
-                                  color: T.ink700,
+                                  color: SINV_T.ink700,
                                 }}
                                 onMouseEnter={(e) =>
-                                  (e.currentTarget.style.background = T.accentXlit)
+                                  (e.currentTarget.style.background = SINV_T.accentXlit)
                                 }
                                 onMouseLeave={(e) =>
                                   (e.currentTarget.style.background = "transparent")
@@ -2011,7 +2012,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                                   type="checkbox"
                                   checked={!isHidden}
                                   onChange={() => toggleCol(col.key)}
-                                  style={{ accentColor: T.accent, flexShrink: 0 }}
+                                  style={{ accentColor: SINV_T.accent, flexShrink: 0 }}
                                 />
                                 <span style={{ flex: 1 }}>
                                   {col.label || col.key}
@@ -2020,7 +2021,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                                   <span
                                     style={{
                                       fontSize: 10,
-                                      color: T.amber,
+                                      color: SINV_T.amber,
                                       fontWeight: 600,
                                     }}
                                   >
@@ -2032,7 +2033,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                           })}
                           <div
                             style={{
-                              borderTop: `1px solid ${T.border}`,
+                              borderTop: `1px solid ${SINV_T.border}`,
                               margin: "4px 0",
                             }}
                           />
@@ -2072,9 +2073,9 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                               background: "none",
                               textAlign: "left",
                               fontSize: 12,
-                              color: T.amber,
+                              color: SINV_T.amber,
                               cursor: "pointer",
-                              fontFamily: T.font,
+                              fontFamily: SINV_T.font,
                               fontWeight: 600,
                             }}
                           >
@@ -2095,9 +2096,9 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                               background: "none",
                               textAlign: "left",
                               fontSize: 12,
-                              color: T.ink400,
+                              color: SINV_T.ink400,
                               cursor: "pointer",
-                              fontFamily: T.font,
+                              fontFamily: SINV_T.font,
                             }}
                           >
                             Show all columns
@@ -2112,7 +2113,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                   {viewMode === VIEW_DETAIL && (
                     <button
                       onClick={exportCSV}
-                      style={btnStyle(T.white, T.ink500, T.border, T)}
+                      style={btnStyle(SINV_T.white, SINV_T.ink500, SINV_T.border, T)}
                       title="Export visible columns to CSV"
                     >
                       ↓ CSV
@@ -2120,7 +2121,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                   )}
                   <button
                     onClick={load}
-                    style={btnStyle(T.white, T.ink500, T.border, T)}
+                    style={btnStyle(SINV_T.white, SINV_T.ink500, SINV_T.border, T)}
                     title="Refresh inventory"
                   >
                     ↺ Refresh
@@ -2134,7 +2135,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                       setSelectMode(true);
                     }}
                     title="Select multiple items"
-                    style={btnStyle(T.white, T.ink500, T.border, T)}
+                    style={btnStyle(SINV_T.white, SINV_T.ink500, SINV_T.border, T)}
                   >
                     ☑ Select
                   </button>
@@ -2143,7 +2144,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                       setMoreOpen(false);
                       setShowReorderPanel(true);
                     }}
-                    style={btnStyle(T.white, T.amber, T.amber + "60", T)}
+                    style={btnStyle(SINV_T.white, SINV_T.amber, SINV_T.amber + "60", T)}
                   >
                     ⚑ Reorder
                     {gSoldOut + gBelowReorder > 0
@@ -2164,14 +2165,14 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
               alignItems: "center",
               gap: 10,
               padding: "8px 0 10px",
-              borderTop: `1px solid ${T.border}`,
+              borderTop: `1px solid ${SINV_T.border}`,
               flexWrap: "wrap",
             }}
           >
             <button
               onClick={exitSelectMode}
               style={{
-                ...btnStyle(T.white, T.ink500, T.border, T),
+                ...btnStyle(SINV_T.white, SINV_T.ink500, SINV_T.border, T),
                 fontSize: 12,
               }}
               title="Exit select mode (Esc)"
@@ -2182,7 +2183,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
               style={{
                 fontSize: 13,
                 fontWeight: 700,
-                color: selectedIds.size > 0 ? T.blue : T.ink400,
+                color: selectedIds.size > 0 ? SINV_T.blue : SINV_T.ink400,
               }}
             >
               {selectedIds.size > 0
@@ -2192,7 +2193,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
             <button
               onClick={selectAllItems}
               style={{
-                ...btnStyle(T.white, T.blue, T.blue + "60", T),
+                ...btnStyle(SINV_T.white, SINV_T.blue, SINV_T.blue + "60", T),
                 fontSize: 12,
               }}
             >
@@ -2203,20 +2204,20 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                 <button
                   onClick={() => setSelectedIds(new Set())}
                   style={{
-                    ...btnStyle(T.white, T.ink400, T.border, T),
+                    ...btnStyle(SINV_T.white, SINV_T.ink400, SINV_T.border, T),
                     fontSize: 12,
                   }}
                 >
                   Clear
                 </button>
-                <div style={{ width: 1, height: 20, background: T.border }} />
+                <div style={{ width: 1, height: 20, background: SINV_T.border }} />
                 <button
                   onClick={bulkShow}
                   style={{
                     ...btnStyle(
-                      T.accentLit,
-                      T.accentMid,
-                      T.accentMid + "40",
+                      SINV_T.accentLit,
+                      SINV_T.accentMid,
+                      SINV_T.accentMid + "40",
                       T,
                     ),
                     fontSize: 12,
@@ -2227,7 +2228,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                 <button
                   onClick={bulkHide}
                   style={{
-                    ...btnStyle(T.amberLit, T.amber, T.amber + "40", T),
+                    ...btnStyle(SINV_T.amberLit, SINV_T.amber, SINV_T.amber + "40", T),
                     fontSize: 12,
                   }}
                 >
@@ -2236,7 +2237,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                 <button
                   onClick={exportCSV}
                   style={{
-                    ...btnStyle(T.white, T.ink500, T.border, T),
+                    ...btnStyle(SINV_T.white, SINV_T.ink500, SINV_T.border, T),
                     fontSize: 12,
                   }}
                 >
@@ -2245,7 +2246,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                 <button
                   onClick={bulkDelete}
                   style={{
-                    ...btnStyle(T.dangerLit, T.danger, T.danger + "40", T),
+                    ...btnStyle(SINV_T.dangerLit, SINV_T.danger, SINV_T.danger + "40", T),
                     fontSize: 12,
                   }}
                 >
@@ -2273,9 +2274,9 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                 label: "Total Items",
                 global: gTotal,
                 filtered: fTotal,
-                color: T.ink700,
-                bg: T.ink50,
-                border: T.border,
+                color: SINV_T.ink700,
+                bg: SINV_T.ink50,
+                border: SINV_T.border,
                 onClick: () => {
                   selectCat("all");
                   setGroupFilter(null);
@@ -2293,27 +2294,27 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                 tooltip: "sc_stock_value",
                 global: `R${gStockValue >= 1000000 ? (gStockValue / 1000000).toFixed(1) + "m" : (gStockValue / 1000).toFixed(0) + "k"}`,
                 filtered: `R${fStockValue >= 1000000 ? (fStockValue / 1000000).toFixed(1) + "m" : (fStockValue / 1000).toFixed(0) + "k"}`,
-                color: T.blue,
-                bg: T.blueLit,
-                border: T.blue + "30",
+                color: SINV_T.blue,
+                bg: SINV_T.blueLit,
+                border: SINV_T.blue + "30",
               },
               {
                 key: "active",
                 label: "Active",
                 global: gActive,
                 filtered: fActive,
-                color: T.accentMid,
-                bg: T.accentLit,
-                border: T.accentBd,
+                color: SINV_T.accentMid,
+                bg: SINV_T.accentLit,
+                border: SINV_T.accentBd,
               },
               {
                 key: "soldout",
                 label: "Sold Out",
                 global: gSoldOut,
                 filtered: fSoldOut,
-                color: gSoldOut > 0 ? T.danger : T.ink300,
-                bg: gSoldOut > 0 ? T.dangerLit : T.ink50,
-                border: gSoldOut > 0 ? T.danger + "30" : T.border,
+                color: gSoldOut > 0 ? SINV_T.danger : SINV_T.ink300,
+                bg: gSoldOut > 0 ? SINV_T.dangerLit : SINV_T.ink50,
+                border: gSoldOut > 0 ? SINV_T.danger + "30" : SINV_T.border,
                 urgent: gSoldOut > 0,
                 onClick:
                   gSoldOut > 0 ? () => setActivePanel("soldout") : undefined,
@@ -2324,9 +2325,9 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                 label: "Below Reorder",
                 global: gBelowReorder,
                 filtered: fBelowReorder,
-                color: gBelowReorder > 0 ? T.amber : T.ink300,
-                bg: gBelowReorder > 0 ? T.amberLit : T.ink50,
-                border: gBelowReorder > 0 ? T.amber + "40" : T.border,
+                color: gBelowReorder > 0 ? SINV_T.amber : SINV_T.ink300,
+                bg: gBelowReorder > 0 ? SINV_T.amberLit : SINV_T.ink50,
+                border: gBelowReorder > 0 ? SINV_T.amber + "40" : SINV_T.border,
                 urgent: gBelowReorder > 0,
                 onClick:
                   gBelowReorder > 0
@@ -2339,9 +2340,9 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                 label: "No Price",
                 global: gNoPrice,
                 filtered: fNoPrice,
-                color: gNoPrice > 0 ? T.danger : T.ink300,
-                bg: gNoPrice > 0 ? T.dangerLit : T.ink50,
-                border: gNoPrice > 0 ? T.danger + "30" : T.border,
+                color: gNoPrice > 0 ? SINV_T.danger : SINV_T.ink300,
+                bg: gNoPrice > 0 ? SINV_T.dangerLit : SINV_T.ink50,
+                border: gNoPrice > 0 ? SINV_T.danger + "30" : SINV_T.border,
                 urgent: gNoPrice > 0,
                 onClick:
                   gNoPrice > 0 ? () => setActivePanel("noprice") : undefined,
@@ -2384,7 +2385,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                 <div
                   style={{
                     fontSize: 10,
-                    color: T.ink400,
+                    color: SINV_T.ink400,
                     marginTop: 4,
                     textTransform: "uppercase",
                     letterSpacing: "0.05em",
@@ -2430,7 +2431,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
           <div
             style={{
               padding: "8px 0 10px",
-              borderTop: `1px solid ${T.border}`,
+              borderTop: `1px solid ${SINV_T.border}`,
               display: "flex",
               alignItems: "center",
               gap: 16,
@@ -2444,7 +2445,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                 gap: 7,
                 cursor: "pointer",
                 fontSize: 12,
-                color: T.ink700,
+                color: SINV_T.ink700,
                 userSelect: "none",
               }}
             >
@@ -2452,10 +2453,10 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                 type="checkbox"
                 checked={sortByIssues}
                 onChange={() => setSortByIssues((v) => !v)}
-                style={{ accentColor: T.accent, width: 14, height: 14 }}
+                style={{ accentColor: SINV_T.accent, width: 14, height: 14 }}
               />
               <span>⚠ Issues first</span>
-              <span style={{ fontSize: 10.5, color: T.ink300 }}>
+              <span style={{ fontSize: 10.5, color: SINV_T.ink300 }}>
                 sold out + low stock at top
               </span>
             </label>
@@ -2464,11 +2465,11 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                 style={{
                   fontSize: 10.5,
                   fontWeight: 700,
-                  background: T.amberLit,
-                  color: T.amber,
+                  background: SINV_T.amberLit,
+                  color: SINV_T.amber,
                   padding: "2px 8px",
                   borderRadius: 99,
-                  border: `1px solid ${T.amber}40`,
+                  border: `1px solid ${SINV_T.amber}40`,
                 }}
               >
                 ⚠ Active — {gSoldOut + gBelowReorder} items flagged
@@ -2599,17 +2600,17 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
               top: 0,
               bottom: 0,
               width: 420,
-              background: T.white,
+              background: SINV_T.white,
               display: "flex",
               flexDirection: "column",
               boxShadow: "-4px 0 24px rgba(0,0,0,0.14)",
-              fontFamily: T.font,
+              fontFamily: SINV_T.font,
             }}
           >
             <div
               style={{
                 padding: "18px 20px 14px",
-                borderBottom: `1px solid ${T.border}`,
+                borderBottom: `1px solid ${SINV_T.border}`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
@@ -2617,7 +2618,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
               }}
             >
               <div>
-                <div style={{ fontWeight: 700, fontSize: 15, color: T.ink900 }}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: SINV_T.ink900 }}>
                   {activePanel === "soldout" &&
                     `Sold Out · ${soldOutItems.length} items`}
                   {activePanel === "reorder" &&
@@ -2625,7 +2626,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                   {activePanel === "noprice" &&
                     `No Sell Price · ${noPriceItems.length} items`}
                 </div>
-                <div style={{ fontSize: 11, color: T.ink400, marginTop: 3 }}>
+                <div style={{ fontSize: 11, color: SINV_T.ink400, marginTop: 3 }}>
                   {activePanel === "soldout" &&
                     "Sorted by potential revenue lost"}
                   {activePanel === "reorder" &&
@@ -2641,7 +2642,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                   border: "none",
                   fontSize: 20,
                   cursor: "pointer",
-                  color: T.ink400,
+                  color: SINV_T.ink400,
                   lineHeight: 1,
                 }}
               >
@@ -2655,7 +2656,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                     style={{
                       padding: 32,
                       textAlign: "center",
-                      color: T.ink300,
+                      color: SINV_T.ink300,
                       fontSize: 13,
                     }}
                   >
@@ -2673,11 +2674,11 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                         key={item.id}
                         style={{
                           padding: "12px 20px",
-                          borderBottom: `1px solid ${T.border}`,
+                          borderBottom: `1px solid ${SINV_T.border}`,
                           display: "flex",
                           alignItems: "center",
                           gap: 10,
-                          background: isOnOrder ? "#FFFBEB" : T.white,
+                          background: isOnOrder ? "#FFFBEB" : SINV_T.white,
                         }}
                       >
                         <span style={{ fontSize: 18 }}>
@@ -2688,7 +2689,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                             style={{
                               fontSize: 13,
                               fontWeight: 600,
-                              color: T.ink900,
+                              color: SINV_T.ink900,
                               overflow: "hidden",
                               textOverflow: "ellipsis",
                               whiteSpace: "nowrap",
@@ -2699,7 +2700,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                           <div
                             style={{
                               fontSize: 11,
-                              color: T.ink400,
+                              color: SINV_T.ink400,
                               marginTop: 2,
                             }}
                           >
@@ -2715,11 +2716,11 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                             style={{
                               fontSize: 11,
                               fontWeight: 700,
-                              color: T.amber,
+                              color: SINV_T.amber,
                               padding: "4px 10px",
                               borderRadius: 6,
-                              background: T.amberLit,
-                              border: `1px solid ${T.amber}40`,
+                              background: SINV_T.amberLit,
+                              border: `1px solid ${SINV_T.amber}40`,
                               flexShrink: 0,
                             }}
                           >
@@ -2737,13 +2738,13 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                               style={{
                                 padding: "5px 10px",
                                 borderRadius: 6,
-                                border: `1px solid ${T.amber}60`,
-                                background: T.amberLit,
-                                color: T.amber,
+                                border: `1px solid ${SINV_T.amber}60`,
+                                background: SINV_T.amberLit,
+                                color: SINV_T.amber,
                                 fontSize: 11,
                                 fontWeight: 700,
                                 cursor: "pointer",
-                                fontFamily: T.font,
+                                fontFamily: SINV_T.font,
                               }}
                             >
                               {isSavingOrder ? "…" : "On Order"}
@@ -2753,13 +2754,13 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                               style={{
                                 padding: "5px 12px",
                                 borderRadius: 6,
-                                border: `1px solid ${T.accentBd}`,
-                                background: T.accentLit,
-                                color: T.accentMid,
+                                border: `1px solid ${SINV_T.accentBd}`,
+                                background: SINV_T.accentLit,
+                                color: SINV_T.accentMid,
                                 fontSize: 11,
                                 fontWeight: 700,
                                 cursor: "pointer",
-                                fontFamily: T.font,
+                                fontFamily: SINV_T.font,
                               }}
                             >
                               Receive Stock
@@ -2776,7 +2777,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                     style={{
                       padding: 32,
                       textAlign: "center",
-                      color: T.ink300,
+                      color: SINV_T.ink300,
                       fontSize: 13,
                     }}
                   >
@@ -2793,7 +2794,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                         key={item.id}
                         style={{
                           padding: "12px 20px",
-                          borderBottom: `1px solid ${T.border}`,
+                          borderBottom: `1px solid ${SINV_T.border}`,
                           display: "flex",
                           alignItems: "center",
                           gap: 10,
@@ -2807,7 +2808,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                             style={{
                               fontSize: 13,
                               fontWeight: 600,
-                              color: T.ink900,
+                              color: SINV_T.ink900,
                               overflow: "hidden",
                               textOverflow: "ellipsis",
                               whiteSpace: "nowrap",
@@ -2816,10 +2817,10 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                             {item.name}
                           </div>
                           <div style={{ fontSize: 11, marginTop: 2 }}>
-                            <span style={{ color: T.amber, fontWeight: 700 }}>
+                            <span style={{ color: SINV_T.amber, fontWeight: 700 }}>
                               {item.quantity_on_hand || 0} remaining
                             </span>
-                            <span style={{ color: T.ink400 }}>
+                            <span style={{ color: SINV_T.ink400 }}>
                               {" "}
                               · reorder at {item.reorder_level}
                             </span>
@@ -2831,13 +2832,13 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                             padding: "5px 12px",
                             borderRadius: 6,
                             flexShrink: 0,
-                            border: `1px solid ${isFlagged ? T.accentBd : T.amber + "60"}`,
-                            background: isFlagged ? T.accentLit : T.amberLit,
-                            color: isFlagged ? T.accentMid : T.amber,
+                            border: `1px solid ${isFlagged ? SINV_T.accentBd : SINV_T.amber + "60"}`,
+                            background: isFlagged ? SINV_T.accentLit : SINV_T.amberLit,
+                            color: isFlagged ? SINV_T.accentMid : SINV_T.amber,
                             fontSize: 11,
                             fontWeight: 700,
                             cursor: isFlagged ? "default" : "pointer",
-                            fontFamily: T.font,
+                            fontFamily: SINV_T.font,
                           }}
                         >
                           {isFlagged ? "✓ Flagged" : "⚑ Flag for Reorder"}
@@ -2852,7 +2853,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                     style={{
                       padding: 32,
                       textAlign: "center",
-                      color: T.ink300,
+                      color: SINV_T.ink300,
                       fontSize: 13,
                     }}
                   >
@@ -2870,11 +2871,11 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                         key={item.id}
                         style={{
                           padding: "12px 20px",
-                          borderBottom: `1px solid ${T.border}`,
+                          borderBottom: `1px solid ${SINV_T.border}`,
                           display: "flex",
                           alignItems: "center",
                           gap: 10,
-                          background: isFixed ? "#F0FDF4" : T.white,
+                          background: isFixed ? "#F0FDF4" : SINV_T.white,
                         }}
                       >
                         <span style={{ fontSize: 18 }}>
@@ -2885,7 +2886,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                             style={{
                               fontSize: 13,
                               fontWeight: 600,
-                              color: T.ink900,
+                              color: SINV_T.ink900,
                               overflow: "hidden",
                               textOverflow: "ellipsis",
                               whiteSpace: "nowrap",
@@ -2897,7 +2898,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                             <div
                               style={{
                                 fontSize: 11,
-                                color: T.ink400,
+                                color: SINV_T.ink400,
                                 marginTop: 2,
                               }}
                             >
@@ -2924,7 +2925,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                               style={{
                                 display: "flex",
                                 alignItems: "center",
-                                border: `1px solid ${T.border}`,
+                                border: `1px solid ${SINV_T.border}`,
                                 borderRadius: 6,
                                 overflow: "hidden",
                               }}
@@ -2933,8 +2934,8 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                                 style={{
                                   padding: "5px 6px 5px 8px",
                                   fontSize: 12,
-                                  color: T.ink400,
-                                  background: T.ink50,
+                                  color: SINV_T.ink400,
+                                  background: SINV_T.ink50,
                                 }}
                               >
                                 R
@@ -2960,7 +2961,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                                   border: "none",
                                   fontSize: 12,
                                   outline: "none",
-                                  fontFamily: T.font,
+                                  fontFamily: SINV_T.font,
                                 }}
                               />
                             </div>
@@ -2972,17 +2973,17 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                                 borderRadius: 6,
                                 border: "none",
                                 background: noPriceDraft[item.id]
-                                  ? T.accent
-                                  : T.ink150,
+                                  ? SINV_T.accent
+                                  : SINV_T.ink150,
                                 color: noPriceDraft[item.id]
                                   ? "#fff"
-                                  : T.ink300,
+                                  : SINV_T.ink300,
                                 fontSize: 11,
                                 fontWeight: 700,
                                 cursor: noPriceDraft[item.id]
                                   ? "pointer"
                                   : "not-allowed",
-                                fontFamily: T.font,
+                                fontFamily: SINV_T.font,
                               }}
                             >
                               {isSaving ? "…" : "Save"}
@@ -3020,7 +3021,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
               padding: 28,
               width: 580,
               maxWidth: "95vw",
-              fontFamily: T.font,
+              fontFamily: SINV_T.font,
               boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
             }}
           >
@@ -3037,13 +3038,13 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                   style={{
                     fontSize: 18,
                     fontWeight: 600,
-                    color: T.ink900,
+                    color: SINV_T.ink900,
                     marginBottom: 4,
                   }}
                 >
                   What are you adding?
                 </div>
-                <div style={{ fontSize: 12, color: T.ink400 }}>
+                <div style={{ fontSize: 12, color: SINV_T.ink400 }}>
                   Choose a product type — the form adapts with the right fields
                 </div>
               </div>
@@ -3054,7 +3055,7 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                   border: "none",
                   fontSize: 20,
                   cursor: "pointer",
-                  color: T.ink400,
+                  color: SINV_T.ink400,
                 }}
               >
                 ×
@@ -3083,18 +3084,18 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                   style={{
                     padding: "14px 12px",
                     borderRadius: 8,
-                    border: `1px solid ${T.ink150}`,
+                    border: `1px solid ${SINV_T.ink150}`,
                     cursor: "pointer",
                     textAlign: "center",
                     background: "#fff",
                     transition: "all 0.15s",
                   }}
                   onMouseOver={(e) => {
-                    e.currentTarget.style.borderColor = T.accent;
-                    e.currentTarget.style.background = T.accentLit;
+                    e.currentTarget.style.borderColor = SINV_T.accent;
+                    e.currentTarget.style.background = SINV_T.accentLit;
                   }}
                   onMouseOut={(e) => {
-                    e.currentTarget.style.borderColor = T.ink150;
+                    e.currentTarget.style.borderColor = SINV_T.ink150;
                     e.currentTarget.style.background = "#fff";
                   }}
                 >
@@ -3105,14 +3106,14 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
                     style={{
                       fontSize: 13,
                       fontWeight: 600,
-                      color: T.ink900,
+                      color: SINV_T.ink900,
                       marginBottom: 3,
                     }}
                   >
                     {world.label}
                   </div>
                   <div
-                    style={{ fontSize: 10, color: T.ink400, lineHeight: 1.4 }}
+                    style={{ fontSize: 10, color: SINV_T.ink400, lineHeight: 1.4 }}
                   >
                     {world.desc || world.enums?.[0]?.replace(/_/g, " ") || ""}
                   </div>
@@ -3196,20 +3197,20 @@ export default function SmartInventory({ tenantId, initialSearch, initialCategor
           width={380}
           preventBackdropDismiss
         >
-          <div style={{ fontSize: 14, color: T.ink500, marginBottom: 20 }}>
+          <div style={{ fontSize: 14, color: SINV_T.ink500, marginBottom: 20 }}>
             Permanently delete <strong>{delConfirm.name}</strong>? This removes
             the inventory record. Stock movements are preserved for audit.
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button
               onClick={() => setDelConfirm(null)}
-              style={btnStyle(T.white, T.ink500, T.border, T, false, true)}
+              style={btnStyle(SINV_T.white, SINV_T.ink500, SINV_T.border, T, false, true)}
             >
               Cancel
             </button>
             <button
               onClick={() => deleteItem(delConfirm)}
-              style={btnStyle(T.danger, T.white, T.danger, T, true, true)}
+              style={btnStyle(SINV_T.danger, SINV_T.white, SINV_T.danger, T, true, true)}
             >
               Delete
             </button>
@@ -3289,14 +3290,14 @@ function SmartPillBox({
   const pillBase = (active, accent, T) => ({
     padding: "4px 12px",
     borderRadius: 99,
-    border: `1.5px solid ${active ? accent : T.border}`,
-    background: active ? accent : T.white,
-    color: active ? "#fff" : T.ink500,
+    border: `1.5px solid ${active ? accent : SINV_T.border}`,
+    background: active ? accent : SINV_T.white,
+    color: active ? "#fff" : SINV_T.ink500,
     fontWeight: active ? 700 : 400,
     fontSize: 12.5,
     cursor: "pointer",
     whiteSpace: "nowrap",
-    fontFamily: T.font,
+    fontFamily: SINV_T.font,
     display: "inline-flex",
     alignItems: "center",
     gap: 4,
@@ -3304,8 +3305,8 @@ function SmartPillBox({
     flexShrink: 0,
   });
   const countBadge = (n, active) => ({
-    background: active ? "rgba(255,255,255,0.28)" : T.ink50,
-    color: active ? "#fff" : T.ink400,
+    background: active ? "rgba(255,255,255,0.28)" : SINV_T.ink50,
+    color: active ? "#fff" : SINV_T.ink400,
     borderRadius: 99,
     padding: "0 6px",
     fontSize: 10,
@@ -3315,13 +3316,13 @@ function SmartPillBox({
   const navBtnStyle = {
     padding: "4px 11px",
     borderRadius: 99,
-    border: `1.5px solid ${T.borderDark}`,
-    background: T.white,
-    color: T.ink500,
+    border: `1.5px solid ${SINV_T.borderDark}`,
+    background: SINV_T.white,
+    color: SINV_T.ink500,
     fontSize: 12,
     fontWeight: 600,
     cursor: "pointer",
-    fontFamily: T.font,
+    fontFamily: SINV_T.font,
     display: "inline-flex",
     alignItems: "center",
     gap: 4,
@@ -3349,7 +3350,7 @@ function SmartPillBox({
             onSelectCat("all");
             onCollapsePills();
           }}
-          style={pillBase(navLevel === 0, T.accent, T)}
+          style={pillBase(navLevel === 0, SINV_T.accent, T)}
         >
           <span>●</span>
           <span>All</span>
@@ -3358,7 +3359,7 @@ function SmartPillBox({
           </span>
         </button>
         {navLevel === 0 && (
-          <button onClick={onExpandPills} style={pillBase(false, T.accent, T)}>
+          <button onClick={onExpandPills} style={pillBase(false, SINV_T.accent, T)}>
             <span>🗂</span>
             <span>Categories</span>
             <span style={countBadge(14, false)}>14</span>
@@ -3376,7 +3377,7 @@ function SmartPillBox({
                 <button
                   key={w.id}
                   onClick={() => onSelectCat(w.id)}
-                  style={pillBase(false, T.accent, T)}
+                  style={pillBase(false, SINV_T.accent, T)}
                 >
                   <span>{w.icon || "📦"}</span>
                   <span>{w.label}</span>
@@ -3401,7 +3402,7 @@ function SmartPillBox({
                   ‹ Back
                 </button>
                 <button
-                  style={{ ...pillBase(true, T.accent, T), cursor: "default" }}
+                  style={{ ...pillBase(true, SINV_T.accent, T), cursor: "default" }}
                 >
                   <span>{world?.icon || "📦"}</span>
                   <span>{world?.label || catFilter}</span>
@@ -3422,9 +3423,9 @@ function SmartPillBox({
               ...navBtnStyle,
               padding: "3px 9px",
               fontSize: 15,
-              color: T.ink400,
+              color: SINV_T.ink400,
               fontWeight: 400,
-              border: `1.5px solid ${T.border}`,
+              border: `1.5px solid ${SINV_T.border}`,
               marginLeft: "auto",
             }}
             title="Close — back to All"
@@ -3436,7 +3437,7 @@ function SmartPillBox({
       {navLevel === 2 && activeGroups.length > 0 && (
         <div
           style={{
-            borderTop: `1px solid ${T.border}`,
+            borderTop: `1px solid ${SINV_T.border}`,
             paddingTop: 6,
             paddingBottom: 2,
             display: "flex",
@@ -3462,7 +3463,7 @@ function SmartPillBox({
                 <span
                   style={{
                     fontSize: 10,
-                    color: T.ink300,
+                    color: SINV_T.ink300,
                     fontWeight: 700,
                     letterSpacing: "0.04em",
                     textTransform: "uppercase",
@@ -3492,17 +3493,17 @@ function SmartPillBox({
                       style={{
                         padding: "3px 11px",
                         borderRadius: 99,
-                        border: `1.5px solid ${active ? T.blue : cnt > 0 ? T.borderDark : T.ink150}`,
+                        border: `1.5px solid ${active ? SINV_T.blue : cnt > 0 ? SINV_T.borderDark : SINV_T.ink150}`,
                         background: active
-                          ? T.blueLit
+                          ? SINV_T.blueLit
                           : cnt > 0
-                            ? T.white
-                            : T.ink50,
-                        color: active ? T.blue : cnt > 0 ? T.ink700 : T.ink300,
+                            ? SINV_T.white
+                            : SINV_T.ink50,
+                        color: active ? SINV_T.blue : cnt > 0 ? SINV_T.ink700 : SINV_T.ink300,
                         fontWeight: active ? 700 : 400,
                         fontSize: 12,
                         cursor: cnt > 0 ? "pointer" : "default",
-                        fontFamily: T.font,
+                        fontFamily: SINV_T.font,
                         flexShrink: 0,
                         display: "inline-flex",
                         alignItems: "center",
@@ -3515,8 +3516,8 @@ function SmartPillBox({
                       {cnt > 0 && (
                         <span
                           style={{
-                            background: active ? T.blue + "20" : T.ink50,
-                            color: active ? T.blue : T.ink400,
+                            background: active ? SINV_T.blue + "20" : SINV_T.ink50,
+                            color: active ? SINV_T.blue : SINV_T.ink400,
                             borderRadius: 99,
                             padding: "0 5px",
                             fontSize: 9.5,
@@ -3544,7 +3545,7 @@ function SmartPillBox({
             paddingLeft: 4,
           }}
         >
-          <span style={{ fontSize: 11, color: T.ink400 }}>Filtered:</span>
+          <span style={{ fontSize: 11, color: SINV_T.ink400 }}>Filtered:</span>
           <span
             style={{
               display: "inline-flex",
@@ -3552,9 +3553,9 @@ function SmartPillBox({
               gap: 4,
               padding: "2px 10px",
               borderRadius: 99,
-              background: T.blueLit,
-              border: `1px solid ${T.blue}20`,
-              color: T.blue,
+              background: SINV_T.blueLit,
+              border: `1px solid ${SINV_T.blue}20`,
+              color: SINV_T.blue,
               fontSize: 11,
               fontWeight: 700,
             }}
@@ -3574,7 +3575,7 @@ function SmartPillBox({
               style={{
                 background: "none",
                 border: "none",
-                color: T.blue,
+                color: SINV_T.blue,
                 cursor: "pointer",
                 fontSize: 13,
                 padding: 0,
@@ -3599,8 +3600,8 @@ const isLowStock = (item) =>
 
 function StockChip({ type, T }) {
   const styles = {
-    out: { bg: T.danger, color: "#fff", label: "OUT OF STOCK" },
-    low: { bg: T.amber, color: "#fff", label: "LOW" },
+    out: { bg: SINV_T.danger, color: "#fff", label: "OUT OF STOCK" },
+    low: { bg: SINV_T.amber, color: "#fff", label: "LOW" },
   }[type];
   return (
     <span
@@ -3684,36 +3685,36 @@ function TileView({
         const isSelected = selectMode && selectedIds.has(item.id);
         const tags = getSmartTags(item);
         const statusBorder = isSelected
-          ? T.blue
+          ? SINV_T.blue
           : soldOut
-            ? T.danger
+            ? SINV_T.danger
             : lowStock
-              ? T.amber
+              ? SINV_T.amber
               : item.is_active
-                ? T.border
-                : T.ink150;
+                ? SINV_T.border
+                : SINV_T.ink150;
         return (
           <div
             key={item.id}
             className={isSelected ? "nuai-select-tile" : ""}
             style={{
-              background: T.white,
+              background: SINV_T.white,
               border: `1.5px solid ${statusBorder}`,
               borderLeft: isSelected
-                ? `3px solid ${T.blue}`
+                ? `3px solid ${SINV_T.blue}`
                 : soldOut
-                  ? `3px solid ${T.danger}`
+                  ? `3px solid ${SINV_T.danger}`
                   : lowStock
-                    ? `3px solid ${T.amber}`
+                    ? `3px solid ${SINV_T.amber}`
                     : `1.5px solid ${statusBorder}`,
-              borderRadius: T.radius,
+              borderRadius: SINV_T.radius,
               overflow: "hidden",
               opacity: item.is_active ? (soldOut ? 0.82 : 1) : 0.55,
               boxShadow: isSelected
-                ? `0 0 0 3px ${T.blueLit}`
+                ? `0 0 0 3px ${SINV_T.blueLit}`
                 : isHovered
                   ? "0 4px 14px rgba(0,0,0,0.13)"
-                  : T.shadow,
+                  : SINV_T.shadow,
               cursor: selectMode ? "pointer" : "pointer",
               transition: "box-shadow 0.15s, border-color 0.15s",
               position: "relative",
@@ -3741,7 +3742,7 @@ function TileView({
                   style={{
                     width: 16,
                     height: 16,
-                    accentColor: T.blue,
+                    accentColor: SINV_T.blue,
                     cursor: "pointer",
                   }}
                 />
@@ -3751,12 +3752,12 @@ function TileView({
             {/* Category banner */}
             <div
               style={{
-                background: isSelected ? "#DBEAFE" : T.accentLit,
+                background: isSelected ? "#DBEAFE" : SINV_T.accentLit,
                 padding: "8px 12px",
                 display: "flex",
                 alignItems: "center",
                 gap: 6,
-                borderBottom: `1px solid ${T.border}`,
+                borderBottom: `1px solid ${SINV_T.border}`,
                 transition: "background 0.12s",
               }}
             >
@@ -3772,7 +3773,7 @@ function TileView({
                     style={{
                       fontSize: 11,
                       fontWeight: 600,
-                      color: isSelected ? T.blueMid : T.accentMid,
+                      color: isSelected ? SINV_T.blueMid : SINV_T.accentMid,
                     }}
                   >
                     {w
@@ -3808,14 +3809,14 @@ function TileView({
                   top: 7,
                   right: 8,
                   zIndex: 10,
-                  background: menuOpen ? T.accent : "rgba(255,255,255,0.92)",
-                  border: `1px solid ${T.border}`,
+                  background: menuOpen ? SINV_T.accent : "rgba(255,255,255,0.92)",
+                  border: `1px solid ${SINV_T.border}`,
                   borderRadius: 6,
                   padding: "1px 8px",
                   cursor: "pointer",
                   fontSize: 14,
                   fontWeight: 900,
-                  color: menuOpen ? T.white : T.ink500,
+                  color: menuOpen ? SINV_T.white : SINV_T.ink500,
                   lineHeight: 1.6,
                   transition: "all 0.1s",
                   letterSpacing: 1,
@@ -3832,8 +3833,8 @@ function TileView({
                   left: 0,
                   right: 0,
                   display: "flex",
-                  borderTop: `1px solid ${T.border}`,
-                  background: T.white,
+                  borderTop: `1px solid ${SINV_T.border}`,
+                  background: SINV_T.white,
                   zIndex: 5,
                 }}
                 onClick={(e) => e.stopPropagation()}
@@ -3842,17 +3843,17 @@ function TileView({
                   {
                     label: "✏ Edit",
                     action: () => onEdit(item),
-                    color: T.accent,
+                    color: SINV_T.accent,
                   },
                   {
                     label: item.is_active ? "👁 Hide" : "👁 Show",
                     action: () => onToggle(item, "is_active"),
-                    color: T.amber,
+                    color: SINV_T.amber,
                   },
                   {
                     label: "🗑 Del",
                     action: () => onDelete(item),
-                    color: T.danger,
+                    color: SINV_T.danger,
                   },
                 ].map((a, i) => (
                   <button
@@ -3865,13 +3866,13 @@ function TileView({
                       flex: 1,
                       padding: "8px 0",
                       border: "none",
-                      borderRight: i < 2 ? `1px solid ${T.border}` : "none",
+                      borderRight: i < 2 ? `1px solid ${SINV_T.border}` : "none",
                       background: "transparent",
                       color: a.color,
                       fontSize: 11,
                       fontWeight: 600,
                       cursor: "pointer",
-                      fontFamily: T.font,
+                      fontFamily: SINV_T.font,
                     }}
                   >
                     {a.label}
@@ -3886,7 +3887,7 @@ function TileView({
                 style={{
                   fontWeight: 700,
                   fontSize: 13,
-                  color: T.ink900,
+                  color: SINV_T.ink900,
                   marginBottom: tags.length ? 6 : 10,
                   lineHeight: 1.3,
                   minHeight: 32,
@@ -3909,9 +3910,9 @@ function TileView({
                       style={{
                         fontSize: 10,
                         fontWeight: 700,
-                        color: T.accentMid,
-                        background: T.accentXlit || T.accentLit,
-                        border: `1px solid ${T.accentBd || T.border}`,
+                        color: SINV_T.accentMid,
+                        background: SINV_T.accentXlit || SINV_T.accentLit,
+                        border: `1px solid ${SINV_T.accentBd || SINV_T.border}`,
                         borderRadius: 4,
                         padding: "2px 6px",
                         textTransform: "capitalize",
@@ -3931,7 +3932,7 @@ function TileView({
                 }}
               >
                 <span
-                  style={{ fontWeight: 800, fontSize: 15, color: T.accentMid }}
+                  style={{ fontWeight: 800, fontSize: 15, color: SINV_T.accentMid }}
                 >
                   {item.sell_price ? zar(item.sell_price) : "—"}
                 </span>
@@ -3951,25 +3952,25 @@ function TileView({
                 {soldOut ? (
                   <StockBadge
                     label="Sold Out"
-                    bg={T.dangerLit}
-                    color={T.danger}
+                    bg={SINV_T.dangerLit}
+                    color={SINV_T.danger}
                   />
                 ) : lowStock ? (
                   <StockBadge
                     label={`Low: ${item.quantity_on_hand}`}
-                    bg={T.amberLit}
-                    color={T.amber}
+                    bg={SINV_T.amberLit}
+                    color={SINV_T.amber}
                   />
                 ) : (
                   <StockBadge
                     label={`${item.quantity_on_hand} in stock`}
-                    bg={T.accentXlit}
-                    color={T.accentMid}
+                    bg={SINV_T.accentXlit}
+                    color={SINV_T.accentMid}
                   />
                 )}
               </div>
               {item.weighted_avg_cost > 0 && (
-                <div style={{ fontSize: 11, color: T.ink400 }}>
+                <div style={{ fontSize: 11, color: SINV_T.ink400 }}>
                   Cost: {zar(item.weighted_avg_cost)}
                 </div>
               )}
@@ -3998,9 +3999,9 @@ function ListView({
   return (
     <div
       style={{
-        background: T.white,
-        borderRadius: T.radius,
-        border: `1px solid ${T.border}`,
+        background: SINV_T.white,
+        borderRadius: SINV_T.radius,
+        border: `1px solid ${SINV_T.border}`,
         overflow: "hidden",
       }}
     >
@@ -4009,11 +4010,11 @@ function ListView({
           display: "grid",
           gridTemplateColumns: "40px 1fr 110px 90px 90px 80px 90px",
           padding: "8px 14px",
-          background: T.ink50,
-          borderBottom: `1px solid ${T.border}`,
+          background: SINV_T.ink50,
+          borderBottom: `1px solid ${SINV_T.border}`,
           fontSize: 11,
           fontWeight: 700,
-          color: T.ink400,
+          color: SINV_T.ink400,
           textTransform: "uppercase",
           letterSpacing: "0.05em",
         }}
@@ -4043,15 +4044,15 @@ function ListView({
               background: isSelected
                 ? "#EFF6FF"
                 : idx % 2 === 0
-                  ? T.white
-                  : T.bg,
-              borderBottom: `1px solid ${T.border}`,
+                  ? SINV_T.white
+                  : SINV_T.bg,
+              borderBottom: `1px solid ${SINV_T.border}`,
               borderLeft: isSelected
-                ? `3px solid ${T.blue}`
+                ? `3px solid ${SINV_T.blue}`
                 : soldOut
-                  ? `3px solid ${T.danger}`
+                  ? `3px solid ${SINV_T.danger}`
                   : lowStock
-                    ? `3px solid ${T.amber}`
+                    ? `3px solid ${SINV_T.amber}`
                     : "3px solid transparent",
               opacity: item.is_active ? (soldOut ? 0.82 : 1) : 0.55,
               cursor: "pointer",
@@ -4087,7 +4088,7 @@ function ListView({
                   style={{
                     width: 15,
                     height: 15,
-                    accentColor: T.blue,
+                    accentColor: SINV_T.blue,
                     cursor: "pointer",
                   }}
                 />
@@ -4103,7 +4104,7 @@ function ListView({
                 style={{
                   fontSize: 13,
                   fontWeight: 600,
-                  color: T.ink900,
+                  color: SINV_T.ink900,
                   display: "flex",
                   alignItems: "center",
                   gap: 6,
@@ -4114,7 +4115,7 @@ function ListView({
                 {lowStock && <StockChip type="low" T={T} />}
               </div>
               {item.is_featured && (
-                <span style={{ fontSize: 10, color: T.amber }}>
+                <span style={{ fontSize: 10, color: SINV_T.amber }}>
                   ⭐ Featured
                 </span>
               )}
@@ -4122,8 +4123,8 @@ function ListView({
             <span
               style={{
                 fontSize: 11,
-                background: T.accentLit,
-                color: T.accentMid,
+                background: SINV_T.accentLit,
+                color: SINV_T.accentMid,
                 padding: "2px 8px",
                 borderRadius: 99,
                 fontWeight: 600,
@@ -4153,10 +4154,10 @@ function ListView({
                 fontSize: 13,
                 fontWeight: 700,
                 color: soldOut
-                  ? T.danger
+                  ? SINV_T.danger
                   : item.quantity_on_hand <= 3
-                    ? T.amber
-                    : T.ink900,
+                    ? SINV_T.amber
+                    : SINV_T.ink900,
               }}
             >
               {item.quantity_on_hand ?? 0}
@@ -4166,7 +4167,7 @@ function ListView({
                 textAlign: "right",
                 fontSize: 13,
                 fontWeight: 600,
-                color: T.ink900,
+                color: SINV_T.ink900,
               }}
             >
               {item.sell_price ? zar(item.sell_price) : "—"}
@@ -4176,7 +4177,7 @@ function ListView({
                 textAlign: "right",
                 fontSize: 12,
                 fontWeight: 700,
-                color: m !== null ? marginColor(m) : T.ink300,
+                color: m !== null ? marginColor(m) : SINV_T.ink300,
               }}
             >
               {m !== null ? pct(m) : "—"}
@@ -4190,13 +4191,13 @@ function ListView({
                   <SmallBtn
                     label="Edit"
                     onClick={() => onEdit(item)}
-                    color={T.accent}
+                    color={SINV_T.accent}
                     T={T}
                   />
                   <SmallBtn
                     label="Del"
                     onClick={() => onDelete(item)}
-                    color={T.danger}
+                    color={SINV_T.danger}
                     T={T}
                   />
                 </>
@@ -4353,7 +4354,7 @@ function DetailView({
         overflowX: "auto",
         overflowY: "auto",
         height: "100%",
-        fontFamily: T.font,
+        fontFamily: SINV_T.font,
       }}
     >
       <table
@@ -4377,8 +4378,8 @@ function DetailView({
         <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
           <tr
             style={{
-              background: T.ink50,
-              borderBottom: `2px solid ${T.borderDark}`,
+              background: SINV_T.ink50,
+              borderBottom: `2px solid ${SINV_T.borderDark}`,
             }}
           >
             {visibleCols.map((col) => {
@@ -4404,7 +4405,7 @@ function DetailView({
                     textAlign: col.align || "left",
                     fontWeight: 700,
                     fontSize: 11,
-                    color: sortKey === col.key ? T.accent : T.ink400,
+                    color: sortKey === col.key ? SINV_T.accent : SINV_T.ink400,
                     textTransform: "uppercase",
                     letterSpacing: "0.05em",
                     cursor: col.sortable
@@ -4414,15 +4415,15 @@ function DetailView({
                         : "default",
                     userSelect: "none",
                     background: isOver
-                      ? T.accentLit
+                      ? SINV_T.accentLit
                       : sortKey === col.key
-                        ? T.accentXlit
-                        : T.ink50,
+                        ? SINV_T.accentXlit
+                        : SINV_T.ink50,
                     position: "relative",
                     overflow: "hidden",
                     whiteSpace: "nowrap",
                     transition: "background 0.1s",
-                    outline: isOver ? `2px solid ${T.accentMid}` : "none",
+                    outline: isOver ? `2px solid ${SINV_T.accentMid}` : "none",
                   }}
                 >
                   <span
@@ -4452,7 +4453,7 @@ function DetailView({
                           }
                         }}
                         style={{
-                          accentColor: T.blue,
+                          accentColor: SINV_T.blue,
                           cursor: "pointer",
                           width: 14,
                           height: 14,
@@ -4494,11 +4495,11 @@ function DetailView({
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.querySelector("i").style.background =
-                          T.accentMid;
+                          SINV_T.accentMid;
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.querySelector("i").style.background =
-                          T.borderDark;
+                          SINV_T.borderDark;
                       }}
                     >
                       <i
@@ -4506,7 +4507,7 @@ function DetailView({
                           display: "block",
                           width: 2,
                           height: "55%",
-                          background: T.borderDark,
+                          background: SINV_T.borderDark,
                           borderRadius: 1,
                           pointerEvents: "none",
                           transition: "background 0.12s",
@@ -4521,8 +4522,8 @@ function DetailView({
           {filterRowOpen && !selectMode && (
             <tr
               style={{
-                background: T.white,
-                borderBottom: `1px solid ${T.border}`,
+                background: SINV_T.white,
+                borderBottom: `1px solid ${SINV_T.border}`,
               }}
             >
               {visibleCols.map((col) => (
@@ -4530,7 +4531,7 @@ function DetailView({
                   key={col.key}
                   style={{
                     padding: "4px 6px",
-                    borderRight: `1px solid ${T.border}`,
+                    borderRight: `1px solid ${SINV_T.border}`,
                   }}
                 >
                   {col.key !== "_actions" &&
@@ -4545,10 +4546,10 @@ function DetailView({
                       style={{
                         width: "100%",
                         padding: "3px 6px",
-                        border: `1px solid ${T.border}`,
+                        border: `1px solid ${SINV_T.border}`,
                         borderRadius: 4,
                         fontSize: 11,
-                        fontFamily: T.font,
+                        fontFamily: SINV_T.font,
                         outline: "none",
                       }}
                     />
@@ -4569,7 +4570,7 @@ function DetailView({
             const rowBg = isSelected
               ? "#EFF6FF"
               : idx % 2 === 0
-                ? T.white
+                ? SINV_T.white
                 : "#FCFCFB";
             return (
               <tr
@@ -4577,13 +4578,13 @@ function DetailView({
                 className={isSelected ? "nuai-select-row" : ""}
                 style={{
                   background: rowBg,
-                  borderBottom: `1px solid ${T.border}`,
+                  borderBottom: `1px solid ${SINV_T.border}`,
                   borderLeft: isSelected
-                    ? `3px solid ${T.blue}`
+                    ? `3px solid ${SINV_T.blue}`
                     : soldOut
-                      ? `3px solid ${T.danger}`
+                      ? `3px solid ${SINV_T.danger}`
                       : lowStock
-                        ? `3px solid ${T.amber}`
+                        ? `3px solid ${SINV_T.amber}`
                         : "3px solid transparent",
                   opacity: item.is_active ? (soldOut ? 0.85 : 1) : 0.55,
                   transition: "background 0.1s",
@@ -4605,8 +4606,8 @@ function DetailView({
                     style={{
                       padding: "7px 10px",
                       textAlign: col.align || "left",
-                      borderRight: `1px solid ${T.border}`,
-                      color: T.ink700,
+                      borderRight: `1px solid ${SINV_T.border}`,
+                      color: SINV_T.ink700,
                       verticalAlign: "middle",
                       whiteSpace: "nowrap",
                       overflow: "hidden",
@@ -4627,7 +4628,7 @@ function DetailView({
                             style={{
                               width: 14,
                               height: 14,
-                              accentColor: T.blue,
+                              accentColor: SINV_T.blue,
                               cursor: "pointer",
                             }}
                           />
@@ -4636,7 +4637,7 @@ function DetailView({
                         <span
                           style={{
                             fontSize: 11,
-                            color: T.ink300,
+                            color: SINV_T.ink300,
                             fontWeight: 600,
                             fontVariantNumeric: "tabular-nums",
                           }}
@@ -4655,7 +4656,7 @@ function DetailView({
                         <span style={{ fontSize: 14 }}>
                           {CATEGORY_ICONS[item.category] || "📦"}
                         </span>
-                        <span style={{ fontWeight: 600, color: T.ink900 }}>
+                        <span style={{ fontWeight: 600, color: SINV_T.ink900 }}>
                           {item.name}
                         </span>
                         {soldOut && <StockChip type="out" T={T} />}
@@ -4669,7 +4670,7 @@ function DetailView({
                       <span
                         style={{
                           fontSize: 11,
-                          color: T.ink500,
+                          color: SINV_T.ink500,
                           fontFamily: "monospace",
                         }}
                       >
@@ -4684,8 +4685,8 @@ function DetailView({
                         return (
                           <span
                             style={{
-                              background: T.accentLit,
-                              color: T.accentMid,
+                              background: SINV_T.accentLit,
+                              color: SINV_T.accentMid,
                               padding: "2px 8px",
                               borderRadius: 99,
                               fontSize: 11,
@@ -4711,10 +4712,10 @@ function DetailView({
                         style={{
                           fontWeight: 700,
                           color: soldOut
-                            ? T.danger
+                            ? SINV_T.danger
                             : (item.quantity_on_hand || 0) <= 3
-                              ? T.amber
-                              : T.ink900,
+                              ? SINV_T.amber
+                              : SINV_T.ink900,
                         }}
                       >
                         {item.quantity_on_hand ?? 0}
@@ -4736,7 +4737,7 @@ function DetailView({
                       <span
                         style={{
                           fontWeight: 700,
-                          color: m !== null ? marginColor(m) : T.ink300,
+                          color: m !== null ? marginColor(m) : SINV_T.ink300,
                         }}
                       >
                         {m !== null ? pct(m) : "—"}
@@ -4753,13 +4754,13 @@ function DetailView({
                           borderRadius: 99,
                           border: "none",
                           background: item.is_active
-                            ? T.accentLit
-                            : T.dangerLit,
-                          color: item.is_active ? T.accentMid : T.danger,
+                            ? SINV_T.accentLit
+                            : SINV_T.dangerLit,
+                          color: item.is_active ? SINV_T.accentMid : SINV_T.danger,
                           fontSize: 10.5,
                           fontWeight: 700,
                           cursor: "pointer",
-                          fontFamily: T.font,
+                          fontFamily: SINV_T.font,
                         }}
                       >
                         {item.is_active ? "Active" : "Hidden"}
@@ -4775,19 +4776,19 @@ function DetailView({
                           padding: "2px 8px",
                           borderRadius: 99,
                           border: "none",
-                          background: item.is_featured ? T.amberLit : T.ink50,
-                          color: item.is_featured ? T.amber : T.ink300,
+                          background: item.is_featured ? SINV_T.amberLit : SINV_T.ink50,
+                          color: item.is_featured ? SINV_T.amber : SINV_T.ink300,
                           fontSize: 10.5,
                           fontWeight: 700,
                           cursor: "pointer",
-                          fontFamily: T.font,
+                          fontFamily: SINV_T.font,
                         }}
                       >
                         {item.is_featured ? "⭐ Yes" : "No"}
                       </button>
                     )}
                     {col.key === "loyalty_category" && (
-                      <span style={{ fontSize: 11, color: T.ink400 }}>
+                      <span style={{ fontSize: 11, color: SINV_T.ink400 }}>
                         {item.loyalty_category || "—"}
                       </span>
                     )}
@@ -4796,24 +4797,24 @@ function DetailView({
                         style={{
                           fontWeight: 600,
                           color:
-                            (item.reorder_level || 0) > 0 ? T.ink700 : T.ink300,
+                            (item.reorder_level || 0) > 0 ? SINV_T.ink700 : SINV_T.ink300,
                         }}
                       >
                         {item.reorder_level || "—"}
                       </span>
                     )}
                     {col.key === "max_stock_level" && (
-                      <span style={{ color: T.ink400 }}>
+                      <span style={{ color: SINV_T.ink400 }}>
                         {item.max_stock_level || "—"}
                       </span>
                     )}
                     {col.key === "supplier" && (
-                      <span style={{ fontSize: 11, color: T.ink500 }}>
+                      <span style={{ fontSize: 11, color: SINV_T.ink500 }}>
                         {item.suppliers?.name || "—"}
                       </span>
                     )}
                     {col.key === "variant_value" && (
-                      <span style={{ fontSize: 11, color: T.ink500 }}>
+                      <span style={{ fontSize: 11, color: SINV_T.ink500 }}>
                         {item.variant_value || "—"}
                       </span>
                     )}
@@ -4831,14 +4832,14 @@ function DetailView({
                         <SmallBtn
                           label="✎"
                           onClick={() => onEdit(item)}
-                          color={T.accent}
+                          color={SINV_T.accent}
                           T={T}
                           title="Edit"
                         />
                         <SmallBtn
                           label="✕"
                           onClick={() => onDelete(item)}
-                          color={T.danger}
+                          color={SINV_T.danger}
                           T={T}
                           title="Delete"
                         />
@@ -4872,8 +4873,8 @@ function EditPanel({
     <div
       style={{
         width: 380,
-        background: T.white,
-        borderLeft: `1px solid ${T.border}`,
+        background: SINV_T.white,
+        borderLeft: `1px solid ${SINV_T.border}`,
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
@@ -4883,7 +4884,7 @@ function EditPanel({
       <div
         style={{
           padding: "14px 18px",
-          borderBottom: `1px solid ${T.border}`,
+          borderBottom: `1px solid ${SINV_T.border}`,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -4891,10 +4892,10 @@ function EditPanel({
         }}
       >
         <div>
-          <div style={{ fontWeight: 700, fontSize: 14, color: T.ink900 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: SINV_T.ink900 }}>
             {CATEGORY_ICONS[item.category] || "📦"} Edit Item
           </div>
-          <div style={{ fontSize: 11, color: T.ink400, marginTop: 1 }}>
+          <div style={{ fontSize: 11, color: SINV_T.ink400, marginTop: 1 }}>
             ID: {item.id?.slice(0, 8)}…
           </div>
         </div>
@@ -4905,7 +4906,7 @@ function EditPanel({
             border: "none",
             fontSize: 18,
             cursor: "pointer",
-            color: T.ink400,
+            color: SINV_T.ink400,
           }}
         >
           ×
@@ -4949,14 +4950,14 @@ function ItemForm({
               display: "block",
               fontSize: 11,
               fontWeight: 600,
-              color: T.ink400,
+              color: SINV_T.ink400,
               marginBottom: 4,
               textTransform: "uppercase",
               letterSpacing: "0.04em",
             }}
           >
             {field.label}
-            {field.required && <span style={{ color: T.danger }}> *</span>}
+            {field.required && <span style={{ color: SINV_T.danger }}> *</span>}
           </label>
           {field.type === "select" ? (
             <select
@@ -4986,9 +4987,9 @@ function ItemForm({
                 type="checkbox"
                 checked={Boolean(draft[field.key])}
                 onChange={(e) => onChange(field.key, e.target.checked)}
-                style={{ width: 16, height: 16, accentColor: T.accent }}
+                style={{ width: 16, height: 16, accentColor: SINV_T.accent }}
               />
-              <span style={{ fontSize: 13, color: T.ink700 }}>
+              <span style={{ fontSize: 13, color: SINV_T.ink700 }}>
                 {Boolean(draft[field.key]) ? "Yes" : "No"}
               </span>
             </label>
@@ -5010,7 +5011,7 @@ function ItemForm({
               display: "block",
               fontSize: 11,
               fontWeight: 600,
-              color: T.ink400,
+              color: SINV_T.ink400,
               marginBottom: 4,
               textTransform: "uppercase",
               letterSpacing: "0.04em",
@@ -5035,15 +5036,15 @@ function ItemForm({
       {draft.sell_price > 0 && draft.weighted_avg_cost > 0 && (
         <div
           style={{
-            background: T.accentXlit,
-            border: `1px solid ${T.accentLit}`,
+            background: SINV_T.accentXlit,
+            border: `1px solid ${SINV_T.accentLit}`,
             borderRadius: 8,
             padding: "10px 14px",
             marginBottom: 16,
             fontSize: 13,
           }}
         >
-          <span style={{ color: T.ink400 }}>Margin preview: </span>
+          <span style={{ color: SINV_T.ink400 }}>Margin preview: </span>
           <span
             style={{
               fontWeight: 800,
@@ -5055,7 +5056,7 @@ function ItemForm({
           >
             {pct(margin(draft.sell_price, draft.weighted_avg_cost))}
           </span>
-          <span style={{ color: T.ink400, fontSize: 11, marginLeft: 8 }}>
+          <span style={{ color: SINV_T.ink400, fontSize: 11, marginLeft: 8 }}>
             ({zar(draft.sell_price - draft.weighted_avg_cost)} GP per unit)
           </span>
         </div>
@@ -5063,12 +5064,12 @@ function ItemForm({
       {error && (
         <div
           style={{
-            background: T.dangerLit,
+            background: SINV_T.dangerLit,
             border: "1px solid #FCA5A5",
             borderRadius: 6,
             padding: "8px 12px",
             fontSize: 12,
-            color: T.danger,
+            color: SINV_T.danger,
             marginBottom: 12,
           }}
         >
@@ -5079,7 +5080,7 @@ function ItemForm({
         {onDelete && !isNew && (
           <button
             onClick={onDelete}
-            style={btnStyle(T.white, T.danger, T.danger, T, false, true)}
+            style={btnStyle(SINV_T.white, SINV_T.danger, SINV_T.danger, T, false, true)}
           >
             Delete
           </button>
@@ -5087,7 +5088,7 @@ function ItemForm({
         <button
           onClick={onCancel}
           style={{
-            ...btnStyle(T.white, T.ink500, T.border, T, false, true),
+            ...btnStyle(SINV_T.white, SINV_T.ink500, SINV_T.border, T, false, true),
             flex: 1,
           }}
         >
@@ -5097,7 +5098,7 @@ function ItemForm({
           onClick={onSave}
           disabled={saving}
           style={{
-            ...btnStyle(T.accent, T.white, T.accent, T, true, true),
+            ...btnStyle(SINV_T.accent, SINV_T.white, SINV_T.accent, T, true, true),
             flex: 2,
             opacity: saving ? 0.7 : 1,
           }}
@@ -5119,7 +5120,7 @@ function ViewToggle({ current, onChange, T }) {
     <div
       style={{
         display: "flex",
-        border: `1.5px solid ${T.border}`,
+        border: `1.5px solid ${SINV_T.border}`,
         borderRadius: 8,
         overflow: "hidden",
       }}
@@ -5133,12 +5134,12 @@ function ViewToggle({ current, onChange, T }) {
             padding: "5px 12px",
             border: "none",
             borderRight:
-              i < views.length - 1 ? `1px solid ${T.border}` : "none",
-            background: current === v.id ? T.accent : T.white,
-            color: current === v.id ? T.white : T.ink500,
+              i < views.length - 1 ? `1px solid ${SINV_T.border}` : "none",
+            background: current === v.id ? SINV_T.accent : SINV_T.white,
+            color: current === v.id ? SINV_T.white : SINV_T.ink500,
             cursor: "pointer",
             fontSize: 14,
-            fontFamily: T.font,
+            fontFamily: SINV_T.font,
             transition: "all 0.12s",
           }}
         >
@@ -5172,28 +5173,28 @@ function Modal({
     >
       <div
         style={{
-          background: T.white,
+          background: SINV_T.white,
           borderRadius: 14,
           width,
           maxHeight: "88vh",
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
-          boxShadow: T.shadowLg,
+          boxShadow: SINV_T.shadowLg,
         }}
         onClick={(e) => e.stopPropagation()}
       >
         <div
           style={{
             padding: "16px 20px",
-            borderBottom: `1px solid ${T.border}`,
+            borderBottom: `1px solid ${SINV_T.border}`,
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
             flexShrink: 0,
           }}
         >
-          <span style={{ fontWeight: 700, fontSize: 15, color: T.ink900 }}>
+          <span style={{ fontWeight: 700, fontSize: 15, color: SINV_T.ink900 }}>
             {title}
           </span>
           <button
@@ -5203,7 +5204,7 @@ function Modal({
               border: "none",
               fontSize: 18,
               cursor: "pointer",
-              color: T.ink400,
+              color: SINV_T.ink400,
             }}
           >
             ×
@@ -5260,13 +5261,13 @@ function SmallBtn({ label, onClick, color, T, title }) {
       style={{
         padding: "3px 8px",
         borderRadius: 5,
-        border: `1px solid ${hover ? color : T.border}`,
-        background: hover ? color + "15" : T.white,
-        color: hover ? color : T.ink400,
+        border: `1px solid ${hover ? color : SINV_T.border}`,
+        background: hover ? color + "15" : SINV_T.white,
+        color: hover ? color : SINV_T.ink400,
         fontSize: 11,
         fontWeight: 700,
         cursor: "pointer",
-        fontFamily: T.font,
+        fontFamily: SINV_T.font,
         transition: "all 0.1s",
       }}
     >
@@ -5277,7 +5278,7 @@ function SmallBtn({ label, onClick, color, T, title }) {
 
 function LoadingState({ T }) {
   const shimmer = {
-    background: `linear-gradient(90deg, ${T.ink50} 25%, ${T.ink150}40 50%, ${T.ink50} 75%)`,
+    background: `linear-gradient(90deg, ${SINV_T.ink50} 25%, ${SINV_T.ink150}40 50%, ${SINV_T.ink50} 75%)`,
     backgroundSize: "200% 100%",
     animation: "nuai-shimmer 1.4s ease-in-out infinite",
     borderRadius: 6,
@@ -5291,7 +5292,7 @@ function LoadingState({ T }) {
           alignItems: "center",
           gap: 12,
           padding: "8px 4px",
-          borderBottom: `1px solid ${T.border}`,
+          borderBottom: `1px solid ${SINV_T.border}`,
           marginBottom: 2,
         }}
       >
@@ -5310,7 +5311,7 @@ function LoadingState({ T }) {
             alignItems: "center",
             gap: 12,
             padding: "14px 4px",
-            borderBottom: `1px solid ${T.border}`,
+            borderBottom: `1px solid ${SINV_T.border}`,
             opacity: 1 - row * 0.07,
           }}
         >
@@ -5351,7 +5352,7 @@ function ErrorState({ msg, T }) {
 
 function EmptyState({ catFilter, search, onAdd, isFiltered, onClearAll, T }) {
   return (
-    <div style={{ textAlign: "center", padding: 64, color: T.ink400 }}>
+    <div style={{ textAlign: "center", padding: 64, color: SINV_T.ink400 }}>
       <div style={{ fontSize: 40, marginBottom: 10 }}>
         {isFiltered ? "🔍" : "📦"}
       </div>
@@ -5359,7 +5360,7 @@ function EmptyState({ catFilter, search, onAdd, isFiltered, onClearAll, T }) {
         style={{
           fontWeight: 700,
           fontSize: 15,
-          color: T.ink500,
+          color: SINV_T.ink500,
           marginBottom: 6,
         }}
       >
@@ -5380,7 +5381,7 @@ function EmptyState({ catFilter, search, onAdd, isFiltered, onClearAll, T }) {
         {isFiltered && onClearAll && (
           <button
             onClick={onClearAll}
-            style={btnStyle(T.white, T.danger, T.danger, T, true)}
+            style={btnStyle(SINV_T.white, SINV_T.danger, SINV_T.danger, T, true)}
           >
             ✕ Clear all filters
           </button>
@@ -5400,13 +5401,13 @@ function inputStyle(T) {
   return {
     width: "100%",
     padding: "8px 10px",
-    border: `1.5px solid ${T.border}`,
+    border: `1.5px solid ${SINV_T.border}`,
     borderRadius: 7,
     fontSize: 13,
-    fontFamily: T.font,
-    color: T.ink900,
+    fontFamily: SINV_T.font,
+    color: SINV_T.ink900,
     outline: "none",
-    background: T.white,
+    background: SINV_T.white,
     boxSizing: "border-box",
   };
 }
@@ -5421,7 +5422,7 @@ function btnStyle(bg, color, borderColor, T, bold = false, full = false) {
     fontWeight: bold ? 700 : 500,
     fontSize: 13,
     cursor: "pointer",
-    fontFamily: T.font,
+    fontFamily: SINV_T.font,
     width: full ? "100%" : "auto",
     whiteSpace: "nowrap",
   };

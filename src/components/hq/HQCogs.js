@@ -33,38 +33,9 @@ import InfoTooltip from "../InfoTooltip";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
 import { ChartCard, ChartTooltip } from "../viz";
+import { T } from "../../styles/tokens";
 
-// ── Design tokens ────────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
-  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
+// ── WP-UNIFY: local T block removed — now uses shared design tokens ─────────
 
 // ── Domain colours (preserved — functional category markers in builder) ──────
 const CATEGORY_COLOURS = {
@@ -90,10 +61,10 @@ const CHAMBER_COLORS = [
 const sCard = {
   background: "#fff",
   borderRadius: 8,
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   padding: 24,
   marginBottom: 20,
-  boxShadow: T.shadow,
+  boxShadow: T.shadow.sm,
 };
 
 const mkBtn = (variant = "primary", extra = {}) => {
@@ -102,7 +73,7 @@ const mkBtn = (variant = "primary", extra = {}) => {
     borderRadius: 4,
     border: "none",
     cursor: "pointer",
-    fontFamily: T.fontUi,
+    fontFamily: T.font,
     fontWeight: 600,
     fontSize: 13,
     transition: "opacity 0.15s",
@@ -117,7 +88,7 @@ const mkBtn = (variant = "primary", extra = {}) => {
     },
     danger: { background: T.danger, color: "#fff" },
     small: {
-      background: T.ink075,
+      background: T.bg,
       color: T.ink700,
       padding: "5px 12px",
       fontSize: 12,
@@ -129,9 +100,9 @@ const mkBtn = (variant = "primary", extra = {}) => {
 
 const sInput = {
   padding: "9px 12px",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: 4,
-  fontFamily: T.fontUi,
+  fontFamily: T.font,
   fontSize: 13,
   width: "100%",
   boxSizing: "border-box",
@@ -144,12 +115,12 @@ const sLbl = (text) => (
     style={{
       fontSize: 11,
       fontWeight: 700,
-      color: T.ink400,
+      color: T.ink500,
       textTransform: "uppercase",
       letterSpacing: "0.08em",
       display: "block",
       marginBottom: 6,
-      fontFamily: T.fontUi,
+      fontFamily: T.font,
     }}
   >
     {text}
@@ -448,7 +419,7 @@ function LandedCostCalc({ usdZar, onApply }) {
           fontSize: 12,
           padding: "4px 12px",
           cursor: "pointer",
-          fontFamily: T.fontUi,
+          fontFamily: T.font,
           fontWeight: 600,
         }}
       >
@@ -458,7 +429,7 @@ function LandedCostCalc({ usdZar, onApply }) {
         <div
           style={{
             marginTop: 10,
-            background: T.infoBg,
+            background: T.infoLight,
             border: `1px solid ${T.infoBd}`,
             borderRadius: 6,
             padding: "14px 16px",
@@ -563,7 +534,7 @@ function LandedCostCalc({ usdZar, onApply }) {
                 <div
                   style={{
                     fontSize: 10,
-                    color: T.ink400,
+                    color: T.ink500,
                     textTransform: "uppercase",
                   }}
                 >
@@ -571,7 +542,7 @@ function LandedCostCalc({ usdZar, onApply }) {
                 </div>
                 <div
                   style={{
-                    fontFamily: T.fontData,
+                    fontFamily: T.font,
                     fontWeight: 600,
                     color: T.info,
                   }}
@@ -586,7 +557,7 @@ function LandedCostCalc({ usdZar, onApply }) {
                     <div
                       style={{
                         fontSize: 10,
-                        color: T.ink400,
+                        color: T.ink500,
                         textTransform: "uppercase",
                       }}
                     >
@@ -594,7 +565,7 @@ function LandedCostCalc({ usdZar, onApply }) {
                     </div>
                     <div
                       style={{
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         fontWeight: 600,
                         color: T.info,
                       }}
@@ -607,7 +578,7 @@ function LandedCostCalc({ usdZar, onApply }) {
                     <div
                       style={{
                         fontSize: 10,
-                        color: T.ink400,
+                        color: T.ink500,
                         textTransform: "uppercase",
                       }}
                     >
@@ -615,7 +586,7 @@ function LandedCostCalc({ usdZar, onApply }) {
                     </div>
                     <div
                       style={{
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         fontSize: 18,
                         fontWeight: 400,
                         color: T.info,
@@ -643,7 +614,7 @@ function LandedCostCalc({ usdZar, onApply }) {
               )}
             </div>
           )}
-          <div style={{ fontSize: 10, color: T.info, fontFamily: T.fontUi }}>
+          <div style={{ fontSize: 10, color: T.info, fontFamily: T.font }}>
             DDP rates: ≤21kg $15.80/kg · 21–50kg $15.50/kg · 50–100kg $15.20/kg
             · 100kg+ $14.90/kg · +$25 clearance
           </div>
@@ -716,9 +687,9 @@ function CogsBar({ breakdown }) {
                   background: col.color,
                 }}
               />
-              <span style={{ color: T.ink500, fontFamily: T.fontUi }}>
+              <span style={{ color: T.ink500, fontFamily: T.font }}>
                 {c.label}:{" "}
-                <strong style={{ fontFamily: T.fontData }}>{fmt(pct)}%</strong>
+                <strong style={{ fontFamily: T.font }}>{fmt(pct)}%</strong>
               </span>
             </div>
           );
@@ -750,18 +721,18 @@ function ChambersEditor({
           gap: 10,
           flexWrap: "wrap",
           marginBottom: 14,
-          background: T.ink075,
+          background: T.bg,
           borderRadius: 6,
           padding: "10px 14px",
           alignItems: "center",
         }}
       >
-        <div style={{ fontSize: 13, color: T.ink500, fontFamily: T.fontUi }}>
+        <div style={{ fontSize: 13, color: T.ink500, fontFamily: T.font }}>
           <strong style={{ color: T.ink900 }}>
             {chambers.length} chambers
           </strong>
           <span style={{ color: T.ink300, margin: "0 8px" }}>·</span>
-          <strong style={{ fontFamily: T.fontData, color: "#1565C0" }}>
+          <strong style={{ fontFamily: T.font, color: "#1565C0" }}>
             {totalDistillate.toFixed(2)}ml
           </strong>
           <span style={{ fontSize: 11, color: T.ink300, marginLeft: 4 }}>
@@ -797,7 +768,7 @@ function ChambersEditor({
                   fontSize: 12,
                   color: col.accent,
                   fontWeight: 600,
-                  fontFamily: T.fontUi,
+                  fontFamily: T.font,
                 }}
               >
                 {ch.label || `Ch.${i + 1}`}
@@ -806,7 +777,7 @@ function ChambersEditor({
                 style={{
                   fontSize: 11,
                   color: col.accent,
-                  fontFamily: T.fontData,
+                  fontFamily: T.font,
                 }}
               >
                 {ch.distillate_qty_ml}ml
@@ -891,7 +862,7 @@ function ChambersEditor({
                 style={{
                   border: "none",
                   background: "transparent",
-                  fontFamily: T.fontUi,
+                  fontFamily: T.font,
                   fontWeight: 700,
                   fontSize: 14,
                   color: col.accent,
@@ -907,7 +878,7 @@ function ChambersEditor({
                   background: "rgba(255,255,255,0.6)",
                   borderRadius: 4,
                   padding: "2px 8px",
-                  fontFamily: T.fontData,
+                  fontFamily: T.font,
                 }}
               >
                 {chDiCost > 0 || chTpCost > 0
@@ -929,7 +900,7 @@ function ChambersEditor({
                     style={{
                       fontSize: 11,
                       fontWeight: 700,
-                      color: T.ink400,
+                      color: T.ink500,
                       textTransform: "uppercase",
                       letterSpacing: "0.08em",
                       marginBottom: 5,
@@ -960,7 +931,7 @@ function ChambersEditor({
                     style={{
                       fontSize: 11,
                       fontWeight: 700,
-                      color: T.ink400,
+                      color: T.ink500,
                       textTransform: "uppercase",
                       letterSpacing: "0.08em",
                       marginBottom: 5,
@@ -986,7 +957,7 @@ function ChambersEditor({
                     fontSize: 11,
                     color: "#F57F17",
                     marginBottom: 10,
-                    fontFamily: T.fontData,
+                    fontFamily: T.font,
                   }}
                 >
                   R{parseFloat(di.cost_zar).toFixed(2)}/ml ×{" "}
@@ -1005,7 +976,7 @@ function ChambersEditor({
                     style={{
                       fontSize: 11,
                       fontWeight: 700,
-                      color: T.ink400,
+                      color: T.ink500,
                       textTransform: "uppercase",
                       letterSpacing: "0.08em",
                       marginBottom: 5,
@@ -1063,7 +1034,7 @@ function ChambersEditor({
                         color: col.accent,
                         marginTop: 3,
                         fontWeight: 600,
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                       }}
                     >
                       = {(parseFloat(ch.terpene_qty_ul) / 1000).toFixed(4)} ml
@@ -1095,7 +1066,7 @@ function ChambersEditor({
                       color: col.accent,
                       cursor: "pointer",
                       fontSize: 11,
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                       fontWeight: 700,
                     }}
                   >
@@ -1108,13 +1079,13 @@ function ChambersEditor({
                       fontSize: 11,
                       color: col.accent,
                       marginLeft: 4,
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                     }}
                   >
                     = {(parseFloat(ch.terpene_qty_ul) / 1000).toFixed(4)}ml ·{" "}
                     {terpPct}% of {ch.distillate_qty_ml}ml
                     {tp && (
-                      <span style={{ color: T.ink400 }}>
+                      <span style={{ color: T.ink500 }}>
                         {" "}
                         · {fmtZar(chTpCost)}
                       </span>
@@ -1404,7 +1375,7 @@ export default function HQCogs() {
   ];
 
   return (
-    <div style={{ fontFamily: T.fontUi, color: T.ink700 }}>
+    <div style={{ fontFamily: T.font, color: T.ink700 }}>
       <WorkflowGuide
         context={ctx}
         tabId="costing"
@@ -1426,7 +1397,7 @@ export default function HQCogs() {
             fontSize: 13,
             fontWeight: 500,
             boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
-            fontFamily: T.fontUi,
+            fontFamily: T.font,
           }}
         >
           {toast}
@@ -1447,7 +1418,7 @@ export default function HQCogs() {
             style={{
               margin: 0,
               fontSize: 22,
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
               fontWeight: 300,
               color: T.ink900,
             }}
@@ -1461,14 +1432,14 @@ export default function HQCogs() {
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <div
             style={{
-              background: fxLoading ? T.ink075 : T.successBg,
+              background: fxLoading ? T.bg : T.successLight,
               border: `1px solid ${T.successBd}`,
               borderRadius: 4,
               padding: "6px 12px",
               fontSize: 12,
               color: T.success,
               fontWeight: 600,
-              fontFamily: T.fontData,
+              fontFamily: T.font,
             }}
           >
             {fxLoading
@@ -1488,7 +1459,7 @@ export default function HQCogs() {
         style={{
           display: "flex",
           gap: 0,
-          borderBottom: `1px solid ${T.ink150}`,
+          borderBottom: `1px solid ${T.border}`,
           marginBottom: 24,
         }}
       >
@@ -1501,7 +1472,7 @@ export default function HQCogs() {
               border: "none",
               cursor: "pointer",
               padding: "10px 18px",
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
               fontSize: 11,
               fontWeight: activeSubTab === t.id ? 700 : 400,
               letterSpacing: "0.06em",
@@ -1528,7 +1499,7 @@ export default function HQCogs() {
                 margin: "0 0 4px",
                 fontSize: 15,
                 color: T.ink900,
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
                 fontWeight: 500,
               }}
             >
@@ -1554,7 +1525,7 @@ export default function HQCogs() {
                       background: col.bg,
                       color: col.color,
                       marginBottom: 12,
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                     }}
                   >
                     {cat}
@@ -1573,9 +1544,9 @@ export default function HQCogs() {
                           gap: 14,
                           padding: "12px 16px",
                           borderRadius: 6,
-                          border: `1px solid ${T.ink150}`,
+                          border: `1px solid ${T.border}`,
                           marginBottom: 8,
-                          background: T.ink050,
+                          background: T.surface,
                         }}
                       >
                         <div style={{ flex: 2 }}>
@@ -1585,7 +1556,7 @@ export default function HQCogs() {
                           <div
                             style={{
                               fontSize: 11,
-                              color: T.ink400,
+                              color: T.ink500,
                               marginTop: 2,
                             }}
                           >
@@ -1612,7 +1583,7 @@ export default function HQCogs() {
                               style={{ ...sInput, width: 120 }}
                               autoFocus
                             />
-                            <span style={{ fontSize: 12, color: T.ink400 }}>
+                            <span style={{ fontSize: 12, color: T.ink500 }}>
                               per {inp.unit?.replace("per ", "")}
                             </span>
                             <button
@@ -1646,7 +1617,7 @@ export default function HQCogs() {
                           >
                             <div
                               style={{
-                                fontFamily: T.fontData,
+                                fontFamily: T.font,
                                 fontSize: 18,
                                 fontWeight: 400,
                                 color: inp.cost_zar ? T.accent : T.ink300,
@@ -1683,12 +1654,12 @@ export default function HQCogs() {
           </div>
           <div
             style={{
-              background: T.ink075,
+              background: T.bg,
               borderRadius: 6,
               padding: "14px 18px",
               fontSize: 13,
               color: T.ink500,
-              border: `1px solid ${T.ink150}`,
+              border: `1px solid ${T.border}`,
             }}
           >
             Terpene & hardware are imported items priced in USD — ZAR cost is
@@ -1704,14 +1675,14 @@ export default function HQCogs() {
           {localInputs.some((i) => !i.cost_zar) && (
             <div
               style={{
-                background: T.warningBg,
+                background: T.warningLight,
                 border: `1px solid ${T.warningBd}`,
                 borderRadius: 6,
                 padding: "12px 16px",
                 marginBottom: 20,
                 fontSize: 13,
                 color: T.warning,
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
               }}
             >
               Some local input costs are still <strong>TBD</strong> (packaging,
@@ -1758,7 +1729,7 @@ export default function HQCogs() {
                 .map(([key, value]) => ({
                   name: key.charAt(0).toUpperCase() + key.slice(1),
                   value: Math.round(value),
-                  color: CATEGORY_COLOURS[key]?.color || T.ink400,
+                  color: CATEGORY_COLOURS[key]?.color || T.ink500,
                 }));
 
               if (allBreakdowns.length === 0) return null;
@@ -1781,13 +1752,13 @@ export default function HQCogs() {
                         <CartesianGrid
                           horizontal
                           vertical={false}
-                          stroke={T.ink150}
+                          stroke={T.border}
                           strokeWidth={0.5}
                         />
                         <XAxis
                           dataKey="name"
                           tick={{
-                            fill: T.ink400,
+                            fill: T.ink500,
                             fontSize: 10,
                             fontFamily: T.font,
                           }}
@@ -1797,7 +1768,7 @@ export default function HQCogs() {
                         />
                         <YAxis
                           tick={{
-                            fill: T.ink400,
+                            fill: T.ink500,
                             fontSize: 10,
                             fontFamily: T.font,
                           }}
@@ -1878,7 +1849,7 @@ export default function HQCogs() {
             })()}
 
           {loading ? (
-            <div style={{ textAlign: "center", padding: 60, color: T.ink400 }}>
+            <div style={{ textAlign: "center", padding: 60, color: T.ink500 }}>
               Loading COGS data…
             </div>
           ) : recipes.length === 0 ? (
@@ -1886,14 +1857,14 @@ export default function HQCogs() {
               <h3
                 style={{
                   color: T.ink900,
-                  fontFamily: T.fontUi,
+                  fontFamily: T.font,
                   fontWeight: 400,
                   marginBottom: 8,
                 }}
               >
                 No SKU recipes yet
               </h3>
-              <p style={{ color: T.ink400, fontSize: 13, marginBottom: 24 }}>
+              <p style={{ color: T.ink500, fontSize: 13, marginBottom: 24 }}>
                 Build a recipe for each finished product SKU.
               </p>
               <button style={mkBtn("primary")} onClick={openNew}>
@@ -1941,7 +1912,7 @@ export default function HQCogs() {
                             fontSize: 16,
                             fontWeight: 600,
                             color: T.ink900,
-                            fontFamily: T.fontUi,
+                            fontFamily: T.font,
                           }}
                         >
                           {recipe.product_name}
@@ -1950,9 +1921,9 @@ export default function HQCogs() {
                           <div
                             style={{
                               fontSize: 11,
-                              color: T.ink400,
+                              color: T.ink500,
                               marginTop: 2,
-                              fontFamily: T.fontData,
+                              fontFamily: T.font,
                             }}
                           >
                             {recipe.sku}
@@ -1970,8 +1941,8 @@ export default function HQCogs() {
                             <div
                               style={{
                                 fontSize: 11,
-                                color: T.ink400,
-                                fontFamily: T.fontUi,
+                                color: T.ink500,
+                                fontFamily: T.font,
                               }}
                             >
                               Batch: {bd.batchSize} units
@@ -1986,7 +1957,7 @@ export default function HQCogs() {
                                 borderRadius: 3,
                                 padding: "1px 7px",
                                 fontWeight: 700,
-                                fontFamily: T.fontUi,
+                                fontFamily: T.font,
                               }}
                             >
                               {bd.chamberSummary.length}-Chamber
@@ -2018,8 +1989,8 @@ export default function HQCogs() {
                           <div
                             style={{
                               background: bd?.hasMissingCosts
-                                ? T.warningBg
-                                : T.accentLit,
+                                ? T.warningLight
+                                : T.accentLight,
                               border: `1px solid ${bd?.hasMissingCosts ? T.warningBd : T.accentBd}`,
                               borderRadius: 6,
                               padding: "12px 16px",
@@ -2033,7 +2004,7 @@ export default function HQCogs() {
                               <div
                                 style={{
                                   fontSize: 10,
-                                  color: T.ink400,
+                                  color: T.ink500,
                                   marginBottom: 4,
                                   textTransform: "uppercase",
                                   letterSpacing: "0.08em",
@@ -2044,7 +2015,7 @@ export default function HQCogs() {
                               </div>
                               <div
                                 style={{
-                                  fontFamily: T.fontData,
+                                  fontFamily: T.font,
                                   fontSize: 26,
                                   fontWeight: 400,
                                   color: T.accent,
@@ -2071,14 +2042,14 @@ export default function HQCogs() {
                             getCardQty(recipe.id) < parseInt(bd.hwMoq) && (
                               <div
                                 style={{
-                                  background: T.warningBg,
+                                  background: T.warningLight,
                                   border: `1px solid ${T.warningBd}`,
                                   borderRadius: 6,
                                   padding: "9px 12px",
                                   marginBottom: 10,
                                   fontSize: 12,
                                   color: T.warning,
-                                  fontFamily: T.fontUi,
+                                  fontFamily: T.font,
                                 }}
                               >
                                 <strong>Below hardware MOQ</strong> — minimum
@@ -2088,8 +2059,8 @@ export default function HQCogs() {
                             )}
                           <div
                             style={{
-                              background: T.ink050,
-                              border: `1px solid ${T.ink150}`,
+                              background: T.surface,
+                              border: `1px solid ${T.border}`,
                               borderRadius: 6,
                               padding: "10px 12px",
                               marginBottom: 14,
@@ -2107,7 +2078,7 @@ export default function HQCogs() {
                                 style={{
                                   fontSize: 11,
                                   fontWeight: 700,
-                                  color: T.ink400,
+                                  color: T.ink500,
                                   textTransform: "uppercase",
                                   letterSpacing: "0.08em",
                                   flexShrink: 0,
@@ -2126,9 +2097,9 @@ export default function HQCogs() {
                                 style={{
                                   width: 72,
                                   padding: "4px 8px",
-                                  border: `1px solid ${T.ink150}`,
+                                  border: `1px solid ${T.border}`,
                                   borderRadius: 4,
-                                  fontFamily: T.fontData,
+                                  fontFamily: T.font,
                                   fontSize: 13,
                                   fontWeight: 700,
                                   color: T.accent,
@@ -2142,12 +2113,12 @@ export default function HQCogs() {
                                   style={{
                                     padding: "3px 8px",
                                     borderRadius: 4,
-                                    border: `1px solid ${T.ink150}`,
-                                    background: qty === n ? T.accent : T.ink050,
+                                    border: `1px solid ${T.border}`,
+                                    background: qty === n ? T.accent : T.surface,
                                     color: qty === n ? "#fff" : T.ink500,
                                     cursor: "pointer",
                                     fontSize: 11,
-                                    fontFamily: T.fontUi,
+                                    fontFamily: T.font,
                                     fontWeight: 700,
                                   }}
                                 >
@@ -2163,7 +2134,7 @@ export default function HQCogs() {
                                 <div
                                   style={{
                                     fontSize: 10,
-                                    color: T.ink400,
+                                    color: T.ink500,
                                     textTransform: "uppercase",
                                     letterSpacing: "0.06em",
                                   }}
@@ -2172,7 +2143,7 @@ export default function HQCogs() {
                                 </div>
                                 <div
                                   style={{
-                                    fontFamily: T.fontData,
+                                    fontFamily: T.font,
                                     fontSize: 15,
                                     fontWeight: 600,
                                     color: T.danger,
@@ -2184,8 +2155,8 @@ export default function HQCogs() {
                                   <div
                                     style={{
                                       fontSize: 10,
-                                      color: T.ink400,
-                                      fontFamily: T.fontData,
+                                      color: T.ink500,
+                                      fontFamily: T.font,
                                     }}
                                   >
                                     {fmtZar(total)}/unit ×{" "}
@@ -2274,7 +2245,7 @@ export default function HQCogs() {
                                   justifyContent: "space-between",
                                   alignItems: "center",
                                   padding: "7px 0",
-                                  borderBottom: `1px solid ${T.ink075}`,
+                                  borderBottom: `1px solid ${T.bg}`,
                                 }}
                               >
                                 <div
@@ -2297,7 +2268,7 @@ export default function HQCogs() {
                                     <span
                                       style={{
                                         color: T.ink700,
-                                        fontFamily: T.fontUi,
+                                        fontFamily: T.font,
                                       }}
                                     >
                                       {row.label}
@@ -2338,7 +2309,7 @@ export default function HQCogs() {
                                       <div>
                                         <strong
                                           style={{
-                                            fontFamily: T.fontData,
+                                            fontFamily: T.font,
                                             color: T.ink900,
                                           }}
                                         >
@@ -2349,7 +2320,7 @@ export default function HQCogs() {
                                             color: T.ink300,
                                             fontSize: 11,
                                             marginLeft: 6,
-                                            fontFamily: T.fontData,
+                                            fontFamily: T.font,
                                           }}
                                         >
                                           {fmt(pct)}%
@@ -2362,7 +2333,7 @@ export default function HQCogs() {
                                               fontSize: 10,
                                               color: "#1565C0",
                                               marginTop: 2,
-                                              fontFamily: T.fontData,
+                                              fontFamily: T.font,
                                             }}
                                           >
                                             {fmtZar(row.hwBaseZar)} unit +{" "}
@@ -2370,7 +2341,7 @@ export default function HQCogs() {
                                             {qty > 1 && (
                                               <span
                                                 style={{
-                                                  color: T.ink400,
+                                                  color: T.ink500,
                                                   marginLeft: 4,
                                                 }}
                                               >
@@ -2402,7 +2373,7 @@ export default function HQCogs() {
                                             color: T.danger,
                                             fontWeight: 700,
                                             marginTop: 2,
-                                            fontFamily: T.fontData,
+                                            fontFamily: T.font,
                                           }}
                                         >
                                           ×{qty.toLocaleString()} ={" "}
@@ -2412,7 +2383,7 @@ export default function HQCogs() {
                                     </>
                                   ) : (
                                     <span
-                                      style={{ color: T.ink150, fontSize: 12 }}
+                                      style={{ color: T.border, fontSize: 12 }}
                                     >
                                       TBD
                                     </span>
@@ -2426,14 +2397,14 @@ export default function HQCogs() {
                           <div
                             style={{
                               marginTop: 14,
-                              borderTop: `1px solid ${T.ink150}`,
+                              borderTop: `1px solid ${T.border}`,
                               paddingTop: 12,
                             }}
                           >
                             <div
                               style={{
                                 fontSize: 10,
-                                color: T.ink400,
+                                color: T.ink500,
                                 textTransform: "uppercase",
                                 letterSpacing: "0.08em",
                                 marginBottom: 8,
@@ -2467,7 +2438,7 @@ export default function HQCogs() {
                                       fontSize: 12,
                                       color: col.accent,
                                       minWidth: 80,
-                                      fontFamily: T.fontUi,
+                                      fontFamily: T.font,
                                     }}
                                   >
                                     {ch.label}
@@ -2477,7 +2448,7 @@ export default function HQCogs() {
                                       fontSize: 11,
                                       color: T.ink500,
                                       flex: 1,
-                                      fontFamily: T.fontUi,
+                                      fontFamily: T.font,
                                     }}
                                   >
                                     {ch.diName
@@ -2498,7 +2469,7 @@ export default function HQCogs() {
                                       fontSize: 12,
                                       fontWeight: 600,
                                       color: col.accent,
-                                      fontFamily: T.fontData,
+                                      fontFamily: T.font,
                                     }}
                                   >
                                     {fmtZar(ch.diCost + ch.tpCost)}
@@ -2515,7 +2486,7 @@ export default function HQCogs() {
                         style={{
                           marginTop: 12,
                           fontSize: 12,
-                          color: T.ink400,
+                          color: T.ink500,
                           fontStyle: "italic",
                         }}
                       >
@@ -2550,7 +2521,7 @@ export default function HQCogs() {
               padding: 32,
               width: 360,
               textAlign: "center",
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
             }}
           >
             <h3 style={{ margin: "0 0 8px", color: T.ink900 }}>
@@ -2600,7 +2571,7 @@ export default function HQCogs() {
             <div
               style={{
                 padding: "20px 24px",
-                borderBottom: `1px solid ${T.ink150}`,
+                borderBottom: `1px solid ${T.border}`,
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
@@ -2615,7 +2586,7 @@ export default function HQCogs() {
                   style={{
                     margin: 0,
                     fontSize: 18,
-                    fontFamily: T.fontUi,
+                    fontFamily: T.font,
                     fontWeight: 500,
                     color: T.ink900,
                   }}
@@ -2627,9 +2598,9 @@ export default function HQCogs() {
                 <div
                   style={{
                     fontSize: 12,
-                    color: T.ink400,
+                    color: T.ink500,
                     marginTop: 3,
-                    fontFamily: T.fontData,
+                    fontFamily: T.font,
                   }}
                 >
                   USD/ZAR: R{usdZar.toFixed(4)} · Terpene cost = price ÷ 50ml
@@ -2656,7 +2627,7 @@ export default function HQCogs() {
               {previewBreakdown && previewBreakdown.total > 0 && (
                 <div
                   style={{
-                    background: T.accentLit,
+                    background: T.accentLight,
                     border: `1px solid ${T.accentBd}`,
                     borderRadius: 6,
                     padding: "14px 18px",
@@ -2666,7 +2637,7 @@ export default function HQCogs() {
                   <div
                     style={{
                       fontSize: 11,
-                      color: T.ink400,
+                      color: T.ink500,
                       marginBottom: 4,
                       textTransform: "uppercase",
                       letterSpacing: "0.08em",
@@ -2677,7 +2648,7 @@ export default function HQCogs() {
                   </div>
                   <div
                     style={{
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       fontSize: 28,
                       fontWeight: 400,
                       color: T.accent,
@@ -2688,8 +2659,8 @@ export default function HQCogs() {
                       style={{
                         fontSize: 13,
                         fontWeight: 400,
-                        color: T.ink400,
-                        fontFamily: T.fontUi,
+                        color: T.ink500,
+                        fontFamily: T.font,
                       }}
                     >
                       per unit
@@ -2719,10 +2690,10 @@ export default function HQCogs() {
                       .map(([l, v]) => (
                         <span
                           key={l}
-                          style={{ color: T.ink500, fontFamily: T.fontUi }}
+                          style={{ color: T.ink500, fontFamily: T.font }}
                         >
                           {l}:{" "}
-                          <strong style={{ fontFamily: T.fontData }}>
+                          <strong style={{ fontFamily: T.font }}>
                             {fmtZar(v)}
                           </strong>
                         </span>
@@ -2797,7 +2768,7 @@ export default function HQCogs() {
                       style={{
                         fontSize: 11,
                         fontWeight: 700,
-                        color: T.ink400,
+                        color: T.ink500,
                         textTransform: "uppercase",
                         letterSpacing: "0.08em",
                         display: "flex",
@@ -2820,11 +2791,11 @@ export default function HQCogs() {
                     />
                   </div>
                   <div
-                    style={{ fontSize: 12, color: T.ink400, paddingBottom: 2 }}
+                    style={{ fontSize: 12, color: T.ink500, paddingBottom: 2 }}
                   >
                     Lab, transport and misc costs are divided by this number.
                     E.g. R350 potency test ÷ {form.batch_size || 50} units ={" "}
-                    <span style={{ fontFamily: T.fontData }}>
+                    <span style={{ fontFamily: T.font }}>
                       {fmtZar(350 / (parseInt(form.batch_size) || 50))}
                     </span>
                     /unit.
@@ -2920,7 +2891,7 @@ export default function HQCogs() {
                             style={{
                               fontWeight: 700,
                               color: belowMoq ? "#E65100" : "#1565C0",
-                              fontFamily: T.fontData,
+                              fontFamily: T.font,
                             }}
                           >
                             MOQ: {moq.toLocaleString()} units
@@ -2949,7 +2920,7 @@ export default function HQCogs() {
                       style={sInput}
                     />
                     <div
-                      style={{ fontSize: 11, color: T.ink400, marginTop: 4 }}
+                      style={{ fontSize: 11, color: T.ink500, marginTop: 4 }}
                     >
                       Almost always <strong>1</strong>.
                     </div>
@@ -2959,7 +2930,7 @@ export default function HQCogs() {
                           marginTop: 5,
                           fontSize: 11,
                           color: T.danger,
-                          background: T.dangerBg,
+                          background: T.dangerLight,
                           borderRadius: 4,
                           padding: "4px 8px",
                         }}
@@ -3003,7 +2974,7 @@ export default function HQCogs() {
                           fontSize: 12,
                           color: "#1565C0",
                           marginTop: 8,
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                         }}
                       >
                         = {fmtZar(cost)} ($
@@ -3099,7 +3070,7 @@ export default function HQCogs() {
                           style={{
                             fontSize: 11,
                             fontWeight: 700,
-                            color: T.ink400,
+                            color: T.ink500,
                             textTransform: "uppercase",
                             letterSpacing: "0.08em",
                             display: "flex",
@@ -3130,7 +3101,7 @@ export default function HQCogs() {
                               color: "#6A1B9A",
                               marginTop: 3,
                               fontWeight: 700,
-                              fontFamily: T.fontData,
+                              fontFamily: T.font,
                             }}
                           >
                             ={" "}
@@ -3170,7 +3141,7 @@ export default function HQCogs() {
                               fontSize: 11,
                               color: "#6A1B9A",
                               fontWeight: 700,
-                              fontFamily: T.fontData,
+                              fontFamily: T.font,
                             }}
                           >
                             ={" "}
@@ -3221,7 +3192,7 @@ export default function HQCogs() {
                               color: "#6A1B9A",
                               cursor: "pointer",
                               fontSize: 11,
-                              fontFamily: T.fontUi,
+                              fontFamily: T.font,
                               fontWeight: 700,
                             }}
                           >
@@ -3246,7 +3217,7 @@ export default function HQCogs() {
                               fontSize: 12,
                               color: "#6A1B9A",
                               marginTop: 8,
-                              fontFamily: T.fontData,
+                              fontFamily: T.font,
                             }}
                           >
                             R{fmt(costPerMl, 4)}/ml × {fmt(terpMl, 4)}ml ={" "}
@@ -3329,7 +3300,7 @@ export default function HQCogs() {
                               fontSize: 12,
                               color: "#F57F17",
                               marginTop: 8,
-                              fontFamily: T.fontData,
+                              fontFamily: T.font,
                             }}
                           >
                             ={" "}
@@ -3451,10 +3422,10 @@ export default function HQCogs() {
                           : undefined,
                         border: form.packaging_manual_zar
                           ? `1px solid ${T.successBd}`
-                          : `1px solid ${T.ink150}`,
+                          : `1px solid ${T.border}`,
                       }}
                     />
-                    <span style={{ fontSize: 11, color: T.ink400 }}>
+                    <span style={{ fontSize: 11, color: T.ink500 }}>
                       per unit
                     </span>
                     {form.packaging_manual_zar && (
@@ -3463,7 +3434,7 @@ export default function HQCogs() {
                           fontSize: 12,
                           color: "#2E7D32",
                           fontWeight: 700,
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                         }}
                       >
                         ={" "}
@@ -3588,10 +3559,10 @@ export default function HQCogs() {
                           : undefined,
                         border: form.labour_manual_zar
                           ? "1px solid #E91E8C"
-                          : `1px solid ${T.ink150}`,
+                          : `1px solid ${T.border}`,
                       }}
                     />
-                    <span style={{ fontSize: 11, color: T.ink400 }}>
+                    <span style={{ fontSize: 11, color: T.ink500 }}>
                       per unit
                     </span>
                     {form.labour_manual_zar && (
@@ -3600,7 +3571,7 @@ export default function HQCogs() {
                           fontSize: 12,
                           color: "#880E4F",
                           fontWeight: 700,
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                         }}
                       >
                         ={" "}
@@ -3668,10 +3639,10 @@ export default function HQCogs() {
                       total / Math.max(1, parseInt(form.batch_size) || 50);
                     return total > 0 ? (
                       <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 11, color: T.ink400 }}>
+                        <div style={{ fontSize: 11, color: T.ink500 }}>
                           Total:{" "}
                           <strong
-                            style={{ color: "#283593", fontFamily: T.fontData }}
+                            style={{ color: "#283593", fontFamily: T.font }}
                           >
                             {fmtZar(total)}
                           </strong>
@@ -3681,7 +3652,7 @@ export default function HQCogs() {
                             fontSize: 13,
                             fontWeight: 700,
                             color: "#283593",
-                            fontFamily: T.fontData,
+                            fontFamily: T.font,
                           }}
                         >
                           {fmtZar(perUnit)}/unit
@@ -3732,7 +3703,7 @@ export default function HQCogs() {
                             fontSize: 12,
                             fontWeight: checked ? 700 : 400,
                             color: checked ? "#283593" : T.ink500,
-                            fontFamily: T.fontUi,
+                            fontFamily: T.font,
                           }}
                         >
                           {test.label}
@@ -3743,7 +3714,7 @@ export default function HQCogs() {
                             fontWeight: 700,
                             color: "#283593",
                             flexShrink: 0,
-                            fontFamily: T.fontData,
+                            fontFamily: T.font,
                           }}
                         >
                           {fmtZar(test.price)}
@@ -3801,7 +3772,7 @@ export default function HQCogs() {
                         fontSize: 11,
                         color: "#00695C",
                         marginTop: 6,
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                       }}
                     >
                       ={" "}
@@ -3847,7 +3818,7 @@ export default function HQCogs() {
                         fontSize: 11,
                         color: "#455A64",
                         marginTop: 6,
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                       }}
                     >
                       ={" "}
@@ -3878,7 +3849,7 @@ export default function HQCogs() {
             <div
               style={{
                 padding: "18px 24px",
-                borderTop: `1px solid ${T.ink150}`,
+                borderTop: `1px solid ${T.border}`,
                 display: "flex",
                 justifyContent: "space-between",
                 position: "sticky",
