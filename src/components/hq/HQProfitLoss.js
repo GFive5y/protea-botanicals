@@ -36,7 +36,7 @@ import WorkflowGuide from "../WorkflowGuide";
 import InfoTooltip from "../InfoTooltip";
 import ExpenseManager from "./ExpenseManager";
 import HQFinancialSetup from "./HQFinancialSetup";
-import { T } from "../../theme";
+import { T } from "../../styles/tokens";
 
 // ─── WP-FINANCIALS Phase 2: IFRS account mapping ─────────────────────────────
 const SUBCATEGORY_TO_ACCOUNT = {
@@ -1418,7 +1418,7 @@ export default function HQProfitLoss() {
     padding: "8px 12px",
     border: "1px solid #ddd",
     borderRadius: 8,
-    fontFamily: T.font.ui,
+    fontFamily: T.font,
     fontSize: 14,
     boxSizing: "border-box",
   };
@@ -1435,7 +1435,7 @@ export default function HQProfitLoss() {
   }
 
   return (
-    <div style={{ fontFamily: T.font.ui, color: "#333" }}>
+    <div style={{ fontFamily: T.font, color: "#333" }}>
       <WorkflowGuide
         context={ctx}
         tabId="pl"
@@ -1581,7 +1581,7 @@ export default function HQProfitLoss() {
               background: "#fafafa",
               color: "#555",
               cursor: loading ? "wait" : "pointer",
-              fontFamily: T.font.ui,
+              fontFamily: T.font,
               fontSize: 13,
               fontWeight: 600,
               opacity: loading ? 0.5 : 1,
@@ -2088,7 +2088,7 @@ export default function HQProfitLoss() {
                       background: "#2d4a2d",
                       color: "#fff",
                       cursor: "pointer",
-                      fontFamily: T.font.ui,
+                      fontFamily: T.font,
                       fontSize: 13,
                       fontWeight: 600,
                     }}
@@ -2129,8 +2129,8 @@ export default function HQProfitLoss() {
                       </div>
                       <div
                         style={{
-                          ...T.type.metricLg,
-                          fontFamily: T.font.ui,
+                          fontFamily: T.font, fontSize: 28, fontWeight: 700,
+                          letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums",
                           color: netProfit >= 0 ? "#2E7D32" : "#c62828",
                         }}
                       >
@@ -2260,7 +2260,7 @@ export default function HQProfitLoss() {
             {productMargins.length > 0 && (
               <div style={{ ...card, marginTop: 20 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px 8px", borderBottom: "1px solid #eee" }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: T.color?.ink900 || "#111" }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: T.ink900 }}>
                     Gross Profit by Product
                   </span>
                   <div style={{ display: "flex", gap: 4 }}>
@@ -2271,7 +2271,7 @@ export default function HQProfitLoss() {
                         style={{
                           fontSize: 10, fontWeight: 600, padding: "4px 10px", borderRadius: 3,
                           border: "1px solid #ddd", cursor: "pointer",
-                          background: marginSortMode === m.id ? (T.color?.accent || "#1A3D2B") : "#fff",
+                          background: marginSortMode === m.id ? (T.accent) : "#fff",
                           color: marginSortMode === m.id ? "#fff" : "#666",
                         }}
                       >
@@ -3029,14 +3029,14 @@ export default function HQProfitLoss() {
             top: 24,
             right: 24,
             zIndex: 9999,
-            background: toast.type === "error" ? T.danger.text : T.accent.dark,
+            background: toast.type === "error" ? T.danger : T.accent,
             color: "#fff",
             padding: "12px 18px",
             borderRadius: 8,
             fontSize: 13,
             fontWeight: 600,
-            fontFamily: T.font.ui,
-            boxShadow: T.shadow.hover,
+            fontFamily: T.font,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
           }}
         >
           {toast.msg}
