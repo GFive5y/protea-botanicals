@@ -683,7 +683,7 @@ that doesn't feel like it was designed in the same room on the same day.
 | **P2: Post-demo sessions 1-5** | | | |
 | HQAnalytics.js | COMPLETE | fe241e6 | 13 Apr 2026 |
 | HQTradingDashboard.js | COMPLETE | 7395330 | 13 Apr 2026 |
-| HQFraud.js | NOT STARTED | — | — |
+| HQFraud.js | COMPLETE | 629a7d5 | 13 Apr 2026 |
 | HQLoyalty.js (10 tabs) | NOT STARTED | — | — |
 | HQVat.js | NOT STARTED | — | — |
 | + 23 more P2 files | NOT STARTED | — | — |
