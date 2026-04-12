@@ -716,7 +716,14 @@ that doesn't feel like it was designed in the same room on the same day.
 | HQCogs.js (PROTECTED) | NOT STARTED | — | — |
 | HQProduction.js (307KB) | NOT STARTED | — | — |
 | SmartInventory.js (180KB) | NOT STARTED | — | — |
-| + remaining P3 F&B files | NOT STARTED | — | — |
+| HQFoodSafety.js | COMPLETE | f4db94a | 13 Apr 2026 |
+| HQRecall.js | COMPLETE | f4db94a | 13 Apr 2026 |
+| HQColdChain.js | COMPLETE | f4db94a | 13 Apr 2026 |
+| HQHaccp.js | COMPLETE | f4db94a | 13 Apr 2026 |
+| HQNutritionLabel.js | COMPLETE | f4db94a | 13 Apr 2026 |
+| HQRecipeEngine.js | COMPLETE | f4db94a | 13 Apr 2026 |
+| HQFoodIngredients.js | COMPLETE | f4db94a | 13 Apr 2026 |
+| HQFoodIntelligence.js | DEFERRED (local T with 55 composite spreads) | — | — |
 | **P4: HR Suite + Admin + Staff** | | | |
 | AdminBatchManager.js | COMPLETE | 3f650bc | 13 Apr 2026 |
 | AdminCommsCenter.js | COMPLETE | 3f650bc | 13 Apr 2026 |
