@@ -723,7 +723,7 @@ that doesn't feel like it was designed in the same room on the same day.
 | HQNutritionLabel.js | COMPLETE | f4db94a | 13 Apr 2026 |
 | HQRecipeEngine.js | COMPLETE | f4db94a | 13 Apr 2026 |
 | HQFoodIngredients.js | COMPLETE | f4db94a | 13 Apr 2026 |
-| HQFoodIntelligence.js | DEFERRED (local T with 55 composite spreads) | — | — |
+| HQFoodIntelligence.js | COMPLETE (T→FI_T) | 533cd86 | 13 Apr 2026 |
 | **P4: HR Suite + Admin + Staff** | | | |
 | AdminBatchManager.js | COMPLETE | 3f650bc | 13 Apr 2026 |
 | AdminCommsCenter.js | COMPLETE | 3f650bc | 13 Apr 2026 |
