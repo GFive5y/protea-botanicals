@@ -33,37 +33,9 @@ import { supabase } from "../../services/supabaseClient";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import { ChartCard, ChartTooltip } from "../viz";
+import { T } from "../../styles/tokens";
 
-// ─── T TOKENS ────────────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 function fmtDate(d) {
@@ -108,7 +80,7 @@ const makeBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
   padding: "8px 16px",
   backgroundColor: disabled ? "#ccc" : bg,
   color,
-  border: bg === "transparent" ? `1px solid ${T.ink150}` : "none",
+  border: bg === "transparent" ? `1px solid ${T.border}` : "none",
   borderRadius: 4,
   fontSize: 10,
   fontWeight: 700,
@@ -121,7 +93,7 @@ const makeBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
 });
 const inputStyle = {
   padding: "8px 12px",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: 4,
   fontSize: 13,
   fontFamily: T.font,
@@ -133,16 +105,16 @@ const inputStyle = {
 
 // ─── SEVERITY CONFIG ──────────────────────────────────────────────────────────
 const FLAG_COLORS = {
-  velocity: { bg: T.dangerBg, color: T.danger },
-  travel: { bg: T.warningBg, color: T.warning },
-  bulk: { bg: T.dangerBg, color: T.danger },
-  distance: { bg: T.infoBg, color: T.info },
+  velocity: { bg: T.dangerLight, color: T.danger },
+  travel: { bg: T.warningLight, color: T.warning },
+  bulk: { bg: T.dangerLight, color: T.danger },
+  distance: { bg: T.infoLight, color: T.info },
   foreign: { bg: "#f5e6fa", color: "#7b2d8b" },
 };
 
 function ScoreBadge({ score }) {
   const color = score >= 85 ? T.danger : score >= 50 ? T.warning : T.success;
-  const bg = score >= 85 ? T.dangerBg : score >= 50 ? T.warningBg : T.successBg;
+  const bg = score >= 85 ? T.dangerLight : score >= 50 ? T.warningLight : T.successLight;
   return (
     <span
       style={{
@@ -171,12 +143,12 @@ function OutcomeBadge({ outcome }) {
     ? T.danger
     : outcome === "points_awarded"
       ? T.success
-      : T.ink400;
+      : T.ink500;
   const bg = suspicious
-    ? T.dangerBg
+    ? T.dangerLight
     : outcome === "points_awarded"
-      ? T.successBg
-      : T.ink075;
+      ? T.successLight
+      : T.bg;
   return (
     <span
       style={{
@@ -299,11 +271,11 @@ function Section({ title, action, children }) {
     <div
       style={{
         background: "#fff",
-        border: `1px solid ${T.ink150}`,
+        border: `1px solid ${T.border}`,
         borderRadius: 8,
         padding: 24,
         marginBottom: 20,
-        boxShadow: T.shadow,
+        boxShadow: T.shadow.sm,
       }}
     >
       <div
@@ -320,7 +292,7 @@ function Section({ title, action, children }) {
             fontWeight: 700,
             letterSpacing: "0.1em",
             textTransform: "uppercase",
-            color: T.ink400,
+            color: T.ink500,
             fontFamily: T.font,
           }}
         >
@@ -341,11 +313,11 @@ function StatGrid({ stats }) {
         display: "grid",
         gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))",
         gap: "1px",
-        background: T.ink150,
+        background: T.border,
         borderRadius: 8,
         overflow: "hidden",
-        border: `1px solid ${T.ink150}`,
-        boxShadow: T.shadow,
+        border: `1px solid ${T.border}`,
+        boxShadow: T.shadow.sm,
         marginBottom: 20,
       }}
     >
@@ -364,7 +336,7 @@ function StatGrid({ stats }) {
               fontWeight: 700,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
-              color: T.ink400,
+              color: T.ink500,
               marginBottom: 6,
               fontFamily: T.font,
             }}
@@ -388,7 +360,7 @@ function StatGrid({ stats }) {
             <div
               style={{
                 fontSize: 9,
-                color: T.ink400,
+                color: T.ink500,
                 marginTop: 4,
                 fontFamily: T.font,
               }}
@@ -426,7 +398,7 @@ function SuspendModal({ user, onClose, onConfirm, adminId }) {
           maxWidth: 440,
           width: "90%",
           fontFamily: T.font,
-          boxShadow: T.shadowMd,
+          boxShadow: T.shadow.lg,
         }}
       >
         <div
@@ -455,7 +427,7 @@ function SuspendModal({ user, onClose, onConfirm, adminId }) {
           <div
             style={{
               fontSize: 11,
-              color: T.ink400,
+              color: T.ink500,
               marginBottom: 6,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
@@ -474,7 +446,7 @@ function SuspendModal({ user, onClose, onConfirm, adminId }) {
         <div style={{ display: "flex", gap: 10 }}>
           <button
             onClick={onClose}
-            style={{ ...makeBtn("transparent", T.ink400), flex: 1 }}
+            style={{ ...makeBtn("transparent", T.ink500), flex: 1 }}
           >
             Cancel
           </button>
@@ -526,7 +498,7 @@ function EraseModal({ customer, onClose, onConfirm }) {
           maxWidth: 440,
           width: "90%",
           fontFamily: T.font,
-          boxShadow: T.shadowMd,
+          boxShadow: T.shadow.lg,
         }}
       >
         <div
@@ -560,7 +532,7 @@ function EraseModal({ customer, onClose, onConfirm }) {
         <div style={{ display: "flex", gap: 10 }}>
           <button
             onClick={onClose}
-            style={{ ...makeBtn("transparent", T.ink400), flex: 1 }}
+            style={{ ...makeBtn("transparent", T.ink500), flex: 1 }}
           >
             Cancel
           </button>
@@ -910,7 +882,7 @@ export default function HQFraud() {
     .map((r) => ({
       name: r.charAt(0).toUpperCase() + r.slice(1),
       detected: detections.filter((d) => d.reason === r).length,
-      color: FLAG_COLORS[r]?.color || T.ink400,
+      color: FLAG_COLORS[r]?.color || T.ink500,
     }))
     .filter((d) => d.detected > 0);
 
@@ -967,7 +939,7 @@ export default function HQFraud() {
             fontWeight: 600,
             zIndex: 2000,
             fontFamily: T.font,
-            boxShadow: T.shadowMd,
+            boxShadow: T.shadow.lg,
           }}
         >
           {toast}
@@ -997,7 +969,7 @@ export default function HQFraud() {
           >
             Fraud &amp; Security Centre
           </h2>
-          <div style={{ fontSize: 13, color: T.ink400 }}>
+          <div style={{ fontSize: 13, color: T.ink500 }}>
             Real-time fraud detection · Account suspension · POPIA compliance ·
             Admin audit trail
           </div>
@@ -1005,8 +977,8 @@ export default function HQFraud() {
         <button
           onClick={fetchAll}
           style={{
-            ...makeBtn("transparent", T.ink400),
-            border: `1px solid ${T.ink150}`,
+            ...makeBtn("transparent", T.ink500),
+            border: `1px solid ${T.border}`,
           }}
         >
           ↻ Refresh
@@ -1061,7 +1033,7 @@ export default function HQFraud() {
         style={{
           display: "flex",
           gap: 0,
-          borderBottom: `2px solid ${T.ink150}`,
+          borderBottom: `2px solid ${T.border}`,
           marginBottom: 24,
         }}
       >
@@ -1084,7 +1056,7 @@ export default function HQFraud() {
               fontWeight: activeTab === t.id ? 700 : 400,
               letterSpacing: "0.07em",
               textTransform: "uppercase",
-              color: activeTab === t.id ? T.accent : T.ink400,
+              color: activeTab === t.id ? T.accent : T.ink500,
             }}
           >
             {t.label}
@@ -1110,10 +1082,10 @@ export default function HQFraud() {
             <div
               style={{
                 background: "#fff",
-                border: `1px solid ${T.ink150}`,
+                border: `1px solid ${T.border}`,
                 borderRadius: 8,
                 padding: 20,
-                boxShadow: T.shadow,
+                boxShadow: T.shadow.sm,
               }}
             >
               <div
@@ -1122,7 +1094,7 @@ export default function HQFraud() {
                   fontWeight: 700,
                   letterSpacing: "0.08em",
                   textTransform: "uppercase",
-                  color: T.ink400,
+                  color: T.ink500,
                   marginBottom: 12,
                   fontFamily: T.font,
                 }}
@@ -1157,7 +1129,7 @@ export default function HQFraud() {
                       justifyContent: "space-between",
                       alignItems: "center",
                       padding: "8px 0",
-                      borderBottom: `1px solid ${T.ink075}`,
+                      borderBottom: `1px solid ${T.bg}`,
                     }}
                   >
                     <span
@@ -1190,7 +1162,7 @@ export default function HQFraud() {
                             fontWeight: 700,
                             padding: "1px 6px",
                             borderRadius: 10,
-                            background: up ? T.dangerBg : T.successBg,
+                            background: up ? T.dangerLight : T.successLight,
                             color: up ? T.danger : T.success,
                             fontFamily: T.font,
                           }}
@@ -1208,10 +1180,10 @@ export default function HQFraud() {
             <div
               style={{
                 background: "#fff",
-                border: `1px solid ${T.ink150}`,
+                border: `1px solid ${T.border}`,
                 borderRadius: 8,
                 padding: 20,
-                boxShadow: T.shadow,
+                boxShadow: T.shadow.sm,
               }}
             >
               <div
@@ -1220,7 +1192,7 @@ export default function HQFraud() {
                   fontWeight: 700,
                   letterSpacing: "0.08em",
                   textTransform: "uppercase",
-                  color: T.ink400,
+                  color: T.ink500,
                   marginBottom: 12,
                   fontFamily: T.font,
                 }}
@@ -1229,7 +1201,7 @@ export default function HQFraud() {
               </div>
               {tenantRisk.length === 0 ? (
                 <div
-                  style={{ fontSize: 12, color: T.ink400, fontFamily: T.font }}
+                  style={{ fontSize: 12, color: T.ink500, fontFamily: T.font }}
                 >
                   No tenant data
                 </div>
@@ -1242,7 +1214,7 @@ export default function HQFraud() {
                       justifyContent: "space-between",
                       alignItems: "center",
                       padding: "8px 0",
-                      borderBottom: `1px solid ${T.ink075}`,
+                      borderBottom: `1px solid ${T.bg}`,
                     }}
                   >
                     <span
@@ -1266,7 +1238,7 @@ export default function HQFraud() {
                             borderRadius: 10,
                             fontWeight: 700,
                             background:
-                              t.suspicious > 10 ? T.dangerBg : T.warningBg,
+                              t.suspicious > 10 ? T.dangerLight : T.warningLight,
                             color: t.suspicious > 10 ? T.danger : T.warning,
                             fontFamily: T.font,
                           }}
@@ -1281,7 +1253,7 @@ export default function HQFraud() {
                             padding: "1px 6px",
                             borderRadius: 10,
                             fontWeight: 700,
-                            background: T.dangerBg,
+                            background: T.dangerLight,
                             color: T.danger,
                             fontFamily: T.font,
                           }}
@@ -1366,13 +1338,13 @@ export default function HQFraud() {
                       <CartesianGrid
                         horizontal
                         vertical={false}
-                        stroke={T.ink150}
+                        stroke={T.border}
                         strokeWidth={0.5}
                       />
                       <XAxis
                         dataKey="name"
                         tick={{
-                          fill: T.ink400,
+                          fill: T.ink500,
                           fontSize: 9,
                           fontFamily: T.font,
                         }}
@@ -1382,7 +1354,7 @@ export default function HQFraud() {
                       />
                       <YAxis
                         tick={{
-                          fill: T.ink400,
+                          fill: T.ink500,
                           fontSize: 9,
                           fontFamily: T.font,
                         }}
@@ -1417,7 +1389,7 @@ export default function HQFraud() {
                       justifyContent: "center",
                       height: "100%",
                       fontSize: 12,
-                      color: T.ink400,
+                      color: T.ink500,
                       fontFamily: T.font,
                     }}
                   >
@@ -1470,13 +1442,13 @@ export default function HQFraud() {
                       <CartesianGrid
                         horizontal
                         vertical={false}
-                        stroke={T.ink150}
+                        stroke={T.border}
                         strokeWidth={0.5}
                       />
                       <XAxis
                         dataKey="date"
                         tick={{
-                          fill: T.ink400,
+                          fill: T.ink500,
                           fontSize: 8,
                           fontFamily: T.font,
                         }}
@@ -1488,7 +1460,7 @@ export default function HQFraud() {
                       />
                       <YAxis
                         tick={{
-                          fill: T.ink400,
+                          fill: T.ink500,
                           fontSize: 8,
                           fontFamily: T.font,
                         }}
@@ -1533,7 +1505,7 @@ export default function HQFraud() {
                       justifyContent: "center",
                       height: "100%",
                       fontSize: 12,
-                      color: T.ink400,
+                      color: T.ink500,
                       fontFamily: T.font,
                     }}
                   >
@@ -1548,13 +1520,13 @@ export default function HQFraud() {
                       <CartesianGrid
                         horizontal
                         vertical={false}
-                        stroke={T.ink150}
+                        stroke={T.border}
                         strokeWidth={0.5}
                       />
                       <XAxis
                         dataKey="name"
                         tick={{
-                          fill: T.ink400,
+                          fill: T.ink500,
                           fontSize: 8,
                           fontFamily: T.font,
                         }}
@@ -1564,7 +1536,7 @@ export default function HQFraud() {
                       />
                       <YAxis
                         tick={{
-                          fill: T.ink400,
+                          fill: T.ink500,
                           fontSize: 8,
                           fontFamily: T.font,
                         }}
@@ -1620,10 +1592,10 @@ export default function HQFraud() {
                             padding: "7px 12px",
                             textAlign: "left",
                             fontSize: 9,
-                            color: T.ink400,
+                            color: T.ink500,
                             letterSpacing: "0.08em",
                             textTransform: "uppercase",
-                            borderBottom: `1px solid ${T.ink150}`,
+                            borderBottom: `1px solid ${T.border}`,
                           }}
                         >
                           {h}
@@ -1636,8 +1608,8 @@ export default function HQFraud() {
                       <tr
                         key={u.id}
                         style={{
-                          background: i % 2 === 0 ? "#fff" : T.ink050,
-                          borderBottom: `1px solid ${T.ink075}`,
+                          background: i % 2 === 0 ? "#fff" : T.surface,
+                          borderBottom: `1px solid ${T.bg}`,
                         }}
                       >
                         <td
@@ -1652,7 +1624,7 @@ export default function HQFraud() {
                         <td
                           style={{
                             padding: "9px 12px",
-                            color: T.ink400,
+                            color: T.ink500,
                             fontSize: 11,
                           }}
                         >
@@ -1664,7 +1636,7 @@ export default function HQFraud() {
                               fontSize: 10,
                               padding: "2px 8px",
                               borderRadius: 10,
-                              background: T.ink075,
+                              background: T.bg,
                               color: T.ink700,
                               fontWeight: 600,
                               fontFamily: T.font,
@@ -1683,7 +1655,7 @@ export default function HQFraud() {
                                 fontSize: 10,
                                 padding: "2px 8px",
                                 borderRadius: 10,
-                                background: T.warningBg,
+                                background: T.warningLight,
                                 color: T.warning,
                                 fontWeight: 700,
                                 fontFamily: T.font,
@@ -1697,7 +1669,7 @@ export default function HQFraud() {
                                 fontSize: 10,
                                 padding: "2px 8px",
                                 borderRadius: 10,
-                                background: T.dangerBg,
+                                background: T.dangerLight,
                                 color: T.danger,
                                 fontWeight: 700,
                                 fontFamily: T.font,
@@ -1711,7 +1683,7 @@ export default function HQFraud() {
                                 fontSize: 10,
                                 padding: "2px 8px",
                                 borderRadius: 10,
-                                background: T.warningBg,
+                                background: T.warningLight,
                                 color: T.warning,
                                 fontWeight: 700,
                                 fontFamily: T.font,
@@ -1779,7 +1751,7 @@ export default function HQFraud() {
             action={
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <span
-                  style={{ fontSize: 10, color: T.ink400, fontFamily: T.font }}
+                  style={{ fontSize: 10, color: T.ink500, fontFamily: T.font }}
                 >
                   Min score:
                 </span>
@@ -1798,7 +1770,7 @@ export default function HQFraud() {
           >
             {loading ? (
               <div
-                style={{ padding: 40, textAlign: "center", color: T.ink400 }}
+                style={{ padding: 40, textAlign: "center", color: T.ink500 }}
               >
                 Loading…
               </div>
@@ -1806,7 +1778,7 @@ export default function HQFraud() {
               <div style={{ padding: 40, textAlign: "center" }}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
                 <div
-                  style={{ fontSize: 13, color: T.ink400, fontFamily: T.font }}
+                  style={{ fontSize: 13, color: T.ink500, fontFamily: T.font }}
                 >
                   No accounts with anomaly score ≥ 50. System clean.
                 </div>
@@ -1838,10 +1810,10 @@ export default function HQFraud() {
                             padding: "7px 12px",
                             textAlign: "left",
                             fontSize: 9,
-                            color: T.ink400,
+                            color: T.ink500,
                             letterSpacing: "0.08em",
                             textTransform: "uppercase",
-                            borderBottom: `1px solid ${T.ink150}`,
+                            borderBottom: `1px solid ${T.border}`,
                           }}
                         >
                           {h}
@@ -1854,8 +1826,8 @@ export default function HQFraud() {
                       <tr
                         key={u.id}
                         style={{
-                          background: i % 2 === 0 ? "#fff" : T.ink050,
-                          borderBottom: `1px solid ${T.ink075}`,
+                          background: i % 2 === 0 ? "#fff" : T.surface,
+                          borderBottom: `1px solid ${T.bg}`,
                         }}
                       >
                         <td
@@ -1870,7 +1842,7 @@ export default function HQFraud() {
                         <td
                           style={{
                             padding: "9px 12px",
-                            color: T.ink400,
+                            color: T.ink500,
                             fontSize: 11,
                           }}
                         >
@@ -1885,7 +1857,7 @@ export default function HQFraud() {
                               fontSize: 10,
                               padding: "2px 8px",
                               borderRadius: 10,
-                              background: T.ink075,
+                              background: T.bg,
                               color: T.ink700,
                               fontWeight: 600,
                               fontFamily: T.font,
@@ -1916,7 +1888,7 @@ export default function HQFraud() {
                           style={{
                             padding: "9px 12px",
                             fontSize: 11,
-                            color: T.ink400,
+                            color: T.ink500,
                           }}
                         >
                           {fmtDate(u.created_at)}
@@ -1964,10 +1936,10 @@ export default function HQFraud() {
                             padding: "7px 12px",
                             textAlign: "left",
                             fontSize: 9,
-                            color: T.ink400,
+                            color: T.ink500,
                             letterSpacing: "0.08em",
                             textTransform: "uppercase",
-                            borderBottom: `1px solid ${T.ink150}`,
+                            borderBottom: `1px solid ${T.border}`,
                           }}
                         >
                           {h}
@@ -1980,8 +1952,8 @@ export default function HQFraud() {
                       <tr
                         key={u.id}
                         style={{
-                          background: i % 2 === 0 ? "#fff" : T.ink050,
-                          borderBottom: `1px solid ${T.ink075}`,
+                          background: i % 2 === 0 ? "#fff" : T.surface,
+                          borderBottom: `1px solid ${T.bg}`,
                         }}
                       >
                         <td
@@ -1996,7 +1968,7 @@ export default function HQFraud() {
                         <td
                           style={{
                             padding: "9px 12px",
-                            color: T.ink400,
+                            color: T.ink500,
                             fontSize: 11,
                           }}
                         >
@@ -2036,7 +2008,7 @@ export default function HQFraud() {
               alignItems: "center",
               justifyContent: "space-between",
               padding: "14px 18px",
-              background: autoDetected > 0 ? T.dangerBg : T.successBg,
+              background: autoDetected > 0 ? T.dangerLight : T.successLight,
               border: `1px solid ${autoDetected > 0 ? T.dangerBd : T.successBd}`,
               borderRadius: 8,
               marginBottom: 20,
@@ -2060,7 +2032,7 @@ export default function HQFraud() {
               <div
                 style={{
                   fontSize: 12,
-                  color: T.ink400,
+                  color: T.ink500,
                   marginTop: 2,
                   fontFamily: T.font,
                 }}
@@ -2081,8 +2053,8 @@ export default function HQFraud() {
                     ).length;
                     if (count === 0) return null;
                     const cfg = FLAG_COLORS[reason] || {
-                      bg: T.ink075,
-                      color: T.ink400,
+                      bg: T.bg,
+                      color: T.ink500,
                     };
                     return (
                       <div
@@ -2157,10 +2129,10 @@ export default function HQFraud() {
                           padding: "7px 10px",
                           textAlign: "left",
                           fontSize: 9,
-                          color: T.ink400,
+                          color: T.ink500,
                           letterSpacing: "0.08em",
                           textTransform: "uppercase",
-                          borderBottom: `1px solid ${T.ink150}`,
+                          borderBottom: `1px solid ${T.border}`,
                           whiteSpace: "nowrap",
                         }}
                       >
@@ -2176,15 +2148,15 @@ export default function HQFraud() {
                       <tr
                         key={s.id}
                         style={{
-                          background: i % 2 === 0 ? "#fff" : T.ink050,
-                          borderBottom: `1px solid ${T.ink075}`,
+                          background: i % 2 === 0 ? "#fff" : T.surface,
+                          borderBottom: `1px solid ${T.bg}`,
                         }}
                       >
                         <td
                           style={{
                             padding: "7px 10px",
                             whiteSpace: "nowrap",
-                            color: T.ink400,
+                            color: T.ink500,
                           }}
                         >
                           {fmtDate(s.scanned_at)}
@@ -2203,7 +2175,7 @@ export default function HQFraud() {
                           style={{
                             padding: "7px 10px",
                             fontFamily: "monospace",
-                            color: T.ink400,
+                            color: T.ink500,
                             fontSize: 10,
                           }}
                         >
@@ -2215,14 +2187,14 @@ export default function HQFraud() {
                         <td
                           style={{
                             padding: "7px 10px",
-                            color: T.ink400,
+                            color: T.ink500,
                             whiteSpace: "nowrap",
                           }}
                         >
                           {s.ip_city || "—"}
                           {s.ip_country ? ` · ${s.ip_country}` : ""}
                         </td>
-                        <td style={{ padding: "7px 10px", color: T.ink400 }}>
+                        <td style={{ padding: "7px 10px", color: T.ink500 }}>
                           {s.device_type || "—"}
                         </td>
                         <td style={{ padding: "7px 10px" }}>
@@ -2232,7 +2204,7 @@ export default function HQFraud() {
                                 fontSize: 9,
                                 padding: "2px 6px",
                                 borderRadius: 10,
-                                background: T.warningBg,
+                                background: T.warningLight,
                                 color: T.warning,
                                 fontWeight: 700,
                                 fontFamily: T.font,
@@ -2315,7 +2287,7 @@ export default function HQFraud() {
                       padding: "12px 0",
                       borderBottom:
                         i < pendingDels.length - 1
-                          ? `1px solid ${T.ink150}`
+                          ? `1px solid ${T.border}`
                           : "none",
                       flexWrap: "wrap",
                       gap: 10,
@@ -2336,7 +2308,7 @@ export default function HQFraud() {
                       <div
                         style={{
                           fontSize: 11,
-                          color: T.ink400,
+                          color: T.ink500,
                           marginTop: 2,
                           fontFamily: T.font,
                         }}
@@ -2359,10 +2331,10 @@ export default function HQFraud() {
                       <button
                         onClick={() => handleProcessDeletion(req, false)}
                         style={{
-                          ...makeBtn("transparent", T.ink400),
+                          ...makeBtn("transparent", T.ink500),
                           fontSize: 9,
                           padding: "5px 12px",
-                          border: `1px solid ${T.ink150}`,
+                          border: `1px solid ${T.border}`,
                         }}
                       >
                         Reject
@@ -2401,10 +2373,10 @@ export default function HQFraud() {
                           padding: "7px 12px",
                           textAlign: "left",
                           fontSize: 9,
-                          color: T.ink400,
+                          color: T.ink500,
                           letterSpacing: "0.08em",
                           textTransform: "uppercase",
-                          borderBottom: `1px solid ${T.ink150}`,
+                          borderBottom: `1px solid ${T.border}`,
                         }}
                       >
                         {h}
@@ -2417,8 +2389,8 @@ export default function HQFraud() {
                     <tr
                       key={u.id}
                       style={{
-                        background: i % 2 === 0 ? "#fff" : T.ink050,
-                        borderBottom: `1px solid ${T.ink075}`,
+                        background: i % 2 === 0 ? "#fff" : T.surface,
+                        borderBottom: `1px solid ${T.bg}`,
                       }}
                     >
                       <td
@@ -2452,7 +2424,7 @@ export default function HQFraud() {
                         style={{
                           padding: "9px 12px",
                           fontSize: 11,
-                          color: T.ink400,
+                          color: T.ink500,
                         }}
                       >
                         {u.popia_date ? fmtDateOnly(u.popia_date) : "—"}
@@ -2490,7 +2462,7 @@ export default function HQFraud() {
                         style={{
                           padding: 40,
                           textAlign: "center",
-                          color: T.ink400,
+                          color: T.ink500,
                         }}
                       >
                         No customers found
@@ -2505,7 +2477,7 @@ export default function HQFraud() {
           <div
             style={{
               padding: 16,
-              background: T.infoBg,
+              background: T.infoLight,
               border: `1px solid ${T.infoBd}`,
               borderRadius: 8,
             }}
@@ -2555,7 +2527,7 @@ export default function HQFraud() {
           >
             {loading ? (
               <div
-                style={{ padding: 40, textAlign: "center", color: T.ink400 }}
+                style={{ padding: 40, textAlign: "center", color: T.ink500 }}
               >
                 Loading…
               </div>
@@ -2564,7 +2536,7 @@ export default function HQFraud() {
                 style={{
                   padding: 40,
                   textAlign: "center",
-                  color: T.ink400,
+                  color: T.ink500,
                   fontFamily: T.font,
                 }}
               >
@@ -2590,10 +2562,10 @@ export default function HQFraud() {
                               padding: "7px 12px",
                               textAlign: "left",
                               fontSize: 9,
-                              color: T.ink400,
+                              color: T.ink500,
                               letterSpacing: "0.08em",
                               textTransform: "uppercase",
-                              borderBottom: `1px solid ${T.ink150}`,
+                              borderBottom: `1px solid ${T.border}`,
                             }}
                           >
                             {h}
@@ -2614,15 +2586,15 @@ export default function HQFraud() {
                         <tr
                           key={entry.id}
                           style={{
-                            background: i % 2 === 0 ? "#fff" : T.ink050,
-                            borderBottom: `1px solid ${T.ink075}`,
+                            background: i % 2 === 0 ? "#fff" : T.surface,
+                            borderBottom: `1px solid ${T.bg}`,
                           }}
                         >
                           <td
                             style={{
                               padding: "8px 12px",
                               whiteSpace: "nowrap",
-                              color: T.ink400,
+                              color: T.ink500,
                               fontSize: 10,
                             }}
                           >
@@ -2631,7 +2603,7 @@ export default function HQFraud() {
                           <td
                             style={{
                               padding: "8px 12px",
-                              color: T.ink400,
+                              color: T.ink500,
                               fontFamily: "monospace",
                               fontSize: 10,
                             }}
@@ -2658,7 +2630,7 @@ export default function HQFraud() {
                           <td
                             style={{
                               padding: "8px 12px",
-                              color: T.ink400,
+                              color: T.ink500,
                               fontSize: 10,
                             }}
                           >
