@@ -27,98 +27,13 @@ import { usePageContext } from "../../hooks/usePageContext";
 import { ChartCard, ChartTooltip, SparkLine, DeltaBadge } from "../viz";
 import { PRODUCT_WORLDS, worldForItem } from "./ProductWorlds";
 import ActionCentre from "../shared/ActionCentre";
+import { T } from "../../styles/tokens";
 
 const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
   "https://uvicrqapgzcdvozxrreo.supabase.co/functions/v1";
 
-// ─── Design tokens (mirrors src/theme.js) ───────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  ink400: "#474747",
-  fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
-  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
-  shadowCard: "0 1px 3px rgba(0,0,0,0.07)",
-  display: {
-    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-    fontSize: 36,
-    fontWeight: 300,
-    letterSpacing: "-0.03em",
-    fontVariantNumeric: "tabular-nums",
-  },
-  title: {
-    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-    fontSize: 22,
-    fontWeight: 400,
-    letterSpacing: "-0.01em",
-  },
-  heading: {
-    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-    fontSize: 16,
-    fontWeight: 600,
-  },
-  kpi: {
-    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-    fontSize: 24,
-    fontWeight: 400,
-    letterSpacing: "-0.02em",
-    fontVariantNumeric: "tabular-nums",
-  },
-  kpiSm: {
-    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-    fontSize: 18,
-    fontWeight: 400,
-    fontVariantNumeric: "tabular-nums",
-  },
-  body: {
-    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-    fontSize: 13,
-    fontWeight: 400,
-  },
-  label: {
-    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-    fontSize: 11,
-    fontWeight: 600,
-    letterSpacing: "0.07em",
-    textTransform: "uppercase",
-  },
-  caption: {
-    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-    fontSize: 11,
-    fontWeight: 400,
-  },
-  data: {
-    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-    fontSize: 12,
-    fontWeight: 400,
-    fontVariantNumeric: "tabular-nums",
-  },
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY migration)
 
 // ── Chart colour palette — Indigo Intelligence ──────────────────────────────
 const CHART = {
@@ -1215,7 +1130,7 @@ export default function HQOverview({ onNavigate }) {
           textAlign: "center",
           padding: "60px 0",
           color: T.ink500,
-          fontFamily: T.fontUi,
+          fontFamily: T.font,
         }}
       >
         <style>{`@keyframes protea-spin{to{transform:rotate(360deg)}}`}</style>
@@ -1223,7 +1138,7 @@ export default function HQOverview({ onNavigate }) {
           style={{
             width: 28,
             height: 28,
-            border: `2px solid ${T.ink150}`,
+            border: `2px solid ${T.border}`,
             borderTopColor: T.accent,
             borderRadius: "50%",
             animation: "protea-spin 0.8s linear infinite",
@@ -1248,12 +1163,12 @@ export default function HQOverview({ onNavigate }) {
     return (
       <div
         style={{
-          background: T.dangerBg,
+          background: T.dangerLight,
           border: `1px solid ${T.dangerBd}`,
           borderRadius: 6,
           padding: "14px 18px",
           color: T.danger,
-          fontFamily: T.fontUi,
+          fontFamily: T.font,
           fontSize: 13,
           display: "flex",
           alignItems: "center",
@@ -1311,7 +1226,7 @@ export default function HQOverview({ onNavigate }) {
   };
 
   return (
-    <div style={{ fontFamily: T.fontUi, width: "100%" }}>
+    <div style={{ fontFamily: T.font, width: "100%" }}>
       <WorkflowGuide
         context={ctx}
         title="HQ Command Centre"
@@ -1961,7 +1876,7 @@ export default function HQOverview({ onNavigate }) {
                             style={{
                               flex: 1,
                               height: 7,
-                              background: T.ink075,
+                              background: T.bg,
                               borderRadius: 3,
                               overflow: "hidden",
                             }}
@@ -1985,8 +1900,8 @@ export default function HQOverview({ onNavigate }) {
                             style={{
                               width: 44,
                               fontSize: 10,
-                              color: clickable ? "#6366F1" : T.ink400,
-                              fontFamily: T.fontData,
+                              color: clickable ? "#6366F1" : T.ink500,
+                              fontFamily: T.font,
                               textAlign: "right",
                               flexShrink: 0,
                               fontWeight: clickable ? 500 : 400,
@@ -2249,7 +2164,7 @@ export default function HQOverview({ onNavigate }) {
                       fontSize: 11,
                       fontWeight: 500,
                       color: "#111827",
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       fontVariantNumeric: "tabular-nums",
                     }}>
                       {item.value}
@@ -2406,10 +2321,10 @@ export default function HQOverview({ onNavigate }) {
             <div
               style={{
                 background: "white",
-                border: `1px solid ${T.ink150}`,
+                border: `1px solid ${T.border}`,
                 borderRadius: 6,
                 padding: "18px 20px",
-                boxShadow: T.shadowCard,
+                boxShadow: T.shadow.sm,
               }}
             >
               <div
@@ -2434,10 +2349,10 @@ export default function HQOverview({ onNavigate }) {
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span
                     style={{
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       fontSize: 10,
-                      color: T.ink400,
-                      background: T.ink075,
+                      color: T.ink500,
+                      background: T.bg,
                       padding: "1px 6px",
                       borderRadius: 3,
                     }}
@@ -2464,7 +2379,7 @@ export default function HQOverview({ onNavigate }) {
               </div>
               <div
                 style={{
-                  fontFamily: T.fontData,
+                  fontFamily: T.font,
                   fontSize: 28,
                   fontWeight: 400,
                   color: T.success,
@@ -2485,26 +2400,26 @@ export default function HQOverview({ onNavigate }) {
                     <span style={{
                       fontSize: 11, fontWeight: 600,
                       color: fxRate > fxYesterday ? "#DC2626" : "#059669",
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       fontVariantNumeric: "tabular-nums",
                     }}>
                       {fxRate > fxYesterday ? "\u2191" : "\u2193"}{" "}
                       {Math.abs(((fxRate - fxYesterday) / fxYesterday) * 100).toFixed(2)}%
                     </span>
-                    <span style={{ fontSize: 10, color: T.ink400 }}>vs yesterday</span>
+                    <span style={{ fontSize: 10, color: T.ink500 }}>vs yesterday</span>
                   </div>
                   {fxRate30d && (
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <span style={{
                         fontSize: 11, fontWeight: 600,
                         color: fxRate > fxRate30d ? "#DC2626" : "#059669",
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         fontVariantNumeric: "tabular-nums",
                       }}>
                         {fxRate > fxRate30d ? "\u2191" : "\u2193"}{" "}
                         {Math.abs(((fxRate - fxRate30d) / fxRate30d) * 100).toFixed(2)}%
                       </span>
-                      <span style={{ fontSize: 10, color: T.ink400 }}>vs 30 days</span>
+                      <span style={{ fontSize: 10, color: T.ink500 }}>vs 30 days</span>
                     </div>
                   )}
                 </div>
@@ -2568,23 +2483,23 @@ export default function HQOverview({ onNavigate }) {
         <div
           style={{
             background: "white",
-            border: `1px solid ${T.ink150}`,
+            border: `1px solid ${T.border}`,
             borderRadius: 6,
             overflow: "hidden",
-            boxShadow: T.shadowCard,
+            boxShadow: T.shadow.sm,
           }}
         >
           <div
             onClick={() => nav("analytics")}
             style={{
               padding: "14px 20px",
-              borderBottom: `1px solid ${T.ink150}`,
+              borderBottom: `1px solid ${T.border}`,
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
               cursor: "pointer",
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = T.ink075)}
+            onMouseEnter={(e) => (e.currentTarget.style.background = T.bg)}
             onMouseLeave={(e) =>
               (e.currentTarget.style.background = "transparent")
             }
@@ -2600,7 +2515,7 @@ export default function HQOverview({ onNavigate }) {
               </span>
               <span
                 style={{
-                  background: T.accentLit,
+                  background: T.accentLight,
                   color: T.accent,
                   padding: "1px 7px",
                   borderRadius: 2,
@@ -2633,7 +2548,7 @@ export default function HQOverview({ onNavigate }) {
                     padding: "10px 20px",
                     borderBottom:
                       i < recentScans.length - 1
-                        ? `1px solid ${T.ink075}`
+                        ? `1px solid ${T.bg}`
                         : "none",
                     display: "flex",
                     justifyContent: "space-between",
@@ -2645,7 +2560,7 @@ export default function HQOverview({ onNavigate }) {
                     <span
                       style={{
                         color: T.ink900,
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         fontSize: 11,
                         fontWeight: 500,
                       }}
@@ -2656,7 +2571,7 @@ export default function HQOverview({ onNavigate }) {
                       <span
                         style={{
                           marginLeft: 8,
-                          background: T.infoBg,
+                          background: T.infoLight,
                           color: T.info,
                           padding: "1px 6px",
                           borderRadius: 2,
@@ -2671,13 +2586,13 @@ export default function HQOverview({ onNavigate }) {
                     )}
                     {scan.ip_city && (
                       <span
-                        style={{ marginLeft: 6, fontSize: 10, color: T.ink400 }}
+                        style={{ marginLeft: 6, fontSize: 10, color: T.ink500 }}
                       >
                         {scan.ip_city}
                       </span>
                     )}
                   </div>
-                  <span style={{ color: T.ink400, fontSize: 11 }}>
+                  <span style={{ color: T.ink500, fontSize: 11 }}>
                     {fmtAgo(scan.scanned_at)}
                   </span>
                 </div>
@@ -2692,10 +2607,10 @@ export default function HQOverview({ onNavigate }) {
       <div
         style={{
           background: "white",
-          border: `1px solid ${T.ink150}`,
+          border: `1px solid ${T.border}`,
           borderRadius: 6,
           padding: "20px 24px",
-          boxShadow: T.shadowCard,
+          boxShadow: T.shadow.sm,
         }}
       >
         <div
@@ -2714,7 +2629,7 @@ export default function HQOverview({ onNavigate }) {
             fontWeight: 700,
             letterSpacing: "0.1em",
             textTransform: "uppercase",
-            color: T.ink400,
+            color: T.ink500,
             marginBottom: 10,
           }}
         >
@@ -2740,11 +2655,11 @@ export default function HQOverview({ onNavigate }) {
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                background: T.ink075,
-                border: `1px solid ${T.ink150}`,
+                background: T.bg,
+                border: `1px solid ${T.border}`,
                 borderRadius: 3,
                 padding: "8px 14px",
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
                 fontSize: 11,
                 fontWeight: 600,
                 letterSpacing: "0.05em",
@@ -2765,7 +2680,7 @@ export default function HQOverview({ onNavigate }) {
                 fontWeight: 700,
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                color: T.ink400,
+                color: T.ink500,
                 marginBottom: 10,
               }}
             >
@@ -2801,11 +2716,11 @@ export default function HQOverview({ onNavigate }) {
                     display: "inline-flex",
                     alignItems: "center",
                     gap: 6,
-                    background: alert ? T.dangerBg : T.ink075,
-                    border: `1px solid ${alert ? T.dangerBd : T.ink150}`,
+                    background: alert ? T.dangerLight : T.bg,
+                    border: `1px solid ${alert ? T.dangerBd : T.border}`,
                     borderRadius: 3,
                     padding: "8px 14px",
-                    fontFamily: T.fontUi,
+                    fontFamily: T.font,
                     fontSize: 11,
                     fontWeight: 600,
                     letterSpacing: "0.05em",
@@ -2843,11 +2758,11 @@ export default function HQOverview({ onNavigate }) {
           onClick={fetchStats}
           style={{
             background: "transparent",
-            border: `1px solid ${T.ink150}`,
+            border: `1px solid ${T.border}`,
             borderRadius: 3,
             padding: "7px 14px",
             cursor: "pointer",
-            fontFamily: T.fontUi,
+            fontFamily: T.font,
             fontSize: 10,
             fontWeight: 600,
             letterSpacing: "0.1em",
@@ -2927,7 +2842,7 @@ function MarginGauge({ value, color }) {
       <path
         d={arcPath(startAngle, startAngle + totalDeg)}
         fill="none"
-        stroke={T.ink150}
+        stroke={T.border}
         strokeWidth={16}
         strokeLinecap="round"
       />
@@ -2948,7 +2863,7 @@ function MarginGauge({ value, color }) {
         fill={color}
         fontSize="28"
         fontWeight="400"
-        fontFamily={T.fontUi}
+        fontFamily={T.font}
         style={{ fontVariantNumeric: "tabular-nums" }}
       >
         {value !== null && value !== undefined ? `${value.toFixed(1)}%` : "—"}
@@ -2957,10 +2872,10 @@ function MarginGauge({ value, color }) {
         x={cx}
         y={cy + 20}
         textAnchor="middle"
-        fill={T.ink400}
+        fill={T.ink500}
         fontSize="10"
         fontWeight="600"
-        fontFamily={T.fontUi}
+        fontFamily={T.font}
         letterSpacing="0.08em"
       >
         GROSS MARGIN
@@ -2971,7 +2886,7 @@ function MarginGauge({ value, color }) {
         textAnchor="middle"
         fill={T.ink300}
         fontSize="9"
-        fontFamily={T.fontUi}
+        fontFamily={T.font}
       >
         0%
       </text>
@@ -2981,7 +2896,7 @@ function MarginGauge({ value, color }) {
         textAnchor="middle"
         fill={T.ink300}
         fontSize="9"
-        fontFamily={T.fontUi}
+        fontFamily={T.font}
       >
         100%
       </text>
