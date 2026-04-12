@@ -156,6 +156,7 @@ const HQ_PAGES = [
   },
   // ── Platform ─────────────────────────────────────────────────────────────────
   { group: "Platform", icon: "🏢", label: "Tenants", path: "/hq?tab=tenants" },
+  { group: "Platform", icon: "⊞", label: "Group Portal", path: "/group-portal" },
   {
     group: "Platform",
     icon: "⚕️",
