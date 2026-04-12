@@ -8,6 +8,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTenant } from "../services/tenantService";
+import { T } from "../styles/tokens";
 
 import HQOverview from "../components/hq/HQOverview";
 import ShopManager from "../components/hq/ShopManager";
@@ -56,19 +57,6 @@ import LiveFXBar from "../components/hq/LiveFXBar";
 import PlatformBar from "../components/PlatformBar";
 import { PlatformBarProvider } from "../contexts/PlatformBarContext";
 
-const C = {
-  bg: "#faf9f6",
-  warmBg: "#f4f0e8",
-  primaryDark: "#1b4332",
-  primaryMid: "#2d6a4f",
-  accentGreen: "#52b788",
-  gold: "#b5935a",
-  text: "#1a1a1a",
-  muted: "#474747",
-  border: "#e8e0d4",
-  white: "#ffffff",
-  red: "#c62828",
-};
 
 const TABS = [
   { id: "overview", label: "Overview", icon: "📊", ready: true },
@@ -151,7 +139,7 @@ export default function HQDashboard() {
 
   return (
     <PlatformBarProvider>
-      <div style={{ fontFamily: "Jost, sans-serif", color: C.text }}>
+      <div style={{ fontFamily: T.font, color: T.ink900 }}>
         <div
           style={{
             display: "flex",
@@ -166,7 +154,7 @@ export default function HQDashboard() {
                 fontFamily: "'Outfit', 'Helvetica Neue', Arial, sans-serif",
                 fontSize: "24px",
                 fontWeight: 300,
-                color: C.primaryDark,
+                color: T.accentText,
                 margin: "0 0 2px",
               }}
             >
@@ -174,7 +162,7 @@ export default function HQDashboard() {
             </h1>
             <p
               style={{
-                color: C.muted,
+                color: T.ink700,
                 fontSize: "13px",
                 fontWeight: 300,
                 margin: 0,
@@ -193,7 +181,7 @@ export default function HQDashboard() {
                   fontWeight: 600,
                   letterSpacing: "0.15em",
                   textTransform: "uppercase",
-                  color: C.muted,
+                  color: T.ink700,
                 }}
               >
                 Viewing:
@@ -214,12 +202,12 @@ export default function HQDashboard() {
                 }}
                 style={{
                   padding: "6px 10px",
-                  border: "1px solid " + C.border,
+                  border: "1px solid " + T.border,
                   borderRadius: "2px",
-                  fontFamily: "Jost, sans-serif",
+                  fontFamily: T.font,
                   fontSize: "12px",
-                  color: C.text,
-                  background: C.white,
+                  color: T.ink900,
+                  background: T.surface,
                   cursor: "pointer",
                 }}
               >
@@ -243,7 +231,7 @@ export default function HQDashboard() {
                     color: "#00E87A",
                     border: "1px solid rgba(0,232,122,0.3)",
                     borderRadius: "2px",
-                    fontFamily: "Jost, sans-serif",
+                    fontFamily: T.font,
                     fontSize: "11px",
                     fontWeight: 600,
                     letterSpacing: "0.08em",

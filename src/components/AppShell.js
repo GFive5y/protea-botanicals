@@ -7,6 +7,7 @@ import DevErrorCapture from "../components/DevErrorCapture";
 import ToastContainer from "./ToastContainer";
 import "./AppShell.css";
 import { useTenant } from "../services/tenantService"; // ✦ WP-MULTISITE
+import { T } from "../styles/tokens";
 
 /**
  * AppShell — WP-NAV v1.3
@@ -62,8 +63,8 @@ export default function AppShell({ children, maxWidth = 1400 }) {
           style={{
             maxWidth,
             margin: "0 auto",
-            padding: "28px 32px 48px",
-            background: "#faf9f6",
+            padding: `${T.page.gutterY}px ${T.page.gutterX}px ${Math.round(T.page.gutterY * 1.2)}px`,
+            background: T.bg,
             minHeight: "100%",
           }}
         >
