@@ -56,6 +56,7 @@ import HQEmailLogs from "../components/hq/HQEmailLogs";
 import LiveFXBar from "../components/hq/LiveFXBar";
 import PlatformBar from "../components/PlatformBar";
 import { PlatformBarProvider } from "../contexts/PlatformBarContext";
+import AINSBar from "../components/shared/AINSBar";
 
 
 const TABS = [
@@ -249,6 +250,15 @@ export default function HQDashboard() {
         <div>
           <LiveFXBar />
           <PlatformBar role="hq" tenantId={tenant?.id} onNavigate={() => {}} />
+          <AINSBar
+            role="hq"
+            activeTab={activeTab}
+            tenantId={tenant?.id}
+            tenantName={tenantName}
+            industryProfile={tenant?.industry_profile}
+            onNavigate={handleNavigate}
+            allTenants={allTenants}
+          />
 
           {activeTab === "overview" && (
             <HQOverview onNavigate={handleNavigate} />

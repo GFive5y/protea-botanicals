@@ -73,6 +73,7 @@ import { IntelligenceProvider } from "../contexts/IntelligenceContext";
 import { useNavIntelligence } from "../hooks/useNavIntelligence";
 import { useIntelStrip } from "../hooks/useIntelStrip";
 import IntelStrip from "../components/IntelStrip";
+import AINSBar from "../components/shared/AINSBar";
 import AccountBubble from "../components/AccountBubble";
 import {
   Home, Package, ShoppingCart, Activity, ShoppingBag,
@@ -1350,11 +1351,15 @@ export default function TenantPortal() {
               </div>
             </div>
 
-            {/* IntelStrip — WP-AINS Phase 3 */}
-            <IntelStrip
-              pills={intelPills}
-              loading={intelStripLoading}
-              onPillClick={null}
+            {/* AINSBar — WP-DS-6 Phase 2 (replaces IntelStrip) */}
+            <AINSBar
+              role="tenant"
+              activeTab={activeTab}
+              tenantId={tenantId}
+              tenantName={tenantName}
+              industryProfile={industryProfile}
+              onNavigate={setActiveTab}
+              intelData={intelData}
             />
 
             {/* Content */}
