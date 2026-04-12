@@ -11,55 +11,27 @@ import { supabase } from "../services/supabaseClient";
 import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
 import { ChartCard, ChartTooltip } from "./viz";
+import { T } from "../styles/tokens";
 
-// ─── THEME ────────────────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
 const C = {
   green: T.accent,
   mid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
-  cream: T.ink050,
-  border: T.ink150,
-  muted: T.ink400,
+  cream: T.surface,
+  border: T.border,
+  muted: T.ink500,
   text: T.ink700,
   white: "#fff",
   red: T.danger,
-  lightRed: T.dangerBg,
+  lightRed: T.dangerLight,
   orange: T.warning,
-  lightOrange: T.warningBg,
-  lightGreen: T.accentLit,
+  lightOrange: T.warningLight,
+  lightGreen: T.accentLight,
   blue: T.info,
-  lightBlue: T.infoBg,
+  lightBlue: T.infoLight,
   purple: "#6c3483",
   lightPurple: "#f5eef8",
 };
@@ -68,7 +40,7 @@ const C = {
 const inputStyle = {
   width: "100%",
   padding: "8px 12px",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: 4,
   fontSize: 13,
   fontFamily: T.font,
@@ -81,7 +53,7 @@ const makeBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
   padding: "9px 20px",
   backgroundColor: disabled ? "#ccc" : bg,
   color,
-  border: bg === "transparent" ? `1px solid ${T.ink150}` : "none",
+  border: bg === "transparent" ? `1px solid ${T.border}` : "none",
   borderRadius: 4,
   fontSize: 11,
   fontWeight: 700,
@@ -94,7 +66,7 @@ const makeBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
 });
 const hint = {
   fontSize: 11,
-  color: T.ink400,
+  color: T.ink500,
   marginTop: 4,
   fontFamily: T.font,
 };
@@ -141,7 +113,7 @@ function ExpiryBadge({ expiryDate }) {
       <span
         style={{
           ...style,
-          background: T.dangerBg,
+          background: T.dangerLight,
           color: T.danger,
           border: `1px solid ${T.dangerBd}`,
         }}
@@ -154,7 +126,7 @@ function ExpiryBadge({ expiryDate }) {
       <span
         style={{
           ...style,
-          background: T.warningBg,
+          background: T.warningLight,
           color: T.warning,
           border: `1px solid ${T.warningBd}`,
         }}
@@ -166,7 +138,7 @@ function ExpiryBadge({ expiryDate }) {
     <span
       style={{
         ...style,
-        background: T.successBg,
+        background: T.successLight,
         color: T.success,
         border: `1px solid ${T.successBd}`,
       }}
@@ -183,7 +155,7 @@ function ProgressBar({ value, max, color = T.accentMid }) {
     <div
       style={{
         height: 6,
-        background: T.ink150,
+        background: T.border,
         borderRadius: 3,
         overflow: "hidden",
         marginTop: 4,
@@ -251,7 +223,7 @@ function BatchCard({
       ? T.dangerBd
       : days !== null && days <= 30
         ? T.warningBd
-        : T.ink150;
+        : T.border;
 
   return (
     <div
@@ -263,10 +235,10 @@ function BatchCard({
         display: "flex",
         flexDirection: "column",
         gap: 12,
-        boxShadow: T.shadow,
+        boxShadow: T.shadow.sm,
         transition: "box-shadow 0.15s",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.boxShadow = T.shadowMd)}
+      onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)")}
       onMouseLeave={(e) => (e.currentTarget.style.boxShadow = T.shadow)}
     >
       <div
@@ -291,7 +263,7 @@ function BatchCard({
           <div
             style={{
               fontSize: 11,
-              color: T.ink400,
+              color: T.ink500,
               letterSpacing: "0.06em",
               textTransform: "uppercase",
               marginTop: 2,
@@ -325,10 +297,10 @@ function BatchCard({
           display: "grid",
           gridTemplateColumns: "repeat(4,1fr)",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: 6,
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
+          border: `1px solid ${T.border}`,
         }}
       >
         {[
@@ -372,7 +344,7 @@ function BatchCard({
                 fontWeight: 700,
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                color: T.ink400,
+                color: T.ink500,
                 marginTop: 3,
                 fontFamily: T.font,
               }}
@@ -387,7 +359,7 @@ function BatchCard({
         <div
           style={{
             fontSize: 10,
-            color: T.ink400,
+            color: T.ink500,
             fontFamily: T.font,
             letterSpacing: "0.08em",
             textTransform: "uppercase",
@@ -408,7 +380,7 @@ function BatchCard({
           display: "flex",
           gap: 16,
           fontSize: 11,
-          color: T.ink400,
+          color: T.ink500,
           fontFamily: T.font,
         }}
       >
@@ -430,7 +402,7 @@ function BatchCard({
               fontSize: 10,
               padding: "2px 8px",
               borderRadius: 20,
-              background: T.successBg,
+              background: T.successLight,
               color: T.success,
               border: `1px solid ${T.successBd}`,
               fontWeight: 700,
@@ -467,7 +439,7 @@ function BatchCard({
               fontSize: 10,
               padding: "2px 8px",
               borderRadius: 20,
-              background: T.infoBg,
+              background: T.infoLight,
               color: T.info,
               border: `1px solid ${T.infoBd}`,
               fontWeight: 700,
@@ -479,7 +451,7 @@ function BatchCard({
             VIEW COA
           </a>
         ) : (
-          <span style={{ fontSize: 10, color: T.ink400, fontFamily: T.font }}>
+          <span style={{ fontSize: 10, color: T.ink500, fontFamily: T.font }}>
             No COA uploaded
           </span>
         )}
@@ -515,8 +487,8 @@ function BatchCard({
         <button
           onClick={() => onArchive(batch)}
           style={{
-            ...makeBtn("transparent", T.ink400),
-            border: `1px solid ${T.ink150}`,
+            ...makeBtn("transparent", T.ink500),
+            border: `1px solid ${T.border}`,
             fontSize: 11,
             padding: "8px 14px",
           }}
@@ -543,7 +515,7 @@ function Field({ label: l, children, flex = 1 }) {
           fontWeight: 600,
           letterSpacing: "0.07em",
           textTransform: "uppercase",
-          color: T.ink400,
+          color: T.ink500,
           marginBottom: 5,
           fontFamily: T.font,
           display: "block",
@@ -686,11 +658,11 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
         fontWeight: 700,
         letterSpacing: "0.1em",
         textTransform: "uppercase",
-        color: T.ink400,
+        color: T.ink500,
         marginBottom: 12,
         marginTop: 8,
         paddingBottom: 8,
-        borderBottom: `1px solid ${T.ink150}`,
+        borderBottom: `1px solid ${T.border}`,
         fontFamily: T.font,
       }}
     >
@@ -760,7 +732,7 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
           <div
             style={{
               padding: "10px 14px",
-              background: T.dangerBg,
+              background: T.dangerLight,
               border: `1px solid ${T.dangerBd}`,
               borderRadius: 4,
               color: T.danger,
@@ -965,7 +937,7 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
               alignItems: "center",
               gap: 12,
               padding: "12px 14px",
-              background: T.successBg,
+              background: T.successLight,
               border: `1px solid ${T.successBd}`,
               borderRadius: 4,
               marginBottom: 14,
@@ -1005,19 +977,19 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
           <div
             onClick={() => fileRef.current?.click()}
             style={{
-              border: `2px dashed ${T.ink150}`,
+              border: `2px dashed ${T.border}`,
               borderRadius: 4,
               padding: "20px",
               textAlign: "center",
               cursor: "pointer",
               marginBottom: 14,
-              background: T.ink075,
+              background: T.bg,
               transition: "border-color 0.15s",
             }}
             onMouseEnter={(e) =>
               (e.currentTarget.style.borderColor = T.accentBd)
             }
-            onMouseLeave={(e) => (e.currentTarget.style.borderColor = T.ink150)}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = T.border)}
           >
             <div
               style={{ fontSize: 13, color: T.accentMid, fontFamily: T.font }}
@@ -1027,7 +999,7 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
             <div
               style={{
                 fontSize: 11,
-                color: T.ink400,
+                color: T.ink500,
                 marginTop: 3,
                 fontFamily: T.font,
               }}
@@ -1071,7 +1043,7 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
             gap: 10,
             paddingTop: 16,
             marginTop: 16,
-            borderTop: `1px solid ${T.ink150}`,
+            borderTop: `1px solid ${T.border}`,
           }}
         >
           <button
@@ -1084,8 +1056,8 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
           <button
             onClick={onCancel}
             style={{
-              ...makeBtn("transparent", T.ink400),
-              border: `1px solid ${T.ink150}`,
+              ...makeBtn("transparent", T.ink500),
+              border: `1px solid ${T.border}`,
             }}
           >
             Cancel
@@ -1325,7 +1297,7 @@ export default function AdminBatchManager({
           >
             Batch Manager
           </h2>
-          <div style={{ fontSize: 13, color: T.ink400 }}>
+          <div style={{ fontSize: 13, color: T.ink500 }}>
             Create and manage production batches · COA uploads · QR code linking
           </div>
         </div>
@@ -1345,11 +1317,11 @@ export default function AdminBatchManager({
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: 6,
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
-          boxShadow: T.shadow,
+          border: `1px solid ${T.border}`,
+          boxShadow: T.shadow.sm,
           marginBottom: 24,
         }}
       >
@@ -1358,7 +1330,7 @@ export default function AdminBatchManager({
           {
             label: "Expiring Soon",
             value: expiringBatches,
-            color: expiringBatches > 0 ? T.warning : T.ink400,
+            color: expiringBatches > 0 ? T.warning : T.ink500,
           },
           {
             label: "Total Units",
@@ -1381,7 +1353,7 @@ export default function AdminBatchManager({
                 fontWeight: 700,
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                color: T.ink400,
+                color: T.ink500,
                 marginBottom: 6,
                 fontFamily: T.font,
               }}
@@ -1498,7 +1470,7 @@ export default function AdminBatchManager({
                       justifyContent: "center",
                       height: "100%",
                       fontSize: 13,
-                      color: T.ink400,
+                      color: T.ink500,
                       fontFamily: T.font,
                     }}
                   >
@@ -1527,7 +1499,7 @@ export default function AdminBatchManager({
                         <span
                           style={{
                             fontSize: 9,
-                            color: T.ink400,
+                            color: T.ink500,
                             fontFamily: "monospace",
                             width: 54,
                             flexShrink: 0,
@@ -1542,7 +1514,7 @@ export default function AdminBatchManager({
                           style={{
                             flex: 1,
                             height: 14,
-                            background: T.ink075,
+                            background: T.bg,
                             borderRadius: 3,
                             overflow: "hidden",
                           }}
@@ -1576,7 +1548,7 @@ export default function AdminBatchManager({
                         <span
                           style={{
                             fontSize: 10,
-                            color: T.ink400,
+                            color: T.ink500,
                             fontFamily: T.font,
                             minWidth: 32,
                             textAlign: "right",
@@ -1602,7 +1574,7 @@ export default function AdminBatchManager({
                       justifyContent: "center",
                       height: "100%",
                       fontSize: 13,
-                      color: T.ink400,
+                      color: T.ink500,
                       fontFamily: T.font,
                     }}
                   >
@@ -1631,7 +1603,7 @@ export default function AdminBatchManager({
                         <span
                           style={{
                             fontSize: 9,
-                            color: T.ink400,
+                            color: T.ink500,
                             fontFamily: "monospace",
                             width: 54,
                             flexShrink: 0,
@@ -1646,7 +1618,7 @@ export default function AdminBatchManager({
                           style={{
                             flex: 1,
                             height: 14,
-                            background: T.ink075,
+                            background: T.bg,
                             borderRadius: 3,
                             overflow: "hidden",
                           }}
@@ -1685,7 +1657,7 @@ export default function AdminBatchManager({
                         <span
                           style={{
                             fontSize: 10,
-                            color: T.ink400,
+                            color: T.ink500,
                             fontFamily: T.font,
                             minWidth: 30,
                             textAlign: "right",
@@ -1720,7 +1692,7 @@ export default function AdminBatchManager({
         <div
           style={{
             display: "flex",
-            borderBottom: `2px solid ${T.ink150}`,
+            borderBottom: `2px solid ${T.border}`,
             gap: 0,
           }}
         >
@@ -1741,7 +1713,7 @@ export default function AdminBatchManager({
                 fontWeight: filter === f.key ? 700 : 400,
                 letterSpacing: "0.06em",
                 textTransform: "uppercase",
-                color: filter === f.key ? T.accent : T.ink400,
+                color: filter === f.key ? T.accent : T.ink500,
                 cursor: "pointer",
                 marginBottom: -2,
               }}
@@ -1753,7 +1725,7 @@ export default function AdminBatchManager({
         <div
           style={{
             fontSize: 12,
-            color: T.ink400,
+            color: T.ink500,
             marginLeft: "auto",
             fontFamily: T.font,
           }}
@@ -1763,8 +1735,8 @@ export default function AdminBatchManager({
         <button
           onClick={fetchBatches}
           style={{
-            ...makeBtn("transparent", T.ink400),
-            border: `1px solid ${T.ink150}`,
+            ...makeBtn("transparent", T.ink500),
+            border: `1px solid ${T.border}`,
             padding: "7px 14px",
             fontSize: 11,
           }}
@@ -1778,7 +1750,7 @@ export default function AdminBatchManager({
           style={{
             padding: "60px",
             textAlign: "center",
-            color: T.ink400,
+            color: T.ink500,
             fontSize: 13,
             fontFamily: T.font,
           }}
@@ -1790,7 +1762,7 @@ export default function AdminBatchManager({
           style={{
             padding: "60px",
             textAlign: "center",
-            border: `1px dashed ${T.ink150}`,
+            border: `1px dashed ${T.border}`,
             borderRadius: 8,
           }}
         >
@@ -1808,7 +1780,7 @@ export default function AdminBatchManager({
           <div
             style={{
               fontSize: 13,
-              color: T.ink400,
+              color: T.ink500,
               marginBottom: 20,
               fontFamily: T.font,
             }}
@@ -1897,7 +1869,7 @@ export default function AdminBatchManager({
             <div
               style={{
                 fontSize: 13,
-                color: T.ink400,
+                color: T.ink500,
                 marginBottom: 24,
                 lineHeight: 1.6,
               }}
@@ -1915,8 +1887,8 @@ export default function AdminBatchManager({
               <button
                 onClick={() => setArchiveTarget(null)}
                 style={{
-                  ...makeBtn("transparent", T.ink400),
-                  border: `1px solid ${T.ink150}`,
+                  ...makeBtn("transparent", T.ink500),
+                  border: `1px solid ${T.border}`,
                 }}
               >
                 Cancel

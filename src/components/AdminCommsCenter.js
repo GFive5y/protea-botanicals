@@ -11,55 +11,27 @@ import { useTenant } from "../services/tenantService";
 import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
 import { ChartCard, ChartTooltip } from "./viz";
+import { T } from "../styles/tokens";
 
-// ─── THEME ────────────────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 // Legacy aliases so all C.* refs resolve
 const C = {
   green: T.accent,
   mid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
-  cream: T.ink050,
-  warm: T.ink075,
+  cream: T.surface,
+  warm: T.bg,
   white: "#fff",
-  border: T.ink150,
-  muted: T.ink400,
+  border: T.border,
+  muted: T.ink500,
   text: T.ink700,
   red: T.danger,
-  lightRed: T.dangerBg,
+  lightRed: T.dangerLight,
   blue: T.info,
-  lightBlue: T.infoBg,
-  lightGreen: T.accentLit,
-  lightGold: T.warningBg,
+  lightBlue: T.infoLight,
+  lightGreen: T.accentLight,
+  lightGold: T.warningLight,
   orange: T.warning,
   success: T.success,
   purple: "#6A1B9A",
@@ -71,7 +43,7 @@ const sBtn = (bg = T.accent, color = "#fff", disabled = false) => ({
   padding: "8px 16px",
   background: disabled ? "#ccc" : bg,
   color,
-  border: bg === "transparent" ? `1px solid ${T.ink150}` : "none",
+  border: bg === "transparent" ? `1px solid ${T.border}` : "none",
   borderRadius: 4,
   fontSize: 10,
   fontWeight: 700,
@@ -84,7 +56,7 @@ const sBtn = (bg = T.accent, color = "#fff", disabled = false) => ({
 });
 const sInp = {
   padding: "8px 12px",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: 4,
   fontSize: 13,
   fontFamily: T.font,
@@ -96,10 +68,10 @@ const sInp = {
 };
 
 const STATUS_COLOURS = {
-  open: { bg: T.infoBg, text: T.info },
-  pending_reply: { bg: T.warningBg, text: T.warning },
-  resolved: { bg: T.successBg, text: T.success },
-  closed: { bg: T.ink075, text: T.ink400 },
+  open: { bg: T.infoLight, text: T.info },
+  pending_reply: { bg: T.warningLight, text: T.warning },
+  resolved: { bg: T.successLight, text: T.success },
+  closed: { bg: T.bg, text: T.ink500 },
 };
 const TICKET_STATUSES = ["open", "pending_reply", "resolved", "closed"];
 const RESPONSE_TEMPLATES = [
@@ -313,8 +285,8 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
       <div
         style={{
           padding: "14px 20px",
-          borderBottom: `1px solid ${T.ink150}`,
-          background: T.ink075,
+          borderBottom: `1px solid ${T.border}`,
+          background: T.bg,
           flexShrink: 0,
         }}
       >
@@ -337,7 +309,7 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
             >
               {ticket.subject}
             </div>
-            <div style={{ fontSize: 11, color: T.ink400, marginTop: 2 }}>
+            <div style={{ fontSize: 11, color: T.ink500, marginTop: 2 }}>
               {profile?.full_name || "Customer"} · {ticket.ticket_number}
               {ticket.category ? ` · ${ticket.category}` : ""}
             </div>
@@ -358,9 +330,9 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
                   onClick={() => handleSetStatus(s)}
                   style={{
                     padding: "3px 9px",
-                    border: `1px solid ${status === s ? T.accent : T.ink150}`,
+                    border: `1px solid ${status === s ? T.accent : T.border}`,
                     background: status === s ? T.accent : "#fff",
-                    color: status === s ? "#fff" : T.ink400,
+                    color: status === s ? "#fff" : T.ink500,
                     borderRadius: 20,
                     fontSize: 9,
                     fontWeight: 700,
@@ -380,7 +352,7 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
                 background: "none",
                 border: "none",
                 cursor: "pointer",
-                color: T.ink400,
+                color: T.ink500,
                 fontSize: 18,
                 padding: "0 4px",
               }}
@@ -407,7 +379,7 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
             style={{
               textAlign: "center",
               padding: 32,
-              color: T.ink400,
+              color: T.ink500,
               fontFamily: T.font,
             }}
           >
@@ -418,7 +390,7 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
             style={{
               textAlign: "center",
               padding: 32,
-              color: T.ink400,
+              color: T.ink500,
               fontSize: 12,
               fontFamily: T.font,
             }}
@@ -440,7 +412,7 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
                     height: 28,
                     borderRadius: "50%",
                     background: isCustomer
-                      ? T.ink150
+                      ? T.border
                       : isAuto
                         ? T.accentMid
                         : T.accent,
@@ -487,7 +459,7 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
                     <span
                       style={{
                         fontSize: 10,
-                        color: T.ink400,
+                        color: T.ink500,
                         fontFamily: T.font,
                       }}
                     >
@@ -497,11 +469,11 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
                   <div
                     style={{
                       background: isCustomer
-                        ? T.ink075
+                        ? T.bg
                         : isAuto
-                          ? T.accentLit
+                          ? T.accentLight
                           : "#fff",
-                      border: `1px solid ${T.ink150}`,
+                      border: `1px solid ${T.border}`,
                       borderRadius: isCustomer
                         ? "4px 12px 12px 12px"
                         : "12px 12px 12px 4px",
@@ -527,7 +499,7 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
       <div
         style={{
           padding: "14px 20px",
-          borderTop: `1px solid ${T.ink150}`,
+          borderTop: `1px solid ${T.border}`,
           background: "#fff",
           flexShrink: 0,
         }}
@@ -538,7 +510,7 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
               style={{
                 fontSize: 10,
                 fontWeight: 700,
-                color: T.ink400,
+                color: T.ink500,
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
                 marginBottom: 2,
@@ -557,8 +529,8 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
                 style={{
                   textAlign: "left",
                   padding: "7px 11px",
-                  background: T.ink075,
-                  border: `1px solid ${T.ink150}`,
+                  background: T.bg,
+                  border: `1px solid ${T.border}`,
                   borderRadius: 4,
                   cursor: "pointer",
                   fontSize: 12,
@@ -597,7 +569,7 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
           </button>
           <button
             onClick={() => setShowTemplates((s) => !s)}
-            style={sBtn("transparent", T.ink400)}
+            style={sBtn("transparent", T.ink500)}
           >
             Templates
           </button>
@@ -605,7 +577,7 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
         <div
           style={{
             fontSize: 10,
-            color: T.ink400,
+            color: T.ink500,
             marginTop: 6,
             fontFamily: T.font,
           }}
@@ -710,7 +682,7 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
     streak_bonus: { label: "Streak Bonus", icon: "🔥", color: "#b5935a" },
     birthday: { label: "Birthday", icon: "🎂", color: "#b5935a" },
     broadcast: { label: "Broadcast", icon: "📣", color: T.accentMid },
-    general: { label: "Message", icon: "📩", color: T.ink400 },
+    general: { label: "Message", icon: "📩", color: T.ink500 },
   };
 
   const timeline = [
@@ -746,8 +718,8 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
       <div
         style={{
           padding: "14px 20px",
-          borderBottom: `1px solid ${T.ink150}`,
-          background: T.ink075,
+          borderBottom: `1px solid ${T.border}`,
+          background: T.bg,
           flexShrink: 0,
         }}
       >
@@ -764,7 +736,7 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
         <div
           style={{
             fontSize: 11,
-            color: T.ink400,
+            color: T.ink500,
             marginTop: 2,
             display: "flex",
             gap: 12,
@@ -793,11 +765,11 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
         }}
       >
         {loading ? (
-          <div style={{ textAlign: "center", padding: 40, color: T.ink400 }}>
+          <div style={{ textAlign: "center", padding: 40, color: T.ink500 }}>
             Loading thread…
           </div>
         ) : timeline.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 40, color: T.ink400 }}>
+          <div style={{ textAlign: "center", padding: 40, color: T.ink500 }}>
             <div style={{ fontSize: 28, marginBottom: 8 }}>💬</div>
             <div
               style={{
@@ -831,7 +803,7 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
                     transition: "box-shadow 0.12s",
                   }}
                   onMouseEnter={(e) =>
-                    (e.currentTarget.style.boxShadow = T.shadowMd)
+                    (e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)")
                   }
                   onMouseLeave={(e) =>
                     (e.currentTarget.style.boxShadow = "none")
@@ -862,7 +834,7 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
                         <span
                           style={{
                             fontSize: 10,
-                            color: T.ink400,
+                            color: T.ink500,
                             marginLeft: 8,
                             fontFamily: "monospace",
                           }}
@@ -891,7 +863,7 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
                       <span
                         style={{
                           fontSize: 10,
-                          color: T.ink400,
+                          color: T.ink500,
                           fontFamily: T.font,
                         }}
                       >
@@ -936,7 +908,7 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
                 <div
                   style={{
                     fontSize: 10,
-                    color: T.ink400,
+                    color: T.ink500,
                     marginBottom: 3,
                     display: "flex",
                     gap: 8,
@@ -959,7 +931,7 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
                   style={{
                     background: isOutbound ? T.accent : "#fff",
                     color: isOutbound ? "#fff" : T.ink700,
-                    border: `1px solid ${isOutbound ? T.accent : T.ink150}`,
+                    border: `1px solid ${isOutbound ? T.accent : T.border}`,
                     borderRadius: isOutbound
                       ? "12px 12px 4px 12px"
                       : "12px 12px 12px 4px",
@@ -1000,7 +972,7 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
             borderRadius: 4,
             fontSize: 12,
             fontWeight: 600,
-            background: toast.ok ? T.successBg : T.dangerBg,
+            background: toast.ok ? T.successLight : T.dangerLight,
             color: toast.ok ? T.success : T.danger,
             fontFamily: T.font,
           }}
@@ -1013,7 +985,7 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
       <div
         style={{
           padding: "14px 20px",
-          borderTop: `1px solid ${T.ink150}`,
+          borderTop: `1px solid ${T.border}`,
           background: "#fff",
           flexShrink: 0,
         }}
@@ -1024,7 +996,7 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
               style={{
                 fontSize: 10,
                 fontWeight: 700,
-                color: T.ink400,
+                color: T.ink500,
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
                 marginBottom: 2,
@@ -1043,8 +1015,8 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
                 style={{
                   textAlign: "left",
                   padding: "7px 11px",
-                  background: T.ink075,
-                  border: `1px solid ${T.ink150}`,
+                  background: T.bg,
+                  border: `1px solid ${T.border}`,
                   borderRadius: 4,
                   cursor: "pointer",
                   fontSize: 12,
@@ -1072,7 +1044,7 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
             <button
               onClick={() => setShowTemplates((s) => !s)}
               style={{
-                ...sBtn("transparent", T.ink400),
+                ...sBtn("transparent", T.ink500),
                 padding: "6px 10px",
                 fontSize: 9,
               }}
@@ -1174,8 +1146,8 @@ function WholesaleThread({ partner, adminUser }) {
       <div
         style={{
           padding: "14px 20px",
-          borderBottom: `1px solid ${T.ink150}`,
-          background: T.ink075,
+          borderBottom: `1px solid ${T.border}`,
+          background: T.bg,
           flexShrink: 0,
         }}
       >
@@ -1190,7 +1162,7 @@ function WholesaleThread({ partner, adminUser }) {
           🏪 {partner.name}
         </div>
         {partner.contact_name && (
-          <div style={{ fontSize: 11, color: T.ink400, marginTop: 2 }}>
+          <div style={{ fontSize: 11, color: T.ink500, marginTop: 2 }}>
             Contact: {partner.contact_name}
           </div>
         )}
@@ -1206,11 +1178,11 @@ function WholesaleThread({ partner, adminUser }) {
         }}
       >
         {loading ? (
-          <div style={{ textAlign: "center", padding: 40, color: T.ink400 }}>
+          <div style={{ textAlign: "center", padding: 40, color: T.ink500 }}>
             Loading…
           </div>
         ) : messages.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 40, color: T.ink400 }}>
+          <div style={{ textAlign: "center", padding: 40, color: T.ink500 }}>
             <div style={{ fontSize: 28, marginBottom: 8 }}>🏪</div>
             <div
               style={{
@@ -1238,7 +1210,7 @@ function WholesaleThread({ partner, adminUser }) {
                 <div
                   style={{
                     fontSize: 10,
-                    color: T.ink400,
+                    color: T.ink500,
                     marginBottom: 3,
                     textAlign: isOutbound ? "right" : "left",
                     fontFamily: T.font,
@@ -1251,7 +1223,7 @@ function WholesaleThread({ partner, adminUser }) {
                   style={{
                     background: isOutbound ? T.info : "#fff",
                     color: isOutbound ? "#fff" : T.ink700,
-                    border: `1px solid ${isOutbound ? T.info : T.ink150}`,
+                    border: `1px solid ${isOutbound ? T.info : T.border}`,
                     borderRadius: isOutbound
                       ? "12px 12px 4px 12px"
                       : "12px 12px 12px 4px",
@@ -1290,7 +1262,7 @@ function WholesaleThread({ partner, adminUser }) {
             borderRadius: 4,
             fontSize: 12,
             fontWeight: 600,
-            background: toast.ok ? T.successBg : T.dangerBg,
+            background: toast.ok ? T.successLight : T.dangerLight,
             color: toast.ok ? T.success : T.danger,
             fontFamily: T.font,
           }}
@@ -1301,7 +1273,7 @@ function WholesaleThread({ partner, adminUser }) {
       <div
         style={{
           padding: "14px 20px",
-          borderTop: `1px solid ${T.ink150}`,
+          borderTop: `1px solid ${T.border}`,
           background: "#fff",
           flexShrink: 0,
         }}
@@ -1331,7 +1303,7 @@ function WholesaleThread({ partner, adminUser }) {
         <div
           style={{
             fontSize: 10,
-            color: T.ink400,
+            color: T.ink500,
             marginTop: 4,
             fontFamily: T.font,
           }}
@@ -1389,7 +1361,7 @@ function TemplatesPanel() {
         fontWeight: 700,
         letterSpacing: "0.08em",
         textTransform: "uppercase",
-        color: T.ink400,
+        color: T.ink500,
         display: "block",
         marginBottom: 6,
         fontFamily: T.font,
@@ -1416,7 +1388,7 @@ function TemplatesPanel() {
               background: "none",
               border: "none",
               cursor: "pointer",
-              color: T.ink400,
+              color: T.ink500,
               fontSize: 20,
               padding: 0,
             }}
@@ -1487,7 +1459,7 @@ function TemplatesPanel() {
         <div style={{ display: "flex", gap: 10 }}>
           <button
             onClick={() => setEditing(null)}
-            style={sBtn("transparent", T.ink400)}
+            style={sBtn("transparent", T.ink500)}
           >
             Cancel
           </button>
@@ -1516,7 +1488,7 @@ function TemplatesPanel() {
           <div style={{ fontSize: 18, fontWeight: 600, color: T.ink900 }}>
             Message Templates
           </div>
-          <div style={{ fontSize: 12, color: T.ink400, marginTop: 2 }}>
+          <div style={{ fontSize: 12, color: T.ink500, marginTop: 2 }}>
             Auto-replies, event notifications, system messages
           </div>
         </div>
@@ -1538,7 +1510,7 @@ function TemplatesPanel() {
         </button>
       </div>
       {loading ? (
-        <div style={{ padding: 32, textAlign: "center", color: T.ink400 }}>
+        <div style={{ padding: 32, textAlign: "center", color: T.ink500 }}>
           Loading templates…
         </div>
       ) : templates.length === 0 ? (
@@ -1546,9 +1518,9 @@ function TemplatesPanel() {
           style={{
             padding: 40,
             textAlign: "center",
-            border: `1px dashed ${T.ink150}`,
+            border: `1px dashed ${T.border}`,
             borderRadius: 8,
-            color: T.ink400,
+            color: T.ink500,
           }}
         >
           <div style={{ fontSize: 28, marginBottom: 8 }}>📝</div>
@@ -1570,10 +1542,10 @@ function TemplatesPanel() {
       ) : (
         <div
           style={{
-            border: `1px solid ${T.ink150}`,
+            border: `1px solid ${T.border}`,
             borderRadius: 8,
             overflow: "hidden",
-            boxShadow: T.shadow,
+            boxShadow: T.shadow.sm,
           }}
         >
           {templates.map((t, i) => (
@@ -1585,8 +1557,8 @@ function TemplatesPanel() {
                 gap: 12,
                 padding: "12px 16px",
                 borderBottom:
-                  i < templates.length - 1 ? `1px solid ${T.ink150}` : "none",
-                background: i % 2 === 0 ? "#fff" : T.ink050,
+                  i < templates.length - 1 ? `1px solid ${T.border}` : "none",
+                background: i % 2 === 0 ? "#fff" : T.surface,
               }}
             >
               <div
@@ -1612,7 +1584,7 @@ function TemplatesPanel() {
                 <div
                   style={{
                     fontSize: 11,
-                    color: T.ink400,
+                    color: T.ink500,
                     marginTop: 2,
                     fontFamily: T.font,
                   }}
@@ -1632,7 +1604,7 @@ function TemplatesPanel() {
               </div>
               <button
                 onClick={() => setEditing({ ...t })}
-                style={sBtn("transparent", T.ink400)}
+                style={sBtn("transparent", T.ink500)}
               >
                 Edit
               </button>
@@ -1713,7 +1685,7 @@ function BroadcastPanel() {
         fontWeight: 700,
         letterSpacing: "0.08em",
         textTransform: "uppercase",
-        color: T.ink400,
+        color: T.ink500,
         display: "block",
         marginBottom: 6,
         fontFamily: T.font,
@@ -1735,14 +1707,14 @@ function BroadcastPanel() {
       >
         Broadcast Message
       </div>
-      <div style={{ fontSize: 12, color: T.ink400, marginBottom: 20 }}>
+      <div style={{ fontSize: 12, color: T.ink500, marginBottom: 20 }}>
         Send to opted-in customers (inbox delivery). Use {"{{first_name}}"} for
         personalisation.
       </div>
       {sent && (
         <div
           style={{
-            background: T.successBg,
+            background: T.successLight,
             border: `1px solid ${T.successBd}`,
             borderRadius: 6,
             padding: "12px 16px",
@@ -1758,7 +1730,7 @@ function BroadcastPanel() {
               background: "none",
               border: "none",
               cursor: "pointer",
-              color: T.ink400,
+              color: T.ink500,
               marginLeft: 12,
               fontSize: 11,
             }}
@@ -1807,8 +1779,8 @@ function BroadcastPanel() {
           style={{
             marginBottom: 20,
             padding: "10px 14px",
-            background: T.ink075,
-            border: `1px solid ${T.ink150}`,
+            background: T.bg,
+            border: `1px solid ${T.border}`,
             borderRadius: 6,
           }}
         >
@@ -1818,7 +1790,7 @@ function BroadcastPanel() {
               fontWeight: 700,
               letterSpacing: "0.1em",
               textTransform: "uppercase",
-              color: T.ink400,
+              color: T.ink500,
               marginBottom: 8,
               fontFamily: T.font,
             }}
@@ -1843,7 +1815,7 @@ function BroadcastPanel() {
       {error && (
         <div
           style={{
-            background: T.dangerBg,
+            background: T.dangerLight,
             border: `1px solid ${T.dangerBd}`,
             borderRadius: 6,
             padding: "10px 14px",
@@ -1888,7 +1860,7 @@ function ChannelTabs({
         display: "flex",
         alignItems: "center",
         gap: 0,
-        borderBottom: `2px solid ${T.ink150}`,
+        borderBottom: `2px solid ${T.border}`,
         flexWrap: "wrap",
       }}
     >
@@ -1910,7 +1882,7 @@ function ChannelTabs({
             fontWeight: channel === ch.id ? 700 : 400,
             letterSpacing: "0.07em",
             textTransform: "uppercase",
-            color: channel === ch.id ? T.accent : T.ink400,
+            color: channel === ch.id ? T.accent : T.ink500,
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
@@ -1937,7 +1909,7 @@ function ChannelTabs({
       <button
         onClick={onRefresh}
         style={{
-          ...sBtn("transparent", T.ink400),
+          ...sBtn("transparent", T.ink500),
           padding: "8px 12px",
           marginLeft: 8,
           marginBottom: 2,
@@ -2135,7 +2107,7 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
         >
           Comms Centre
         </h2>
-        <div style={{ fontSize: 13, color: T.ink400 }}>
+        <div style={{ fontSize: 13, color: T.ink500 }}>
           Customer messages · Support tickets · Wholesale comms
         </div>
       </div>
@@ -2213,11 +2185,11 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit,minmax(110px,1fr))",
               gap: "1px",
-              background: T.ink150,
+              background: T.border,
               borderRadius: 8,
               overflow: "hidden",
-              border: `1px solid ${T.ink150}`,
-              boxShadow: T.shadow,
+              border: `1px solid ${T.border}`,
+              boxShadow: T.shadow.sm,
               marginBottom: 16,
             }}
           >
@@ -2230,7 +2202,7 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
               {
                 label: "Unread",
                 value: custUnread,
-                color: custUnread > 0 ? T.danger : T.ink400,
+                color: custUnread > 0 ? T.danger : T.ink500,
               },
               {
                 label: "Open Tickets",
@@ -2241,7 +2213,7 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
               {
                 label: "Partner Unread",
                 value: partUnread,
-                color: partUnread > 0 ? T.danger : T.ink400,
+                color: partUnread > 0 ? T.danger : T.ink500,
               },
             ].map((s) => (
               <div
@@ -2258,7 +2230,7 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
                     fontWeight: 700,
                     letterSpacing: "0.08em",
                     textTransform: "uppercase",
-                    color: T.ink400,
+                    color: T.ink500,
                     marginBottom: 6,
                     fontFamily: T.font,
                   }}
@@ -2411,7 +2383,7 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
                               style={{
                                 flex: 1,
                                 height: 14,
-                                background: T.ink075,
+                                background: T.bg,
                                 borderRadius: 3,
                                 overflow: "hidden",
                               }}
@@ -2430,7 +2402,7 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
                             <span
                               style={{
                                 fontSize: 10,
-                                color: T.ink400,
+                                color: T.ink500,
                                 fontFamily: T.font,
                                 minWidth: 16,
                                 textAlign: "right",
@@ -2466,27 +2438,27 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
           display: "grid",
           gridTemplateColumns: "280px 1fr",
           gap: 0,
-          border: `1px solid ${T.ink150}`,
+          border: `1px solid ${T.border}`,
           borderRadius: 8,
           overflow: "hidden",
           minHeight: 560,
           marginTop: 20,
-          boxShadow: T.shadow,
+          boxShadow: T.shadow.sm,
         }}
       >
         {/* LEFT PANEL */}
         <div
           style={{
-            borderRight: `1px solid ${T.ink150}`,
+            borderRight: `1px solid ${T.border}`,
             display: "flex",
             flexDirection: "column",
-            background: T.ink050,
+            background: T.surface,
           }}
         >
           <div
             style={{
               padding: "12px 14px",
-              borderBottom: `1px solid ${T.ink150}`,
+              borderBottom: `1px solid ${T.border}`,
             }}
           >
             <input
@@ -2508,7 +2480,7 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
                   style={{
                     padding: 24,
                     textAlign: "center",
-                    color: T.ink400,
+                    color: T.ink500,
                     fontSize: 12,
                   }}
                 >
@@ -2516,7 +2488,7 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
                 </div>
               ) : filteredCustomers.length === 0 ? (
                 <div
-                  style={{ padding: 24, textAlign: "center", color: T.ink400 }}
+                  style={{ padding: 24, textAlign: "center", color: T.ink500 }}
                 >
                   <div style={{ fontSize: 24, marginBottom: 8 }}>👥</div>
                   <div style={{ fontSize: 12 }}>
@@ -2533,9 +2505,9 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
                       onClick={() => setSelectedCustomer(c)}
                       style={{
                         padding: "12px 14px",
-                        borderBottom: `1px solid ${T.ink150}`,
+                        borderBottom: `1px solid ${T.border}`,
                         cursor: "pointer",
-                        background: isSelected ? T.accentLit : "transparent",
+                        background: isSelected ? T.accentLight : "transparent",
                         borderLeft: isSelected
                           ? `3px solid ${T.accent}`
                           : "3px solid transparent",
@@ -2566,7 +2538,7 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
                           <div
                             style={{
                               fontSize: 10,
-                              color: T.ink400,
+                              color: T.ink500,
                               marginTop: 1,
                               whiteSpace: "nowrap",
                               overflow: "hidden",
@@ -2590,7 +2562,7 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
                                   fontSize: 9,
                                   padding: "1px 5px",
                                   borderRadius: 4,
-                                  background: T.dangerBg,
+                                  background: T.dangerLight,
                                   color: T.danger,
                                   fontWeight: 700,
                                   fontFamily: T.font,
@@ -2605,7 +2577,7 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
                                   fontSize: 9,
                                   padding: "1px 5px",
                                   borderRadius: 4,
-                                  background: T.warningBg,
+                                  background: T.warningLight,
                                   color: T.warning,
                                   textTransform: "capitalize",
                                   fontFamily: T.font,
@@ -2642,7 +2614,7 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
                           <div
                             style={{
                               fontSize: 10,
-                              color: T.ink400,
+                              color: T.ink500,
                               fontFamily: T.font,
                             }}
                           >
@@ -2661,7 +2633,7 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
                   style={{
                     padding: 24,
                     textAlign: "center",
-                    color: T.ink400,
+                    color: T.ink500,
                     fontSize: 12,
                   }}
                 >
@@ -2669,7 +2641,7 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
                 </div>
               ) : partners.length === 0 ? (
                 <div
-                  style={{ padding: 24, textAlign: "center", color: T.ink400 }}
+                  style={{ padding: 24, textAlign: "center", color: T.ink500 }}
                 >
                   <div style={{ fontSize: 24, marginBottom: 8 }}>🏪</div>
                   <div style={{ fontSize: 12 }}>
@@ -2688,9 +2660,9 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
                       onClick={() => setSelectedPartner(p)}
                       style={{
                         padding: "12px 14px",
-                        borderBottom: `1px solid ${T.ink150}`,
+                        borderBottom: `1px solid ${T.border}`,
                         cursor: "pointer",
-                        background: isSelected ? T.infoBg : "transparent",
+                        background: isSelected ? T.infoLight : "transparent",
                         borderLeft: isSelected
                           ? `3px solid ${T.info}`
                           : "3px solid transparent",
@@ -2716,7 +2688,7 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
                           <div
                             style={{
                               fontSize: 10,
-                              color: T.ink400,
+                              color: T.ink500,
                               marginTop: 1,
                               fontFamily: T.font,
                             }}
@@ -2753,7 +2725,7 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
                             <div
                               style={{
                                 fontSize: 10,
-                                color: T.ink400,
+                                color: T.ink500,
                                 fontFamily: T.font,
                               }}
                             >
@@ -2779,7 +2751,7 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                color: T.ink400,
+                color: T.ink500,
                 padding: 40,
                 textAlign: "center",
               }}
@@ -2802,7 +2774,7 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
                   maxWidth: 300,
                   lineHeight: 1.7,
                   fontFamily: T.font,
-                  color: T.ink400,
+                  color: T.ink500,
                 }}
               >
                 Click any customer on the left to view their full message and
@@ -2827,7 +2799,7 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                color: T.ink400,
+                color: T.ink500,
                 padding: 40,
                 textAlign: "center",
               }}
@@ -2850,7 +2822,7 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
                   maxWidth: 300,
                   lineHeight: 1.7,
                   fontFamily: T.font,
-                  color: T.ink400,
+                  color: T.ink500,
                 }}
               >
                 Private comms channel — visible to Admin and HQ only, not to
@@ -2860,7 +2832,7 @@ export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
                 style={{
                   marginTop: 20,
                   padding: "12px 16px",
-                  background: T.infoBg,
+                  background: T.infoLight,
                   border: `1px solid ${T.infoBd}`,
                   borderRadius: 6,
                   fontSize: 12,

@@ -7,61 +7,33 @@ import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
 import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
+import { T } from "../styles/tokens";
 
-// ─── THEME ────────────────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 const C = {
   green: T.accent,
   mid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
-  cream: T.ink050,
-  border: T.ink150,
-  muted: T.ink400,
+  cream: T.surface,
+  border: T.border,
+  muted: T.ink500,
   text: T.ink700,
   white: "#fff",
   red: T.danger,
-  lightRed: T.dangerBg,
+  lightRed: T.dangerLight,
   orange: T.warning,
-  lightOrange: T.warningBg,
+  lightOrange: T.warningLight,
   blue: T.info,
-  lightBlue: T.infoBg,
-  lightGreen: T.accentLit,
+  lightBlue: T.infoLight,
+  lightGreen: T.accentLight,
 };
 const F = { heading: T.font, body: T.font };
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 const inputStyle = {
   padding: "8px 12px",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: 4,
   fontSize: 13,
   fontFamily: T.font,
@@ -74,7 +46,7 @@ const makeBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
   padding: "9px 18px",
   backgroundColor: disabled ? "#ccc" : bg,
   color,
-  border: bg === "transparent" ? `1px solid ${T.ink150}` : "none",
+  border: bg === "transparent" ? `1px solid ${T.border}` : "none",
   borderRadius: 4,
   fontSize: 10,
   fontWeight: 700,
@@ -89,7 +61,7 @@ const fldLabel = (text) => (
   <div
     style={{
       fontSize: 11,
-      color: T.ink400,
+      color: T.ink500,
       marginBottom: 5,
       textTransform: "uppercase",
       letterSpacing: "0.08em",
@@ -172,10 +144,10 @@ const SMS_PREVIEWS = {
 // ─── BADGES ───────────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const cfg = {
-    sent: { bg: T.successBg, color: T.success },
-    failed: { bg: T.dangerBg, color: T.danger },
-    pending: { bg: T.warningBg, color: T.warning },
-  }[status] || { bg: T.ink075, color: T.ink400 };
+    sent: { bg: T.successLight, color: T.success },
+    failed: { bg: T.dangerLight, color: T.danger },
+    pending: { bg: T.warningLight, color: T.warning },
+  }[status] || { bg: T.bg, color: T.ink500 };
   return (
     <span
       style={{
@@ -204,7 +176,7 @@ function TypeBadge({ type }) {
         fontWeight: 700,
         letterSpacing: "0.07em",
         textTransform: "uppercase",
-        background: type === "sms" ? T.infoBg : T.accentLit,
+        background: type === "sms" ? T.infoLight : T.accentLight,
         color: type === "sms" ? T.info : T.accentMid,
         fontFamily: T.font,
       }}
@@ -304,10 +276,10 @@ function TestSendPanel({ onSent }) {
     <div
       style={{
         background: "#fff",
-        border: `1px solid ${T.ink150}`,
+        border: `1px solid ${T.border}`,
         borderRadius: 8,
         padding: 24,
-        boxShadow: T.shadow,
+        boxShadow: T.shadow.sm,
       }}
     >
       <div
@@ -316,7 +288,7 @@ function TestSendPanel({ onSent }) {
           fontWeight: 700,
           letterSpacing: "0.1em",
           textTransform: "uppercase",
-          color: T.ink400,
+          color: T.ink500,
           marginBottom: 16,
           fontFamily: T.font,
         }}
@@ -381,7 +353,7 @@ function TestSendPanel({ onSent }) {
       <div
         style={{
           padding: 12,
-          background: T.ink075,
+          background: T.bg,
           borderRadius: 6,
           marginBottom: 14,
           fontSize: 12,
@@ -394,7 +366,7 @@ function TestSendPanel({ onSent }) {
         <span
           style={{
             fontSize: 9,
-            color: T.ink400,
+            color: T.ink500,
             textTransform: "uppercase",
             letterSpacing: "0.08em",
             display: "block",
@@ -422,7 +394,7 @@ function TestSendPanel({ onSent }) {
             padding: "10px 14px",
             borderRadius: 6,
             fontSize: 12,
-            background: result.ok ? T.successBg : T.dangerBg,
+            background: result.ok ? T.successLight : T.dangerLight,
             color: result.ok ? T.success : T.danger,
             fontWeight: 600,
             fontFamily: T.font,
@@ -541,11 +513,11 @@ export default function AdminNotifications() {
     <div
       style={{
         background: "#fff",
-        border: `1px solid ${T.ink150}`,
+        border: `1px solid ${T.border}`,
         borderRadius: 8,
         padding: 24,
         marginBottom: 16,
-        boxShadow: T.shadow,
+        boxShadow: T.shadow.sm,
       }}
     >
       <div
@@ -579,7 +551,7 @@ export default function AdminNotifications() {
             fontWeight: 700,
             letterSpacing: "0.08em",
             textTransform: "uppercase",
-            color: T.ink400,
+            color: T.ink500,
             fontFamily: T.font,
           }}
         >
@@ -614,7 +586,7 @@ export default function AdminNotifications() {
             fontWeight: 600,
             zIndex: 2000,
             fontFamily: T.font,
-            boxShadow: T.shadowMd,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
           }}
         >
           {toast}
@@ -644,15 +616,15 @@ export default function AdminNotifications() {
           >
             Notifications
           </h2>
-          <div style={{ fontSize: 13, color: T.ink400 }}>
+          <div style={{ fontSize: 13, color: T.ink500 }}>
             SMS via BulkSMS · Email framework ready · 6 trigger types
           </div>
         </div>
         <button
           onClick={fetchLogs}
           style={{
-            ...makeBtn("transparent", T.ink400),
-            border: `1px solid ${T.ink150}`,
+            ...makeBtn("transparent", T.ink500),
+            border: `1px solid ${T.border}`,
           }}
         >
           ↻ Refresh
@@ -665,11 +637,11 @@ export default function AdminNotifications() {
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit,minmax(110px,1fr))",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: 8,
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
-          boxShadow: T.shadow,
+          border: `1px solid ${T.border}`,
+          boxShadow: T.shadow.sm,
           marginBottom: 20,
         }}
       >
@@ -698,7 +670,7 @@ export default function AdminNotifications() {
                 fontWeight: 700,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                color: T.ink400,
+                color: T.ink500,
                 marginBottom: 6,
                 fontFamily: T.font,
               }}
@@ -727,7 +699,7 @@ export default function AdminNotifications() {
         style={{
           display: "flex",
           gap: 0,
-          borderBottom: `2px solid ${T.ink150}`,
+          borderBottom: `2px solid ${T.border}`,
           marginBottom: 24,
         }}
       >
@@ -750,7 +722,7 @@ export default function AdminNotifications() {
               fontWeight: activeTab === t.id ? 700 : 400,
               letterSpacing: "0.07em",
               textTransform: "uppercase",
-              color: activeTab === t.id ? T.accent : T.ink400,
+              color: activeTab === t.id ? T.accent : T.ink500,
             }}
           >
             {t.label}
@@ -789,19 +761,19 @@ export default function AdminNotifications() {
                     style={{
                       padding: "8px 14px",
                       background: "#fff",
-                      border: `1px solid ${T.ink150}`,
-                      borderLeft: `3px solid ${t?.color || T.ink400}`,
+                      border: `1px solid ${T.border}`,
+                      borderLeft: `3px solid ${t?.color || T.ink500}`,
                       borderRadius: 6,
                       display: "flex",
                       alignItems: "center",
                       gap: 8,
-                      boxShadow: T.shadow,
+                      boxShadow: T.shadow.sm,
                     }}
                   >
                     <span
                       style={{
                         fontSize: 11,
-                        color: T.ink400,
+                        color: T.ink500,
                         fontFamily: T.font,
                       }}
                     >
@@ -868,7 +840,7 @@ export default function AdminNotifications() {
             <span
               style={{
                 fontSize: 12,
-                color: T.ink400,
+                color: T.ink500,
                 marginLeft: "auto",
                 fontFamily: T.font,
               }}
@@ -883,7 +855,7 @@ export default function AdminNotifications() {
               style={{
                 padding: 40,
                 textAlign: "center",
-                color: T.ink400,
+                color: T.ink500,
                 fontFamily: T.font,
               }}
             >
@@ -894,7 +866,7 @@ export default function AdminNotifications() {
               style={{
                 padding: 60,
                 textAlign: "center",
-                border: `1px dashed ${T.ink150}`,
+                border: `1px dashed ${T.border}`,
                 borderRadius: 8,
               }}
             >
@@ -911,7 +883,7 @@ export default function AdminNotifications() {
                 No notifications yet
               </div>
               <div
-                style={{ fontSize: 13, color: T.ink400, fontFamily: T.font }}
+                style={{ fontSize: 13, color: T.ink500, fontFamily: T.font }}
               >
                 Use the test send panel above or notifications will appear here
                 as they fire from the system.
@@ -921,10 +893,10 @@ export default function AdminNotifications() {
             <div
               style={{
                 background: "#fff",
-                border: `1px solid ${T.ink150}`,
+                border: `1px solid ${T.border}`,
                 borderRadius: 8,
                 overflow: "hidden",
-                boxShadow: T.shadow,
+                boxShadow: T.shadow.sm,
               }}
             >
               <table
@@ -967,14 +939,14 @@ export default function AdminNotifications() {
                     <tr
                       key={l.id}
                       style={{
-                        background: i % 2 === 0 ? "#fff" : T.ink050,
-                        borderBottom: `1px solid ${T.ink075}`,
+                        background: i % 2 === 0 ? "#fff" : T.surface,
+                        borderBottom: `1px solid ${T.bg}`,
                       }}
                     >
                       <td
                         style={{
                           padding: "10px 12px",
-                          color: T.ink400,
+                          color: T.ink500,
                           whiteSpace: "nowrap",
                           fontSize: 11,
                         }}
@@ -999,7 +971,7 @@ export default function AdminNotifications() {
                       <td
                         style={{
                           padding: "10px 12px",
-                          color: T.ink400,
+                          color: T.ink500,
                           fontSize: 11,
                         }}
                       >
@@ -1008,7 +980,7 @@ export default function AdminNotifications() {
                       <td
                         style={{
                           padding: "10px 12px",
-                          color: T.ink400,
+                          color: T.ink500,
                           fontSize: 11,
                           maxWidth: 240,
                           overflow: "hidden",
@@ -1048,7 +1020,7 @@ export default function AdminNotifications() {
           <div
             style={{
               fontSize: 13,
-              color: T.ink400,
+              color: T.ink500,
               marginBottom: 20,
               fontFamily: T.font,
             }}
@@ -1056,7 +1028,7 @@ export default function AdminNotifications() {
             SMS templates are defined in the Edge Function. Edit{" "}
             <code
               style={{
-                background: T.ink075,
+                background: T.bg,
                 padding: "1px 4px",
                 borderRadius: 3,
               }}
@@ -1071,11 +1043,11 @@ export default function AdminNotifications() {
                 key={key}
                 style={{
                   background: "#fff",
-                  border: `1px solid ${T.ink150}`,
+                  border: `1px solid ${T.border}`,
                   borderLeft: `4px solid ${t.color}`,
                   borderRadius: 8,
                   padding: 20,
-                  boxShadow: T.shadow,
+                  boxShadow: T.shadow.sm,
                 }}
               >
                 <div
@@ -1100,14 +1072,14 @@ export default function AdminNotifications() {
                     <div
                       style={{
                         fontSize: 11,
-                        color: T.ink400,
+                        color: T.ink500,
                         fontFamily: T.font,
                       }}
                     >
                       Recipient: {t.to} · Key:{" "}
                       <code
                         style={{
-                          background: T.ink075,
+                          background: T.bg,
                           padding: "1px 4px",
                           borderRadius: 3,
                         }}
@@ -1120,7 +1092,7 @@ export default function AdminNotifications() {
                 <div
                   style={{
                     padding: "10px 14px",
-                    background: T.ink075,
+                    background: T.bg,
                     borderRadius: 6,
                     fontSize: 12,
                     color: T.ink700,
@@ -1145,7 +1117,7 @@ export default function AdminNotifications() {
             <div
               style={{
                 fontSize: 13,
-                color: T.ink400,
+                color: T.ink500,
                 marginBottom: 12,
                 fontFamily: T.font,
               }}
@@ -1199,10 +1171,10 @@ supabase functions deploy send-notification --no-verify-jwt`}</CodeBlock>
                         textAlign: "left",
                         padding: "8px 10px",
                         fontSize: 10,
-                        color: T.ink400,
+                        color: T.ink500,
                         letterSpacing: "0.08em",
                         textTransform: "uppercase",
-                        borderBottom: `1px solid ${T.ink150}`,
+                        borderBottom: `1px solid ${T.border}`,
                       }}
                     >
                       {h}
@@ -1227,12 +1199,12 @@ supabase functions deploy send-notification --no-verify-jwt`}</CodeBlock>
                     <td
                       style={{
                         padding: 10,
-                        borderBottom: `1px solid ${T.ink075}`,
+                        borderBottom: `1px solid ${T.bg}`,
                       }}
                     >
                       <code
                         style={{
-                          background: T.ink075,
+                          background: T.bg,
                           padding: "2px 6px",
                           borderRadius: 3,
                           fontSize: 12,
@@ -1244,8 +1216,8 @@ supabase functions deploy send-notification --no-verify-jwt`}</CodeBlock>
                     <td
                       style={{
                         padding: 10,
-                        borderBottom: `1px solid ${T.ink075}`,
-                        color: T.ink400,
+                        borderBottom: `1px solid ${T.bg}`,
+                        color: T.ink500,
                         fontStyle: "italic",
                         fontSize: 12,
                       }}
@@ -1255,9 +1227,9 @@ supabase functions deploy send-notification --no-verify-jwt`}</CodeBlock>
                     <td
                       style={{
                         padding: 10,
-                        borderBottom: `1px solid ${T.ink075}`,
+                        borderBottom: `1px solid ${T.bg}`,
                         fontSize: 12,
-                        color: T.ink400,
+                        color: T.ink500,
                       }}
                     >
                       {note}
@@ -1279,7 +1251,7 @@ REACT_APP_ADMIN_EMAIL=admin@proteabotanicals.co.za`}</CodeBlock>
             <div
               style={{
                 fontSize: 13,
-                color: T.ink400,
+                color: T.ink500,
                 marginBottom: 12,
                 fontFamily: T.font,
               }}
@@ -1287,7 +1259,7 @@ REACT_APP_ADMIN_EMAIL=admin@proteabotanicals.co.za`}</CodeBlock>
               Add{" "}
               <code
                 style={{
-                  background: T.ink075,
+                  background: T.bg,
                   padding: "1px 4px",
                   borderRadius: 3,
                 }}
@@ -1322,7 +1294,7 @@ REACT_APP_ADMIN_EMAIL=admin@proteabotanicals.co.za`}</CodeBlock>
                 <div
                   key={h.file}
                   style={{
-                    border: `1px solid ${T.ink150}`,
+                    border: `1px solid ${T.border}`,
                     borderRadius: 8,
                     overflow: "hidden",
                   }}
@@ -1330,8 +1302,8 @@ REACT_APP_ADMIN_EMAIL=admin@proteabotanicals.co.za`}</CodeBlock>
                   <div
                     style={{
                       padding: "8px 14px",
-                      background: T.ink075,
-                      borderBottom: `1px solid ${T.ink150}`,
+                      background: T.bg,
+                      borderBottom: `1px solid ${T.border}`,
                     }}
                   >
                     <span
@@ -1347,7 +1319,7 @@ REACT_APP_ADMIN_EMAIL=admin@proteabotanicals.co.za`}</CodeBlock>
                     <span
                       style={{
                         fontSize: 11,
-                        color: T.ink400,
+                        color: T.ink500,
                         marginLeft: 8,
                         fontFamily: T.font,
                       }}

@@ -29,36 +29,9 @@ import HRTimesheets from "./hq/HRTimesheets";
 import HRContracts from "./hq/HRContracts";
 import HRDisciplinary from "./hq/HRDisciplinary";
 import { ChartCard, ChartTooltip } from "./viz";
+import { T } from "../styles/tokens";
 
-// ─── THEME ────────────────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
 // ─── SUB-TABS ─────────────────────────────────────────────────────────────────
 const SUB_TABS = [
@@ -227,7 +200,7 @@ export default function AdminHRPanel({ tenantId, user }) {
         <p
           style={{
             fontSize: 13,
-            color: T.ink400,
+            color: T.ink500,
             margin: "0 0 20px",
             fontFamily: T.font,
           }}
@@ -243,11 +216,11 @@ export default function AdminHRPanel({ tenantId, user }) {
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit,minmax(110px,1fr))",
             gap: "1px",
-            background: T.ink150,
+            background: T.border,
             borderRadius: 8,
             overflow: "hidden",
-            border: `1px solid ${T.ink150}`,
-            boxShadow: T.shadow,
+            border: `1px solid ${T.border}`,
+            boxShadow: T.shadow.sm,
             marginBottom: 20,
           }}
         >
@@ -262,7 +235,7 @@ export default function AdminHRPanel({ tenantId, user }) {
             {
               label: "Pending Leave",
               value: summary.pendingLeave,
-              color: summary.pendingLeave > 0 ? T.warning : T.ink400,
+              color: summary.pendingLeave > 0 ? T.warning : T.ink500,
             },
             {
               label: "Late (30d)",
@@ -289,7 +262,7 @@ export default function AdminHRPanel({ tenantId, user }) {
                   fontWeight: 700,
                   letterSpacing: "0.08em",
                   textTransform: "uppercase",
-                  color: T.ink400,
+                  color: T.ink500,
                   marginBottom: 6,
                   fontFamily: T.font,
                 }}
@@ -334,7 +307,7 @@ export default function AdminHRPanel({ tenantId, user }) {
                   justifyContent: "center",
                   height: "100%",
                   fontSize: 13,
-                  color: T.ink400,
+                  color: T.ink500,
                   fontFamily: T.font,
                 }}
               >
@@ -376,7 +349,7 @@ export default function AdminHRPanel({ tenantId, user }) {
                   justifyContent: "center",
                   height: "100%",
                   fontSize: 13,
-                  color: T.ink400,
+                  color: T.ink500,
                   fontFamily: T.font,
                 }}
               >
@@ -391,18 +364,18 @@ export default function AdminHRPanel({ tenantId, user }) {
                   <CartesianGrid
                     horizontal
                     vertical={false}
-                    stroke={T.ink150}
+                    stroke={T.border}
                     strokeWidth={0.5}
                   />
                   <XAxis
                     dataKey="name"
-                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    tick={{ fill: T.ink500, fontSize: 10, fontFamily: T.font }}
                     axisLine={false}
                     tickLine={false}
                     dy={4}
                   />
                   <YAxis
-                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    tick={{ fill: T.ink500, fontSize: 10, fontFamily: T.font }}
                     axisLine={false}
                     tickLine={false}
                     width={24}
@@ -439,7 +412,7 @@ export default function AdminHRPanel({ tenantId, user }) {
                   justifyContent: "center",
                   height: "100%",
                   fontSize: 13,
-                  color: T.ink400,
+                  color: T.ink500,
                   fontFamily: T.font,
                 }}
               >
@@ -469,7 +442,7 @@ export default function AdminHRPanel({ tenantId, user }) {
                       <span
                         style={{
                           fontSize: 10,
-                          color: T.ink400,
+                          color: T.ink500,
                           fontFamily: "monospace",
                           width: 64,
                           flexShrink: 0,
@@ -483,7 +456,7 @@ export default function AdminHRPanel({ tenantId, user }) {
                         style={{
                           flex: 1,
                           height: 14,
-                          background: T.ink075,
+                          background: T.bg,
                           borderRadius: 3,
                           overflow: "hidden",
                         }}
@@ -517,7 +490,7 @@ export default function AdminHRPanel({ tenantId, user }) {
                       <span
                         style={{
                           fontSize: 10,
-                          color: T.ink400,
+                          color: T.ink500,
                           fontFamily: T.font,
                           minWidth: 28,
                           textAlign: "right",
@@ -540,7 +513,7 @@ export default function AdminHRPanel({ tenantId, user }) {
         <div
           style={{
             padding: "10px 16px",
-            background: T.warningBg,
+            background: T.warningLight,
             border: `1px solid ${T.warningBd}`,
             borderRadius: 6,
             marginBottom: 16,
@@ -561,7 +534,7 @@ export default function AdminHRPanel({ tenantId, user }) {
         style={{
           display: "flex",
           gap: 0,
-          borderBottom: `2px solid ${T.ink150}`,
+          borderBottom: `2px solid ${T.border}`,
           marginBottom: 24,
           overflowX: "auto",
         }}
@@ -581,7 +554,7 @@ export default function AdminHRPanel({ tenantId, user }) {
               letterSpacing: "0.07em",
               textTransform: "uppercase",
               whiteSpace: "nowrap",
-              color: activeTab === tab.id ? T.accent : T.ink400,
+              color: activeTab === tab.id ? T.accent : T.ink500,
               borderBottom:
                 activeTab === tab.id
                   ? `2px solid ${T.accent}`
