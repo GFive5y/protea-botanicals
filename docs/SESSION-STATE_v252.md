@@ -1,6 +1,6 @@
 # SESSION STATE v252
 ## Produced: 13 April 2026 — end of session
-## HEAD: `8a05a20` (pre doc-commit — final HEAD will be the doc-commit SHA)
+## HEAD: `cf9241e` (pre doc-commit — final HEAD will be the doc-commit SHA)
 
 ### CURRENT PRIORITY
 CA business rescue demo — ~4 weeks away (meeting ~12 May 2026)
@@ -50,6 +50,13 @@ Next: demo rehearsal, notification badge system, cross-tenant navigation.
   - LL-NEW-5: hq_all_ policies must use is_hq_user()
 - **RLS policy fixes (Supabase, not in git):**
   - dispensing_log, patients, prescriptions — operator → is_hq_user()
+- **DS-6 Phase 1 — Shell Unification (424fca6, 2e3aed4, 364f926, cf9241e):**
+  - WP-DS-6-PHASE2_v1_0.md spec committed
+  - AppShell.js: T token import, padding from T.page.gutterY/gutterX, removed maxWidth + margin auto
+  - HQDashboard.js: removed local C tokens, replaced all with T equivalents, Jost → Inter
+  - HQOverview.js: root container width: 100% (was maxWidth: 1400 + margin auto)
+  - Phase 1 browser-verified: HQ content fills correctly with sidebar collapsed and expanded
+  - NavSidebar.js read-only audit: CSS widths 52/240px vs T.sidebar 64/220px (mismatch deferred)
 
 ### DATA FIXES APPLIED (Supabase MCP, not in git)
 - MediCare: equity_ledger.share_capital = R250,000
@@ -79,16 +86,22 @@ Next: demo rehearsal, notification badge system, cross-tenant navigation.
 | Nourish Kitchen & Deli | [existing] | food_beverage | ENTRY | Reserve F&B | Existing |
 
 ### WHAT IS NEXT (in priority order)
-1. **Demo rehearsal** — walk through all 4 tenants end-to-end, verify rescue signals render correctly in each module
-2. **Notification badge system (WP-NOTIFICATION-BADGES)** — P3 in WP-DEMO-CA-RESCUE spec. Nav badges surfacing rescue signals. Touches PlatformBar.js (LOCKED).
-3. **Phase 4b — Cross-tenant navigation** — "View store" buttons + Group Portal link
-4. **QR → Wizard URL scheme (Gap 1)** — personalised entry for CA meeting
-5. **Auto-group-join + reveal element (Gaps 5+6)** — the Group Portal reveal
+1. **WP-DS-6 Phase 2 — AINS Bar Unification** — persistent AI bar across HQ + Tenant Portal
+2. **WP-DS-6 Phase 3 — Profile-Aware Tokens** — industry colour differentiation
+3. **WP-DS-6 Phase 4 — Notification Badges** — rescue signal badges on nav items
+4. **Demo rehearsal** — walk through all 4 tenants end-to-end
+5. **Phase 4b — Cross-tenant navigation** — "View store" buttons + Group Portal link
 
 ### COMMIT CHAIN (this session)
 - `72ab6a6` — HQBalanceSheet LL-231 + cash at bank + opex liabilities + RLS + LL-NEW-5
 - `8a05a20` — SESSION-STATE v251 + NEXT-SESSION-PROMPT v251
-- `[this commit]` — SESSION-STATE v252 + NEXT-SESSION-PROMPT v252
+- `e7aba6a` — SESSION-STATE v252 + NEXT-SESSION-PROMPT v252 (all 4 tenants complete)
+- `424fca6` — WP-DS-6 Phase 2 spec committed
+- `2e3aed4` — DS-6 Phase 1: AppShell padding tokens + HQDashboard T migration
+- `364f926` — DS-6 Phase 1b: AppShell remove maxWidth + margin auto
+- `cf9241e` — DS-6 Phase 1c: HQOverview root container fill fix
+- `458129a` — WP-DS-6 Phase 1 status update
+- `[this commit]` — SESSION-STATE v252 update + WP status final SHA
 
 ### LESSONS LEARNED THIS SESSION
 - **LL-NEW-5:** hq_all_ RLS policies must use `is_hq_user()`, never `industry_profile='operator'`. Three tables were silently broken.
