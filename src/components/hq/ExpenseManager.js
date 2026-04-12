@@ -5,34 +5,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
+import { T } from "../../styles/tokens";
 
-// ── T tokens ──────────────────────────────────────────────────────────────────
-const T = {
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentBd: "#A7D9B8",
-  accentLit: "#E8F5EE",
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#747474",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.08)",
-  shadowMd: "0 4px 16px rgba(0,0,0,0.12)",
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
 const CATEGORIES = [
   {
@@ -456,7 +431,7 @@ export default function ExpenseManager({
   // ── Shared input styles ───────────────────────────────────────────────────
   const inp = {
     padding: "8px 10px",
-    border: `1px solid ${T.ink150}`,
+    border: `1px solid ${T.border}`,
     borderRadius: 6,
     fontSize: 13,
     fontFamily: T.font,
@@ -490,11 +465,11 @@ export default function ExpenseManager({
         ? {
             background: "#fff",
             color: T.ink700,
-            border: `1px solid ${T.ink150}`,
+            border: `1px solid ${T.border}`,
           }
         : variant === "danger"
           ? {
-              background: T.dangerBg,
+              background: T.dangerLight,
               color: T.danger,
               border: `1px solid ${T.dangerBd}`,
             }
@@ -515,8 +490,8 @@ export default function ExpenseManager({
       wages: "#FFFBEB",
       capex: "#F0FDF4",
       tax: "#FEF2F2",
-      other: T.ink075,
-    })[cat] || T.ink050;
+      other: T.bg,
+    })[cat] || T.surface;
 
   return (
     <div
@@ -540,14 +515,14 @@ export default function ExpenseManager({
           maxHeight: "90vh",
           display: "flex",
           flexDirection: "column",
-          boxShadow: T.shadowMd,
+          boxShadow: T.shadow.lg,
         }}
       >
         {/* Header */}
         <div
           style={{
             padding: "18px 24px 0",
-            borderBottom: `1px solid ${T.ink150}`,
+            borderBottom: `1px solid ${T.border}`,
             flexShrink: 0,
           }}
         >
@@ -589,7 +564,7 @@ export default function ExpenseManager({
                 border: "none",
                 cursor: "pointer",
                 fontSize: 18,
-                color: T.ink400,
+                color: T.ink500,
               }}
             >
               ✕
@@ -644,7 +619,7 @@ export default function ExpenseManager({
                 <div style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between",
                   padding: "10px 14px", marginBottom: 12,
-                  background: T.warningBg, border: `1px solid ${T.warningBd}`,
+                  background: T.warningLight, border: `1px solid ${T.warningBd}`,
                   borderRadius: 8,
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -675,7 +650,7 @@ export default function ExpenseManager({
               {vatRegistered && needsVatReview.length === 0 && expenses.length > 0 && (
                 <div style={{
                   padding: "8px 14px", marginBottom: 12,
-                  background: T.successBg, border: `1px solid ${T.successBd}`,
+                  background: T.successLight, border: `1px solid ${T.successBd}`,
                   borderRadius: 8, fontFamily: T.font, fontSize: 12,
                   color: T.success, fontWeight: 600,
                 }}>
@@ -704,8 +679,8 @@ export default function ExpenseManager({
                       cursor: "pointer",
                       textAlign: "center",
                       background:
-                        filterCat === cat.value ? catBg(cat.value) : T.ink050,
-                      border: `1px solid ${filterCat === cat.value ? catColor(cat.value) + "44" : T.ink150}`,
+                        filterCat === cat.value ? catBg(cat.value) : T.surface,
+                      border: `1px solid ${filterCat === cat.value ? catColor(cat.value) + "44" : T.border}`,
                       transition: "all 0.12s",
                     }}
                   >
@@ -744,14 +719,14 @@ export default function ExpenseManager({
                     padding: 40,
                     fontFamily: T.font,
                     fontSize: 13,
-                    color: T.ink400,
+                    color: T.ink500,
                   }}
                 >
                   Loading expenses…
                 </div>
               ) : displayExpenses.length === 0 ? (
                 <div style={{ textAlign: "center", padding: 40 }}>
-                  <div style={{ fontFamily: T.font, fontSize: 14, color: T.ink400, marginBottom: 12 }}>
+                  <div style={{ fontFamily: T.font, fontSize: 14, color: T.ink500, marginBottom: 12 }}>
                     {vatFilter
                       ? "All applicable expenses have VAT amounts — nothing to review"
                       : filterCat === "all"
@@ -767,7 +742,7 @@ export default function ExpenseManager({
               ) : (
                 <div
                   style={{
-                    border: `1px solid ${T.ink150}`,
+                    border: `1px solid ${T.border}`,
                     borderRadius: 8,
                     overflow: "hidden",
                   }}
@@ -806,8 +781,8 @@ export default function ExpenseManager({
                         <tr
                           key={e.id}
                           style={{
-                            background: i % 2 === 0 ? "#fff" : T.ink050,
-                            borderBottom: `1px solid ${T.ink075}`,
+                            background: i % 2 === 0 ? "#fff" : T.surface,
+                            borderBottom: `1px solid ${T.bg}`,
                           }}
                         >
                           <td
@@ -839,7 +814,7 @@ export default function ExpenseManager({
                               <span
                                 style={{
                                   fontSize: 11,
-                                  color: T.ink400,
+                                  color: T.ink500,
                                   marginLeft: 6,
                                 }}
                               >
@@ -881,7 +856,7 @@ export default function ExpenseManager({
                                     onChange={ev => setInlineVat(p => ({ ...p, [e.id]: ev.target.value }))}
                                     style={{
                                       width: 80, padding: "4px 6px", fontSize: 12,
-                                      border: `1px solid ${T.ink150}`, borderRadius: 4,
+                                      border: `1px solid ${T.border}`, borderRadius: 4,
                                       fontFamily: T.font,
                                     }}
                                   />
@@ -893,7 +868,7 @@ export default function ExpenseManager({
                                     title="Auto-calculate 15% from inclusive amount"
                                     style={{
                                       padding: "4px 6px", fontSize: 10, borderRadius: 4,
-                                      border: `1px solid ${T.accentBd}`, background: T.accentLit,
+                                      border: `1px solid ${T.accentBd}`, background: T.accentLight,
                                       color: T.accent, cursor: "pointer", fontFamily: T.font,
                                       fontWeight: 600, flexShrink: 0,
                                     }}
@@ -905,7 +880,7 @@ export default function ExpenseManager({
                                     disabled={!inlineVat[e.id] || savingVat[e.id]}
                                     style={{
                                       padding: "4px 8px", fontSize: 10, borderRadius: 4,
-                                      border: "none", background: inlineVat[e.id] ? T.accent : T.ink150,
+                                      border: "none", background: inlineVat[e.id] ? T.accent : T.border,
                                       color: "#fff", cursor: inlineVat[e.id] ? "pointer" : "default",
                                       fontFamily: T.font, fontWeight: 600, flexShrink: 0,
                                     }}
@@ -935,8 +910,8 @@ export default function ExpenseManager({
                                 style={{
                                   padding: "4px 8px",
                                   fontSize: 11,
-                                  background: T.ink050,
-                                  border: `1px solid ${T.ink150}`,
+                                  background: T.surface,
+                                  border: `1px solid ${T.border}`,
                                   borderRadius: 4,
                                   cursor: "pointer",
                                   fontFamily: T.font,
@@ -951,7 +926,7 @@ export default function ExpenseManager({
                                     style={{
                                       padding: "4px 8px",
                                       fontSize: 11,
-                                      background: T.dangerBg,
+                                      background: T.dangerLight,
                                       border: `1px solid ${T.dangerBd}`,
                                       color: T.danger,
                                       borderRadius: 4,
@@ -968,7 +943,7 @@ export default function ExpenseManager({
                                       padding: "4px 8px",
                                       fontSize: 11,
                                       background: "#fff",
-                                      border: `1px solid ${T.ink150}`,
+                                      border: `1px solid ${T.border}`,
                                       borderRadius: 4,
                                       cursor: "pointer",
                                       fontFamily: T.font,
@@ -1002,8 +977,8 @@ export default function ExpenseManager({
                     <tfoot>
                       <tr
                         style={{
-                          background: T.ink050,
-                          borderTop: `2px solid ${T.ink150}`,
+                          background: T.surface,
+                          borderTop: `2px solid ${T.border}`,
                         }}
                       >
                         <td colSpan={3} style={{ padding: "10px 12px", fontFamily: T.font, fontSize: 12, fontWeight: 600, color: T.ink500 }}>
@@ -1143,7 +1118,7 @@ export default function ExpenseManager({
                         title="Calculate 15% VAT from inclusive amount"
                         style={{
                           padding: "8px 10px",
-                          background: T.accentLit,
+                          background: T.accentLight,
                           border: `1px solid ${T.accentBd}`,
                           borderRadius: 6,
                           cursor: "pointer",
@@ -1158,7 +1133,7 @@ export default function ExpenseManager({
                         Calc 15%
                       </button>
                     </div>
-                    <div style={{ fontSize: 10, color: T.ink400, marginTop: 3, fontFamily: T.font }}>
+                    <div style={{ fontSize: 10, color: T.ink500, marginTop: 3, fontFamily: T.font }}>
                       From supplier tax invoice. Auto-filled by Smart Capture.
                     </div>
                   </div>
@@ -1183,9 +1158,9 @@ export default function ExpenseManager({
                 style={{
                   marginBottom: 16,
                   padding: "12px 14px",
-                  background: T.ink050,
+                  background: T.surface,
                   borderRadius: 8,
-                  border: `1px solid ${T.ink150}`,
+                  border: `1px solid ${T.border}`,
                 }}
               >
                 <div
@@ -1193,7 +1168,7 @@ export default function ExpenseManager({
                     fontFamily: T.font,
                     fontSize: 11,
                     fontWeight: 600,
-                    color: T.ink400,
+                    color: T.ink500,
                     marginBottom: 10,
                     letterSpacing: "0.06em",
                     textTransform: "uppercase",
@@ -1298,7 +1273,7 @@ export default function ExpenseManager({
               <div
                 style={{
                   padding: "12px 16px",
-                  background: T.accentLit,
+                  background: T.accentLight,
                   border: `1px solid ${T.accentBd}`,
                   borderRadius: 8,
                   marginBottom: 20,
@@ -1334,7 +1309,7 @@ export default function ExpenseManager({
               <div
                 style={{
                   padding: "10px 14px",
-                  background: T.ink050,
+                  background: T.surface,
                   borderRadius: 6,
                   marginBottom: 14,
                   fontFamily: "monospace",
@@ -1376,7 +1351,7 @@ export default function ExpenseManager({
                     marginBottom: 14,
                     padding: "12px 14px",
                     borderRadius: 8,
-                    background: bulkResult.success ? T.successBg : T.dangerBg,
+                    background: bulkResult.success ? T.successLight : T.dangerLight,
                     border: `1px solid ${bulkResult.success ? T.successBd : T.dangerBd}`,
                   }}
                 >
@@ -1484,10 +1459,10 @@ export default function ExpenseManager({
               <div
                 style={{
                   padding: "16px",
-                  background: T.ink050,
+                  background: T.surface,
                   borderRadius: 8,
                   marginBottom: 20,
-                  border: `1px solid ${T.ink150}`,
+                  border: `1px solid ${T.border}`,
                 }}
               >
                 <div
@@ -1532,7 +1507,7 @@ export default function ExpenseManager({
                   style={{
                     fontFamily: T.font,
                     fontSize: 11,
-                    color: T.ink400,
+                    color: T.ink500,
                     lineHeight: 1.5,
                   }}
                 >
@@ -1547,14 +1522,14 @@ export default function ExpenseManager({
         <div
           style={{
             padding: "12px 24px",
-            borderTop: `1px solid ${T.ink150}`,
+            borderTop: `1px solid ${T.border}`,
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
             flexShrink: 0,
           }}
         >
-          <div style={{ fontFamily: T.font, fontSize: 11, color: T.ink400 }}>
+          <div style={{ fontFamily: T.font, fontSize: 11, color: T.ink500 }}>
             WP-FIN S1 · expenses table · tenant_id enforced
           </div>
           <button onClick={onClose} style={btn("secondary")}>
@@ -1578,7 +1553,7 @@ export default function ExpenseManager({
             fontFamily: T.font,
             fontSize: 13,
             fontWeight: 600,
-            boxShadow: T.shadowMd,
+            boxShadow: T.shadow.lg,
           }}
         >
           {toast.msg}
