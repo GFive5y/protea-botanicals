@@ -32,52 +32,23 @@ import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import { ChartCard, ChartTooltip } from "../viz";
 import { useTenant } from "../../services/tenantService";
+import { T } from "../../styles/tokens";
 
-// ── Design tokens ─────────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
-  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
 const sCard = {
   background: "#fff",
   borderRadius: 8,
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   padding: 24,
   marginBottom: 20,
-  boxShadow: T.shadow,
+  boxShadow: T.shadow.sm,
 };
 const sInput = {
   padding: "9px 12px",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: 4,
-  fontFamily: T.fontUi,
+  fontFamily: T.font,
   fontSize: 13,
   width: "100%",
   boxSizing: "border-box",
@@ -88,14 +59,14 @@ const sTh = {
   textAlign: "left",
   fontSize: 10,
   fontWeight: 700,
-  color: T.ink400,
+  color: T.ink500,
   textTransform: "uppercase",
   letterSpacing: "0.1em",
-  borderBottom: `1px solid ${T.ink150}`,
+  borderBottom: `1px solid ${T.border}`,
 };
 const sTd = {
   padding: "12px 14px",
-  borderBottom: `1px solid ${T.ink075}`,
+  borderBottom: `1px solid ${T.bg}`,
   color: T.ink700,
   verticalAlign: "middle",
   fontSize: 13,
@@ -107,7 +78,7 @@ const mkBtn = (variant = "primary", extra = {}) => {
     borderRadius: 4,
     border: "none",
     cursor: "pointer",
-    fontFamily: T.fontUi,
+    fontFamily: T.font,
     fontWeight: 600,
     fontSize: 12,
     transition: "all 0.15s",
@@ -120,11 +91,11 @@ const mkBtn = (variant = "primary", extra = {}) => {
       color: T.accent,
       border: `1px solid ${T.accentBd}`,
     },
-    muted: { background: T.ink075, color: T.ink400, cursor: "default" },
+    muted: { background: T.bg, color: T.ink500, cursor: "default" },
     toggle: {
-      background: T.ink075,
+      background: T.bg,
       color: T.ink500,
-      border: `1px solid ${T.ink150}`,
+      border: `1px solid ${T.border}`,
     },
     toggleOn: { background: T.accent, color: "#fff" },
   };
@@ -264,11 +235,11 @@ function recommendedPrice(cogs, targetPct) {
 // ── Margin helpers ────────────────────────────────────────────────────────────
 function marginTokens(pct) {
   if (pct === null || isNaN(pct))
-    return { color: T.ink300, bg: T.ink075, label: "—" };
-  if (pct < 0) return { color: T.danger, bg: T.dangerBg, label: "Loss" };
-  if (pct < 20) return { color: T.danger, bg: T.dangerBg, label: "Low" };
-  if (pct < 35) return { color: T.warning, bg: T.warningBg, label: "OK" };
-  return { color: T.success, bg: T.successBg, label: "Good" };
+    return { color: T.ink300, bg: T.bg, label: "—" };
+  if (pct < 0) return { color: T.danger, bg: T.dangerLight, label: "Loss" };
+  if (pct < 20) return { color: T.danger, bg: T.dangerLight, label: "Low" };
+  if (pct < 35) return { color: T.warning, bg: T.warningLight, label: "OK" };
+  return { color: T.success, bg: T.successLight, label: "Good" };
 }
 
 function MarginBadge({ pct, large = false }) {
@@ -283,7 +254,7 @@ function MarginBadge({ pct, large = false }) {
         fontWeight: 700,
         color: c.color,
         background: c.bg,
-        fontFamily: T.fontData,
+        fontFamily: T.font,
         letterSpacing: "-0.01em",
       }}
     >
@@ -308,7 +279,7 @@ function FxSensitivity({ baseCogs, baseRate, sellPrice }) {
           width: "100%",
           borderCollapse: "collapse",
           fontSize: 13,
-          fontFamily: T.fontUi,
+          fontFamily: T.font,
         }}
       >
         <thead>
@@ -327,14 +298,14 @@ function FxSensitivity({ baseCogs, baseRate, sellPrice }) {
             <tr
               key={s.rate}
               style={{
-                background: s.delta === 0 ? T.accentLit : "transparent",
+                background: s.delta === 0 ? T.accentLight : "transparent",
               }}
             >
               <td
                 style={{
                   ...sTd,
                   fontWeight: s.delta === 0 ? 700 : 400,
-                  fontFamily: T.fontData,
+                  fontFamily: T.font,
                 }}
               >
                 R{fmt(s.rate, 2)}/USD{" "}
@@ -344,7 +315,7 @@ function FxSensitivity({ baseCogs, baseRate, sellPrice }) {
                     ? `(+R${s.delta})`
                     : `(−R${Math.abs(s.delta)})`}
               </td>
-              <td style={{ ...sTd, fontFamily: T.fontData }}>
+              <td style={{ ...sTd, fontFamily: T.font }}>
                 {fmtZar(s.scenarioCogs)}
               </td>
               <td style={sTd}>
@@ -354,8 +325,8 @@ function FxSensitivity({ baseCogs, baseRate, sellPrice }) {
                 style={{
                   ...sTd,
                   fontSize: 11,
-                  color: T.ink400,
-                  fontFamily: T.fontData,
+                  color: T.ink500,
+                  fontFamily: T.font,
                 }}
               >
                 {s.delta !== 0 && s.margin !== null
@@ -411,10 +382,10 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
       style={{
         background: "#fff",
         borderRadius: 8,
-        border: `2px solid ${dirty ? T.accent : T.ink150}`,
+        border: `2px solid ${dirty ? T.accent : T.border}`,
         padding: 20,
         transition: "border-color 0.2s",
-        boxShadow: T.shadow,
+        boxShadow: T.shadow.sm,
       }}
     >
       {/* Channel header */}
@@ -432,7 +403,7 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
               fontWeight: 700,
               fontSize: 14,
               color: T.ink900,
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
             }}
           >
             {channel.label}
@@ -440,9 +411,9 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
           <div
             style={{
               fontSize: 11,
-              color: T.ink400,
+              color: T.ink500,
               marginTop: 2,
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
             }}
           >
             {channel.desc}
@@ -457,12 +428,12 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
           style={{
             fontSize: 11,
             fontWeight: 700,
-            color: T.ink400,
+            color: T.ink500,
             textTransform: "uppercase",
             letterSpacing: "0.08em",
             display: "block",
             marginBottom: 6,
-            fontFamily: T.fontUi,
+            fontFamily: T.font,
           }}
         >
           Sell Price (ZAR) — per unit
@@ -473,7 +444,7 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
               fontSize: 16,
               color: T.ink500,
               fontWeight: 600,
-              fontFamily: T.fontData,
+              fontFamily: T.font,
             }}
           >
             R
@@ -493,8 +464,8 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
               fontSize: 16,
               fontWeight: 600,
               color: T.accent,
-              fontFamily: T.fontData,
-              border: `1px solid ${dirty ? T.accent : T.ink150}`,
+              fontFamily: T.font,
+              border: `1px solid ${dirty ? T.accent : T.border}`,
               flex: 1,
             }}
           />
@@ -508,12 +479,12 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
             style={{
               fontSize: 11,
               fontWeight: 700,
-              color: T.ink400,
+              color: T.ink500,
               textTransform: "uppercase",
               letterSpacing: "0.08em",
               display: "block",
               marginBottom: 6,
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
             }}
           >
             Adjust Price (what-if)
@@ -537,7 +508,7 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
               fontSize: 11,
               color: T.ink300,
               marginTop: 2,
-              fontFamily: T.fontData,
+              fontFamily: T.font,
             }}
           >
             <span>{fmtZar(Math.max(1, cogs * 0.8))}</span>
@@ -563,7 +534,7 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
             <div
               style={{
                 fontSize: 10,
-                color: T.ink400,
+                color: T.ink500,
                 textTransform: "uppercase",
                 letterSpacing: "0.06em",
                 fontWeight: 700,
@@ -577,24 +548,24 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
                 display: "flex",
                 justifyContent: "space-between",
                 fontSize: 12,
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
               }}
             >
               <span style={{ color: T.ink500 }}>
                 COGS:{" "}
-                <strong style={{ fontFamily: T.fontData }}>
+                <strong style={{ fontFamily: T.font }}>
                   {fmtZar(cogs)}
                 </strong>
               </span>
               <span style={{ color: T.ink500 }}>
                 Profit:{" "}
-                <strong style={{ color: mc.color, fontFamily: T.fontData }}>
+                <strong style={{ color: mc.color, fontFamily: T.font }}>
                   {fmtZar(sell - cogs)}
                 </strong>
               </span>
               <span style={{ color: T.ink500 }}>
                 Margin:{" "}
-                <strong style={{ color: mc.color, fontFamily: T.fontData }}>
+                <strong style={{ color: mc.color, fontFamily: T.font }}>
                   {fmt(margin)}%
                 </strong>
               </span>
@@ -603,7 +574,7 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
           {qtyUnits > 1 && (
             <div
               style={{
-                background: T.ink075,
+                background: T.bg,
                 borderRadius: 6,
                 padding: "8px 12px",
                 marginBottom: 14,
@@ -612,9 +583,9 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
             >
               <div
                 style={{
-                  color: T.ink400,
+                  color: T.ink500,
                   marginBottom: 4,
-                  fontFamily: T.fontUi,
+                  fontFamily: T.font,
                 }}
               >
                 × {qtyUnits.toLocaleString()} units
@@ -623,30 +594,30 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
-                  fontFamily: T.fontUi,
+                  fontFamily: T.font,
                 }}
               >
                 <span style={{ color: T.ink500 }}>
                   Total COGS:{" "}
-                  <strong style={{ color: T.danger, fontFamily: T.fontData }}>
+                  <strong style={{ color: T.danger, fontFamily: T.font }}>
                     {fmtZar(cogs * qtyUnits)}
                   </strong>
                 </span>
                 <span style={{ color: T.ink500 }}>
                   Revenue:{" "}
-                  <strong style={{ color: T.accent, fontFamily: T.fontData }}>
+                  <strong style={{ color: T.accent, fontFamily: T.font }}>
                     {fmtZar(sell * qtyUnits)}
                   </strong>
                 </span>
               </div>
-              <div style={{ marginTop: 3, fontFamily: T.fontUi }}>
+              <div style={{ marginTop: 3, fontFamily: T.font }}>
                 <span style={{ color: T.ink500 }}>
                   Gross Profit:{" "}
                   <strong
                     style={{
                       color:
                         (sell - cogs) * qtyUnits >= 0 ? T.accent : T.danger,
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                     }}
                   >
                     {fmtZar((sell - cogs) * qtyUnits)}
@@ -664,12 +635,12 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
           style={{
             fontSize: 11,
             fontWeight: 700,
-            color: T.ink400,
+            color: T.ink500,
             textTransform: "uppercase",
             letterSpacing: "0.08em",
             display: "block",
             marginBottom: 6,
-            fontFamily: T.fontUi,
+            fontFamily: T.font,
           }}
         >
           Target Margin % → Recommended Price
@@ -690,13 +661,13 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
               ...sInput,
               width: 80,
               textAlign: "center",
-              fontFamily: T.fontData,
+              fontFamily: T.font,
             }}
           />
-          <span style={{ fontSize: 12, color: T.ink400 }}>% →</span>
+          <span style={{ fontSize: 12, color: T.ink500 }}>% →</span>
           {recPrice ? (
             <button onClick={applyRec} style={mkBtn("ghost", { fontSize: 12 })}>
-              <span style={{ fontFamily: T.fontData }}>{fmtZar(recPrice)}</span>{" "}
+              <span style={{ fontFamily: T.font }}>{fmtZar(recPrice)}</span>{" "}
               — apply
             </button>
           ) : (
@@ -729,11 +700,11 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
           borderRadius: 4,
           border: "none",
           cursor: dirty ? "pointer" : "default",
-          fontFamily: T.fontUi,
+          fontFamily: T.font,
           fontWeight: 700,
           fontSize: 13,
-          background: dirty ? T.accent : T.ink075,
-          color: dirty ? "#fff" : T.ink400,
+          background: dirty ? T.accent : T.bg,
+          color: dirty ? "#fff" : T.ink500,
           transition: "all 0.2s",
           letterSpacing: "0.04em",
         }}
@@ -866,7 +837,7 @@ export default function HQPricing() {
   });
 
   return (
-    <div style={{ fontFamily: T.fontUi, color: T.ink700 }}>
+    <div style={{ fontFamily: T.font, color: T.ink700 }}>
       {toast && (
         <div
           style={{
@@ -881,7 +852,7 @@ export default function HQPricing() {
             fontSize: 13,
             fontWeight: 500,
             boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
-            fontFamily: T.fontUi,
+            fontFamily: T.font,
           }}
         >
           {toast}
@@ -909,7 +880,7 @@ export default function HQPricing() {
             style={{
               margin: 0,
               fontSize: 22,
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
               fontWeight: 300,
               color: T.ink900,
             }}
@@ -924,14 +895,14 @@ export default function HQPricing() {
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <div
             style={{
-              background: fxLoading ? T.ink075 : T.successBg,
+              background: fxLoading ? T.bg : T.successLight,
               border: `1px solid ${T.successBd}`,
               borderRadius: 4,
               padding: "6px 12px",
               fontSize: 12,
               color: T.success,
               fontWeight: 600,
-              fontFamily: T.fontData,
+              fontFamily: T.font,
             }}
           >
             {fxLoading
@@ -948,7 +919,7 @@ export default function HQPricing() {
       </div>
 
       {loading ? (
-        <div style={{ textAlign: "center", padding: 60, color: T.ink400 }}>
+        <div style={{ textAlign: "center", padding: 60, color: T.ink500 }}>
           Loading pricing data…
         </div>
       ) : recipes.length === 0 ? (
@@ -956,14 +927,14 @@ export default function HQPricing() {
           <h3
             style={{
               color: T.ink900,
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
               fontWeight: 400,
               marginBottom: 8,
             }}
           >
             No SKU recipes yet
           </h3>
-          <p style={{ color: T.ink400, fontSize: 13 }}>
+          <p style={{ color: T.ink500, fontSize: 13 }}>
             Build COGS recipes in <strong>HQ → Costing</strong> first, then set
             prices here.
           </p>
@@ -977,7 +948,7 @@ export default function HQPricing() {
                 margin: "0 0 16px",
                 fontSize: 15,
                 color: T.ink900,
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
                 fontWeight: 500,
               }}
             >
@@ -988,7 +959,7 @@ export default function HQPricing() {
                 style={{
                   width: "100%",
                   borderCollapse: "collapse",
-                  fontFamily: T.fontUi,
+                  fontFamily: T.font,
                 }}
               >
                 <thead>
@@ -1016,7 +987,7 @@ export default function HQPricing() {
                       style={{
                         cursor: "pointer",
                         background:
-                          selectedId === row.id ? T.accentLit : "transparent",
+                          selectedId === row.id ? T.accentLight : "transparent",
                         transition: "background 0.1s",
                       }}
                     >
@@ -1028,8 +999,8 @@ export default function HQPricing() {
                           <div
                             style={{
                               fontSize: 11,
-                              color: T.ink400,
-                              fontFamily: T.fontData,
+                              color: T.ink500,
+                              fontFamily: T.font,
                             }}
                           >
                             {row.sku}
@@ -1039,7 +1010,7 @@ export default function HQPricing() {
                       <td
                         style={{
                           ...sTd,
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                           fontWeight: 600,
                           color: T.accent,
                         }}
@@ -1052,7 +1023,7 @@ export default function HQPricing() {
                             <div>
                               <div
                                 style={{
-                                  fontFamily: T.fontData,
+                                  fontFamily: T.font,
                                   fontWeight: 600,
                                   marginBottom: 4,
                                 }}
@@ -1062,7 +1033,7 @@ export default function HQPricing() {
                               <MarginBadge pct={ch.margin} />
                             </div>
                           ) : (
-                            <span style={{ fontSize: 12, color: T.ink150 }}>
+                            <span style={{ fontSize: 12, color: T.border }}>
                               Not set
                             </span>
                           )}
@@ -1075,7 +1046,7 @@ export default function HQPricing() {
                           );
                           if (!wc?.sell || !loyaltyConfig)
                             return (
-                              <span style={{ fontSize: 12, color: T.ink150 }}>
+                              <span style={{ fontSize: 12, color: T.border }}>
                                 —
                               </span>
                             );
@@ -1092,7 +1063,7 @@ export default function HQPricing() {
                             <div>
                               <div
                                 style={{
-                                  fontFamily: T.fontData,
+                                  fontFamily: T.font,
                                   fontSize: 11,
                                   color: T.ink500,
                                   marginBottom: 3,
@@ -1184,14 +1155,14 @@ export default function HQPricing() {
                           <CartesianGrid
                             horizontal={false}
                             vertical
-                            stroke={T.ink150}
+                            stroke={T.border}
                             strokeWidth={0.5}
                           />
                           <XAxis
                             type="number"
                             domain={[0, 100]}
                             tick={{
-                              fill: T.ink400,
+                              fill: T.ink500,
                               fontSize: 10,
                               fontFamily: T.font,
                             }}
@@ -1203,7 +1174,7 @@ export default function HQPricing() {
                             type="category"
                             dataKey="channel"
                             tick={{
-                              fill: T.ink400,
+                              fill: T.ink500,
                               fontSize: 11,
                               fontFamily: T.font,
                             }}
@@ -1265,13 +1236,13 @@ export default function HQPricing() {
                         <ScatterChart
                           margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
                         >
-                          <CartesianGrid stroke={T.ink150} strokeWidth={0.5} />
+                          <CartesianGrid stroke={T.border} strokeWidth={0.5} />
                           <XAxis
                             type="number"
                             dataKey="sell"
                             name="Sell Price"
                             tick={{
-                              fill: T.ink400,
+                              fill: T.ink500,
                               fontSize: 10,
                               fontFamily: T.font,
                             }}
@@ -1283,7 +1254,7 @@ export default function HQPricing() {
                               position: "insideBottom",
                               offset: -4,
                               fontSize: 9,
-                              fill: T.ink400,
+                              fill: T.ink500,
                             }}
                           />
                           <YAxis
@@ -1291,7 +1262,7 @@ export default function HQPricing() {
                             dataKey="margin"
                             name="Margin %"
                             tick={{
-                              fill: T.ink400,
+                              fill: T.ink500,
                               fontSize: 10,
                               fontFamily: T.font,
                             }}
@@ -1355,7 +1326,7 @@ export default function HQPricing() {
                       style={{
                         margin: 0,
                         fontSize: 18,
-                        fontFamily: T.fontUi,
+                        fontFamily: T.font,
                         fontWeight: 500,
                         color: T.ink900,
                       }}
@@ -1366,9 +1337,9 @@ export default function HQPricing() {
                       <div
                         style={{
                           fontSize: 12,
-                          color: T.ink400,
+                          color: T.ink500,
                           marginTop: 3,
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                         }}
                       >
                         {selected.sku}
@@ -1389,7 +1360,7 @@ export default function HQPricing() {
                           <span
                             style={{
                               fontSize: 11,
-                              background: T.infoBg,
+                              background: T.infoLight,
                               color: T.info,
                               borderRadius: 3,
                               padding: "2px 8px",
@@ -1410,7 +1381,7 @@ export default function HQPricing() {
                           <span
                             style={{
                               fontSize: 11,
-                              background: T.accentLit,
+                              background: T.accentLight,
                               color: T.accent,
                               borderRadius: 3,
                               padding: "2px 8px",
@@ -1424,7 +1395,7 @@ export default function HQPricing() {
                           <span
                             style={{
                               fontSize: 11,
-                              background: T.ink075,
+                              background: T.bg,
                               color: T.ink500,
                               borderRadius: 3,
                               padding: "2px 8px",
@@ -1441,7 +1412,7 @@ export default function HQPricing() {
                     <div
                       style={{
                         fontSize: 10,
-                        color: T.ink400,
+                        color: T.ink500,
                         textTransform: "uppercase",
                         letterSpacing: "0.08em",
                         fontWeight: 700,
@@ -1452,7 +1423,7 @@ export default function HQPricing() {
                     </div>
                     <div
                       style={{
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         fontSize: 26,
                         fontWeight: 400,
                         color: T.accent,
@@ -1463,9 +1434,9 @@ export default function HQPricing() {
                     <div
                       style={{
                         fontSize: 11,
-                        color: T.ink400,
+                        color: T.ink500,
                         marginTop: 2,
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                       }}
                     >
                       at R{usdZar.toFixed(4)}/USD
@@ -1477,14 +1448,14 @@ export default function HQPricing() {
               {/* FX Sensitivity panel */}
               {showFxPanel && selectedCogs > 0 && (
                 <div
-                  style={{ ...sCard, background: T.ink050, marginBottom: 16 }}
+                  style={{ ...sCard, background: T.surface, marginBottom: 16 }}
                 >
                   <h4
                     style={{
                       margin: "0 0 12px",
                       fontSize: 14,
                       color: T.ink900,
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                       fontWeight: 500,
                     }}
                   >
@@ -1529,7 +1500,7 @@ export default function HQPricing() {
               {/* Quantity / Batch P&L strip */}
               <div
                 style={{
-                  background: T.accentLit,
+                  background: T.accentLight,
                   border: `1px solid ${T.accentBd}`,
                   borderRadius: 8,
                   padding: "16px 18px",
@@ -1560,7 +1531,7 @@ export default function HQPricing() {
                     <div
                       style={{
                         fontSize: 10,
-                        color: T.ink400,
+                        color: T.ink500,
                         textTransform: "uppercase",
                         letterSpacing: "0.08em",
                         fontWeight: 700,
@@ -1571,7 +1542,7 @@ export default function HQPricing() {
                     </div>
                     <div
                       style={{
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         fontSize: 24,
                         fontWeight: 400,
                         color: T.accent,
@@ -1630,7 +1601,7 @@ export default function HQPricing() {
                         ...sInput,
                         width: 90,
                         textAlign: "center",
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         fontWeight: 700,
                         color: T.accent,
                         border: `1px solid ${T.accentBd}`,
@@ -1688,7 +1659,7 @@ export default function HQPricing() {
                         <div
                           style={{
                             background: "#fff",
-                            border: `1px solid ${T.ink150}`,
+                            border: `1px solid ${T.border}`,
                             borderRadius: 6,
                             padding: "8px 14px",
                             minWidth: 150,
@@ -1697,7 +1668,7 @@ export default function HQPricing() {
                           <div
                             style={{
                               fontSize: 10,
-                              color: T.ink400,
+                              color: T.ink500,
                               textTransform: "uppercase",
                               letterSpacing: "0.06em",
                               fontWeight: 700,
@@ -1707,7 +1678,7 @@ export default function HQPricing() {
                           </div>
                           <div
                             style={{
-                              fontFamily: T.fontData,
+                              fontFamily: T.font,
                               fontSize: 17,
                               fontWeight: 400,
                               color: T.danger,
@@ -1718,8 +1689,8 @@ export default function HQPricing() {
                           <div
                             style={{
                               fontSize: 10,
-                              color: T.ink400,
-                              fontFamily: T.fontData,
+                              color: T.ink500,
+                              fontFamily: T.font,
                               marginTop: 2,
                             }}
                           >
@@ -1735,7 +1706,7 @@ export default function HQPricing() {
                             <div
                               style={{
                                 background: "#fff",
-                                border: `1px solid ${T.ink150}`,
+                                border: `1px solid ${T.border}`,
                                 borderRadius: 6,
                                 padding: "8px 14px",
                                 minWidth: 150,
@@ -1744,7 +1715,7 @@ export default function HQPricing() {
                               <div
                                 style={{
                                   fontSize: 10,
-                                  color: T.ink400,
+                                  color: T.ink500,
                                   textTransform: "uppercase",
                                   letterSpacing: "0.06em",
                                   fontWeight: 700,
@@ -1755,7 +1726,7 @@ export default function HQPricing() {
                               </div>
                               <div
                                 style={{
-                                  fontFamily: T.fontData,
+                                  fontFamily: T.font,
                                   fontSize: 17,
                                   fontWeight: 400,
                                   color: T.accent,
@@ -1766,8 +1737,8 @@ export default function HQPricing() {
                               <div
                                 style={{
                                   fontSize: 10,
-                                  color: T.ink400,
-                                  fontFamily: T.fontData,
+                                  color: T.ink500,
+                                  fontFamily: T.font,
                                   marginTop: 2,
                                 }}
                               >
@@ -1781,7 +1752,7 @@ export default function HQPricing() {
                             <div
                               style={{
                                 background:
-                                  totalProfit >= 0 ? "#fff" : T.dangerBg,
+                                  totalProfit >= 0 ? "#fff" : T.dangerLight,
                                 border: `1px solid ${totalProfit >= 0 ? T.successBd : T.dangerBd}`,
                                 borderRadius: 6,
                                 padding: "8px 14px",
@@ -1791,7 +1762,7 @@ export default function HQPricing() {
                               <div
                                 style={{
                                   fontSize: 10,
-                                  color: T.ink400,
+                                  color: T.ink500,
                                   textTransform: "uppercase",
                                   letterSpacing: "0.06em",
                                   fontWeight: 700,
@@ -1801,7 +1772,7 @@ export default function HQPricing() {
                               </div>
                               <div
                                 style={{
-                                  fontFamily: T.fontData,
+                                  fontFamily: T.font,
                                   fontSize: 17,
                                   fontWeight: 400,
                                   color:
@@ -1821,8 +1792,8 @@ export default function HQPricing() {
                                 <span
                                   style={{
                                     fontSize: 10,
-                                    color: T.ink400,
-                                    fontFamily: T.fontData,
+                                    color: T.ink500,
+                                    fontFamily: T.font,
                                   }}
                                 >
                                   {fmtZar(totalProfit / qtyUnits)}/unit
@@ -1837,7 +1808,7 @@ export default function HQPricing() {
                           <div
                             style={{
                               fontSize: 12,
-                              color: T.ink400,
+                              color: T.ink500,
                               fontStyle: "italic",
                             }}
                           >
@@ -1883,7 +1854,7 @@ export default function HQPricing() {
                   alignItems: "center",
                 }}
               >
-                <span style={{ color: T.ink400, fontFamily: T.fontUi }}>
+                <span style={{ color: T.ink500, fontFamily: T.font }}>
                   Margin guide:
                 </span>
                 {[
@@ -1903,7 +1874,7 @@ export default function HQPricing() {
                         background: g.color,
                       }}
                     />
-                    <span style={{ color: T.ink400, fontFamily: T.fontUi }}>
+                    <span style={{ color: T.ink500, fontFamily: T.font }}>
                       {g.label}
                     </span>
                   </div>

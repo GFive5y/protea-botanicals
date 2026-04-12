@@ -25,44 +25,17 @@ import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
 import { sendInvoiceEmail, sendOverduePaymentEmail } from "../../services/emailService";
+import { T } from "../../styles/tokens";
+const MONO = "'DM Mono','Courier New',monospace";
 
-const T = {
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  mono: "'DM Mono','Courier New',monospace",
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-  shadowLg: "0 8px 32px rgba(0,0,0,0.12)",
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
 const STATUS_META = {
-  draft: { bg: T.ink075, color: T.ink500, label: "Draft" },
-  pending: { bg: T.warningBg, color: T.warning, label: "Pending" },
-  paid: { bg: T.successBg, color: T.success, label: "Paid" },
-  overdue: { bg: T.dangerBg, color: T.danger, label: "Overdue" },
-  cancelled: { bg: T.ink075, color: T.ink400, label: "Cancelled" },
+  draft: { bg: T.bg, color: T.ink500, label: "Draft" },
+  pending: { bg: T.warningLight, color: T.warning, label: "Pending" },
+  paid: { bg: T.successLight, color: T.success, label: "Paid" },
+  overdue: { bg: T.dangerLight, color: T.danger, label: "Overdue" },
+  cancelled: { bg: T.bg, color: T.ink500, label: "Cancelled" },
 };
 const TYPE_LABEL = {
   wholesale_order: "Wholesale",
@@ -111,7 +84,7 @@ const sBtn = (v = "outline") => ({
   border: ["primary", "danger"].includes(v)
     ? "none"
     : v === "ghost"
-      ? `1px solid ${T.ink150}`
+      ? `1px solid ${T.border}`
       : `1px solid ${T.accentBd}`,
   background:
     v === "primary" ? T.accent : v === "danger" ? T.danger : "transparent",
@@ -126,18 +99,18 @@ const sTh = {
   fontSize: 9,
   letterSpacing: "0.12em",
   textTransform: "uppercase",
-  color: T.ink400,
+  color: T.ink500,
   fontWeight: 700,
   fontFamily: T.font,
   textAlign: "left",
-  borderBottom: `2px solid ${T.ink150}`,
-  background: T.ink050,
+  borderBottom: `2px solid ${T.border}`,
+  background: T.surface,
 };
 const sTd = {
   padding: "10px 12px",
   fontSize: 12,
   fontFamily: T.font,
-  borderBottom: `1px solid ${T.ink075}`,
+  borderBottom: `1px solid ${T.bg}`,
 };
 
 function StatusBadge({ status }) {
@@ -170,7 +143,7 @@ function TypeBadge({ type }) {
         fontSize: 9,
         padding: "2px 8px",
         borderRadius: 3,
-        background: ap ? T.infoBg : T.accentLit,
+        background: ap ? T.infoLight : T.accentLight,
         color: ap ? T.info : T.accent,
         letterSpacing: "0.08em",
         textTransform: "uppercase",
@@ -207,17 +180,17 @@ function AgedPanel({ invoices, getName, direction }) {
   return (
     <div
       style={{
-        border: `1px solid ${T.ink150}`,
+        border: `1px solid ${T.border}`,
         borderRadius: 8,
         overflow: "hidden",
-        boxShadow: T.shadow,
+        boxShadow: T.shadow.sm,
       }}
     >
       <div
         style={{
           padding: "14px 18px",
-          background: T.ink050,
-          borderBottom: `1px solid ${T.ink150}`,
+          background: T.surface,
+          borderBottom: `1px solid ${T.border}`,
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
@@ -230,7 +203,7 @@ function AgedPanel({ invoices, getName, direction }) {
               fontWeight: 700,
               letterSpacing: "0.1em",
               textTransform: "uppercase",
-              color: T.ink400,
+              color: T.ink500,
               fontFamily: T.font,
             }}
           >
@@ -253,7 +226,7 @@ function AgedPanel({ invoices, getName, direction }) {
           <div
             style={{
               fontSize: 11,
-              color: T.ink400,
+              color: T.ink500,
               fontFamily: T.font,
               fontWeight: 700,
               letterSpacing: "0.08em",
@@ -267,7 +240,7 @@ function AgedPanel({ invoices, getName, direction }) {
               fontSize: 22,
               fontWeight: 700,
               color: T.danger,
-              fontFamily: T.mono,
+              fontFamily: MONO,
               marginTop: 2,
             }}
           >
@@ -284,7 +257,7 @@ function AgedPanel({ invoices, getName, direction }) {
         }}
       >
         <thead>
-          <tr style={{ background: T.ink050 }}>
+          <tr style={{ background: T.surface }}>
             {[
               isAR ? "Client / Dispensary" : "Supplier",
               "Current",
@@ -304,7 +277,7 @@ function AgedPanel({ invoices, getName, direction }) {
         </thead>
         <tbody>
           {partners.map((p, i) => (
-            <tr key={i} style={{ background: i % 2 === 0 ? "#fff" : T.ink050 }}>
+            <tr key={i} style={{ background: i % 2 === 0 ? "#fff" : T.surface }}>
               <td style={{ ...sTd, fontWeight: 600, color: T.ink900 }}>
                 {p.name}
               </td>
@@ -314,7 +287,7 @@ function AgedPanel({ invoices, getName, direction }) {
                   style={{
                     ...sTd,
                     textAlign: "right",
-                    fontFamily: T.mono,
+                    fontFamily: MONO,
                     color:
                       b > 0
                         ? bi >= 2
@@ -334,7 +307,7 @@ function AgedPanel({ invoices, getName, direction }) {
                   textAlign: "right",
                   fontWeight: 700,
                   color: T.accent,
-                  fontFamily: T.mono,
+                  fontFamily: MONO,
                 }}
               >
                 {fmt(p.total)}
@@ -345,7 +318,7 @@ function AgedPanel({ invoices, getName, direction }) {
         <tfoot>
           <tr
             style={{
-              background: T.accentLit,
+              background: T.accentLight,
               borderTop: `2px solid ${T.accentBd}`,
             }}
           >
@@ -357,7 +330,7 @@ function AgedPanel({ invoices, getName, direction }) {
                   ...sTd,
                   textAlign: "right",
                   fontWeight: 700,
-                  fontFamily: T.mono,
+                  fontFamily: MONO,
                   color: T.accent,
                 }}
               >
@@ -369,7 +342,7 @@ function AgedPanel({ invoices, getName, direction }) {
                 ...sTd,
                 textAlign: "right",
                 fontWeight: 700,
-                fontFamily: T.mono,
+                fontFamily: MONO,
                 color: T.accent,
               }}
             >
@@ -445,7 +418,7 @@ function CreateInvoiceModal({
   const inp = {
     width: "100%",
     padding: "9px 12px",
-    border: `1px solid ${T.ink150}`,
+    border: `1px solid ${T.border}`,
     borderRadius: 4,
     fontFamily: T.font,
     fontSize: 13,
@@ -459,7 +432,7 @@ function CreateInvoiceModal({
     fontWeight: 700,
     letterSpacing: "0.1em",
     textTransform: "uppercase",
-    color: T.ink400,
+    color: T.ink500,
     fontFamily: T.font,
     marginBottom: 5,
   };
@@ -482,7 +455,7 @@ function CreateInvoiceModal({
           height: "100vh",
           background: "#fff",
           overflowY: "auto",
-          boxShadow: T.shadowLg,
+          boxShadow: T.shadow.lg,
           display: "flex",
           flexDirection: "column",
         }}
@@ -490,7 +463,7 @@ function CreateInvoiceModal({
         <div
           style={{
             padding: "20px 24px 16px",
-            borderBottom: `1px solid ${T.ink150}`,
+            borderBottom: `1px solid ${T.border}`,
             display: "flex",
             justifyContent: "space-between",
             alignItems: "flex-start",
@@ -507,7 +480,7 @@ function CreateInvoiceModal({
                 fontWeight: 700,
                 letterSpacing: "0.12em",
                 textTransform: "uppercase",
-                color: T.ink400,
+                color: T.ink500,
                 fontFamily: T.font,
                 marginBottom: 4,
               }}
@@ -543,7 +516,7 @@ function CreateInvoiceModal({
               border: "none",
               cursor: "pointer",
               fontSize: 20,
-              color: T.ink400,
+              color: T.ink500,
               padding: "4px 8px",
             }}
           >
@@ -564,7 +537,7 @@ function CreateInvoiceModal({
               style={{
                 padding: "10px 14px",
                 borderRadius: 6,
-                background: T.dangerBg,
+                background: T.dangerLight,
                 border: `1px solid ${T.dangerBd}`,
                 fontSize: 12,
                 color: T.danger,
@@ -661,7 +634,7 @@ function CreateInvoiceModal({
               style={{
                 padding: "10px 14px",
                 borderRadius: 6,
-                background: T.accentLit,
+                background: T.accentLight,
                 border: `1px solid ${T.accentBd}`,
                 display: "flex",
                 justifyContent: "space-between",
@@ -678,7 +651,7 @@ function CreateInvoiceModal({
                   fontSize: 16,
                   fontWeight: 700,
                   color: T.accent,
-                  fontFamily: T.mono,
+                  fontFamily: MONO,
                 }}
               >
                 {fmt(total)}
@@ -722,7 +695,7 @@ function CreateInvoiceModal({
         <div
           style={{
             padding: "16px 24px",
-            borderTop: `1px solid ${T.ink150}`,
+            borderTop: `1px solid ${T.border}`,
             display: "flex",
             justifyContent: "flex-end",
             gap: 10,
@@ -948,7 +921,7 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
             fontSize: 12,
             fontFamily: T.font,
             fontWeight: 500,
-            background: toast.type === "error" ? T.dangerBg : T.successBg,
+            background: toast.type === "error" ? T.dangerLight : T.successLight,
             color: toast.type === "error" ? T.danger : T.success,
             border: `1px solid ${toast.type === "error" ? T.dangerBd : T.successBd}`,
           }}
@@ -962,7 +935,7 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
       <div
         style={{
           display: "flex",
-          borderBottom: `2px solid ${T.ink150}`,
+          borderBottom: `2px solid ${T.border}`,
           justifyContent: "space-between",
           alignItems: "flex-end",
         }}
@@ -1008,7 +981,7 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
               <div
                 style={{
                   fontSize: 10,
-                  color: T.ink400,
+                  color: T.ink500,
                   fontFamily: T.font,
                   marginTop: 2,
                 }}
@@ -1041,7 +1014,7 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
           style={{
             textAlign: "center",
             padding: 60,
-            color: T.ink400,
+            color: T.ink500,
             fontFamily: T.font,
             fontSize: 13,
           }}
@@ -1053,7 +1026,7 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
           style={{
             padding: "12px 16px",
             borderRadius: 6,
-            background: T.dangerBg,
+            background: T.dangerLight,
             color: T.danger,
             fontFamily: T.font,
             fontSize: 13,
@@ -1070,11 +1043,11 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
               display: "grid",
               gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))",
               gap: 1,
-              background: T.ink150,
+              background: T.border,
               borderRadius: 6,
               overflow: "hidden",
-              border: `1px solid ${T.ink150}`,
-              boxShadow: T.shadow,
+              border: `1px solid ${T.border}`,
+              boxShadow: T.shadow.sm,
             }}
           >
             {[
@@ -1111,7 +1084,7 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
                     fontSize: 10,
                     letterSpacing: "0.1em",
                     textTransform: "uppercase",
-                    color: T.ink400,
+                    color: T.ink500,
                     marginBottom: 6,
                     fontFamily: T.font,
                     fontWeight: 700,
@@ -1121,7 +1094,7 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
                 </div>
                 <div
                   style={{
-                    fontFamily: T.mono,
+                    fontFamily: MONO,
                     fontSize: 22,
                     fontWeight: 600,
                     color: m.color,
@@ -1138,7 +1111,7 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
           {overdueCount > 0 && (
             <div
               style={{
-                background: T.dangerBg,
+                background: T.dangerLight,
                 border: `1px solid ${T.dangerBd}`,
                 borderRadius: 6,
                 padding: "12px 16px",
@@ -1263,7 +1236,7 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
                   background: filter === f.id ? T.accent : "#fff",
                   color:
                     filter === f.id ? "#fff" : f.alert ? T.danger : T.ink500,
-                  border: `1px solid ${filter === f.id ? T.accent : f.alert ? T.dangerBd : T.ink150}`,
+                  border: `1px solid ${filter === f.id ? T.accent : f.alert ? T.dangerBd : T.border}`,
                 }}
               >
                 {f.label}
@@ -1274,10 +1247,10 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
           {/* Invoice table */}
           <div
             style={{
-              border: `1px solid ${T.ink150}`,
+              border: `1px solid ${T.border}`,
               borderRadius: 8,
               overflow: "hidden",
-              boxShadow: T.shadow,
+              boxShadow: T.shadow.sm,
             }}
           >
             {filtered.length === 0 ? (
@@ -1307,7 +1280,7 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
                 <div
                   style={{
                     fontSize: 13,
-                    color: T.ink400,
+                    color: T.ink500,
                     fontFamily: T.font,
                     maxWidth: 360,
                     margin: "0 auto",
@@ -1376,9 +1349,9 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
                           <tr
                             style={{
                               background: isOpen
-                                ? T.accentLit
+                                ? T.accentLight
                                 : inv.status === "overdue"
-                                  ? T.dangerBg
+                                  ? T.dangerLight
                                   : "transparent",
                               cursor: "pointer",
                             }}
@@ -1389,7 +1362,7 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
                                 ...sTd,
                                 fontWeight: 600,
                                 color: T.accent,
-                                fontFamily: T.mono,
+                                fontFamily: MONO,
                               }}
                             >
                               {n._number}
@@ -1440,7 +1413,7 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
                               style={{
                                 ...sTd,
                                 textAlign: "right",
-                                fontFamily: T.mono,
+                                fontFamily: MONO,
                               }}
                             >
                               {fmt(n._sub)}
@@ -1449,7 +1422,7 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
                               style={{
                                 ...sTd,
                                 textAlign: "right",
-                                fontFamily: T.mono,
+                                fontFamily: MONO,
                                 color: T.ink500,
                               }}
                             >
@@ -1459,7 +1432,7 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
                               style={{
                                 ...sTd,
                                 textAlign: "right",
-                                fontFamily: T.mono,
+                                fontFamily: MONO,
                                 fontWeight: 700,
                               }}
                             >
@@ -1475,7 +1448,7 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
                                     fontSize: 10,
                                     padding: "2px 6px",
                                     borderRadius: 3,
-                                    background: T.infoBg,
+                                    background: T.infoLight,
                                     color: T.info,
                                     fontWeight: 600,
                                   }}
@@ -1581,7 +1554,7 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
                                 colSpan={11}
                                 style={{
                                   padding: "12px 16px",
-                                  background: T.accentLit,
+                                  background: T.accentLight,
                                   borderBottom: `1px solid ${T.accentBd}`,
                                 }}
                               >
@@ -1654,15 +1627,15 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
                                 colSpan={11}
                                 style={{
                                   padding: 16,
-                                  background: T.ink050,
-                                  borderBottom: `1px solid ${T.ink150}`,
+                                  background: T.surface,
+                                  borderBottom: `1px solid ${T.border}`,
                                 }}
                               >
                                 {lineLoading === inv.id ? (
                                   <div
                                     style={{
                                       fontSize: 12,
-                                      color: T.ink400,
+                                      color: T.ink500,
                                       fontFamily: T.font,
                                     }}
                                   >
@@ -1672,7 +1645,7 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
                                   <div
                                     style={{
                                       fontSize: 12,
-                                      color: T.ink400,
+                                      color: T.ink500,
                                       fontFamily: T.font,
                                     }}
                                   >
@@ -1744,7 +1717,7 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
                                             style={{
                                               ...sTd,
                                               padding: "6px 8px",
-                                              fontFamily: T.mono,
+                                              fontFamily: MONO,
                                             }}
                                           >
                                             {l.quantity}
@@ -1753,7 +1726,7 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
                                             style={{
                                               ...sTd,
                                               padding: "6px 8px",
-                                              fontFamily: T.mono,
+                                              fontFamily: MONO,
                                             }}
                                           >
                                             {fmt(l.unit_price)}
@@ -1762,7 +1735,7 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
                                             style={{
                                               ...sTd,
                                               padding: "6px 8px",
-                                              fontFamily: T.mono,
+                                              fontFamily: MONO,
                                               fontWeight: 700,
                                             }}
                                           >

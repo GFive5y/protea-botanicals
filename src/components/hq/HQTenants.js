@@ -8,42 +8,16 @@ import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { INDUSTRY_PROFILES } from "../../constants/industryProfiles";
 import TenantSetupWizard from "./TenantSetupWizard";
+import { T } from "../../styles/tokens";
 
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
 const sCard = {
   background: "#fff",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: "6px",
   padding: "20px",
-  boxShadow: T.shadow,
+  boxShadow: T.shadow.sm,
 };
 const sBtn = (v = "primary") => ({
   padding: "8px 16px",
@@ -70,7 +44,7 @@ const sBtn = (v = "primary") => ({
 });
 const sInput = {
   padding: "8px 12px",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: "4px",
   fontSize: "13px",
   fontFamily: T.font,
@@ -84,7 +58,7 @@ const sLabel = {
   fontSize: "10px",
   letterSpacing: "0.1em",
   textTransform: "uppercase",
-  color: T.ink400,
+  color: T.ink500,
   marginBottom: "6px",
   fontFamily: T.font,
   fontWeight: 700,
@@ -94,21 +68,21 @@ const sLabel = {
 const TIERS = {
   entry: {
     label: "Entry",
-    bg: T.ink075,
+    bg: T.bg,
     color: T.ink500,
     price: "R499/mo",
     desc: "Shop + loyalty + QR",
   },
   pro: {
     label: "Pro",
-    bg: T.infoBg,
+    bg: T.infoLight,
     color: T.info,
     price: "R1,499/mo",
     desc: "+ Admin portal + AI basic",
   },
   enterprise: {
     label: "Enterprise",
-    bg: T.accentLit,
+    bg: T.accentLight,
     color: T.accent,
     price: "R4,999/mo",
     desc: "+ HQ + full AI + medical",
@@ -203,8 +177,8 @@ const PROTECTED_TENANT_IDS = new Set([
 function TierBadge({ tier }) {
   const t = TIERS[tier] || {
     label: tier || "—",
-    bg: T.ink075,
-    color: T.ink400,
+    bg: T.bg,
+    color: T.ink500,
   };
   return (
     <span
@@ -393,7 +367,7 @@ function AddTenantModal({ onClose, onSaved, showToast }) {
               border: "none",
               fontSize: 20,
               cursor: "pointer",
-              color: T.ink400,
+              color: T.ink500,
             }}
           >
             ✕
@@ -406,7 +380,7 @@ function AddTenantModal({ onClose, onSaved, showToast }) {
               style={{
                 ...sCard,
                 border: `1px solid ${T.successBd}`,
-                background: T.successBg,
+                background: T.successLight,
                 marginBottom: 16,
               }}
             >
@@ -433,7 +407,7 @@ function AddTenantModal({ onClose, onSaved, showToast }) {
                 <code
                   style={{
                     fontFamily: T.font,
-                    background: T.ink075,
+                    background: T.bg,
                     padding: "1px 5px",
                     borderRadius: 3,
                   }}
@@ -447,7 +421,7 @@ function AddTenantModal({ onClose, onSaved, showToast }) {
                 style={{
                   ...sCard,
                   border: `1px solid ${T.warningBd}`,
-                  background: T.warningBg,
+                  background: T.warningLight,
                   marginBottom: 16,
                   fontSize: 12,
                   fontFamily: T.font,
@@ -634,7 +608,7 @@ function AddTenantModal({ onClose, onSaved, showToast }) {
                 Requires{" "}
                 <code
                   style={{
-                    background: T.ink075,
+                    background: T.bg,
                     padding: "1px 4px",
                     borderRadius: 3,
                     fontSize: 11,
@@ -651,8 +625,8 @@ function AddTenantModal({ onClose, onSaved, showToast }) {
             <div
               style={{
                 ...sCard,
-                background: T.ink075,
-                border: `1px solid ${T.ink150}`,
+                background: T.bg,
+                border: `1px solid ${T.border}`,
               }}
             >
               <div style={{ ...sLabel, marginBottom: 8 }}>
@@ -668,7 +642,7 @@ function AddTenantModal({ onClose, onSaved, showToast }) {
                         fontSize: "10px",
                         padding: "2px 8px",
                         borderRadius: "3px",
-                        background: on ? T.successBg : T.dangerBg,
+                        background: on ? T.successLight : T.dangerLight,
                         color: on ? T.success : T.danger,
                         fontWeight: 600,
                         fontFamily: T.font,
@@ -790,12 +764,12 @@ function FlagEditor({ tenantId, config, industryProfile, onSaved, showToast }) {
                   fontSize: "9px",
                   padding: "2px 8px",
                   borderRadius: "3px",
-                  background: config[f.key] ? T.successBg : T.ink075,
-                  color: config[f.key] ? T.success : T.ink400,
+                  background: config[f.key] ? T.successLight : T.bg,
+                  color: config[f.key] ? T.success : T.ink500,
                   fontWeight: 600,
                   fontFamily: T.font,
                   cursor: "help",
-                  border: `1px solid ${config[f.key] ? T.successBd : T.ink150}`,
+                  border: `1px solid ${config[f.key] ? T.successBd : T.border}`,
                 }}
               >
                 {config[f.key] ? "✓" : "✕"} {f.label}
@@ -833,7 +807,7 @@ function FlagEditor({ tenantId, config, industryProfile, onSaved, showToast }) {
         <div
           style={{
             ...sCard,
-            background: T.accentLit,
+            background: T.accentLight,
             border: `1px solid ${T.accentBd}`,
             marginTop: 8,
           }}
@@ -1099,7 +1073,7 @@ export default function HQTenants() {
           style={{
             width: 28,
             height: 28,
-            border: `2px solid ${T.ink150}`,
+            border: `2px solid ${T.border}`,
             borderTopColor: T.accent,
             borderRadius: "50%",
             animation: "spin 0.8s linear infinite",
@@ -1155,7 +1129,7 @@ export default function HQTenants() {
             fontSize: "12px",
             fontFamily: T.font,
             fontWeight: 500,
-            background: toast.type === "error" ? T.dangerBg : T.successBg,
+            background: toast.type === "error" ? T.dangerLight : T.successLight,
             color: toast.type === "error" ? T.danger : T.success,
             border: `1px solid ${toast.type === "error" ? T.dangerBd : T.successBd}`,
           }}
@@ -1289,7 +1263,7 @@ export default function HQTenants() {
             ...sBtn(),
             fontSize: 10,
             padding: "6px 12px",
-            background: T.dangerBg || "#FEF2F2",
+            background: T.dangerLight || "#FEF2F2",
             color: T.danger || "#991B1B",
             border: `1px solid ${T.dangerBd || "#FECACA"}`,
             opacity: simWiping ? 0.5 : 1,
@@ -1305,11 +1279,11 @@ export default function HQTenants() {
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: "6px",
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
-          boxShadow: T.shadow,
+          border: `1px solid ${T.border}`,
+          boxShadow: T.shadow.sm,
         }}
       >
         {[
@@ -1346,7 +1320,7 @@ export default function HQTenants() {
                 fontSize: "10px",
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                color: T.ink400,
+                color: T.ink500,
                 marginBottom: "6px",
                 fontFamily: T.font,
                 fontWeight: 700,
@@ -1403,7 +1377,7 @@ export default function HQTenants() {
                 key={tenant.id}
                 style={{
                   ...sCard,
-                  borderLeft: `3px solid ${tenant.is_active === false ? T.ink300 : (configs[tenant.id]?.tier || tenant.tier) === "enterprise" ? T.accent : (configs[tenant.id]?.tier || tenant.tier) === "pro" ? T.info : T.ink400}`,
+                  borderLeft: `3px solid ${tenant.is_active === false ? T.ink300 : (configs[tenant.id]?.tier || tenant.tier) === "enterprise" ? T.accent : (configs[tenant.id]?.tier || tenant.tier) === "pro" ? T.info : T.ink500}`,
                   opacity: tenant.is_active === false ? 0.65 : 1,
                 }}
               >
@@ -1443,7 +1417,7 @@ export default function HQTenants() {
                             fontSize: "9px",
                             padding: "2px 8px",
                             borderRadius: "3px",
-                            background: T.infoBg,
+                            background: T.infoLight,
                             color: T.info,
                             letterSpacing: "0.1em",
                             textTransform: "uppercase",
@@ -1462,8 +1436,8 @@ export default function HQTenants() {
                             fontSize: "9px",
                             padding: "2px 8px",
                             borderRadius: "3px",
-                            background: T.ink075,
-                            color: T.ink400,
+                            background: T.bg,
+                            color: T.ink500,
                             fontWeight: 700,
                             letterSpacing: "0.1em",
                             textTransform: "uppercase",
@@ -1521,7 +1495,7 @@ export default function HQTenants() {
                             fontSize: "9px",
                             letterSpacing: "0.1em",
                             textTransform: "uppercase",
-                            color: T.ink400,
+                            color: T.ink500,
                             fontFamily: T.font,
                             fontWeight: 700,
                           }}
@@ -1553,7 +1527,7 @@ export default function HQTenants() {
                             fontSize: "9px",
                             letterSpacing: "0.1em",
                             textTransform: "uppercase",
-                            color: T.ink400,
+                            color: T.ink500,
                             fontFamily: T.font,
                             fontWeight: 700,
                           }}
@@ -1583,7 +1557,7 @@ export default function HQTenants() {
                             fontSize: "9px",
                             letterSpacing: "0.1em",
                             textTransform: "uppercase",
-                            color: T.ink400,
+                            color: T.ink500,
                             fontFamily: T.font,
                             fontWeight: 700,
                             marginBottom: 2,
@@ -1670,7 +1644,7 @@ export default function HQTenants() {
                     style={{
                       marginTop: 16,
                       paddingTop: 16,
-                      borderTop: `1px solid ${T.ink150}`,
+                      borderTop: `1px solid ${T.border}`,
                     }}
                   >
                     <div style={{ ...sLabel, marginBottom: 8 }}>
@@ -1681,8 +1655,8 @@ export default function HQTenants() {
                         style={{
                           padding: "12px 14px",
                           borderRadius: 6,
-                          background: T.ink050,
-                          border: `1px solid ${T.ink150}`,
+                          background: T.surface,
+                          border: `1px solid ${T.border}`,
                           fontFamily: T.font,
                         }}
                       >
@@ -1754,7 +1728,7 @@ export default function HQTenants() {
                       style={{
                         marginTop: 16,
                         paddingTop: 12,
-                        borderTop: `1px solid ${T.ink075}`,
+                        borderTop: `1px solid ${T.bg}`,
                       }}
                     >
                       <div
@@ -1790,7 +1764,7 @@ export default function HQTenants() {
                                   fontSize: "9px",
                                   letterSpacing: "0.1em",
                                   textTransform: "uppercase",
-                                  color: T.ink400,
+                                  color: T.ink500,
                                   fontFamily: T.font,
                                   fontWeight: 700,
                                 }}
@@ -1813,7 +1787,7 @@ export default function HQTenants() {
                     </div>
                   {/* Delete tenant */}
                   {PROTECTED_TENANT_IDS.has(tenant.id) ? (
-                    <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${T.ink075}`, fontSize: 11, color: T.ink400, fontFamily: T.font }}>
+                    <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${T.bg}`, fontSize: 11, color: T.ink500, fontFamily: T.font }}>
                       🔒 Protected demo tenant — cannot be deleted
                     </div>
                   ) : (

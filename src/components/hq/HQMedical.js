@@ -6,61 +6,33 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
+import { T } from "../../styles/tokens";
 
-// ── Design tokens ─────────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
-  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const sCard = {
   background: "#fff",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: "6px",
   padding: "20px",
-  boxShadow: T.shadow,
+  boxShadow: T.shadow.sm,
 };
 const sLabel = {
   fontSize: "10px",
   letterSpacing: "0.1em",
   textTransform: "uppercase",
-  color: T.ink400,
+  color: T.ink500,
   marginBottom: "6px",
-  fontFamily: T.fontUi,
+  fontFamily: T.font,
   fontWeight: 700,
 };
 const sInput = {
   padding: "8px 12px",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: "4px",
   fontSize: "13px",
-  fontFamily: T.fontUi,
+  fontFamily: T.font,
   background: "#fff",
   outline: "none",
   width: "100%",
@@ -81,7 +53,7 @@ const sBtn = (v = "primary") => ({
   textTransform: "uppercase",
   fontWeight: 600,
   cursor: "pointer",
-  fontFamily: T.fontUi,
+  fontFamily: T.font,
 });
 const sTh = {
   textAlign: "left",
@@ -89,18 +61,18 @@ const sTh = {
   fontSize: "9px",
   letterSpacing: "0.15em",
   textTransform: "uppercase",
-  color: T.ink400,
-  borderBottom: `2px solid ${T.ink150}`,
+  color: T.ink500,
+  borderBottom: `2px solid ${T.border}`,
   fontWeight: 700,
-  fontFamily: T.fontUi,
+  fontFamily: T.font,
 };
 const sTd = {
   padding: "10px 12px",
-  borderBottom: `1px solid ${T.ink075}`,
+  borderBottom: `1px solid ${T.bg}`,
   color: T.ink700,
   verticalAlign: "middle",
   fontSize: "13px",
-  fontFamily: T.fontUi,
+  fontFamily: T.font,
 };
 
 const fmtDate = (d) => {
@@ -112,7 +84,7 @@ const fmtDate = (d) => {
   });
 };
 
-function Badge({ label, color = T.info, bg = T.infoBg, border = T.infoBd }) {
+function Badge({ label, color = T.info, bg = T.infoLight, border = T.infoBd }) {
   return (
     <span
       style={{
@@ -125,7 +97,7 @@ function Badge({ label, color = T.info, bg = T.infoBg, border = T.infoBd }) {
         fontWeight: 700,
         letterSpacing: "0.1em",
         textTransform: "uppercase",
-        fontFamily: T.fontUi,
+        fontFamily: T.font,
         whiteSpace: "nowrap",
       }}
     >
@@ -233,7 +205,7 @@ function PatientsTab({ patients, loading, onRefresh }) {
         color: T.ink500,
         display: "block",
         marginBottom: "4px",
-        fontFamily: T.fontUi,
+        fontFamily: T.font,
       }}
     >
       {t}
@@ -405,8 +377,8 @@ function PatientsTab({ patients, loading, onRefresh }) {
           style={{
             textAlign: "center",
             padding: "60px",
-            color: T.ink400,
-            fontFamily: T.fontUi,
+            color: T.ink500,
+            fontFamily: T.font,
           }}
         >
           Loading patients...
@@ -417,8 +389,8 @@ function PatientsTab({ patients, loading, onRefresh }) {
             ...sCard,
             textAlign: "center",
             padding: "60px",
-            color: T.ink400,
-            fontFamily: T.fontUi,
+            color: T.ink500,
+            fontFamily: T.font,
           }}
         >
           {search
@@ -449,7 +421,7 @@ function PatientsTab({ patients, loading, onRefresh }) {
                   <td
                     style={{
                       ...sTd,
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       fontSize: "12px",
                       color: T.ink500,
                     }}
@@ -462,7 +434,7 @@ function PatientsTab({ patients, loading, onRefresh }) {
                   <td
                     style={{
                       ...sTd,
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       fontSize: "11px",
                       color: T.ink500,
                     }}
@@ -557,10 +529,10 @@ function PatientsTab({ patients, loading, onRefresh }) {
       <div
         style={{
           fontSize: "11px",
-          color: T.ink400,
+          color: T.ink500,
           marginTop: "10px",
           textAlign: "right",
-          fontFamily: T.fontUi,
+          fontFamily: T.font,
         }}
       >
         {filtered.length} of {patients.length} patients
@@ -650,7 +622,7 @@ function PrescriptionsTab({ prescriptions, patients, loading, onRefresh }) {
         color: T.ink500,
         display: "block",
         marginBottom: "4px",
-        fontFamily: T.fontUi,
+        fontFamily: T.font,
       }}
     >
       {t}
@@ -677,7 +649,7 @@ function PrescriptionsTab({ prescriptions, patients, loading, onRefresh }) {
             ...sBtn("outline"),
             fontSize: "9px",
             color: filterActive ? T.success : T.ink500,
-            borderColor: filterActive ? T.successBd : T.ink150,
+            borderColor: filterActive ? T.successBd : T.border,
           }}
         >
           {filterActive ? "Active Only" : "All Prescriptions"}
@@ -821,8 +793,8 @@ function PrescriptionsTab({ prescriptions, patients, loading, onRefresh }) {
           style={{
             textAlign: "center",
             padding: "60px",
-            color: T.ink400,
-            fontFamily: T.fontUi,
+            color: T.ink500,
+            fontFamily: T.font,
           }}
         >
           Loading prescriptions...
@@ -833,8 +805,8 @@ function PrescriptionsTab({ prescriptions, patients, loading, onRefresh }) {
             ...sCard,
             textAlign: "center",
             padding: "60px",
-            color: T.ink400,
-            fontFamily: T.fontUi,
+            color: T.ink500,
+            fontFamily: T.font,
           }}
         >
           No prescriptions found.
@@ -869,7 +841,7 @@ function PrescriptionsTab({ prescriptions, patients, loading, onRefresh }) {
                     <td style={{ ...sTd, fontSize: "12px" }}>
                       {rx.doctor_name}
                       {rx.doctor_hpcsa && (
-                        <div style={{ color: T.ink400, fontSize: "10px" }}>
+                        <div style={{ color: T.ink500, fontSize: "10px" }}>
                           {rx.doctor_hpcsa}
                         </div>
                       )}
@@ -895,7 +867,7 @@ function PrescriptionsTab({ prescriptions, patients, loading, onRefresh }) {
                       style={{
                         ...sTd,
                         textAlign: "center",
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         fontWeight: 700,
                         color:
                           remaining === 0
@@ -910,9 +882,9 @@ function PrescriptionsTab({ prescriptions, patients, loading, onRefresh }) {
                     <td style={sTd}>
                       <Badge
                         label={rx.is_active ? "Active" : "Inactive"}
-                        color={rx.is_active ? T.success : T.ink400}
-                        bg={rx.is_active ? T.successBg : T.ink075}
-                        border={rx.is_active ? T.successBd : T.ink150}
+                        color={rx.is_active ? T.success : T.ink500}
+                        bg={rx.is_active ? T.successLight : T.bg}
+                        border={rx.is_active ? T.successBd : T.border}
                       />
                     </td>
                     <td style={sTd}>
@@ -1096,7 +1068,7 @@ function DispensingTab({
         color: T.ink500,
         display: "block",
         marginBottom: "4px",
-        fontFamily: T.fontUi,
+        fontFamily: T.font,
       }}
     >
       {t}
@@ -1177,7 +1149,7 @@ function DispensingTab({
                     fontSize: "11px",
                     marginTop: "4px",
                     color: repeatsRemaining <= 1 ? T.warning : T.success,
-                    fontFamily: T.fontUi,
+                    fontFamily: T.font,
                   }}
                 >
                   {repeatsRemaining} repeat{repeatsRemaining !== 1 ? "s" : ""}{" "}
@@ -1280,7 +1252,7 @@ function DispensingTab({
               padding: "28px",
               width: "460px",
               boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
             }}
           >
             <div
@@ -1308,7 +1280,7 @@ function DispensingTab({
             </div>
             <div
               style={{
-                background: T.ink075,
+                background: T.bg,
                 borderRadius: "6px",
                 padding: "12px 14px",
                 marginBottom: "16px",
@@ -1388,8 +1360,8 @@ function DispensingTab({
         <div
           style={{
             padding: "14px 16px",
-            borderBottom: `1px solid ${T.ink150}`,
-            background: T.ink050,
+            borderBottom: `1px solid ${T.border}`,
+            background: T.surface,
             display: "flex",
             alignItems: "center",
             gap: "10px",
@@ -1403,8 +1375,8 @@ function DispensingTab({
               ...sBtn("outline"),
               fontSize: "9px",
               padding: "4px 10px",
-              color: showVoided ? T.danger : T.ink400,
-              borderColor: showVoided ? T.dangerBd : T.ink150,
+              color: showVoided ? T.danger : T.ink500,
+              borderColor: showVoided ? T.dangerBd : T.border,
             }}
           >
             {showVoided ? "Hide Voided" : "Show Voided"}
@@ -1420,8 +1392,8 @@ function DispensingTab({
               style={{
                 padding: "40px",
                 textAlign: "center",
-                color: T.ink400,
-                fontFamily: T.fontUi,
+                color: T.ink500,
+                fontFamily: T.font,
               }}
             >
               Loading...
@@ -1431,8 +1403,8 @@ function DispensingTab({
               style={{
                 padding: "40px",
                 textAlign: "center",
-                color: T.ink400,
-                fontFamily: T.fontUi,
+                color: T.ink500,
+                fontFamily: T.font,
               }}
             >
               {!showVoided && voidedCount > 0
@@ -1459,7 +1431,7 @@ function DispensingTab({
                       key={entry.id}
                       style={{
                         opacity: entry.is_voided ? 0.55 : 1,
-                        background: entry.is_voided ? T.dangerBg : "transparent",
+                        background: entry.is_voided ? T.dangerLight : "transparent",
                       }}
                     >
                       <td style={{ ...sTd, whiteSpace: "nowrap" }}>
@@ -1473,7 +1445,7 @@ function DispensingTab({
                           {new Date(entry.dispensed_at).toLocaleDateString(
                             "en-ZA",
                           )}
-                          <div style={{ fontSize: "10px", color: T.ink400 }}>
+                          <div style={{ fontSize: "10px", color: T.ink500 }}>
                             {new Date(entry.dispensed_at).toLocaleTimeString(
                               "en-ZA",
                               { hour: "2-digit", minute: "2-digit" },
@@ -1508,7 +1480,7 @@ function DispensingTab({
                           ...sTd,
                           fontSize: "11px",
                           color: T.ink500,
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                         }}
                       >
                         {entry.batches?.batch_number || "\u2014"}
@@ -1517,7 +1489,7 @@ function DispensingTab({
                         style={{
                           ...sTd,
                           textAlign: "right",
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                           fontWeight: 600,
                         }}
                       >
@@ -1529,7 +1501,7 @@ function DispensingTab({
                             <Badge
                               label="VOIDED"
                               color={T.danger}
-                              bg={T.dangerBg}
+                              bg={T.dangerLight}
                               border={T.dangerBd}
                             />
                             {entry.void_reason && (
@@ -1569,7 +1541,7 @@ function DispensingTab({
                           <span
                             style={{
                               fontSize: "9px",
-                              color: T.ink400,
+                              color: T.ink500,
                               fontStyle: "italic",
                             }}
                           >
@@ -1587,7 +1559,7 @@ function DispensingTab({
                     padding: "8px 16px",
                     fontSize: "11px",
                     color: T.danger,
-                    background: T.dangerBg,
+                    background: T.dangerLight,
                     borderTop: `1px solid ${T.dangerBd}`,
                   }}
                 >
@@ -1602,7 +1574,7 @@ function DispensingTab({
                       cursor: "pointer",
                       textDecoration: "underline",
                       fontSize: "11px",
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                       padding: 0,
                     }}
                   >
@@ -1682,7 +1654,7 @@ function ReportsTab({ log, patients, prescriptions }) {
             fontSize: "13px",
             color: T.ink500,
             marginBottom: "16px",
-            fontFamily: T.fontUi,
+            fontFamily: T.font,
           }}
         >
           {monthLog.length} dispensing event{monthLog.length !== 1 ? "s" : ""}{" "}
@@ -1693,8 +1665,8 @@ function ReportsTab({ log, patients, prescriptions }) {
           Object.entries(byPatient).length === 0 ? (
             <div
               style={{
-                color: T.ink400,
-                fontFamily: T.fontUi,
+                color: T.ink500,
+                fontFamily: T.font,
                 fontSize: "13px",
               }}
             >
@@ -1706,7 +1678,7 @@ function ReportsTab({ log, patients, prescriptions }) {
                 key={name}
                 style={{
                   padding: "12px 0",
-                  borderBottom: `1px solid ${T.ink075}`,
+                  borderBottom: `1px solid ${T.bg}`,
                 }}
               >
                 <div
@@ -1714,7 +1686,7 @@ function ReportsTab({ log, patients, prescriptions }) {
                     fontWeight: 600,
                     fontSize: "13px",
                     color: T.ink900,
-                    fontFamily: T.fontUi,
+                    fontFamily: T.font,
                     marginBottom: "6px",
                   }}
                 >
@@ -1724,7 +1696,7 @@ function ReportsTab({ log, patients, prescriptions }) {
                   style={{
                     fontSize: "11px",
                     color: T.ink500,
-                    fontFamily: T.fontUi,
+                    fontFamily: T.font,
                   }}
                 >
                   {data.count} dispensing event{data.count !== 1 ? "s" : ""}
@@ -1743,9 +1715,9 @@ function ReportsTab({ log, patients, prescriptions }) {
                       style={{
                         fontSize: "10px",
                         padding: "2px 8px",
-                        background: T.ink075,
+                        background: T.bg,
                         borderRadius: "3px",
-                        fontFamily: T.fontUi,
+                        fontFamily: T.font,
                       }}
                     >
                       {prod}: {qty}
@@ -1757,7 +1729,7 @@ function ReportsTab({ log, patients, prescriptions }) {
           )
         ) : Object.entries(bySubstance).length === 0 ? (
           <div
-            style={{ color: T.ink400, fontFamily: T.fontUi, fontSize: "13px" }}
+            style={{ color: T.ink500, fontFamily: T.font, fontSize: "13px" }}
           >
             No dispensing events this month.
           </div>
@@ -1778,7 +1750,7 @@ function ReportsTab({ log, patients, prescriptions }) {
                     style={{
                       ...sTd,
                       textAlign: "right",
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                     }}
                   >
                     {data.count}
@@ -1787,7 +1759,7 @@ function ReportsTab({ log, patients, prescriptions }) {
                     style={{
                       ...sTd,
                       textAlign: "right",
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       fontWeight: 600,
                     }}
                   >
@@ -1822,10 +1794,10 @@ function ComplianceTab({ prescriptions, patients, log }) {
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: "6px",
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
+          border: `1px solid ${T.border}`,
         }}
       >
         {[
@@ -1879,9 +1851,9 @@ function ComplianceTab({ prescriptions, patients, log }) {
                 fontSize: "10px",
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                color: T.ink400,
+                color: T.ink500,
                 marginBottom: "6px",
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
                 fontWeight: 700,
               }}
             >
@@ -1889,7 +1861,7 @@ function ComplianceTab({ prescriptions, patients, log }) {
             </div>
             <div
               style={{
-                fontFamily: T.fontData,
+                fontFamily: T.font,
                 fontSize: "24px",
                 fontWeight: 400,
                 color: s.color,
@@ -1958,7 +1930,7 @@ function ComplianceTab({ prescriptions, patients, log }) {
                       <td
                         style={{
                           ...sTd,
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                           fontSize: "11px",
                           color: T.ink500,
                         }}
@@ -1981,7 +1953,7 @@ function ComplianceTab({ prescriptions, patients, log }) {
                         style={{
                           ...sTd,
                           textAlign: "center",
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                           fontWeight: 700,
                           color: isExpired
                             ? T.danger
@@ -2038,7 +2010,7 @@ function ComplianceTab({ prescriptions, patients, log }) {
                       style={{
                         ...sTd,
                         textAlign: "center",
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         fontWeight: 700,
                         color: days <= 7 ? T.danger : T.warning,
                       }}
@@ -2103,7 +2075,7 @@ function ComplianceTab({ prescriptions, patients, log }) {
           style={{
             fontSize: "13px",
             color: T.ink500,
-            fontFamily: T.fontUi,
+            fontFamily: T.font,
             lineHeight: "1.7",
             margin: 0,
           }}
@@ -2253,7 +2225,7 @@ function CSRTab({ items, log, patients }) {
         style={{
           ...sCard,
           borderLeft: `3px solid ${T.info}`,
-          background: T.infoBg,
+          background: T.infoLight,
         }}
       >
         <div style={{ ...sLabel, color: T.info, marginBottom: "6px" }}>
@@ -2263,7 +2235,7 @@ function CSRTab({ items, log, patients }) {
           style={{
             fontSize: "12px",
             color: T.info,
-            fontFamily: T.fontUi,
+            fontFamily: T.font,
             margin: 0,
             lineHeight: "1.6",
           }}
@@ -2281,7 +2253,7 @@ function CSRTab({ items, log, patients }) {
             ...sCard,
             border: `1px solid ${T.warningBd}`,
             borderLeft: `3px solid ${T.warning}`,
-            background: T.warningBg,
+            background: T.warningLight,
           }}
         >
           <div style={{ ...sLabel, color: T.warning, marginBottom: "6px" }}>
@@ -2292,7 +2264,7 @@ function CSRTab({ items, log, patients }) {
             style={{
               fontSize: "12px",
               color: T.warning,
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
             }}
           >
             Total variance: {Math.round(totalVariance * 100) / 100} units.
@@ -2308,8 +2280,8 @@ function CSRTab({ items, log, patients }) {
         <div
           style={{
             padding: "14px 16px",
-            borderBottom: `1px solid ${T.ink150}`,
-            background: T.ink050,
+            borderBottom: `1px solid ${T.border}`,
+            background: T.surface,
             display: "flex",
             alignItems: "center",
             gap: "10px",
@@ -2320,8 +2292,8 @@ function CSRTab({ items, log, patients }) {
             <span
               style={{
                 fontSize: "10px",
-                color: T.ink400,
-                fontFamily: T.fontUi,
+                color: T.ink500,
+                fontFamily: T.font,
               }}
             >
               {csrRows.filter((r) => r.balanced).length} balanced ·{" "}
@@ -2335,8 +2307,8 @@ function CSRTab({ items, log, patients }) {
             style={{
               padding: "40px",
               textAlign: "center",
-              color: T.ink400,
-              fontFamily: T.fontUi,
+              color: T.ink500,
+              fontFamily: T.font,
             }}
           >
             Loading register...
@@ -2363,7 +2335,7 @@ function CSRTab({ items, log, patients }) {
                   style={{
                     background:
                       selectedItem?.id === row.item.id
-                        ? T.accentLit
+                        ? T.accentLight
                         : "transparent",
                   }}
                 >
@@ -2372,8 +2344,8 @@ function CSRTab({ items, log, patients }) {
                     <div
                       style={{
                         fontSize: "10px",
-                        color: T.ink400,
-                        fontFamily: T.fontData,
+                        color: T.ink500,
+                        fontFamily: T.font,
                       }}
                     >
                       {row.item.sku}
@@ -2383,7 +2355,7 @@ function CSRTab({ items, log, patients }) {
                     style={{
                       ...sTd,
                       textAlign: "right",
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                     }}
                   >
                     {row.totalIn}
@@ -2392,8 +2364,8 @@ function CSRTab({ items, log, patients }) {
                     style={{
                       ...sTd,
                       textAlign: "right",
-                      fontFamily: T.fontData,
-                      color: row.dispensed > 0 ? T.danger : T.ink400,
+                      fontFamily: T.font,
+                      color: row.dispensed > 0 ? T.danger : T.ink500,
                     }}
                   >
                     {row.dispensed > 0 ? row.dispensed : "\u2014"}
@@ -2402,8 +2374,8 @@ function CSRTab({ items, log, patients }) {
                     style={{
                       ...sTd,
                       textAlign: "right",
-                      fontFamily: T.fontData,
-                      color: row.voidedQty > 0 ? T.warning : T.ink400,
+                      fontFamily: T.font,
+                      color: row.voidedQty > 0 ? T.warning : T.ink500,
                     }}
                   >
                     {row.voidedQty > 0 ? row.voidedQty : "\u2014"}
@@ -2412,7 +2384,7 @@ function CSRTab({ items, log, patients }) {
                     style={{
                       ...sTd,
                       textAlign: "right",
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       fontWeight: 600,
                     }}
                   >
@@ -2422,7 +2394,7 @@ function CSRTab({ items, log, patients }) {
                     style={{
                       ...sTd,
                       textAlign: "right",
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                     }}
                   >
                     {row.bookBalance}
@@ -2431,7 +2403,7 @@ function CSRTab({ items, log, patients }) {
                     style={{
                       ...sTd,
                       textAlign: "right",
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       fontWeight: 700,
                       color: row.balanced
                         ? T.success
@@ -2446,7 +2418,7 @@ function CSRTab({ items, log, patients }) {
                     <Badge
                       label={row.balanced ? "\u2713 Balanced" : "\u26a0 Discrepancy"}
                       color={row.balanced ? T.success : T.warning}
-                      bg={row.balanced ? T.successBg : T.warningBg}
+                      bg={row.balanced ? T.successLight : T.warningLight}
                       border={row.balanced ? T.successBd : T.warningBd}
                     />
                   </td>
@@ -2468,7 +2440,7 @@ function CSRTab({ items, log, patients }) {
                         borderColor:
                           selectedItem?.id === row.item.id
                             ? T.accentBd
-                            : T.ink150,
+                            : T.border,
                       }}
                     >
                       {selectedItem?.id === row.item.id ? "Close" : "View"}
@@ -2487,8 +2459,8 @@ function CSRTab({ items, log, patients }) {
           <div
             style={{
               padding: "14px 16px",
-              borderBottom: `1px solid ${T.ink150}`,
-              background: T.accentLit,
+              borderBottom: `1px solid ${T.border}`,
+              background: T.accentLight,
             }}
           >
             <div style={{ ...sLabel, color: T.accent }}>
@@ -2515,7 +2487,7 @@ function CSRTab({ items, log, patients }) {
                     key={i}
                     style={{
                       opacity: isVoided ? 0.5 : 1,
-                      background: isVoided ? T.dangerBg : "transparent",
+                      background: isVoided ? T.dangerLight : "transparent",
                     }}
                   >
                     <td
@@ -2533,7 +2505,7 @@ function CSRTab({ items, log, patients }) {
                         <Badge
                           label="VOIDED"
                           color={T.danger}
-                          bg={T.dangerBg}
+                          bg={T.dangerLight}
                           border={T.dangerBd}
                         />
                       )}{" "}
@@ -2543,7 +2515,7 @@ function CSRTab({ items, log, patients }) {
                       style={{
                         ...sTd,
                         textAlign: "right",
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         color: T.success,
                         fontWeight: isIn ? 600 : 400,
                       }}
@@ -2556,7 +2528,7 @@ function CSRTab({ items, log, patients }) {
                       style={{
                         ...sTd,
                         textAlign: "right",
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         color: T.danger,
                         fontWeight: !isIn ? 600 : 400,
                       }}
@@ -2569,9 +2541,9 @@ function CSRTab({ items, log, patients }) {
                       style={{
                         ...sTd,
                         textAlign: "right",
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         fontWeight: 700,
-                        color: isVoided ? T.ink400 : T.ink900,
+                        color: isVoided ? T.ink500 : T.ink900,
                         textDecoration: isVoided ? "line-through" : "none",
                       }}
                     >
@@ -2581,7 +2553,7 @@ function CSRTab({ items, log, patients }) {
                       style={{
                         ...sTd,
                         fontSize: "11px",
-                        color: T.ink400,
+                        color: T.ink500,
                         maxWidth: "200px",
                       }}
                     >
@@ -2681,7 +2653,7 @@ export default function HQMedical() {
           style={{
             fontSize: "13px",
             color: T.ink700,
-            fontFamily: T.fontUi,
+            fontFamily: T.font,
             margin: "8px 0 0",
             lineHeight: "1.7",
           }}
@@ -2705,7 +2677,7 @@ export default function HQMedical() {
   ];
 
   return (
-    <div style={{ fontFamily: T.fontUi }}>
+    <div style={{ fontFamily: T.font }}>
       {/* Header */}
       <div
         style={{
@@ -2721,12 +2693,12 @@ export default function HQMedical() {
               fontSize: "20px",
               fontWeight: 700,
               color: T.accent,
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
             }}
           >
             Medical Dispensary
           </div>
-          <div style={{ fontSize: "12px", color: T.ink400, marginTop: "2px" }}>
+          <div style={{ fontSize: "12px", color: T.ink500, marginTop: "2px" }}>
             {patients.length} patients ·{" "}
             {prescriptions.filter((r) => r.is_active).length} active
             prescriptions · {dispensingLog.length} dispensing events
@@ -2747,7 +2719,7 @@ export default function HQMedical() {
         style={{
           display: "flex",
           gap: 0,
-          borderBottom: `1px solid ${T.ink150}`,
+          borderBottom: `1px solid ${T.border}`,
           marginBottom: "24px",
         }}
       >
@@ -2763,7 +2735,7 @@ export default function HQMedical() {
                 subTab === t.id
                   ? `2px solid ${T.accent}`
                   : "2px solid transparent",
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
               fontSize: "11px",
               fontWeight: subTab === t.id ? 700 : 400,
               letterSpacing: "0.06em",
