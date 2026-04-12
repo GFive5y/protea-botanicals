@@ -684,9 +684,10 @@ that doesn't feel like it was designed in the same room on the same day.
 | HQAnalytics.js | COMPLETE | fe241e6 | 13 Apr 2026 |
 | HQTradingDashboard.js | COMPLETE | 7395330 | 13 Apr 2026 |
 | HQFraud.js | COMPLETE | 629a7d5 | 13 Apr 2026 |
-| HQLoyalty.js (10 tabs) | NOT STARTED | — | — |
-| HQVat.js | NOT STARTED | — | — |
-| + 23 more P2 files | NOT STARTED | — | — |
+| HQLoyalty.js (10 tabs) | COMPLETE | 26202d6 | 13 Apr 2026 |
+| HQVat.js | COMPLETE | 26202d6 | 13 Apr 2026 |
+| HQBankRecon.js | COMPLETE | 26202d6 | 13 Apr 2026 |
+| + 22 more P2 files | NOT STARTED | — | — |
 | **P3: Protected + large + F&B** | | | |
 | HQCogs.js (PROTECTED) | NOT STARTED | — | — |
 | HQProduction.js (307KB) | NOT STARTED | — | — |
