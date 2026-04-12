@@ -6,13 +6,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
+import { T } from "../../styles/tokens";
 
+// WP-UNIFY: D token palette aliased to src/styles/tokens.js
 const D = {
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  ink900: "#0D0D0D", ink700: "#1F2937", ink500: "#6B7280",
-  ink300: "#D1D5DB", ink150: "#E5E7EB", ink075: "#F9FAFB",
-  accent: "#1A3D2B", accentMid: "#2D6A4F", accentLit: "#ECFDF5",
-  shadow: "0 1px 4px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04)",
+  ...T,
+  shadow: T.shadow?.sm || "0 1px 4px rgba(0,0,0,0.08)",
 };
 
 const fmtZar = (n) => `R\u202F${(parseFloat(n)||0).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -24,7 +23,7 @@ function NoteSection({number,title,children,defaultOpen=true}) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div style={{background:"#fff",borderRadius:10,boxShadow:D.shadow,overflow:"hidden",marginBottom:12}}>
-      <button onClick={()=>setOpen(v=>!v)} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 24px",background:open?D.accentLit:"#fff",border:"none",cursor:"pointer",fontFamily:D.font,textAlign:"left",borderBottom:open?"1px solid #C6E8D6":"none",transition:"background 0.15s"}}>
+      <button onClick={()=>setOpen(v=>!v)} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 24px",background:open?D.accentLight:"#fff",border:"none",cursor:"pointer",fontFamily:D.font,textAlign:"left",borderBottom:open?"1px solid #C6E8D6":"none",transition:"background 0.15s"}}>
         <div style={{display:"flex",alignItems:"center",gap:14}}>
           <div style={{width:32,height:32,borderRadius:8,background:D.accent,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#fff",flexShrink:0}}>{number}</div>
           <div style={{fontSize:15,fontWeight:700,color:D.ink900}}>{title}</div>
@@ -39,16 +38,16 @@ function NoteSection({number,title,children,defaultOpen=true}) {
 function NoteTable({headers,rows,totals}) {
   const cols = headers.map((_,i)=>i===0?"1fr":"130px").join(" ");
   return (
-    <div style={{marginTop:12,border:`1px solid ${D.ink150}`,borderRadius:8,overflow:"hidden"}}>
-      <div style={{display:"grid",gridTemplateColumns:cols,padding:"8px 16px",background:D.ink075,fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.07em"}}>
+    <div style={{marginTop:12,border:`1px solid ${D.border}`,borderRadius:8,overflow:"hidden"}}>
+      <div style={{display:"grid",gridTemplateColumns:cols,padding:"8px 16px",background:D.bg,fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.07em"}}>
         {headers.map((h,i)=><span key={i} style={{textAlign:i>0?"right":"left"}}>{h}</span>)}
       </div>
       {rows.map((row,ri)=>(
-        <div key={ri} style={{display:"grid",gridTemplateColumns:cols,padding:"9px 16px",borderTop:`1px solid ${D.ink150}`,fontSize:13,color:D.ink700}}>
+        <div key={ri} style={{display:"grid",gridTemplateColumns:cols,padding:"9px 16px",borderTop:`1px solid ${D.border}`,fontSize:13,color:D.ink700}}>
           {row.map((cell,ci)=><span key={ci} style={{textAlign:ci>0?"right":"left",fontVariantNumeric:ci>0?"tabular-nums":"normal",color:ci>0&&typeof cell==="string"&&cell.startsWith("(")?"#DC2626":D.ink700}}>{cell}</span>)}
         </div>
       ))}
-      {totals&&<div style={{display:"grid",gridTemplateColumns:cols,padding:"11px 16px",borderTop:`2px solid ${D.ink150}`,background:D.ink075,fontSize:13,fontWeight:700}}>
+      {totals&&<div style={{display:"grid",gridTemplateColumns:cols,padding:"11px 16px",borderTop:`2px solid ${D.border}`,background:D.bg,fontSize:13,fontWeight:700}}>
         {totals.map((cell,ci)=><span key={ci} style={{textAlign:ci>0?"right":"left",fontVariantNumeric:"tabular-nums",color:ci>0&&typeof cell==="string"&&cell.startsWith("(")?"#DC2626":D.accent}}>{cell}</span>)}
       </div>}
     </div>
@@ -56,7 +55,7 @@ function NoteTable({headers,rows,totals}) {
 }
 
 function P({children}) { return <p style={{fontSize:13,color:D.ink500,lineHeight:1.7,margin:"10px 0",fontFamily:D.font}}>{children}</p>; }
-function SubHead({label}) { return <div style={{fontSize:11,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.08em",marginTop:20,marginBottom:8,paddingBottom:4,borderBottom:`1px solid ${D.ink150}`}}>{label}</div>; }
+function SubHead({label}) { return <div style={{fontSize:11,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.08em",marginTop:20,marginBottom:8,paddingBottom:4,borderBottom:`1px solid ${D.border}`}}>{label}</div>; }
 
 export default function HQFinancialNotes() {
   const { tenant } = useTenant();
@@ -192,7 +191,7 @@ export default function HQFinancialNotes() {
         <P>Compliant with IFRS for SMEs (2015, 2024 amendments). No material future impact expected.</P>
       </NoteSection>
 
-      <div style={{marginTop:20,padding:"16px 20px",background:D.accentLit,borderRadius:10,border:"1px solid #C6E8D6",fontSize:12,color:D.accentMid,lineHeight:1.6}}>
+      <div style={{marginTop:20,padding:"16px 20px",background:D.accentLight,borderRadius:10,border:"1px solid #C6E8D6",fontSize:12,color:D.accentMid,lineHeight:1.6}}>
         <strong>Preparer note:</strong> System-generated from NuAi accounting data. Should be reviewed by a CA(SA) before submission.
         {cfg?.auditor_name&&<> Auditor: <strong>{cfg.auditor_name}</strong>{cfg.auditor_firm&&` \u2014 ${cfg.auditor_firm}`}.</>}
       </div>
