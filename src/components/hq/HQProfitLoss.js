@@ -891,6 +891,8 @@ export default function HQProfitLoss() {
   const [dispensingProductMargins, setDispensingProductMargins] = useState([]);
   // GAP-02: manual journal adjustments flowing to P&L
   const [journalAdjustments, setJournalAdjustments] = useState(null);
+  // LL-210: canonical RPC data (side-by-side validation)
+  const [rpcData, setRpcData] = useState(null);
 
   const showToast = useCallback((msg, type = "success") => {
     setToast({ msg, type });
@@ -1165,6 +1167,18 @@ export default function HQProfitLoss() {
     return () => supabase.removeChannel(sub);
   }, [fetchAll]);
 
+  // LL-210: side-by-side RPC call for validation
+  useEffect(() => {
+    if (!tenantId) return;
+    const pStart = periodStart(period, customFrom);
+    const pEnd = periodEnd(period, customTo);
+    supabase.rpc("tenant_financial_period", {
+      p_tenant_id: tenantId,
+      p_since: pStart || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString(),
+      p_until: pEnd || new Date().toISOString(),
+    }).then(({ data }) => setRpcData(data));
+  }, [tenantId, period, customFrom, customTo]);
+
   // ── WP-FIN S1: OPEX + CAPEX from expenses table ───────────────────────────
   const totalOpex = expenses
     .filter((e) => ["opex", "wages", "tax", "other"].includes(e.category))
@@ -1331,6 +1345,21 @@ export default function HQProfitLoss() {
   const grossMarginPct      = profileRevenue > 0 ? (grossProfit / profileRevenue) * 100 : 0;
   const netProfit           = grossProfit - totalOpexIncLoyalty;
   const netMarginPct        = profileRevenue > 0 ? (netProfit / profileRevenue) * 100 : 0;
+
+  // LL-210: side-by-side comparison (remove after 24h validation)
+  if (rpcData && !loading && profileRevenue > 0) {
+    const checks = [
+      ["revenue", profileRevenue, rpcData.revenue?.ex_vat],
+      ["cogs", totalCogs, rpcData.cogs?.actual],
+      ["opex", totalOpex, rpcData.opex?.total],
+      ["orders", filteredOrders.length, rpcData.orders?.paid_count],
+    ];
+    checks.forEach(([field, old, rpc]) => {
+      if (rpc != null && Math.abs((old || 0) - rpc) > 1) {
+        console.warn(`[PL-RPC-DIFF] ${field}: old=${old?.toFixed?.(2) ?? old} rpc=${rpc} tenant=${tenantId}`);
+      }
+    });
+  }
 
   const bestSkuMargin = (() => {
     let best = null;
