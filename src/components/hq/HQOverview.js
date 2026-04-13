@@ -538,6 +538,7 @@ export default function HQOverview({ onNavigate }) {
         const { data: ordersData } = await supabase
           .from("orders")
           .select("total")
+          .eq("tenant_id", tenantId)
           .gte("created_at", monthStart.toISOString());
         setPlStats({
           revenueMTD: (ordersData || []).reduce(
@@ -634,9 +635,11 @@ export default function HQOverview({ onNavigate }) {
 
         const [thisRes, lastRes] = await Promise.all([
           supabase.from("orders").select("created_at,total")
+            .eq("tenant_id", tenantId)
             .gte("created_at", d30.toISOString())
             .order("created_at", { ascending: true }),
           supabase.from("orders").select("created_at,total")
+            .eq("tenant_id", tenantId)
             .gte("created_at", d60.toISOString())
             .lt("created_at", d30.toISOString())
             .order("created_at", { ascending: true }),
@@ -708,13 +711,16 @@ export default function HQOverview({ onNavigate }) {
         const weekAgoLabel = `last ${DOW_SHORT[weekAgoStart.getDay()]}`;
         const [todayR, ydayR, weekAgoR] = await Promise.all([
           supabase.from("orders").select("total,items_count")
+            .eq("tenant_id", tenantId)
             .gte("created_at", todayStart.toISOString())
             .not("status", "in", '("cancelled","failed")'),
           supabase.from("orders").select("total,items_count")
+            .eq("tenant_id", tenantId)
             .gte("created_at", ydayStart.toISOString())
             .lt("created_at", ydayEnd.toISOString())
             .not("status", "in", '("cancelled","failed")'),
           supabase.from("orders").select("total,items_count")
+            .eq("tenant_id", tenantId)
             .gte("created_at", weekAgoStart.toISOString())
             .lt("created_at", weekAgoEnd.toISOString())
             .not("status", "in", '("cancelled","failed")')
@@ -750,6 +756,7 @@ export default function HQOverview({ onNavigate }) {
         const { data: pmRaw } = await supabase
           .from("orders")
           .select("payment_method,total")
+          .eq("tenant_id", tenantId)
           .gte("created_at", todayStart.toISOString())
           .not("status", "in", '("cancelled","failed")');
         const pm = {};
@@ -772,6 +779,7 @@ export default function HQOverview({ onNavigate }) {
         const { data: last30 } = await supabase
           .from("orders")
           .select("created_at,total")
+          .eq("tenant_id", tenantId)
           .gte("created_at", d30ago.toISOString())
           .not("status", "in", '("cancelled","failed")');
 
@@ -888,7 +896,7 @@ export default function HQOverview({ onNavigate }) {
     } finally {
       setLoading(false);
     }
-  }, [fxRate, fetchBirthdayStats]);
+  }, [fxRate, fetchBirthdayStats, tenantId]);
 
   useEffect(() => {
     fetchStats();
