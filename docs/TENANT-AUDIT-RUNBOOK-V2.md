@@ -70,7 +70,7 @@ git push origin main
 | MediCare Dispensary | PASS | PASS | PASS | PASS | PASS | PASS |
 | Metro Hardware | PASS | PASS | PASS | PASS | PASS | PASS |
 | Medi Recreational | PASS | PASS | PASS | PASS | PASS | PASS |
-| Garden Bistro | PASS | pending | PASS | PASS | pending | pending |
+| Garden Bistro | PASS | PASS | PASS | PASS | PASS | PASS |
 
 ## KNOWN ISSUES (from pre-flight SQL 13 Apr 2026)
 
@@ -147,3 +147,23 @@ Required action (CANNOT be done from Claude Code):
 4. Re-run Layer 3 coherence check to confirm shell_orders = 0
 5. Hard refresh Metro Hardware portal
 6. Re-verify Dashboard, Daily Trading, P&L tiles against new numbers
+
+---
+
+## GARDEN BISTRO — COMPLETE (14 April 2026)
+
+P&L Revenue R0 bug — RESOLVED
+
+Root cause: PostgREST 1000-row cap silencing client-side period filter.
+Fix (commit 315accd): RPC now accepts p_since/p_until parameters and filters at DB level.
+
+Verified live numbers:
+- Revenue MTD: R38,043 | Revenue 30d: R97,587
+- Gross Profit: R57,290 | Gross Margin: 58.7%
+- Food Cost %: 41.3% (above 30% target — normal for bistro)
+- Net Loss: -R220,690 (OpEx: wages R65k + rent R45k + depreciation R60k)
+
+CRITICAL NOTE added to Phase 4:
+Before assuming RLS or auth issues, add console.log to the component and check
+the actual data returned. PostgREST caps at 1000 rows by default — if a table
+has more than 1000 rows, client-side period filters will silently return wrong data.
