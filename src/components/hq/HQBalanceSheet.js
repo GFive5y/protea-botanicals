@@ -428,9 +428,19 @@ export default function HQBalanceSheet() {
 
       // ── WP-FINANCIALS Phase 3: fixed_assets, equity_ledger, vat ──
       const yr = `FY${new Date().getFullYear()}`;
-      const yrStart = `${new Date().getFullYear()}-01-01`;
 
-      const [faRes, eqRes, cfgRes, ordersYtdRes, expYtdRes, vatTxnRes] = await Promise.all([
+      // Fiscal year start from tenant_config
+      const { data: tcFull } = await supabase
+        .from("tenant_config")
+        .select("vat_registered, vat_rate, financial_year_start")
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+      const fyMonth = parseInt((tcFull?.financial_year_start || "03-01").split("-")[0], 10);
+      const now = new Date();
+      const fyYear = (now.getMonth() + 1) >= fyMonth ? now.getFullYear() : now.getFullYear() - 1;
+      const fyStart = new Date(fyYear, fyMonth - 1, 1);
+
+      const [faRes, eqRes, vatTxnRes, fyRes] = await Promise.all([
         supabase.from("fixed_assets")
           .select("*")
           .eq("tenant_id", tenantId)
@@ -441,24 +451,16 @@ export default function HQBalanceSheet() {
           .eq("tenant_id", tenantId)
           .eq("financial_year", yr)
           .maybeSingle(),
-        supabase.from("tenant_config")
-          .select("vat_registered, vat_rate")
-          .eq("tenant_id", tenantId)
-          .maybeSingle(),
-        supabase.from("orders")
-          .select("total")
-          .eq("tenant_id", tenantId)
-          .gte("created_at", yrStart)
-          .not("status", "in", '("cancelled","failed")'),
-        supabase.from("expenses")
-          .select("amount_zar")
-          .eq("tenant_id", tenantId)
-          .gte("expense_date", yrStart)
-          .in("category", ["opex","wages","tax","other"]),
         supabase.from("vat_transactions")
           .select("output_vat,input_vat")
           .eq("tenant_id", tenantId),
+        supabase.rpc("tenant_financial_period", {
+          p_tenant_id: tenantId,
+          p_since: fyStart.toISOString(),
+          p_until: now.toISOString(),
+        }),
       ]);
+      const cfgRes = { data: tcFull };
 
       setFixedAssetsReg(faRes.data || []);
       if (eqRes.data) setEquityLedger(eqRes.data);
@@ -480,30 +482,12 @@ export default function HQBalanceSheet() {
       }
       setVatSummary({ output: vatOutput, input: vatInput });
 
-      // LL-231: cannabis_dispensary revenue from dispensing_log, not orders
-      let ytdRev = 0;
-      if (industryProfile === "cannabis_dispensary") {
-        const dlRes = await supabase
-          .from("dispensing_log")
-          .select("quantity_dispensed, inventory_item_id")
-          .eq("tenant_id", tenantId)
-          .neq("is_voided", true)
-          .gte("dispensed_at", yrStart);
-        const priceRes = await supabase
-          .from("inventory_items")
-          .select("id, sell_price")
-          .eq("tenant_id", tenantId);
-        const prices = {};
-        (priceRes.data || []).forEach((i) => { prices[i.id] = parseFloat(i.sell_price || 0); });
-        ytdRev = (dlRes.data || []).reduce(
-          (s, dl) => s + (dl.quantity_dispensed || 0) * (prices[dl.inventory_item_id] || 0), 0,
-        );
-      } else if (ordersYtdRes.data) {
-        ytdRev = ordersYtdRes.data.reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
-      }
-      if (expYtdRes.data) {
-        const ytdExp = expYtdRes.data.reduce((s, e) => s + (parseFloat(e.amount_zar) || 0), 0);
-        setYtdNetProfit(ytdRev - ytdExp);
+      // T21: YTD net result via tenant_financial_period RPC (LL-210)
+      if (fyRes.data) {
+        const fyRev = fyRes.data.revenue?.ex_vat || 0;
+        const fyCogs = fyRes.data.cogs?.actual || 0;
+        const fyOpex = fyRes.data.opex?.total || 0;
+        setYtdNetProfit(fyRev - fyCogs - fyOpex);
       }
 
     } catch (err) {
@@ -516,7 +500,19 @@ export default function HQBalanceSheet() {
   // ── Fetch cash flow data via tenant_financial_period RPC (LL-210) ────────
   const fetchCashFlow = useCallback(async () => {
     if (!tenantId) return;
-    const { start, end } = getPeriodBounds(cfPeriod, cfCustomFrom, cfCustomTo);
+    let { start, end } = getPeriodBounds(cfPeriod, cfCustomFrom, cfCustomTo);
+    // T22: "this_year" should use fiscal year, not calendar year
+    if (cfPeriod === "this_year") {
+      const { data: tc } = await supabase
+        .from("tenant_config")
+        .select("financial_year_start")
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+      const fyMonth = parseInt((tc?.financial_year_start || "03-01").split("-")[0], 10);
+      const now = new Date();
+      const fyYear = (now.getMonth() + 1) >= fyMonth ? now.getFullYear() : now.getFullYear() - 1;
+      start = new Date(fyYear, fyMonth - 1, 1).toISOString();
+    }
     try {
       const { data: fp } = await supabase.rpc("tenant_financial_period", {
         p_tenant_id: tenantId,

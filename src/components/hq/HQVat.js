@@ -117,14 +117,12 @@ export default function HQVat() {
     if (!tenantId) return;
     setLoading(true);
     try {
-      const [cfgRes, txnRes, filingsRes, ordersRes, expensesRes, receiptsRes] = await Promise.all([
+      const [cfgRes, txnRes, filingsRes, expensesRes, vatPeriodsRes] = await Promise.all([
         supabase.from("tenant_config").select("vat_registered,vat_number,vat_period,vat_rate,trading_name,company_reg_number,registered_address").eq("tenant_id", tenantId).maybeSingle(),
         supabase.from("vat_transactions").select("*").eq("tenant_id", tenantId).order("transaction_date", { ascending: false }),
         supabase.from("vat_period_filings").select("*").eq("tenant_id", tenantId),
-        supabase.from("orders").select("total,created_at").eq("tenant_id", tenantId).eq("status", "paid"),
         supabase.from("expenses").select("expense_date,input_vat_amount,amount_zar").eq("tenant_id", tenantId),
-        supabase.from("stock_receipts").select("received_at,input_vat_amount")
-          .eq("tenant_id", tenantId).gt("input_vat_amount", 0),
+        supabase.rpc("tenant_vat_periods", { p_tenant_id: tenantId, p_year: new Date().getFullYear() }),
       ]);
       setVatConfig(cfgRes.data);
       setVatTxns(txnRes.data || []);
@@ -132,47 +130,24 @@ export default function HQVat() {
       setTotalExpenses((expensesRes.data || []).length);
       setExpensesInputVat((expensesRes.data || []).reduce((s, e) => s + (parseFloat(e.input_vat_amount) || 0), 0));
 
+      // T23: Build orderStats + expenseStats from tenant_vat_periods RPC
+      const vatPeriods = vatPeriodsRes.data || [];
       const oStats = {};
-      (ordersRes.data || []).forEach(o => {
-        const pid = getPeriodIdFromDate(o.created_at);
-        if (!pid) return;
-        if (!oStats[pid]) oStats[pid] = { count: 0, totalIncl: 0, totalExcl: 0, outputVat: 0 };
-        const incl = parseFloat(o.total) || 0;
-        oStats[pid].count++;
-        oStats[pid].totalIncl += incl;
-        oStats[pid].totalExcl += incl / 1.15;
-        oStats[pid].outputVat += incl / 1.15 * 0.15;
-      });
-      Object.keys(oStats).forEach(k => {
-        oStats[k].totalExcl = Math.round(oStats[k].totalExcl * 100) / 100;
-        oStats[k].outputVat = Math.round(oStats[k].outputVat * 100) / 100;
-        oStats[k].totalIncl = Math.round(oStats[k].totalIncl * 100) / 100;
+      const eStats = {};
+      vatPeriods.forEach(vp => {
+        const pid = vp.period_id;
+        oStats[pid] = {
+          count: vp.order_count || 0,
+          totalIncl: 0,
+          totalExcl: 0,
+          outputVat: parseFloat(vp.output_vat) || 0,
+        };
+        eStats[pid] = { count: 0, totalInputVat: parseFloat(vp.input_vat) || 0 };
       });
       setOrderStats(oStats);
-
-      const eStats = {};
-      (expensesRes.data || []).forEach(e => {
-        const pid = getPeriodIdFromDate(e.expense_date);
-        if (!pid) return;
-        if (!eStats[pid]) eStats[pid] = { count: 0, totalInputVat: 0 };
-        eStats[pid].count++;
-        eStats[pid].totalInputVat += parseFloat(e.input_vat_amount) || 0;
-      });
       setExpenseStats(eStats);
-
-      // Stock receipts input VAT — per period + YTD total
-      const rStats = {};
-      (receiptsRes.data || []).forEach(r => {
-        const pid = getPeriodIdFromDate(r.received_at);
-        if (!pid) return;
-        if (!rStats[pid]) rStats[pid] = { count: 0, totalInputVat: 0 };
-        rStats[pid].count++;
-        rStats[pid].totalInputVat += parseFloat(r.input_vat_amount) || 0;
-      });
-      setReceiptStats(rStats);
-      setReceiptsInputVat(
-        (receiptsRes.data || []).reduce((s, r) => s + (parseFloat(r.input_vat_amount) || 0), 0)
-      );
+      setReceiptStats({});
+      setReceiptsInputVat(0);
     } catch (e) { showToast("Load failed: " + e.message, "error"); }
     finally { setLoading(false); }
   }, [tenantId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -517,10 +492,9 @@ export default function HQVat() {
     );
   }
 
-  // ── DASHBOARD ─────────────────────────────────────────────────
-  const ytdOutput = vatTxns.reduce((s, t) => s + (parseFloat(t.output_vat) || 0), 0);
-  const ytdInputFromTxns = vatTxns.reduce((s, t) => s + (parseFloat(t.input_vat)  || 0), 0);
-  const ytdInput  = ytdInputFromTxns > 0 ? ytdInputFromTxns : ((expensesInputVat || 0) + (receiptsInputVat || 0));
+  // ── DASHBOARD — YTD from period sums (T23: uses tenant_vat_periods RPC)
+  const ytdOutput = Object.values(orderStats).reduce((s, p) => s + (p.outputVat || 0), 0);
+  const ytdInput  = Object.values(expenseStats).reduce((s, p) => s + (p.totalInputVat || 0), 0) || (expensesInputVat || 0);
   const ytdNet    = ytdOutput - ytdInput;
 
   return (

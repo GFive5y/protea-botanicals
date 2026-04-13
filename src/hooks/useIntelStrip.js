@@ -131,9 +131,10 @@ async function buildPills(tabId, tenantId, intel) {
       const margin   = revMtd > 0 ? (grossPft / revMtd) * 100 : 0;
       return [
         { label: "Revenue MTD",      value: fmtR(revMtd),                  variant: revMtd > 0 ? "success" : null, context: "revenue-mtd" },
-        { label: "Expenses MTD",     value: fmtR(expMtd),                  variant: null,       context: "expenses" },
+        { label: "COGS MTD",         value: fmtR(cogsMtd),                 variant: null,       context: "cogs" },
         { label: "Gross Profit",     value: fmtR(grossPft),                variant: grossPft > 0 ? "success" : "danger", context: "gross-profit" },
         { label: "Margin",           value: fmtPct(margin),                variant: margin > 50 ? "success" : margin > 30 ? "warning" : "danger", context: "margin" },
+        { label: "OpEx MTD",         value: fmtR(expMtd),                  variant: null,       context: "expenses" },
       ];
     }
 
