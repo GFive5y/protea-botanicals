@@ -116,23 +116,23 @@ async function buildPills(tabId, tenantId, intel) {
       ];
     }
 
-    // ── P&L ───────────────────────────────────────────────────────
+    // ── P&L — via tenant_financial_period RPC (LL-210) ──────────
     case "pl": {
-      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-        .toISOString().slice(0, 10);
-      const expR = await supabase
-        .from("expenses")
-        .select("amount_zar")
-        .eq("tenant_id", tenantId)
-        .gte("expense_date", monthStart);
-      const expMtd   = (expR.data || []).reduce((s, e) => s + (parseFloat(e.amount_zar) || 0), 0);
-      const revMtd   = sales.mtdRevenue || 0;
-      const grossPft = revMtd - expMtd;
+      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const { data: fp } = await supabase.rpc("tenant_financial_period", {
+        p_tenant_id: tenantId,
+        p_since: monthStart.toISOString(),
+        p_until: new Date().toISOString(),
+      });
+      const revMtd   = fp?.revenue?.ex_vat || 0;
+      const cogsMtd  = fp?.cogs?.actual || 0;
+      const expMtd   = fp?.opex?.total || 0;
+      const grossPft = revMtd - cogsMtd;
       const margin   = revMtd > 0 ? (grossPft / revMtd) * 100 : 0;
       return [
         { label: "Revenue MTD",      value: fmtR(revMtd),                  variant: revMtd > 0 ? "success" : null, context: "revenue-mtd" },
         { label: "Expenses MTD",     value: fmtR(expMtd),                  variant: null,       context: "expenses" },
-        { label: "Gross profit",     value: fmtR(grossPft),                variant: grossPft > 0 ? "success" : "danger", context: "gross-profit" },
+        { label: "Gross Profit",     value: fmtR(grossPft),                variant: grossPft > 0 ? "success" : "danger", context: "gross-profit" },
         { label: "Margin",           value: fmtPct(margin),                variant: margin > 50 ? "success" : margin > 30 ? "warning" : "danger", context: "margin" },
       ];
     }

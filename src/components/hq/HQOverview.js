@@ -555,17 +555,13 @@ export default function HQOverview({ onNavigate }) {
         const monthStart = new Date();
         monthStart.setDate(1);
         monthStart.setHours(0, 0, 0, 0);
-        const { data: ordersData } = await supabase
-          .from("orders")
-          .select("total")
-          .eq("tenant_id", tenantId)
-          .not("status", "in", '("cancelled","failed")')
-          .gte("created_at", monthStart.toISOString());
+        const { data: fp } = await supabase.rpc("tenant_financial_period", {
+          p_tenant_id: tenantId,
+          p_since: monthStart.toISOString(),
+          p_until: new Date().toISOString(),
+        });
         setPlStats({
-          revenueMTD: (ordersData || []).reduce(
-            (s, o) => s + (parseFloat(o.total) || 0),
-            0,
-          ),
+          revenueMTD: fp?.revenue?.ex_vat || 0,
         });
       } catch (_) {
         setPlStats({ revenueMTD: 0 });
