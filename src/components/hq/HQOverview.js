@@ -2488,7 +2488,7 @@ export default function HQOverview({ onNavigate }) {
       )}
 
       {/* ── ACTION CENTRE: Low Stock Alerts (collapsible, session-dismissible) ── */}
-      {lowStock.length > 0 && (
+      {lowStock.length > 0 && industryProfile !== "cannabis_dispensary" && (
         <div style={{ marginBottom: 20 }}>
           <ActionCentre
             title="Low Stock Alerts"

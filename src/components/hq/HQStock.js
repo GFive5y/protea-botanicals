@@ -1930,9 +1930,12 @@ export default function HQStock() {
             style={{ ...sSelect, width: "155px" }}
           >
             <option value="all">All Categories</option>
-            {FOOD_CATS.map((k) => (
+            {(industryProfile === "cannabis_dispensary"
+              ? ["concentrate","edible","flower","topical","medical_consumable","terpene"]
+              : FOOD_CATS
+            ).map((k) => (
               <option key={k} value={k}>
-                {CATEGORY_LABELS[k] || k}
+                {CATEGORY_LABELS[k] || k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
               </option>
             ))}
           </select>
