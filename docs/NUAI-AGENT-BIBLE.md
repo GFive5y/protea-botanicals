@@ -569,6 +569,23 @@ Read once. Used throughout this Bible and BUILD-LOG.md.
     hq_financial_period(p_since, p_until, p_industry_filter) -> jsonb
   Both enforce 9 contract invariants. See SESSION-STATE_v270.
 
+- **LL-244 — TENANT ONBOARDING COMPLETENESS**:
+  A tenant marked financial_setup_complete=true MUST have:
+    - chart_of_accounts row count >= 40 (universal + industry-specific accounts)
+    - equity_ledger row for current FY with share_capital recorded
+    - tenant_config.financial_year_start in 'MM-DD' format (not month name)
+    - VAT settings populated if vat_registered=true
+  The Financial Setup Wizard does NOT seed the COA. 4 of 5 'completed' tenants
+  had ZERO chart_of_accounts rows (discovered 14 Apr 2026). Until the wizard is
+  fixed, every new tenant must have COA seeded manually via migration.
+
+- **LL-245 — FEATURE SCOPING DEPENDENCY MAP**:
+  Every new feature spec MUST list: tables read, tables written, validation gates,
+  downstream consumers requiring re-verification. The Financial Setup Wizard is
+  the cautionary tale: it captured inputs and set a 'complete' flag but did not
+  seed chart_of_accounts. The wizard 'completed' for 4 tenants and broke them all
+  invisibly. A dependency map at scoping time would have caught this.
+
 ## WP-STOREFRONT-WIZARD Discoveries (10 Apr 2026 — Session v228)
 
 - **LL-214 — TESTING PROTOCOL — MANDATORY**:

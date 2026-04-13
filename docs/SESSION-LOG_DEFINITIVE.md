@@ -5,6 +5,48 @@
 
 ---
 
+## v274 — Garden Bistro Audit + COA Seeding + LL-244/LL-245 · 14 April 2026
+HEAD: f35afec
+
+PROBLEMS SOLVED THIS SESSION:
+  1. Garden Bistro financial package internally inconsistent across screens
+     -> 5 audit rounds, 29 tasks, RPC architecture, consistent within 0.7%
+  2. ~50+ bugs across P&L, BS, Cash Flow, VAT, Top Bar, widgets
+     -> Closed via reactive fix-and-verify cycle
+  3. 4 of 5 'complete' tenants had zero chart_of_accounts (silent ghost build)
+     -> Migration seeded 160 accounts across 4 tenants
+  4. Garden Bistro had R0 share capital despite R601k fixed assets
+     -> Set to R700,000 via equity_ledger update
+  5. 7 Feb-2026 expenses unpaid in DB despite being bank-matched
+     -> Backfill UPDATE marked paid via PAY-2026-02
+
+NEW ARCHITECTURE:
+  - tenant_financial_period RPC (canonical financial aggregation per tenant)
+  - hq_financial_period RPC (cross-tenant rollup with industry grouping)
+  - tenant_vat_periods RPC (SA bi-monthly VAT bucketing)
+  - 9 contract invariants enforced
+  - LL-210: financial aggregations via canonical RPCs only
+  - LL-244: tenant onboarding completeness requirements
+  - LL-245: feature scoping dependency map
+
+NEW RPCs: tenant_financial_period, hq_financial_period, tenant_vat_periods
+
+UPDATED FILES:
+  Multiple commits across 7db98a3 -> b6edfb2 -> e529d4e -> dafdd4e -> f35afec
+  Components: HQProfitLoss, HQBalanceSheet, HQVat, HQInvoices,
+              useIntelStrip, HQOverview, CashFlow, AR/AP empty states
+  Docs: NUAI-AGENT-BIBLE (LL-210, LL-244, LL-245 added)
+
+DEFERRED:
+  - Forecast widget RPC migration (needs tenant_inventory_velocity)
+  - Industry profile config table
+  - VAT module full RPC migration
+  - Balance Sheet revenue YTD migration
+
+LOGGED: NEXT-PRIORITY-001 -- Reactive-to-Proactive Quality framework
+
+---
+
 ## v208 — Project Bible + Full Doc Audit + Process Reform · 08 Apr 2026
 HEAD: [this commit]
 
