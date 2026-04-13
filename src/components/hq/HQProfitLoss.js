@@ -1068,6 +1068,7 @@ export default function HQProfitLoss() {
   }, [tenantId]);
 
   const fetchAll = useCallback(async () => {
+    if (!tenantId) return;
     setLoading(true);
     const errors = {};
     const [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11] = await Promise.all([
@@ -1150,10 +1151,6 @@ export default function HQProfitLoss() {
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
-
-  useEffect(() => {
-    if (tenantId) fetchAll();
-  }, [tenantId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // v2.3: realtime revenue tiles
   useEffect(() => {
