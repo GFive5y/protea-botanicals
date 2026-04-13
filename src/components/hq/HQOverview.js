@@ -270,6 +270,7 @@ export default function HQOverview({ onNavigate }) {
 
 
   const fetchBirthdayStats = useCallback(async () => {
+    if (!tenantId) return;
     try {
       const now = new Date();
       const todayM = now.getMonth() + 1,
@@ -282,6 +283,7 @@ export default function HQOverview({ onNavigate }) {
       const { data } = await supabase
         .from("user_profiles")
         .select("date_of_birth")
+        .eq("tenant_id", tenantId)
         .not("date_of_birth", "is", null);
       let todayCount = 0,
         weekCount = 0;
@@ -296,7 +298,7 @@ export default function HQOverview({ onNavigate }) {
       });
       setBirthdayStats({ today: todayCount, thisWeek: weekCount });
     } catch (_) {}
-  }, []);
+  }, [tenantId]);
 
   // LL-231: fetch dispensing revenue for cannabis_dispensary overview tiles
   const fetchDispensingRevenue = useCallback(async () => {
@@ -361,16 +363,19 @@ export default function HQOverview({ onNavigate }) {
         lowStockData = [];
 
       try {
-        const r = await supabase
-          .from("product_cogs")
-          .select("id", { count: "exact", head: true })
-          .eq("is_active", true);
-        products = r.count || 0;
+        if (industryProfile !== "cannabis_dispensary" && industryProfile !== "food_beverage") {
+          const r = await supabase
+            .from("product_cogs")
+            .select("id", { count: "exact", head: true })
+            .eq("is_active", true);
+          products = r.count || 0;
+        }
       } catch (_) {}
       try {
         const r = await supabase
           .from("user_profiles")
-          .select("id", { count: "exact", head: true });
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenantId);
         users = r.count || 0;
       } catch (_) {}
       try {
@@ -380,6 +385,7 @@ export default function HQOverview({ onNavigate }) {
         const r = await supabase
           .from("loyalty_transactions")
           .select("points,transaction_date")
+          .eq("tenant_id", tenantId)
           .in("transaction_type", [
             "EARNED",
             "earned",
@@ -438,6 +444,7 @@ export default function HQOverview({ onNavigate }) {
         const r = await supabase
           .from("inventory_items")
           .select("id,name,sku,quantity_on_hand,reorder_level,unit")
+          .eq("tenant_id", tenantId)
           .eq("is_active", true)
           .lt("quantity_on_hand", 10)
           .order("quantity_on_hand", { ascending: true })
@@ -452,6 +459,7 @@ export default function HQOverview({ onNavigate }) {
         const r = await supabase
           .from("support_tickets")
           .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenantId)
           .in("status", ["open", "pending_reply"]);
         openTickets = r.count || 0;
       } catch (_) {}
@@ -459,6 +467,7 @@ export default function HQOverview({ onNavigate }) {
         const r = await supabase
           .from("customer_messages")
           .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenantId)
           .eq("direction", "inbound")
           .is("read_at", null);
         unreadMsgs = r.count || 0;
@@ -467,6 +476,7 @@ export default function HQOverview({ onNavigate }) {
         const r = await supabase
           .from("wholesale_messages")
           .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenantId)
           .eq("direction", "inbound")
           .is("read_at", null);
         unreadWholesale = r.count || 0;
@@ -494,10 +504,12 @@ export default function HQOverview({ onNavigate }) {
           supabase
             .from("batches")
             .select("id", { count: "exact", head: true })
+            .eq("tenant_id", tenantId)
             .eq("is_archived", false),
           supabase
             .from("inventory_items")
             .select("id,name,quantity_on_hand")
+            .eq("tenant_id", tenantId)
             .eq("is_active", true)
             .eq("category", "finished_product")
             .lt("quantity_on_hand", 5)
@@ -517,10 +529,12 @@ export default function HQOverview({ onNavigate }) {
           supabase
             .from("user_profiles")
             .select("id", { count: "exact", head: true })
+            .eq("tenant_id", tenantId)
             .eq("is_suspended", true),
           supabase
             .from("user_profiles")
             .select("id", { count: "exact", head: true })
+            .eq("tenant_id", tenantId)
             .gt("anomaly_score", 70),
         ]);
         setFraudStats({
@@ -558,6 +572,7 @@ export default function HQOverview({ onNavigate }) {
         const r = await supabase
           .from("inventory_items")
           .select("id,quantity_on_hand,reorder_level")
+          .eq("tenant_id", tenantId)
           .eq("is_active", true)
           .gt("reorder_level", 0);
         reorderCount = (r.data || []).filter(
@@ -613,6 +628,7 @@ export default function HQOverview({ onNavigate }) {
         const r = await supabase
           .from("purchase_orders")
           .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenantId)
           .not(
             "po_status",
             "in",
@@ -983,26 +999,38 @@ export default function HQOverview({ onNavigate }) {
           ((i.sell_price - i.weighted_avg_cost) / i.sell_price) * 100 >= 40,
       );
 
-      // Category breakdown — 14 Product Worlds via subcategory-first matching
+      // Category breakdown
+      // Dispensary: use raw inventory category (Concentrate/Edible/Topical etc.)
+      // Cannabis retail: use 14 Product Worlds via subcategory-first matching
       const byCat = {};
       const byWorldSub = {};
+      const isDispensary = industryProfile === "cannabis_dispensary";
       items.forEach((i) => {
-        const world = worldForItem(i);
-        if (!world || world.id === "all") return;
-        // Overview counts
-        if (!byCat[world.id])
-          byCat[world.id] = { label: world.label, count: 0, inStock: 0 };
-        byCat[world.id].count++;
-        if ((i.quantity_on_hand || 0) > 0) byCat[world.id].inStock++;
-        // Subcategory drill-down counts
-        if (!byWorldSub[world.id]) byWorldSub[world.id] = {};
-        const subKey = i.subcategory || "__none__";
-        const subLabel = world.subLabels?.[subKey]
-          || (subKey === "__none__" ? world.label : subKey.replace(/_/g, " "));
-        if (!byWorldSub[world.id][subKey])
-          byWorldSub[world.id][subKey] = { label: subLabel, count: 0, inStock: 0 };
-        byWorldSub[world.id][subKey].count++;
-        if ((i.quantity_on_hand || 0) > 0) byWorldSub[world.id][subKey].inStock++;
+        if (isDispensary) {
+          const catKey = i.category || "other";
+          const catLabel = catKey
+            .split("_")
+            .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ");
+          if (!byCat[catKey]) byCat[catKey] = { label: catLabel, count: 0, inStock: 0 };
+          byCat[catKey].count++;
+          if ((i.quantity_on_hand || 0) > 0) byCat[catKey].inStock++;
+        } else {
+          const world = worldForItem(i);
+          if (!world || world.id === "all") return;
+          if (!byCat[world.id])
+            byCat[world.id] = { label: world.label, count: 0, inStock: 0 };
+          byCat[world.id].count++;
+          if ((i.quantity_on_hand || 0) > 0) byCat[world.id].inStock++;
+          if (!byWorldSub[world.id]) byWorldSub[world.id] = {};
+          const subKey = i.subcategory || "__none__";
+          const subLabel = world.subLabels?.[subKey]
+            || (subKey === "__none__" ? world.label : subKey.replace(/_/g, " "));
+          if (!byWorldSub[world.id][subKey])
+            byWorldSub[world.id][subKey] = { label: subLabel, count: 0, inStock: 0 };
+          byWorldSub[world.id][subKey].count++;
+          if ((i.quantity_on_hand || 0) > 0) byWorldSub[world.id][subKey].inStock++;
+        }
       });
 
       setCannabisStock({
