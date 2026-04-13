@@ -889,6 +889,7 @@ export default function HQProfitLoss() {
   // LL-231: cannabis_dispensary revenue from dispensing_log, NOT orders
   const [dispensingRevenue, setDispensingRevenue] = useState(0);
   const [dispensingCount, setDispensingCount] = useState(0);
+  const [dispensingProductMargins, setDispensingProductMargins] = useState([]);
   // GAP-02: manual journal adjustments flowing to P&L
   const [journalAdjustments, setJournalAdjustments] = useState(null);
 
@@ -1007,9 +1008,26 @@ export default function HQProfitLoss() {
       );
       setDispensingRevenue(rev);
       setDispensingCount(events.length);
+      const itemMap = {};
+      events.forEach((dl) => {
+        const item = inventoryItems.find((i) => i.id === dl.inventory_item_id);
+        if (!item) return;
+        const qty = parseFloat(dl.quantity_dispensed || 0);
+        const itemRev  = qty * parseFloat(item.sell_price || 0);
+        const itemCogs = qty * parseFloat(item.weighted_avg_cost || 0);
+        if (!itemMap[item.id]) itemMap[item.id] = { name: item.name, units: 0, revenue: 0, cogs: 0 };
+        itemMap[item.id].units   += qty;
+        itemMap[item.id].revenue += itemRev;
+        itemMap[item.id].cogs    += itemCogs;
+      });
+      const dpMargins = Object.values(itemMap)
+        .map((d) => ({ ...d, gp: d.revenue - d.cogs, margin: d.revenue > 0 ? ((d.revenue - d.cogs) / d.revenue) * 100 : 0 }))
+        .filter((d) => d.revenue > 0 && d.cogs > 0);
+      setDispensingProductMargins(dpMargins);
     } catch (_) {
       setDispensingRevenue(0);
       setDispensingCount(0);
+      setDispensingProductMargins([]);
     }
   }, [tenantId, industryProfile, period, customFrom, customTo, inventoryItems]);
 
@@ -1057,20 +1075,23 @@ export default function HQProfitLoss() {
       supabase
         .from("orders")
         .select("id, created_at, total, status, items_count, currency")
+        .eq("tenant_id", tenantId)
         .not("status", "in", '("cancelled","failed")'),
       supabase
         .from("purchase_orders")
         .select(
           "id, order_date, landed_cost_zar, po_status, status, subtotal, shipping_cost_usd, usd_zar_rate",
         )
+        .eq("tenant_id", tenantId)
         .in("po_status", ["received", "complete"]),
-      supabase.from("product_cogs").select("*").eq("is_active", true),
+      supabase.from("product_cogs").select("*").eq("tenant_id", tenantId).eq("is_active", true),
       supabase.from("supplier_products").select("*").eq("is_active", true),
       supabase.from("local_inputs").select("*").eq("is_active", true),
-      supabase.from("product_pricing").select("*"),
+      supabase.from("product_pricing").select("*").eq("tenant_id", tenantId),
       supabase
         .from("loyalty_transactions")
-        .select("points, transaction_type, created_at"),
+        .select("points, transaction_type, created_at")
+        .eq("tenant_id", tenantId),
       supabase
         .from("loyalty_config")
         .select("redemption_value_zar, breakage_rate")
@@ -1078,12 +1099,14 @@ export default function HQProfitLoss() {
       supabase
         .from("stock_movements")
         .select("item_id, quantity, unit_cost, movement_type, created_at")
+        .eq("tenant_id", tenantId)
         .eq("movement_type", "production_out"),
       // sale_out movements removed from P&L — not a revenue source (LL-203)
       Promise.resolve({ data: [] }),
       supabase
         .from("inventory_items")
-        .select("id, sell_price, name")
+        .select("id, sell_price, name, weighted_avg_cost, category")
+        .eq("tenant_id", tenantId)
         .eq("is_active", true),
     ]);
     if (r1.error) errors.orders = r1.error.message;
@@ -1123,7 +1146,7 @@ export default function HQProfitLoss() {
 
     setLastUpdated(new Date());
     setLoading(false);
-  }, []);
+  }, [tenantId]);
 
   useEffect(() => {
     fetchAll();
