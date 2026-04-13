@@ -721,7 +721,7 @@ function CreateInvoiceModal({
 }
 
 export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
-  const { tenantId: ctxId } = useTenant();
+  const { tenantId: ctxId, industryProfile } = useTenant();
   const tenantId = tenantIdProp || ctxId;
   const [invoices, setInvoices] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -1282,13 +1282,19 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
                     fontSize: 13,
                     color: T.ink500,
                     fontFamily: T.font,
-                    maxWidth: 360,
+                    maxWidth: 400,
                     margin: "0 auto",
                   }}
                 >
                   {direction === "ar"
-                    ? "Invoices are auto-generated when you ship a wholesale order. Go to Wholesale Orders to get started."
-                    : "When a supplier sends you an invoice after delivery, record it here. Link it to the purchase order for full traceability."}
+                    ? industryProfile === "food_beverage"
+                      ? "Receivables typically don\u2019t apply for restaurants \u2014 payment is taken at point of sale. This screen will populate if you start invoicing corporate accounts, catering clients, or wholesale buyers."
+                      : industryProfile === "cannabis_dispensary"
+                        ? "Receivables populate when you ship to wholesale or corporate accounts. Most prescriptions are paid at dispensing \u2014 those don\u2019t appear here."
+                        : "Receivables populate when you ship a wholesale order or invoice a corporate client. Most retail POS sales settle immediately and don\u2019t create receivables."
+                    : industryProfile === "food_beverage"
+                      ? "Payables apply when suppliers offer payment terms beyond delivery (e.g. 30-day accounts with butchers, wine merchants). If you pay on delivery, this screen stays empty \u2014 that\u2019s correct for most restaurants."
+                      : "Payables apply when suppliers invoice you with payment terms. Cash-on-delivery purchases bypass this screen \u2014 they\u2019re recorded in Expenses instead."}
                 </div>
                 {direction === "ap" && (
                   <button

@@ -85,7 +85,7 @@ function getPeriodBounds(period, customFrom, customTo) {
   if (period === "this_month") {
     return {
       start: new Date(yr, mo, 1).toISOString(),
-      end: new Date(yr, mo + 1, 0, 23, 59, 59).toISOString(),
+      end: now.toISOString(),
     };
   }
   if (period === "last_month") {
@@ -97,7 +97,7 @@ function getPeriodBounds(period, customFrom, customTo) {
   if (period === "this_year") {
     return {
       start: new Date(yr, 0, 1).toISOString(),
-      end: new Date(yr, 11, 31, 23, 59, 59).toISOString(),
+      end: now.toISOString(),
     };
   }
   if (period === "custom" && customFrom && customTo) {
@@ -1086,7 +1086,7 @@ export default function HQBalanceSheet() {
                           sub={openingRetained === 0 ? "First financial year" : "Brought forward from prior year"} />
                         <BSRow label={`Current Year ${currentYearPL >= 0 ? "Profit" : "Loss"}`}
                           value={Math.abs(currentYearPL)} indent={1}
-                          sub="YTD revenue minus OPEX expenses"
+                          sub="YTD net result (revenue \u2212 COGS \u2212 OpEx)"
                           negative={currentYearPL < 0} />
                         <BSRow label="TOTAL EQUITY" value={netEquity2} total bold borderTop />
                       </>

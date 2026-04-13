@@ -158,15 +158,15 @@ export default function HQVat() {
 
   const periodData = (pid) => {
     const txns = vatTxns.filter(t => t.vat_period === pid);
-    const outputVat    = txns.reduce((s, t) => s + (parseFloat(t.output_vat) || 0), 0);
-    const inputFromTxns = txns.reduce((s, t) => s + (parseFloat(t.input_vat) || 0), 0);
-    const inputVat     = inputFromTxns > 0 ? inputFromTxns : (expenseStats[pid]?.totalInputVat || 0) + (receiptStats[pid]?.totalInputVat || 0);
+    // T26: output VAT from orderStats (RPC), not vatTxns
+    const outputVat    = orderStats[pid]?.outputVat || txns.reduce((s, t) => s + (parseFloat(t.output_vat) || 0), 0);
+    const inputVat     = expenseStats[pid]?.totalInputVat || txns.reduce((s, t) => s + (parseFloat(t.input_vat) || 0), 0);
     const exclusiveRev = txns.filter(t => t.transaction_type === "output").reduce((s, t) => s + (parseFloat(t.exclusive_amount) || 0), 0);
     const inclusiveRev = txns.filter(t => t.transaction_type === "output").reduce((s, t) => s + (parseFloat(t.inclusive_amount) || 0), 0);
     return {
       outputVat, inputVat, exclusiveRev, inclusiveRev,
       netVat: outputVat - inputVat,
-      txnList: txns, count: txns.length,
+      txnList: txns, count: txns.length + (orderStats[pid]?.count || 0),
       hasSeeded: txns.some(t => t.source === "seeded"),
       hasCalculated: txns.some(t => t.source === "calculated"),
     };
