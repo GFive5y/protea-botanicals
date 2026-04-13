@@ -7,6 +7,7 @@
 // Visual: T-token system, matches HQStock (WP-VISUAL-SYSTEM v1.0)
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useTenant } from "../../services/tenantService";
 import { supabase } from "../../services/supabaseClient";
 import { T } from "../../styles/tokens";
 const MONO = "'DM Mono','Courier New',monospace";
@@ -164,6 +165,16 @@ const CATS = [
     icon: "🔧",
     match: (i) => i.category === "hardware",
   },
+];
+
+const DISPENSARY_CATS = [
+  { key: "all", label: "All Items", icon: "◈", match: () => true },
+  { key: "concentrate", label: "Concentrate", icon: "💧", match: (i) => i.category === "concentrate" },
+  { key: "edible", label: "Edible", icon: "🍬", match: (i) => i.category === "edible" },
+  { key: "flower", label: "Flower", icon: "🌿", match: (i) => i.category === "flower" },
+  { key: "topical", label: "Topical", icon: "🧴", match: (i) => i.category === "topical" },
+  { key: "medical_consumable", label: "Medical", icon: "💊", match: (i) => i.category === "medical_consumable" },
+  { key: "terpene", label: "Terpene", icon: "🌸", match: (i) => i.category === "terpene" },
 ];
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -731,6 +742,9 @@ export default function StockPricingPanel({ tenantId }) {
   const [calcOpen, setCalcOpen] = useState(false);
   const searchRef = useRef(null);
 
+  const { industryProfile } = useTenant();
+  const activeCats = industryProfile === "cannabis_dispensary" ? DISPENSARY_CATS : CATS;
+
   const load = useCallback(async () => {
     if (!tenantId) return;
     setLoading(true);
@@ -749,11 +763,11 @@ export default function StockPricingPanel({ tenantId }) {
     load();
   }, [load]);
 
-  const catCounts = CATS.reduce((acc, c) => {
+  const catCounts = activeCats.reduce((acc, c) => {
     acc[c.key] = items.filter((i) => c.match(i)).length;
     return acc;
   }, {});
-  const activeCat = CATS.find((c) => c.key === catFilter) || CATS[0];
+  const activeCat = activeCats.find((c) => c.key === catFilter) || activeCats[0];
 
   let filtered = items.filter((item) => {
     if (!activeCat.match(item)) return false;
@@ -1109,7 +1123,7 @@ export default function StockPricingPanel({ tenantId }) {
       <div
         style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}
       >
-        {CATS.map(({ key, label, icon }) => {
+        {activeCats.map(({ key, label, icon }) => {
           const count = catCounts[key],
             active = catFilter === key;
           return (

@@ -306,7 +306,9 @@ export default function HQOverview({ onNavigate }) {
     try {
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      const todayEnd   = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
 
       const { data } = await supabase
         .from("dispensing_log")
@@ -315,7 +317,8 @@ export default function HQOverview({ onNavigate }) {
         )
         .eq("tenant_id", tenantId)
         .neq("is_voided", true)
-        .gte("dispensed_at", monthStart);
+        .gte("dispensed_at", monthStart)
+        .lt("dispensed_at", monthEnd);
 
       const events = data || [];
       const mtdRev = events.reduce(
@@ -327,7 +330,10 @@ export default function HQOverview({ onNavigate }) {
       );
       setDispensingRevMTD({ revenue: mtdRev, count: events.length });
 
-      const todayEvents = events.filter((dl) => new Date(dl.dispensed_at) >= new Date(todayStart));
+      const todayEvents = events.filter((dl) => {
+        const dt = new Date(dl.dispensed_at);
+        return dt >= new Date(todayStart) && dt < new Date(todayEnd);
+      });
       const todayRev = todayEvents.reduce(
         (s, dl) =>
           s +

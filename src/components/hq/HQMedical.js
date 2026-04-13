@@ -1597,7 +1597,11 @@ function ReportsTab({ log, patients, prescriptions }) {
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthLog = log.filter((e) => new Date(e.dispensed_at) >= monthStart);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const monthLog = log.filter((e) => {
+    const dt = new Date(e.dispensed_at);
+    return dt >= monthStart && dt < monthEnd;
+  });
 
   const generateSAHPRAExport = () => {
     setExporting(true);
