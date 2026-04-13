@@ -68,9 +68,9 @@ git push origin main
 | Tenant | Phase 0 | Phase 1 | Phase 2 | Phase 3 | Phase 4 | Phase 5 |
 |---|---|---|---|---|---|---|
 | MediCare Dispensary | PASS | PASS | PASS | PASS | PASS | PASS |
-| Metro Hardware | pending | | | | | |
-| Medi Recreational | pending | | | | | |
-| Garden Bistro | pending | | | | | |
+| Metro Hardware | PASS | PASS | PASS | PASS | PASS | PASS |
+| Medi Recreational | PASS | pending | PASS | PASS | pending | pending |
+| Garden Bistro | PASS | pending | PASS | PASS | pending | pending |
 
 ## KNOWN ISSUES (from pre-flight SQL 13 Apr 2026)
 
