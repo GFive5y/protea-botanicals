@@ -59,6 +59,7 @@ export default function AINSBar({
   const [drawerContent, setDrawerContent] = useState("");
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
+  const [sahpraAlerts, setSahpraAlerts] = useState(null);
   const [vatStatus, setVatStatus] = useState("clear");
   const [aiHealthy, setAiHealthy] = useState(true);
   const drawerInputRef = useRef(null);
@@ -72,6 +73,27 @@ export default function AINSBar({
   // ── Alert count + VAT status (polled every 60s) ───────────────
   const fetchAlerts = useCallback(async () => {
     if (!tenantId) return;
+
+    if (industryProfile === "cannabis_dispensary") {
+      try {
+        const today = new Date().toISOString().split("T")[0];
+        const in30 = new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0];
+        const [expiredRes, expiringRes] = await Promise.allSettled([
+          supabase.from("prescriptions")
+            .select("id", { count: "exact", head: true })
+            .eq("tenant_id", tenantId).eq("is_active", true).lt("expiry_date", today),
+          supabase.from("prescriptions")
+            .select("id", { count: "exact", head: true })
+            .eq("tenant_id", tenantId).eq("is_active", true)
+            .gte("expiry_date", today).lte("expiry_date", in30),
+        ]);
+        const expiredCount = expiredRes.status === "fulfilled" ? expiredRes.value.count || 0 : 0;
+        const expiringCount = expiringRes.status === "fulfilled" ? expiringRes.value.count || 0 : 0;
+        setSahpraAlerts({ expiredRx: expiredCount, expiringSoon: expiringCount });
+        if (expiredCount > 0) setAlertCount((prev) => prev + expiredCount);
+      } catch (_) {}
+    }
+
     const [vatTxRes, vatFiledRes, captureRes] = await Promise.allSettled([
       supabase.from("vat_transactions").select("vat_period").eq("tenant_id", tenantId),
       supabase.from("vat_period_filings").select("period_id").eq("tenant_id", tenantId),
@@ -89,7 +111,7 @@ export default function AINSBar({
     const dupeCount = captureRes.status === "fulfilled" ? captureRes.value.count || 0 : 0;
     setAlertCount(overdueCount + dupeCount);
     setVatStatus(overdueCount > 0 ? "overdue" : "clear");
-  }, [tenantId]);
+  }, [tenantId, industryProfile]);
 
   useEffect(() => {
     fetchAlerts();
@@ -293,9 +315,31 @@ Previous context: ${drawerTitle}. Be direct and specific.`;
           )}
         </div>
 
-        {/* CENTRE — pills */}
-        <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
-          <IntelStrip pills={pills} loading={pillsLoading} onPillClick={handlePillClick} />
+        {/* CENTRE — pills + SAHPRA compliance alert for dispensary */}
+        <div style={{ flex: 1, minWidth: 0, overflow: "hidden", display: "flex", alignItems: "center", gap: 8 }}>
+          {industryProfile === "cannabis_dispensary" && sahpraAlerts && (sahpraAlerts.expiredRx > 0 || sahpraAlerts.expiringSoon > 0) && (
+            <button
+              onClick={() => onNavigate && onNavigate("medical")}
+              title="View compliance details in Medical Records"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 5,
+                padding: "3px 10px", borderRadius: 20, flexShrink: 0,
+                background: sahpraAlerts.expiredRx > 0 ? "#FEF2F2" : "#FFFBEB",
+                border: `1px solid ${sahpraAlerts.expiredRx > 0 ? "#FECACA" : "#FDE68A"}`,
+                color: sahpraAlerts.expiredRx > 0 ? "#991B1B" : "#92400E",
+                fontSize: 10, fontWeight: 700, cursor: "pointer",
+                letterSpacing: "0.04em", whiteSpace: "nowrap",
+                fontFamily: T.font,
+              }}
+            >
+              {sahpraAlerts.expiredRx > 0
+                ? `${sahpraAlerts.expiredRx} Rx expired \u00b7 SAHPRA action required`
+                : `${sahpraAlerts.expiringSoon} Rx expiring within 30d`}
+            </button>
+          )}
+          <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+            <IntelStrip pills={pills} loading={pillsLoading} onPillClick={handlePillClick} />
+          </div>
         </div>
 
         {/* RIGHT — search + status dots */}
