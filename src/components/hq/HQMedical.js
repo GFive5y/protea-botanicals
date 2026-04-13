@@ -1593,10 +1593,60 @@ function DispensingTab({
 // ── REPORTS TAB ───────────────────────────────────────────────────────────────
 function ReportsTab({ log, patients, prescriptions }) {
   const [groupBy, setGroupBy] = useState("patient");
+  const [exporting, setExporting] = useState(false);
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthLog = log.filter((e) => new Date(e.dispensed_at) >= monthStart);
+
+  const generateSAHPRAExport = () => {
+    setExporting(true);
+    try {
+      const headers = [
+        "Date","Time","Patient Name","Patient ID","Section 21 No",
+        "S21 Expiry","Condition","Authorized By","Prescription Ref",
+        "Substance","Product","SKU","Batch / Lot","Qty Dispensed",
+        "Notes","Voided","Void Reason",
+      ];
+      const rows = log.map((e) => {
+        const patient = patients.find((p) => p.id === e.patient_id) || {};
+        const rx = prescriptions.find((r) => r.id === e.prescription_id) || {};
+        const d = new Date(e.dispensed_at);
+        return [
+          d.toLocaleDateString("en-ZA"),
+          d.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" }),
+          patient.name || "",
+          patient.id_number || "",
+          patient.section_21_number || "",
+          patient.s21_expiry_date ? new Date(patient.s21_expiry_date).toLocaleDateString("en-ZA") : "",
+          patient.condition || "",
+          patient.authorized_practitioner || "",
+          e.prescription_id ? e.prescription_id.slice(0, 8).toUpperCase() : "",
+          rx.substance || "",
+          e.inventory_items?.name || "",
+          e.inventory_items?.sku || "",
+          e.batches?.batch_number || "",
+          e.quantity_dispensed || "",
+          (e.notes || "").replace(/,/g, ";"),
+          e.is_voided ? "YES" : "NO",
+          (e.void_reason || "").replace(/,/g, ";"),
+        ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",");
+      });
+      const csv = [headers.map((h) => `"${h}"`).join(","), ...rows].join("\n");
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const label = now.toLocaleDateString("en-ZA", { month: "long", year: "numeric" }).replace(/ /g, "-");
+      a.href = url;
+      a.download = `SAHPRA-Dispensing-Log-${label}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const byPatient = {};
   monthLog.forEach((e) => {
@@ -1643,6 +1693,21 @@ function ReportsTab({ log, patients, prescriptions }) {
             {g.charAt(0).toUpperCase() + g.slice(1)}
           </button>
         ))}
+        <div style={{ flex: 1 }} />
+        <button
+          onClick={generateSAHPRAExport}
+          disabled={exporting || log.length === 0}
+          style={{
+            ...sBtn("primary"),
+            padding: "6px 14px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            opacity: log.length === 0 ? 0.4 : 1,
+          }}
+        >
+          {exporting ? "Exporting..." : "Export SAHPRA CSV"}
+        </button>
       </div>
 
       <div style={{ ...sCard, borderLeft: `3px solid ${T.info}` }}>
@@ -2610,6 +2675,7 @@ export default function HQMedical() {
         supabase
           .from("inventory_items")
           .select("id,name,sku,category,quantity_on_hand")
+          .eq("tenant_id", tenantId)
           .eq("is_active", true)
           .order("name"),
         supabase
