@@ -1114,6 +1114,7 @@ export default function HQProfitLoss() {
     if (r3.error) errors.cogs = r3.error.message;
     if (r7.error) errors.loyalty = r7.error.message;
     setOrders(r1.data || []);
+    console.log("[PL-DEBUG] orders fetched:", { tenantId, count: (r1.data||[]).length, error: r1.error, sample: (r1.data||[]).slice(0,2) });
     setPurchaseOrders(r2.data || []);
     setRecipes(r3.data || []);
     setSupplierProducts(r4.data || []);
