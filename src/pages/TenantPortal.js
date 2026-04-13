@@ -574,9 +574,7 @@ const CANNABIS_DISPENSARY_WATERFALL = [
     icon: Package,
     color: "#1A3D2B",
     tabs: [
-      { id: "stock",         label: "Formulary Stock",  desc: "Medical products \u00b7 qty on hand \u00b7 AVCO \u00b7 movements" },
-      { id: "hq-production", label: "Batch Management", desc: "Product batches \u00b7 CoA \u00b7 lab certificates \u00b7 expiry" },
-      { id: "supply-chain",  label: "Receiving (GMP)",  desc: "Goods receipt \u00b7 supplier POs \u00b7 GMP-compliant intake" },
+      { id: "stock", label: "Formulary Stock", desc: "Medical products \u00b7 qty on hand \u00b7 AVCO \u00b7 movements" },
     ],
   },
   {

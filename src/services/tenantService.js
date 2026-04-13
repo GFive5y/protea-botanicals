@@ -141,12 +141,24 @@ export function TenantProvider({ children }) {
 
   // ── Switch tenant (HQ only) ────────────────────────────────────────────
   const switchTenant = useCallback(
-    (tenantObj) => {
+    async (tenantObj) => {
       if (!isHQ) {
         console.warn("[TenantService] switchTenant blocked — not HQ user");
         return;
       }
       setTenant(tenantObj);
+      try {
+        const { data: cfgData } = await supabase
+          .from("tenant_config")
+          .select(
+            "feature_hq,feature_ai_basic,feature_ai_full,feature_medical,feature_white_label,feature_wholesale,feature_hr,ai_queries_daily,staff_seats,tier",
+          )
+          .eq("tenant_id", tenantObj.id)
+          .single();
+        setTenantConfig(cfgData || {});
+      } catch (_) {
+        setTenantConfig({});
+      }
       console.log("[TenantService] Switched to tenant:", tenantObj.name);
     },
     [isHQ],

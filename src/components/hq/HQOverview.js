@@ -327,7 +327,7 @@ export default function HQOverview({ onNavigate }) {
       );
       setDispensingRevMTD({ revenue: mtdRev, count: events.length });
 
-      const todayEvents = events.filter((dl) => dl.dispensed_at >= todayStart);
+      const todayEvents = events.filter((dl) => new Date(dl.dispensed_at) >= new Date(todayStart));
       const todayRev = todayEvents.reduce(
         (s, dl) =>
           s +
