@@ -1068,12 +1068,15 @@ export default function HQProfitLoss() {
   }, [tenantId]);
 
   const fetchAll = useCallback(async () => {
-    if (!tenantId) { console.warn("[PL-fetchAll] skipped — tenantId is null"); return; }
-    console.log("[PL-fetchAll] RUNNING with tenantId:", tenantId);
+    if (!tenantId) return;
     setLoading(true);
     const errors = {};
     const [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11] = await Promise.all([
-      supabase.rpc("get_tenant_orders_for_pl", { p_tenant_id: tenantId }),
+      supabase.rpc("get_tenant_orders_for_pl", {
+        p_tenant_id: tenantId,
+        p_since: periodStart(period, customFrom) || null,
+        p_until: periodEnd(period, customTo) || null,
+      }),
       supabase
         .from("purchase_orders")
         .select(
@@ -1110,7 +1113,6 @@ export default function HQProfitLoss() {
     if (r2.error) errors.pos = r2.error.message;
     if (r3.error) errors.cogs = r3.error.message;
     if (r7.error) errors.loyalty = r7.error.message;
-    console.log("[PL-fetchAll] RESULTS:", { orders: (r1.data||[]).length, ordersErr: r1.error?.message, pos: (r2.data||[]).length, cogs: (r3.data||[]).length, inv: (r11.data||[]).length });
     setOrders(r1.data || []);
     setPurchaseOrders(r2.data || []);
     setRecipes(r3.data || []);
@@ -1144,10 +1146,9 @@ export default function HQProfitLoss() {
 
     setLastUpdated(new Date());
     setLoading(false);
-  }, [tenantId]);
+  }, [tenantId, period, customFrom, customTo]);
 
   useEffect(() => {
-    console.log("[PL-effect] fetchAll effect fired, tenantId:", tenantId);
     fetchAll();
   }, [fetchAll]);
 
