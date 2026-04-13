@@ -665,6 +665,7 @@ function HowItWorksBanner() {
 
 // ─── Set Price Panel ─────────────────────────────────────────────────────────
 function SetPricePanel({ items, onRefresh }) {
+  const { tenantId } = useTenant();
   const finished = items.filter((i) => i.category === "finished_product");
   const [prices, setPrices] = useState({});
   const [saving, setSaving] = useState(null);
@@ -682,7 +683,8 @@ function SetPricePanel({ items, onRefresh }) {
       const { error } = await supabase
         .from("inventory_items")
         .update({ sell_price: parseFloat(prices[item.id]) || 0 })
-        .eq("id", item.id);
+        .eq("id", item.id)
+        .eq("tenant_id", tenantId);
       if (error) throw error;
       setToast({
         msg: `${item.name} updated to R${prices[item.id]}`,
@@ -1889,6 +1891,7 @@ export default function HQProduction() {
           supabase
             .from("inventory_items")
             .select("*")
+            .eq("tenant_id", tenantId)
             .eq("is_active", true)
             .order("name"),
           supabase
@@ -3139,6 +3142,7 @@ function BatchesPanel({
   onNavNewRun,
   onRefresh,
 }) {
+  const { tenantId } = useTenant();
   const [filter, setFilter] = useState("all");
   const [editing, setEditing] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -3228,7 +3232,8 @@ function BatchesPanel({
           section_21_number: editForm.section_21_number || null,
           cannabinoid_profile: editForm.cannabinoid_profile || null,
         })
-        .eq("id", b.id);
+        .eq("id", b.id)
+        .eq("tenant_id", tenantId);
       if (error) throw error;
       setEditing(null);
       onRefresh();
@@ -3256,7 +3261,8 @@ function BatchesPanel({
           lifecycle_status: "archived",
           status: "archived",
         })
-        .eq("id", b.id);
+        .eq("id", b.id)
+        .eq("tenant_id", tenantId);
       if (error) throw error;
       onRefresh();
       showToast(`Batch ${b.batch_number} archived.`);
@@ -3276,7 +3282,8 @@ function BatchesPanel({
         const { data: mvs } = await supabase
           .from("stock_movements")
           .select("id,item_id,quantity,movement_type")
-          .eq("reference", linkedRun.run_number);
+          .eq("reference", linkedRun.run_number)
+          .eq("tenant_id", tenantId);
         if (mvs?.length > 0) {
           for (const mv of mvs) {
             const rev = -mv.quantity;
@@ -3286,12 +3293,13 @@ function BatchesPanel({
               movement_type: "adjustment",
               reference: `VOID-${linkedRun.run_number}`,
               notes: `Void: batch ${b.batch_number} cancelled`,
-              tenant_id: b.tenant_id || null,
+              tenant_id: tenantId || null,
             });
             const { data: item } = await supabase
               .from("inventory_items")
               .select("quantity_on_hand")
               .eq("id", mv.item_id)
+              .eq("tenant_id", tenantId)
               .single();
             if (item) {
               await supabase
@@ -3302,7 +3310,8 @@ function BatchesPanel({
                     parseFloat(item.quantity_on_hand || 0) + rev,
                   ),
                 })
-                .eq("id", mv.item_id);
+                .eq("id", mv.item_id)
+                .eq("tenant_id", tenantId);
             }
           }
         }
@@ -3314,7 +3323,7 @@ function BatchesPanel({
         await supabase.from("production_runs").delete().eq("id", linkedRun.id);
       }
       // Delete batch
-      await supabase.from("batches").delete().eq("id", b.id);
+      await supabase.from("batches").delete().eq("id", b.id).eq("tenant_id", tenantId);
       setDeleting(null);
       onRefresh();
       showToast(`Batch ${b.batch_number} voided. Stock reversed.`);
@@ -4832,6 +4841,7 @@ function NewRunPanel({
             movement_type: "production_out",
             reference: runNumber,
             notes: `Run ${runNumber}: distillate`,
+            tenant_id: tenantId,
           },
           {
             item_id: form.terpene_item_id,
@@ -4839,6 +4849,7 @@ function NewRunPanel({
             movement_type: "production_out",
             reference: runNumber,
             notes: `Run ${runNumber}: ${selTerp?.name}`,
+            tenant_id: tenantId,
           },
           {
             item_id: form.hardware_item_id,
@@ -4846,20 +4857,24 @@ function NewRunPanel({
             movement_type: "production_out",
             reference: runNumber,
             notes: `Run ${runNumber}: ${selHw?.name}`,
+            tenant_id: tenantId,
           },
         ]);
         await supabase
           .from("inventory_items")
           .update({ quantity_on_hand: distAvail - distNeeded })
-          .eq("id", form.distillate_item_id);
+          .eq("id", form.distillate_item_id)
+          .eq("tenant_id", tenantId);
         await supabase
           .from("inventory_items")
           .update({ quantity_on_hand: terpAvail - terpNeeded })
-          .eq("id", form.terpene_item_id);
+          .eq("id", form.terpene_item_id)
+          .eq("tenant_id", tenantId);
         await supabase
           .from("inventory_items")
           .update({ quantity_on_hand: hwAvail - hwNeeded })
-          .eq("id", form.hardware_item_id);
+          .eq("id", form.hardware_item_id)
+          .eq("tenant_id", tenantId);
       }
 
       // ── WP-BIB S3: Multi-chamber vape deductions ──
@@ -4892,6 +4907,7 @@ function NewRunPanel({
               movement_type: "production_out",
               reference: runNumber,
               notes: `Run ${runNumber}: Ch${ch.ci + 1} ${ch.medItem?.name || "medium"}`,
+              tenant_id: tenantId,
             },
             {
               item_id: ch.terpeneId,
@@ -4899,6 +4915,7 @@ function NewRunPanel({
               movement_type: "production_out",
               reference: runNumber,
               notes: `Run ${runNumber}: Ch${ch.ci + 1} ${ch.cTerpItem?.name || "terpene"}`,
+              tenant_id: tenantId,
             },
           );
           qtyUpdates[ch.mediumId] =
@@ -4920,6 +4937,7 @@ function NewRunPanel({
           movement_type: "production_out",
           reference: runNumber,
           notes: `Run ${runNumber}: hardware`,
+          tenant_id: tenantId,
         });
         qtyUpdates[hwSelId] = hwSelAvail - planned;
 
@@ -4929,7 +4947,8 @@ function NewRunPanel({
           await supabase
             .from("inventory_items")
             .update({ quantity_on_hand: Math.max(0, newQty) })
-            .eq("id", itemId);
+            .eq("id", itemId)
+            .eq("tenant_id", tenantId);
         }
 
         // Store per-chamber cannabinoid profile on batch
@@ -4947,7 +4966,8 @@ function NewRunPanel({
         await supabase
           .from("batches")
           .update({ cannabinoid_profile: cannabinoidProfile })
-          .eq("id", batch.id);
+          .eq("id", batch.id)
+          .eq("tenant_id", tenantId);
       }
 
       if (hasBom && !isVape && bomLineData.length > 0) {
@@ -4968,12 +4988,14 @@ function NewRunPanel({
             movement_type: "production_out",
             reference: runNumber,
             notes: `Run ${runNumber}: ${bl.selItem?.name || bl.line.material_type}`,
+            tenant_id: tenantId,
           });
           const curAvail = parseFloat(bl.selItem?.quantity_on_hand || 0);
           await supabase
             .from("inventory_items")
             .update({ quantity_on_hand: Math.max(0, curAvail - bl.needed) })
-            .eq("id", bl.selItemId);
+            .eq("id", bl.selItemId)
+            .eq("tenant_id", tenantId);
         }
       }
       const existingFin = items.find(
@@ -4996,6 +5018,7 @@ function NewRunPanel({
             is_active: true,
             description: `Produced via run ${runNumber}`,
             shelf_life_days: isFoodBev && form.expiry_date ? null : null,
+            tenant_id: tenantId,
           })
           .select()
           .single();
@@ -5011,6 +5034,7 @@ function NewRunPanel({
           movement_type: "production_in",
           reference: runNumber,
           notes: `Batch ${runNumber}: ${finishedName}`,
+          tenant_id: tenantId,
         });
         const curQty = parseFloat(existingFin?.quantity_on_hand || 0);
         await supabase
@@ -5027,7 +5051,8 @@ function NewRunPanel({
                 }
               : {}),
           })
-          .eq("id", finId);
+          .eq("id", finId)
+          .eq("tenant_id", tenantId);
       }
       await supabase
         .from("batches")
@@ -5035,7 +5060,8 @@ function NewRunPanel({
           inventory_item_id: finId,
           lifecycle_status: qcBlocked ? "qc_failed" : "active",
         })
-        .eq("id", batch.id);
+        .eq("id", batch.id)
+        .eq("tenant_id", tenantId);
       // WP-PROD-MASTER OP11: yield < 85% fires PlatformBar alert for food_beverage
       const foodYieldPct =
         isFoodBev && form.yield_pct ? parseFloat(form.yield_pct) : null;
@@ -6778,6 +6804,7 @@ function NewRunPanel({
 
 // ─── History Panel ────────────────────────────────────────────────────────────
 function HistoryPanel({ runs, onRefresh, industryProfile }) {
+  const { tenantId } = useTenant();
   const [expanded, setExpanded] = useState(null);
   const [editing, setEditing] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -6846,7 +6873,8 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
         const { data: mvs } = await supabase
           .from("stock_movements")
           .select("id,item_id,quantity,movement_type")
-          .eq("reference", run.run_number);
+          .eq("reference", run.run_number)
+          .eq("tenant_id", tenantId);
         if (mvs?.length > 0) {
           for (const mv of mvs) {
             const rev = -mv.quantity;
@@ -6856,11 +6884,13 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
               movement_type: "adjustment",
               reference: `VOID-${run.run_number}`,
               notes: `Reversal: deleted run ${run.run_number}`,
+              tenant_id: tenantId,
             });
             const { data: item } = await supabase
               .from("inventory_items")
               .select("quantity_on_hand")
               .eq("id", mv.item_id)
+              .eq("tenant_id", tenantId)
               .single();
             await supabase
               .from("inventory_items")
@@ -6870,7 +6900,8 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                   parseFloat(item.quantity_on_hand || 0) + rev,
                 ),
               })
-              .eq("id", mv.item_id);
+              .eq("id", mv.item_id)
+              .eq("tenant_id", tenantId);
           }
         }
       }
@@ -7822,6 +7853,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
 
 // ─── Allocate Panel ───────────────────────────────────────────────────────────
 function AllocatePanel({ items, partners, batches, onRefresh }) {
+  const { tenantId } = useTenant();
   const finished = items.filter(
     (i) =>
       i.category === "finished_product" &&
@@ -7865,12 +7897,14 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
         movement_type: "sale_out",
         reference: ref,
         notes: form.notes || `Allocated to ${ref}`,
+        tenant_id: tenantId,
       });
       const newQty = available - qty;
       await supabase
         .from("inventory_items")
         .update({ quantity_on_hand: newQty })
-        .eq("id", form.item_id);
+        .eq("id", form.item_id)
+        .eq("tenant_id", tenantId);
       const linkedBatch = batches.find(
         (b) =>
           b.inventory_item_id === form.item_id ||
@@ -7881,7 +7915,8 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
         await supabase
           .from("batches")
           .update({ lifecycle_status: "depleted" })
-          .eq("id", linkedBatch.id);
+          .eq("id", linkedBatch.id)
+          .eq("tenant_id", tenantId);
       } else if (
         linkedBatch &&
         newQty <= (linkedBatch.low_stock_threshold || 10)
@@ -7889,7 +7924,8 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
         await supabase
           .from("batches")
           .update({ lifecycle_status: "low_stock" })
-          .eq("id", linkedBatch.id);
+          .eq("id", linkedBatch.id)
+          .eq("tenant_id", tenantId);
       }
       setForm({
         item_id: "",
