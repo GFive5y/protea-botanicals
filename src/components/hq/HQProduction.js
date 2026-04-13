@@ -1879,12 +1879,10 @@ export default function HQProduction() {
         .select(
           "id,batch_number,product_name,product_type,strain,volume,status,lifecycle_status,inventory_item_id,low_stock_threshold,production_date,expiry_date,units_produced,thc_content,cbd_content,lab_certified,is_archived,tenant_id,cannabinoid_profile,section_21_number",
         )
+        .eq("tenant_id", tenantId)
         .eq("is_archived", false)
         .order("production_date", { ascending: false })
         .limit(200);
-
-      // Apply tenant filter if resolved — falls back to all batches for pure HQ role
-      if (hqTenantId) batchQuery.eq("tenant_id", hqTenantId);
 
       const [itemsR, runsR, partnersR, formatsR, strainsR, bomR] =
         await Promise.all([
@@ -1899,6 +1897,7 @@ export default function HQProduction() {
             .select(
               `id,batch_id,run_number,status,planned_units,actual_units,started_at,completed_at,notes,created_at,recipe_name,recipe_version,batch_lot_number,expiry_date,temperature_zone,yield_pct,qc_passed,allergen_flags,fsca_cert_number,haccp_ref,storage_instructions,industry_profile_snapshot,batches(batch_number,product_name,strain,product_type,volume),production_run_inputs(id,run_id,item_id,quantity_planned,quantity_actual,notes,inventory_items(name,sku,unit,category))`,
             )
+            .eq("tenant_id", tenantId)
             .order("created_at", { ascending: false })
             .limit(100),
           supabase

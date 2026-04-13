@@ -715,16 +715,87 @@ function getCannabisSections(waterfall, role) {
   return waterfall.filter(s => allowed.includes(s.id));
 }
 
+const GENERAL_RETAIL_WATERFALL = [
+  {
+    id: "home", label: "Home", icon: Home, color: "#1A3D2B", alwaysOpen: true,
+    tabs: [{ id: "overview", label: "Dashboard", desc: "Live KPIs \u00b7 alerts \u00b7 quick actions" }],
+  },
+  {
+    id: "procurement", label: "Procurement", icon: ShoppingCart, color: "#1E3A5F",
+    tabs: [
+      { id: "suppliers",     label: "Suppliers",       desc: "Suppliers \u00b7 contacts \u00b7 terms" },
+      { id: "procurement",   label: "Purchase Orders", desc: "POs \u00b7 receive stock \u00b7 AVCO" },
+      { id: "documents",     label: "Documents",       desc: "Upload invoice \u2192 auto-process" },
+    ],
+  },
+  {
+    id: "operations", label: "Operations", icon: Activity, color: "#1A3D2B",
+    tabs: [
+      { id: "trading",       label: "Daily Trading",   desc: "Today\u2019s revenue \u00b7 top sellers \u00b7 30-day chart" },
+      { id: "cashup",        label: "Cash-Up",         desc: "End of day \u00b7 till reconciliation \u00b7 variance" },
+      { id: "smart-capture", label: "Smart Capture",   desc: "Photo \u00b7 AI reads \u00b7 auto-post to books" },
+    ],
+  },
+  {
+    id: "inventory", label: "Inventory", icon: Package, color: "#1A3D2B",
+    tabs: [
+      { id: "stock",         label: "Stock Control",   desc: "Items \u00b7 movements \u00b7 AVCO \u00b7 reorder" },
+    ],
+  },
+  {
+    id: "distribution", label: "Distribution", icon: Truck, color: "#92400E",
+    tabs: [
+      { id: "wholesale-orders", label: "Wholesale Orders", desc: "B2B orders \u00b7 reserve \u00b7 ship" },
+      { id: "invoices",         label: "Invoices",         desc: "Tax invoices \u00b7 payment tracking \u00b7 aged debtors" },
+      { id: "transfers",        label: "Transfers",        desc: "Stock movements between locations" },
+    ],
+  },
+  {
+    id: "sales", label: "Sales", icon: ShoppingBag, color: "#065F46",
+    tabs: [
+      { id: "pricing", label: "Pricing", desc: "Sell prices \u00b7 margins \u00b7 scenarios" },
+      { id: "loyalty", label: "Loyalty", desc: "Points \u00b7 tiers \u00b7 campaigns" },
+    ],
+  },
+  {
+    id: "intelligence", label: "Intelligence", icon: TrendingUp, color: "#991B1B",
+    tabs: [
+      { id: "pl",              label: "P&L",              desc: "Live revenue \u00b7 COGS \u00b7 net margin" },
+      { id: "expenses",        label: "Expenses",         desc: "OPEX tracking \u00b7 categories \u00b7 P&L feed" },
+      { id: "analytics",       label: "Analytics",        desc: "Scans \u00b7 geo \u00b7 acquisition \u00b7 churn" },
+      { id: "reorder",         label: "Reorder",          desc: "Stock alerts \u00b7 procurement triggers" },
+      { id: "balance-sheet",   label: "Balance Sheet",    desc: "Assets \u00b7 liabilities \u00b7 cash flow" },
+      { id: "fixed-assets",    label: "Fixed Assets",     desc: "PPE register \u00b7 depreciation \u00b7 NBV" },
+      { id: "fin-statements",  label: "IFRS Statements",  desc: "4 IFRS statements \u00b7 auditor sign-off" },
+      { id: "journals",        label: "Journals",         desc: "Accruals \u00b7 PAYE \u00b7 prepayments" },
+      { id: "vat",             label: "VAT",              desc: "VAT201 \u00b7 output \u00b7 input \u00b7 SARS filing" },
+      { id: "bank-recon",      label: "Bank Recon",       desc: "Statement import \u00b7 match \u00b7 reconcile" },
+      { id: "forecast",        label: "Forecast",         desc: "30-day projection \u00b7 stock depletion" },
+      { id: "year-end",        label: "Year-End Close",   desc: "Lock year \u00b7 retained earnings \u00b7 archive" },
+    ],
+  },
+  {
+    id: "people", label: "People", icon: Briefcase, color: "#374151",
+    tabs: [
+      { id: "staff",      label: "Staff",      desc: "Directory \u00b7 profiles \u00b7 timesheets" },
+      { id: "timesheets", label: "Timesheets", desc: "Track hours \u00b7 approve \u00b7 lock" },
+      { id: "leave",      label: "Leave",      desc: "Leave requests \u00b7 balances \u00b7 approval" },
+      { id: "payroll",    label: "Payroll",    desc: "Pay runs \u00b7 payslips" },
+    ],
+  },
+];
+
+const GENERAL_RETAIL_ROLE_SECTIONS = {
+  owner:   ["home", "procurement", "operations", "inventory", "distribution", "sales", "intelligence", "people"],
+  manager: ["home", "procurement", "operations", "inventory", "distribution", "sales", "people"],
+  staff:   ["home", "operations", "sales"],
+};
+
 function getWaterfall(industryProfile) {
-  if (industryProfile === "cannabis_dispensary") {
-    return CANNABIS_DISPENSARY_WATERFALL;
-  }
-  if (industryProfile === "food_beverage") {
-    return FOOD_BEVERAGE_WATERFALL;
-  }
-  if (industryProfile === "cannabis_retail") {
-    return CANNABIS_RETAIL_WATERFALL;
-  }
+  if (industryProfile === "cannabis_dispensary") return CANNABIS_DISPENSARY_WATERFALL;
+  if (industryProfile === "food_beverage")       return FOOD_BEVERAGE_WATERFALL;
+  if (industryProfile === "cannabis_retail")     return CANNABIS_RETAIL_WATERFALL;
+  if (industryProfile === "general_retail")      return GENERAL_RETAIL_WATERFALL;
   return WATERFALL;
 }
 
@@ -1132,6 +1203,10 @@ export default function TenantPortal() {
         )
       : activeWaterfall === CANNABIS_RETAIL_WATERFALL
       ? getCannabisSections(activeWaterfall, userRole)
+      : activeWaterfall === GENERAL_RETAIL_WATERFALL
+      ? activeWaterfall.filter((s) =>
+          (GENERAL_RETAIL_ROLE_SECTIONS[userRole] || GENERAL_RETAIL_ROLE_SECTIONS.owner).includes(s.id)
+        )
       : activeWaterfall.filter((s) =>
           (ROLE_SECTIONS[userRole] || ROLE_SECTIONS.owner).includes(s.id)
         );

@@ -1133,6 +1133,7 @@ export default function HQCogs() {
       supabase
         .from("product_cogs")
         .select("*")
+        .eq("tenant_id", tenantId)
         .eq("is_active", true)
         .order("product_name"),
       supabase
@@ -1147,7 +1148,7 @@ export default function HQCogs() {
         .eq("is_active", true)
         .order("category")
         .order("name"),
-      supabase.from("product_pricing").select("*"),
+      supabase.from("product_pricing").select("*").eq("tenant_id", tenantId),
       tenantId
         ? supabase
             .from("loyalty_config")

@@ -1700,17 +1700,20 @@ export default function HQWholesaleOrders() {
           .select(
             "*, purchase_order_items(id, item_id, quantity_ordered, unit_cost)",
           )
+          .eq("tenant_id", tenantId)
           .eq("direction", "outbound")
           .order("created_at", { ascending: false }),
         supabase
           .from("wholesale_partners")
           .select("id, business_name, contact_name, email")
+          .eq("tenant_id", tenantId)
           .order("business_name"),
         supabase
           .from("inventory_items")
           .select(
             "id, name, sku, category, unit, quantity_on_hand, reserved_qty, sell_price, weighted_avg_cost, cost_price",
           )
+          .eq("tenant_id", tenantId)
           .eq("is_active", true)
           .order("name"),
       ]);
@@ -1722,7 +1725,7 @@ export default function HQWholesaleOrders() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tenantId]);
 
   useEffect(() => {
     fetchAll();
