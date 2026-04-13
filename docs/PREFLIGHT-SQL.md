@@ -32,6 +32,77 @@ UNION ALL SELECT 'GB items_total'         , COUNT(*) FROM inventory_items WHERE 
 ORDER BY 1;
 ```
 
+---
+
+## COHERENCE CHECKS — Run after MUST_BE_0 block
+## These catch sim-data, seeding errors, and anomalous spikes
+## Every check has an expected range — flag anything outside it
+
+### Run for each tenant before visual verify
+
+```sql
+-- COHERENCE CHECK BLOCK — replace TENANT_ID
+
+-- 1. Shell orders (orders with no order_items) — MUST_BE_0
+--    Any value > 0 = sim artifact or data error.
+SELECT 'shell_orders_MUST_BE_0', COUNT(*)
+FROM orders o
+WHERE o.tenant_id = 'TENANT_ID'
+  AND o.status NOT IN ('cancelled','failed')
+  AND NOT EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = o.id);
+
+-- 2. Today's order count vs 30-day daily average
+--    Flag if ratio > 3 — likely sim data or bleed.
+WITH daily AS (
+  SELECT created_at::date AS day, COUNT(*) AS orders, SUM(total) AS revenue
+  FROM orders
+  WHERE tenant_id = 'TENANT_ID'
+    AND status NOT IN ('cancelled','failed')
+    AND created_at >= NOW() - INTERVAL '30 days'
+  GROUP BY created_at::date
+),
+avg_30 AS (
+  SELECT AVG(orders) AS avg_orders, AVG(revenue) AS avg_revenue FROM daily
+),
+today AS (
+  SELECT COUNT(*) AS today_orders, SUM(total) AS today_revenue
+  FROM orders
+  WHERE tenant_id = 'TENANT_ID'
+    AND status NOT IN ('cancelled','failed')
+    AND created_at::date = current_date
+)
+SELECT
+  'today_vs_30d_avg',
+  ROUND(today.today_orders) AS today_orders,
+  ROUND(today.today_revenue) AS today_revenue,
+  ROUND(avg_30.avg_orders, 1) AS avg_daily_orders,
+  ROUND(avg_30.avg_revenue, 0) AS avg_daily_revenue,
+  ROUND(today.today_orders / NULLIF(avg_30.avg_orders, 0), 1) AS order_ratio,
+  CASE
+    WHEN today.today_orders / NULLIF(avg_30.avg_orders, 0) > 3
+    THEN 'SPIKE — likely sim or bleed'
+    ELSE 'normal range'
+  END AS verdict
+FROM today, avg_30;
+
+-- 3. Orphaned sale movements — stock moved without a matching order
+SELECT 'orphaned_sale_movements', COUNT(*)
+FROM stock_movements sm
+WHERE sm.tenant_id = 'TENANT_ID'
+  AND sm.movement_type = 'sale'
+  AND sm.reference NOT IN (
+    SELECT DISTINCT o.id::text FROM orders o
+    WHERE o.tenant_id = 'TENANT_ID'
+  );
+```
+
+### How to read coherence results
+- `shell_orders_MUST_BE_0`: Any > 0 = cancel immediately
+- `today_vs_30d_avg`: ratio > 3 = investigate before opening browser
+- `orphaned_sale_movements`: Any > 0 = stock data inconsistency
+
+---
+
 ## How to read results
 - Any row ending `_MUST_BE_0` that returns > 0 is a **blocking issue**
 - `expenses_count` should be > 20 for each tenant (indicates OPEX spine exists)
