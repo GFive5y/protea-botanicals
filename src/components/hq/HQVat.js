@@ -184,7 +184,8 @@ export default function HQVat() {
   const periodData = (pid) => {
     const txns = vatTxns.filter(t => t.vat_period === pid);
     const outputVat    = txns.reduce((s, t) => s + (parseFloat(t.output_vat) || 0), 0);
-    const inputVat     = txns.reduce((s, t) => s + (parseFloat(t.input_vat) || 0), 0);
+    const inputFromTxns = txns.reduce((s, t) => s + (parseFloat(t.input_vat) || 0), 0);
+    const inputVat     = inputFromTxns > 0 ? inputFromTxns : (expenseStats[pid]?.totalInputVat || 0) + (receiptStats[pid]?.totalInputVat || 0);
     const exclusiveRev = txns.filter(t => t.transaction_type === "output").reduce((s, t) => s + (parseFloat(t.exclusive_amount) || 0), 0);
     const inclusiveRev = txns.filter(t => t.transaction_type === "output").reduce((s, t) => s + (parseFloat(t.inclusive_amount) || 0), 0);
     return {
@@ -518,7 +519,8 @@ export default function HQVat() {
 
   // ── DASHBOARD ─────────────────────────────────────────────────
   const ytdOutput = vatTxns.reduce((s, t) => s + (parseFloat(t.output_vat) || 0), 0);
-  const ytdInput  = vatTxns.reduce((s, t) => s + (parseFloat(t.input_vat)  || 0), 0);
+  const ytdInputFromTxns = vatTxns.reduce((s, t) => s + (parseFloat(t.input_vat)  || 0), 0);
+  const ytdInput  = ytdInputFromTxns > 0 ? ytdInputFromTxns : ((expensesInputVat || 0) + (receiptsInputVat || 0));
   const ytdNet    = ytdOutput - ytdInput;
 
   return (

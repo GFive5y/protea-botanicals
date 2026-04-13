@@ -1320,7 +1320,7 @@ export default function HQProfitLoss() {
   const loyaltyCost = earnedPoints * costPerPointIssued;
   // GAP-02: include manual journal adjustments in final totals
   const jAdj = journalAdjustments || { totalRevAdj:0, totalCogsAdj:0, totalOpexAdj:0, count:0 };
-  const totalOpexIncLoyalty = totalOpex + loyaltyCost + jAdj.totalOpexAdj;
+  const totalOpexIncLoyalty = totalOpex + loyaltyCost;
   const adjustedRevenue     = totalRevenue + jAdj.totalRevAdj;
   const adjustedCogs        = totalCogs    + jAdj.totalCogsAdj;
   // LL-231: route revenue source by profile — must be declared before grossProfit
@@ -1353,19 +1353,28 @@ export default function HQProfitLoss() {
     return best;
   })();
 
-  const avgCogsPerUnit =
-    recipesWithCogs.length > 0
-      ? recipesWithCogs.reduce((s, r) => s + r.cogsPerUnit, 0) /
-        recipesWithCogs.length
-      : 0;
+  const avgCogsPerUnit = (() => {
+    if (recipesWithCogs.length > 0)
+      return recipesWithCogs.reduce((s, r) => s + r.cogsPerUnit, 0) / recipesWithCogs.length;
+    if (productMargins.length > 0) {
+      const totalUnits = productMargins.reduce((s, p) => s + p.units, 0);
+      const totalCost = productMargins.reduce((s, p) => s + p.cogs, 0);
+      return totalUnits > 0 ? totalCost / totalUnits : 0;
+    }
+    return 0;
+  })();
   const avgSellPrice = (() => {
     const prices = pricing.filter(
       (p) => p.sell_price_zar && p.channel === "retail",
     );
-    return prices.length > 0
-      ? prices.reduce((s, p) => s + parseFloat(p.sell_price_zar), 0) /
-          prices.length
-      : 0;
+    if (prices.length > 0)
+      return prices.reduce((s, p) => s + parseFloat(p.sell_price_zar), 0) / prices.length;
+    if (productMargins.length > 0) {
+      const totalUnits = productMargins.reduce((s, p) => s + p.units, 0);
+      const totalRev = productMargins.reduce((s, p) => s + p.revenue, 0);
+      return totalUnits > 0 ? totalRev / totalUnits : 0;
+    }
+    return 0;
   })();
   const breakEvenUnits =
     avgSellPrice > avgCogsPerUnit && totalOpexIncLoyalty > 0
@@ -2442,14 +2451,21 @@ export default function HQProfitLoss() {
               {/* Gross Margin Trend */}
               {(() => {
                 const dayMap = {};
-                orders.forEach((o) => {
+                const oiCogsByOrder = {};
+                if (orderItemsCogs?.items) {
+                  orderItemsCogs.items.forEach((oi) => {
+                    const avco = oi.product_metadata?.weighted_avg_cost || 0;
+                    oiCogsByOrder[oi.order_id] = (oiCogsByOrder[oi.order_id] || 0) + avco * (oi.quantity || 1);
+                  });
+                }
+                filteredOrders.forEach((o) => {
                   const day = new Date(o.created_at).toLocaleDateString(
                     "en-ZA",
                     { month: "short", day: "numeric" },
                   );
                   dayMap[day] = dayMap[day] || { date: day, revenue: 0, cogs: 0 };
-                  dayMap[day].revenue += parseFloat(o.total) || 0;
-                  dayMap[day].cogs += avgFullCogsPerUnit * (parseInt(o.items_count) || 1);
+                  dayMap[day].revenue += (parseFloat(o.total) || 0) / VAT_RATE;
+                  dayMap[day].cogs += oiCogsByOrder[o.id] || avgFullCogsPerUnit * (parseInt(o.items_count) || 1);
                 });
                 const trendData = Object.values(dayMap)
                   .slice(-20)
@@ -2733,66 +2749,37 @@ export default function HQProfitLoss() {
               <div style={{ ...card, padding: 0 }}>
                 <SectionHeader icon="🏆" label="Best Margin SKU" />
                 <div style={{ padding: "16px 20px" }}>
-                  {bestSkuMargin ? (
+                  {(() => {
+                    const sku = bestSkuMargin || (productMargins.length > 0
+                      ? (() => { const best = [...productMargins].sort((a, b) => b.margin - a.margin)[0]; return { name: best.name, sell: best.revenue / best.units, cogs: best.cogs / best.units, margin: best.margin, channel: "pos" }; })()
+                      : null);
+                    return sku ? (
                     <div>
-                      <div
-                        style={{
-                          fontSize: 18,
-                          fontWeight: 700,
-                          color: "#2d4a2d",
-                          marginBottom: 4,
-                        }}
-                      >
-                        {bestSkuMargin.name}
+                      <div style={{ fontSize: 18, fontWeight: 700, color: "#2d4a2d", marginBottom: 4 }}>
+                        {sku.name}
                       </div>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: "#999",
-                          marginBottom: 12,
-                          textTransform: "capitalize",
-                        }}
-                      >
-                        {bestSkuMargin.channel} channel
+                      <div style={{ fontSize: 12, color: "#999", marginBottom: 12, textTransform: "capitalize" }}>
+                        {sku.channel} channel
                       </div>
                       <div style={{ display: "flex", gap: 16 }}>
                         {[
-                          ["Sell Price", fmtZar(bestSkuMargin.sell)],
-                          ["COGS", fmtZar(bestSkuMargin.cogs)],
-                          ["Margin", `${fmt(bestSkuMargin.margin)}%`],
+                          ["Sell Price", fmtZar(sku.sell)],
+                          ["COGS", fmtZar(sku.cogs)],
+                          ["Margin", `${fmt(sku.margin)}%`],
                         ].map(([l, v]) => (
                           <div key={l} style={{ textAlign: "center" }}>
-                            <div
-                              style={{
-                                fontSize: 11,
-                                color: "#999",
-                                marginBottom: 4,
-                              }}
-                            >
-                              {l}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: 15,
-                                fontWeight: 700,
-                                color:
-                                  l === "Margin"
-                                    ? pctColour(bestSkuMargin.margin)
-                                    : "#333",
-                              }}
-                            >
-                              {v}
-                            </div>
+                            <div style={{ fontSize: 11, color: "#999", marginBottom: 4 }}>{l}</div>
+                            <div style={{ fontSize: 15, fontWeight: 700, color: l === "Margin" ? pctColour(sku.margin) : "#333" }}>{v}</div>
                           </div>
                         ))}
                       </div>
                     </div>
                   ) : (
                     <p style={{ color: "#bbb", fontSize: 13 }}>
-                      Set retail prices in <strong>HQ → Pricing</strong> to see
-                      best margin SKU.
+                      No margin data available yet.
                     </p>
-                  )}
+                  );
+                  })()}
                 </div>
               </div>
 

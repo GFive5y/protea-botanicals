@@ -463,11 +463,20 @@ export default function HQBalanceSheet() {
       if (eqRes.data) setEquityLedger(eqRes.data);
       if (cfgRes.data) setVatRegistered(!!cfgRes.data.vat_registered);
 
-      // Real VAT position from vat_transactions
+      // Real VAT position from vat_transactions, fallback to expenses input_vat_amount
       const vatOutput = (vatTxnRes.data || [])
         .reduce((s, t) => s + (parseFloat(t.output_vat) || 0), 0);
-      const vatInput = (vatTxnRes.data || [])
+      const vatInputFromTxns = (vatTxnRes.data || [])
         .reduce((s, t) => s + (parseFloat(t.input_vat) || 0), 0);
+      let vatInput = vatInputFromTxns;
+      if (vatInput === 0) {
+        const { data: expVat } = await supabase
+          .from("expenses")
+          .select("input_vat_amount")
+          .eq("tenant_id", tenantId)
+          .gt("input_vat_amount", 0);
+        vatInput = (expVat || []).reduce((s, e) => s + (parseFloat(e.input_vat_amount) || 0), 0);
+      }
       setVatSummary({ output: vatOutput, input: vatInput });
 
       // LL-231: cannabis_dispensary revenue from dispensing_log, not orders
@@ -508,14 +517,12 @@ export default function HQBalanceSheet() {
     if (!tenantId) return;
     const { start, end } = getPeriodBounds(cfPeriod, cfCustomFrom, cfCustomTo);
     try {
-      // Cash received from customers (online orders)
-      let ordersQ = supabase
-        .from("orders")
-        .select("total, created_at")
-        .eq("tenant_id", tenantId);
-      if (start) ordersQ = ordersQ.gte("created_at", start);
-      if (end) ordersQ = ordersQ.lte("created_at", end);
-      const ordersRes = await ordersQ;
+      // Cash received from customers — use RPC per LL-209 (1000-row cap)
+      const ordersRes = await supabase.rpc("get_tenant_orders_for_pl", {
+        p_tenant_id: tenantId,
+        p_since: start || null,
+        p_until: end || null,
+      });
 
       // Cash paid to suppliers (received/complete POs)
       let poQ = supabase
@@ -606,9 +613,9 @@ export default function HQBalanceSheet() {
   const totalLiabilities = payables;
   const netEquity = totalAssets - totalLiabilities;
   // ── WP-FINANCIALS Phase 3: derived from new tables ─────────────────────
-  const totalFARCost  = fixedAssetsReg.reduce((s, a) => s + (parseFloat(a.cost_price) || 0), 0);
+  const totalFARCost  = fixedAssetsReg.reduce((s, a) => s + (parseFloat(a.purchase_cost) || 0), 0);
   const totalFARAccDep = fixedAssetsReg.reduce((s, a) => s + (parseFloat(a.accumulated_depreciation) || 0), 0);
-  const totalFARNBV   = totalFARCost - totalFARAccDep;
+  const totalFARNBV   = Math.max(0, totalFARCost - totalFARAccDep);
   const fixedAssetsValue = fixedAssetsReg.length > 0 ? totalFARNBV : totalCapex;
 
   const vatNetPayable  = vatSummary.output - vatSummary.input;
@@ -873,21 +880,21 @@ export default function HQBalanceSheet() {
               >
                 <KPI
                   label="Total Assets"
-                  value={fmtZar(totalAssets)}
+                  value={fmtZar(totalCurrentAssets + fixedAssetsValue)}
                   sub={`${inventoryCount} inventory items`}
                   color={T.accent}
                 />
                 <KPI
                   label="Total Liabilities"
-                  value={fmtZar(totalLiabilities)}
-                  sub={`${payablesCount} open PO${payablesCount !== 1 ? "s" : ""}`}
-                  color={totalLiabilities > 0 ? T.danger : T.ink500}
+                  value={fmtZar(totalLiabilities2)}
+                  sub={`AP + VAT + accrued`}
+                  color={totalLiabilities2 > 0 ? T.danger : T.ink500}
                 />
                 <KPI
                   label="Net Equity"
-                  value={fmtZar(netEquity)}
+                  value={fmtZar(netEquity2)}
                   sub="Assets minus Liabilities"
-                  color={netEquity >= 0 ? T.success : T.danger}
+                  color={netEquity2 >= 0 ? T.success : T.danger}
                 />
               </div>
 
@@ -1020,9 +1027,9 @@ export default function HQBalanceSheet() {
                         <span style={{ textAlign:"right" }}>NBV</span>
                       </div>
                       {fixedAssetsReg.map(asset => {
-                        const cost   = parseFloat(asset.cost_price) || 0;
+                        const cost   = parseFloat(asset.purchase_cost) || 0;
                         const accDep = parseFloat(asset.accumulated_depreciation) || 0;
-                        const nbv    = cost - accDep;
+                        const nbv    = Math.max(0, cost - accDep);
                         return (
                           <div key={asset.id} style={{
                             display:"grid", gridTemplateColumns:"1fr 90px 90px 90px",
