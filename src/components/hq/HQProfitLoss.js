@@ -1497,12 +1497,8 @@ export default function HQProfitLoss() {
 
   return (
     <div style={{ fontFamily: T.font, color: "#333" }}>
-      <WorkflowGuide
-        context={ctx}
-        tabId="pl"
-        onAction={() => {}}
-        defaultOpen={true}
-      />
+      {/* WorkflowGuide removed — showed uncapped order count contradicting P&L.
+         Redundant with AINS AI assistant layer. Revisit post-demo. */}
 
       {/* Header */}
       <div
@@ -1837,38 +1833,45 @@ export default function HQProfitLoss() {
                 />
 
                 <SectionHeader icon="📦" label={PL.cogs} />
+                {cogsSource !== "actual" && (
+                  <>
+                    <WRow
+                      label={
+                        hasActualCogs
+                          ? "Cost of goods produced (actual — stock movements × AVCO)"
+                          : "Imported hardware & terpenes (recipe cost estimate)"
+                      }
+                      sub={
+                        hasActualCogs
+                          ? `${filteredProductionMovements.length} production movement${filteredProductionMovements.length !== 1 ? "s" : ""} · AVCO weighted average cost · actual material usage`
+                          : avgImportCogsPerUnit > 0
+                            ? `R${fmt(avgImportCogsPerUnit)} avg import/unit × ${totalUnitsSold} units sold · from ${recipesWithCogs.length} active recipe${recipesWithCogs.length !== 1 ? "s" : ""}${incompletePOs.length > 0 ? ` · ⚠ ${incompletePOs.length} incomplete PO${incompletePOs.length !== 1 ? "s" : ""} excluded` : ""}`
+                            : "⚠ Set hardware & terpene prices in HQ → Suppliers"
+                      }
+                      value={importCogsHardware}
+                      indent={1}
+                      negative
+                      dim={avgImportCogsPerUnit === 0}
+                    />
+                    <WRow
+                      label="Local inputs (distillate · packaging · labour)"
+                      sub={
+                        avgLocalCogsPerUnit > 0
+                          ? `R${fmt(avgLocalCogsPerUnit)} avg local/unit × ${totalUnitsSold} units sold`
+                          : "⚠ Set costs in HQ → Costing → Local Inputs tab"
+                      }
+                      value={localCogsTotal}
+                      indent={1}
+                      negative
+                      dim={avgLocalCogsPerUnit === 0}
+                    />
+                  </>
+                )}
                 <WRow
-                  label={
-                    hasActualCogs
-                      ? "Cost of goods produced (actual — stock movements × AVCO)"
-                      : "Imported hardware & terpenes (recipe cost estimate)"
-                  }
-                  sub={
-                    hasActualCogs
-                      ? `${filteredProductionMovements.length} production movement${filteredProductionMovements.length !== 1 ? "s" : ""} · AVCO weighted average cost · actual material usage`
-                      : avgImportCogsPerUnit > 0
-                        ? `R${fmt(avgImportCogsPerUnit)} avg import/unit × ${totalUnitsSold} units sold · from ${recipesWithCogs.length} active recipe${recipesWithCogs.length !== 1 ? "s" : ""}${incompletePOs.length > 0 ? ` · ⚠ ${incompletePOs.length} incomplete PO${incompletePOs.length !== 1 ? "s" : ""} excluded` : ""}`
-                        : "⚠ Set hardware & terpene prices in HQ → Suppliers"
-                  }
-                  value={importCogsHardware}
-                  indent={1}
-                  negative
-                  dim={avgImportCogsPerUnit === 0}
-                />
-                <WRow
-                  label="Local inputs (distillate · packaging · labour)"
-                  sub={
-                    avgLocalCogsPerUnit > 0
-                      ? `R${fmt(avgLocalCogsPerUnit)} avg local/unit × ${totalUnitsSold} units sold`
-                      : "⚠ Set costs in HQ → Costing → Local Inputs tab"
-                  }
-                  value={localCogsTotal}
-                  indent={1}
-                  negative
-                  dim={avgLocalCogsPerUnit === 0}
-                />
-                <WRow
-                  label={`Total COGS${cogsSource === "actual" ? " (actual)" : cogsSource === "production" ? " (production)" : " (estimated)"}`}
+                  label={cogsSource === "actual"
+                    ? "Total COGS (actual — POS sales × AVCO)"
+                    : `Total COGS${cogsSource === "production" ? " (production)" : " (estimated)"}`}
+                  sub={cogsSource === "actual" ? `${filteredOI.length} line items from ${filteredOrders.length} orders` : undefined}
                   value={totalCogs}
                   bold
                   negative
@@ -2905,11 +2908,24 @@ export default function HQProfitLoss() {
               <div style={{ ...card, padding: 0 }}>
                 <SectionHeader icon="📈" label="Channel Margin Comparison" />
                 <div style={{ padding: "16px 20px" }}>
-                  {pricing.length === 0 ? (
+                  {pricing.length === 0 && productMargins.length === 0 ? (
                     <p style={{ color: "#bbb", fontSize: 13 }}>
-                      No pricing data yet. Set prices in{" "}
-                      <strong>HQ → Pricing</strong>.
+                      No margin data available yet.
                     </p>
+                  ) : pricing.length === 0 && productMargins.length > 0 ? (
+                    (() => {
+                      const totalRev = productMargins.reduce((s, p) => s + p.revenue, 0);
+                      const totalCg = productMargins.reduce((s, p) => s + p.cogs, 0);
+                      const margin = totalRev > 0 ? ((totalRev - totalCg) / totalRev * 100) : 0;
+                      return (
+                        <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", fontSize: 13, borderBottom: "1px solid #f5f5f5" }}>
+                          <span style={{ textTransform: "capitalize", color: "#333", fontWeight: 500 }}>pos</span>
+                          <span style={{ fontWeight: 700, color: margin >= 50 ? "#2E7D32" : margin >= 30 ? "#F57F17" : "#c62828" }}>
+                            {margin.toFixed(1)}%
+                          </span>
+                        </div>
+                      );
+                    })()
                   ) : (
                     ["wholesale", "retail", "website"].map((ch) => {
                       const chPrices = pricing.filter(

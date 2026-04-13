@@ -513,82 +513,28 @@ export default function HQBalanceSheet() {
     }
   }, [tenantId, industryProfile]);
 
-  // ── Fetch cash flow data ──────────────────────────────────────────────────
+  // ── Fetch cash flow data via tenant_financial_period RPC (LL-210) ────────
   const fetchCashFlow = useCallback(async () => {
     if (!tenantId) return;
     const { start, end } = getPeriodBounds(cfPeriod, cfCustomFrom, cfCustomTo);
     try {
-      // Cash received from customers — use RPC per LL-209 (1000-row cap)
-      const ordersRes = await supabase.rpc("get_tenant_orders_for_pl", {
+      const { data: fp } = await supabase.rpc("tenant_financial_period", {
         p_tenant_id: tenantId,
-        p_since: start || null,
-        p_until: end || null,
+        p_since: start || new Date(0).toISOString(),
+        p_until: end || new Date().toISOString(),
       });
-
-      // Cash paid to suppliers (received/complete POs)
-      let poQ = supabase
-        .from("purchase_orders")
-        .select("landed_cost_zar, received_date, status")
-        .eq("tenant_id", tenantId)
-        .in("status", ["received", "complete", "partially_received"]);
-      if (start) poQ = poQ.gte("received_date", start);
-      if (end) poQ = poQ.lte("received_date", end);
-      const poRes = await poQ;
-
-      // OPEX paid — expense_date is DATE column, compare with YYYY-MM-DD only
-      const expStart = start ? start.slice(0, 10) : null;
-      const expEnd = end ? end.slice(0, 10) : null;
-      let opexQ = supabase
-        .from("expenses")
-        .select("amount_zar, expense_date")
-        .eq("tenant_id", tenantId)
-        .eq("category", "opex");
-      if (expStart) opexQ = opexQ.gte("expense_date", expStart);
-      if (expEnd) opexQ = opexQ.lte("expense_date", expEnd);
-      const opexRes = await opexQ;
-
-      // CAPEX paid — same DATE fix
-      let capexQ = supabase
-        .from("expenses")
-        .select("amount_zar, expense_date, description")
-        .eq("tenant_id", tenantId)
-        .eq("category", "capex");
-      if (expStart) capexQ = capexQ.gte("expense_date", expStart);
-      if (expEnd) capexQ = capexQ.lte("expense_date", expEnd);
-      const capexRes = await capexQ;
-
-      const cashFromCustomers = (ordersRes.data || []).reduce(
-        (s, o) => s + parseFloat(o.total || 0),
-        0,
-      );
-      const cashToSuppliers = (poRes.data || []).reduce(
-        (s, p) => s + parseFloat(p.landed_cost_zar || 0),
-        0,
-      );
-      const opexPaid = (opexRes.data || []).reduce(
-        (s, e) => s + parseFloat(e.amount_zar || 0),
-        0,
-      );
-      const capexPaid = (capexRes.data || []).reduce(
-        (s, e) => s + parseFloat(e.amount_zar || 0),
-        0,
-      );
-
-      const netOperating = cashFromCustomers - cashToSuppliers - opexPaid;
-      const netInvesting = -capexPaid;
-      const netCash = netOperating + netInvesting;
-
+      if (!fp) return;
       setCfData({
-        cashFromCustomers,
-        cashToSuppliers,
-        opexPaid,
-        netOperating,
-        capexPaid,
-        capexItems: capexRes.data || [],
-        netInvesting,
-        netCash,
-        orderCount: (ordersRes.data || []).length,
-        poCount: (poRes.data || []).length,
+        cashFromCustomers: fp.cash?.from_customers || 0,
+        cashToSuppliers: fp.cash?.to_suppliers || 0,
+        opexPaid: fp.cash?.to_opex || 0,
+        netOperating: fp.cash?.net_operating || 0,
+        capexPaid: fp.cash?.capex || 0,
+        capexItems: [],
+        netInvesting: -(fp.cash?.capex || 0),
+        netCash: fp.cash?.net_movement || 0,
+        orderCount: fp.orders?.paid_count || 0,
+        poCount: 0,
       });
     } catch (err) {
       console.error("Cash flow fetch error:", err);
@@ -613,11 +559,13 @@ export default function HQBalanceSheet() {
   const totalAssets = totalCurrentAssets + totalFixedAssets;
   const totalLiabilities = payables;
   const netEquity = totalAssets - totalLiabilities;
+  // T16: single canonical Total Assets used in all display + equation check
   // ── WP-FINANCIALS Phase 3: derived from new tables ─────────────────────
   const totalFARCost  = fixedAssetsReg.reduce((s, a) => s + (parseFloat(a.purchase_cost) || 0), 0);
   const totalFARAccDep = fixedAssetsReg.reduce((s, a) => s + (parseFloat(a.accumulated_depreciation) || 0), 0);
   const totalFARNBV   = Math.max(0, totalFARCost - totalFARAccDep);
   const fixedAssetsValue = fixedAssetsReg.length > 0 ? totalFARNBV : totalCapex;
+  const canonicalTotalAssets = totalCurrentAssets + fixedAssetsValue;
 
   const vatNetPayable  = vatSummary.output - vatSummary.input;
   const vatLiability   = vatRegistered && vatNetPayable > 0 ? vatNetPayable : 0;
@@ -630,12 +578,12 @@ export default function HQBalanceSheet() {
   const equityAvailable  = equityLedger !== null || ytdNetProfit !== null;
 
   const totalLiabilities2 = payables + vatLiability + payePayable + opexAccruals;
-  const netEquity2        = equityAvailable ? equityFromLedger : totalAssets - totalLiabilities2;
+  const netEquity2        = equityAvailable ? equityFromLedger : canonicalTotalAssets - totalLiabilities2;
 
   const balanced =
     Math.abs(totalAssets - (totalLiabilities + netEquity)) < 0.01;
   const balanced2 =
-    Math.abs((inventoryValue + receivables + cashAtBank + fixedAssetsValue) - (totalLiabilities2 + netEquity2)) < 1.0;
+    Math.abs(canonicalTotalAssets - (totalLiabilities2 + netEquity2)) < 1.0;
 
   // ── CSV export ────────────────────────────────────────────────────────────
   const exportCSV = () => {
@@ -654,9 +602,9 @@ export default function HQBalanceSheet() {
         e.description,
         parseFloat(e.amount_zar).toFixed(2),
       ]),
-      ["Total Fixed Assets", totalFixedAssets.toFixed(2)],
+      ["Total Fixed Assets", fixedAssetsValue.toFixed(2)],
       [],
-      ["TOTAL ASSETS", totalAssets.toFixed(2)],
+      ["TOTAL ASSETS", canonicalTotalAssets.toFixed(2)],
       [],
       ["LIABILITIES"],
       ["Accounts Payable", payables.toFixed(2)],
@@ -1083,7 +1031,7 @@ export default function HQBalanceSheet() {
 
                   <BSRow
                     label="TOTAL ASSETS"
-                    value={totalAssets}
+                    value={canonicalTotalAssets}
                     total
                     bold
                     borderTop
@@ -1168,7 +1116,7 @@ export default function HQBalanceSheet() {
                       label="Accounting Equation Check"
                       icon={balanced2 ? "\u2713" : "\u26A0"}
                     />
-                    <BSRow label="Total Assets" value={inventoryValue + receivables + fixedAssetsValue} bold />
+                    <BSRow label="Total Assets" value={canonicalTotalAssets} bold />
                     <BSRow label="Total Liabilities" value={totalLiabilities2} bold />
                     <BSRow label="Total Equity" value={netEquity2} bold />
                     <BSRow label="Liabilities + Equity" value={totalLiabilities2 + netEquity2} bold borderTop />
@@ -1185,7 +1133,7 @@ export default function HQBalanceSheet() {
                     >
                       {balanced2
                         ? "\u2713 Assets = Liabilities + Equity"
-                        : `\u26A0 Difference: ${fmtZar(Math.abs((inventoryValue + receivables + fixedAssetsValue) - totalLiabilities2 - netEquity2))} \u2014 run Financial Setup Wizard`}
+                        : `\u26A0 Difference: ${fmtZar(Math.abs(canonicalTotalAssets - totalLiabilities2 - netEquity2))} \u2014 run Financial Setup Wizard`}
                     </div>
                   </div>
                 </div>
