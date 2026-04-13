@@ -69,7 +69,7 @@ git push origin main
 |---|---|---|---|---|---|---|
 | MediCare Dispensary | PASS | PASS | PASS | PASS | PASS | PASS |
 | Metro Hardware | PASS | PASS | PASS | PASS | PASS | PASS |
-| Medi Recreational | PASS | pending | PASS | PASS | pending | pending |
+| Medi Recreational | PASS | PASS | PASS | PASS | PASS | PASS |
 | Garden Bistro | PASS | pending | PASS | PASS | pending | pending |
 
 ## KNOWN ISSUES (from pre-flight SQL 13 Apr 2026)
@@ -91,3 +91,59 @@ Action: WP-TENANT-ISOLATION post-demo backlog
 
 useHQIntelStrip.js false positive: uses .in("tenant_id", tids) — audit script
 only checks .eq("tenant_id") and misses the cross-tenant .in() pattern.
+
+---
+
+## Medi Recreational — Phase 4 Complete (14 April 2026)
+
+Demo-path bleed check: CLEAN
+Hook-level check: CLEAN
+HQPricing.js: fixed in a3a483a (product_cogs/product_pricing tenant filter)
+Shell orders: 182 cancelled (R202k phantom revenue removed)
+Real orders: 1,758 paid with complete order_items
+
+DB truth verified:
+  Items: 186 | Stock Value: R211,272 | Margin: 60.5%
+  In stock: 185 (1 OOS = Bubble Hash) | Below reorder: 6
+
+---
+
+## COHERENCE FAILURE DISCOVERY — 14 April 2026
+
+Shell orders (orders with no order_items) were found across all demo tenants.
+They produce revenue on Dashboard and P&L but have no inventory impact,
+no top sellers, no stock movements. Classic phantom data.
+
+**Root cause:** An older POS simulation mechanism created order headers
+without order_items. The v2.0 sim-pos-sales function does NOT create these.
+The v3.0 function is now parameterized and creates complete records.
+
+**Scale:**
+- Metro Hardware: 786 cancelled (had R3.57M phantom revenue — ALL data was phantom)
+- Garden Bistro: 390 cancelled (R125k phantom revenue on top of R707k real)
+- Medi Recreational: 182 cancelled (R202k phantom on top of R1.75M real)
+
+**Metro Hardware trading data is now R0** — real orders = 0.
+Metro needs sim-pos-sales v3.0 triggered before demo.
+
+**New Layer 3 coherence checks** now in docs/PREFLIGHT-SQL.md:
+1. Shell order count (MUST BE 0)
+2. Today vs 30d average spike detector (flag if > 3x)
+3. Orphaned sale movements
+
+## METRO HARDWARE — OUTSTANDING ACTION
+
+Metro Hardware has:
+- Nav fixed (GENERAL_RETAIL_WATERFALL)
+- Isolation clean (all bleeds fixed)
+- AVCO set on 847 items
+- **0 real orders** — trading data entirely missing
+- **Dashboard, P&L, IFRS will show R0** until sim runs
+
+Required action (CANNOT be done from Claude Code):
+1. Open Supabase Studio > Edge Functions > sim-pos-sales > Invoke
+2. Body: `{"tenant_id": "57156762-deb8-4721-a1f3-0c6d7c2a67d8", "days": 30, "orders_per_day": 15}`
+3. Wait for success response
+4. Re-run Layer 3 coherence check to confirm shell_orders = 0
+5. Hard refresh Metro Hardware portal
+6. Re-verify Dashboard, Daily Trading, P&L tiles against new numbers

@@ -1,35 +1,41 @@
-// sim-pos-sales v2.0 — POS Sales Simulator
-// Generates realistic order + order_items + pos_sessions + stock_movements + eod_cash_ups
-// Tags all records as notes='sim_data_v1' — wipe via DELETE cascade
-// Does NOT deduct actual inventory (stock_movements are audit trail only)
+// sim-pos-sales v3.0 — POS Sales Simulator (parameterized)
+// v3.0 change: tenant_id and user_id accepted from request body
+//              instead of hardcoded constants. Works for any tenant.
+// v2.0 was hardcoded to Medi Recreational only.
 //
 // Usage: POST /sim-pos-sales
-// Body: { "days": 30, "orders_per_day": 12 } (defaults if omitted)
+// Body: {
+//   "tenant_id": "UUID",            -- REQUIRED
+//   "user_id": "UUID",              -- optional, will use first admin if omitted
+//   "days": 30,                     -- optional, default 30, max 90
+//   "orders_per_day": 12            -- optional, default 12, max 40
+// }
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-const TENANT_ID = 'b1bad266-ceb4-4558-bbc3-22cfeeeafe74';
-const USER_ID   = '283c7fe6-19ab-44fd-95fb-8adb2ca204ad'; // Medi Admin
-const SIM_TAG   = 'sim_data_v1';
+const SIM_TAG = 'sim_data_v1';
 
-// Category weights v2 — cannabis-realistic
 const CAT_WEIGHTS: Record<string, number> = {
-  flower:           30,
-  concentrate:      25,
-  accessory:        20,
-  hardware:         12,
-  finished_product:  8,
-  raw_material:      5,
+  flower:            30,
+  concentrate:       25,
+  accessory:         20,
+  hardware:          12,
+  finished_product:   8,
+  raw_material:       5,
+  edible:            10,
+  terpene:            4,
+  packaging:          3,
+  equipment:          8,
+  other:              3,
 };
 
-// Payment method distribution
 const PAYMENT_METHODS = [
-  ...Array(55).fill('cash'),
+  ...Array(45).fill('cash'),
   ...Array(30).fill('card'),
   ...Array(15).fill('yoco'),
+  ...Array(10).fill('eft'),
 ];
 
-// Realistic trading hours (weighted toward lunch + late afternoon)
 const HOUR_WEIGHTS = [
   { hour: 9,  weight: 4 },
   { hour: 10, weight: 6 },
@@ -56,10 +62,7 @@ function weightedRandom<T>(items: T[], weights: number[]): T {
 }
 
 function pickHour(): number {
-  return weightedRandom(
-    HOUR_WEIGHTS.map(h => h.hour),
-    HOUR_WEIGHTS.map(h => h.weight)
-  );
+  return weightedRandom(HOUR_WEIGHTS.map(h => h.hour), HOUR_WEIGHTS.map(h => h.weight));
 }
 
 function pickPayment(): string {
@@ -70,16 +73,18 @@ function genRef(date: Date, seq: number): string {
   const yy = String(date.getFullYear()).slice(2);
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const dd = String(date.getDate()).padStart(2, '0');
-  return `SIM-${yy}${mm}${dd}-${String(seq).padStart(4,'0')}`;
+  return `SIM-${yy}${mm}${dd}-${String(seq).padStart(4, '0')}`;
 }
 
 function toDateStr(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type' } });
+    return new Response(null, {
+      headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type' }
+    });
   }
 
   try {
@@ -89,10 +94,34 @@ Deno.serve(async (req) => {
     );
 
     const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
-    const DAYS: number           = Math.min(body.days ?? 30, 90);
+
+    const TENANT_ID: string = body.tenant_id;
+    if (!TENANT_ID) {
+      return new Response(JSON.stringify({
+        error: 'tenant_id is required in request body',
+        usage: 'POST body: { "tenant_id": "UUID", "days": 30, "orders_per_day": 12 }'
+      }), { status: 400 });
+    }
+
+    let USER_ID: string = body.user_id ?? null;
+    if (!USER_ID) {
+      const { data: adminUser } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('tenant_id', TENANT_ID)
+        .limit(1)
+        .single();
+      USER_ID = adminUser?.id ?? null;
+    }
+    if (!USER_ID) {
+      return new Response(JSON.stringify({
+        error: 'No user found for tenant. Pass user_id in request body.',
+      }), { status: 400 });
+    }
+
+    const DAYS: number = Math.min(body.days ?? 30, 90);
     const ORDERS_PER_DAY: number = Math.min(body.orders_per_day ?? 12, 40);
 
-    // 1. Fetch available inventory
     const { data: items, error: itemsErr } = await supabase
       .from('inventory_items')
       .select('id, name, category, sell_price, weighted_avg_cost')
@@ -101,10 +130,13 @@ Deno.serve(async (req) => {
       .gt('sell_price', 0);
 
     if (itemsErr || !items?.length) {
-      return new Response(JSON.stringify({ error: 'No inventory items found', detail: itemsErr }), { status: 500 });
+      return new Response(JSON.stringify({
+        error: 'No inventory items found for tenant',
+        tenant_id: TENANT_ID,
+        detail: itemsErr
+      }), { status: 400 });
     }
 
-    // Group items by category
     const byCategory: Record<string, typeof items> = {};
     for (const item of items) {
       if (!byCategory[item.category]) byCategory[item.category] = [];
@@ -126,22 +158,19 @@ Deno.serve(async (req) => {
       const date = new Date(now);
       date.setDate(now.getDate() - dayOffset);
       date.setHours(0, 0, 0, 0);
-
       const dateStr = toDateStr(date);
 
-      // Sundays ~20% quieter
       const isSunday = date.getDay() === 0;
       const dayOrders = isSunday
         ? Math.max(1, Math.round(ORDERS_PER_DAY * 0.8))
         : ORDERS_PER_DAY;
 
-      // Track cash total for this day's EOD
       let dayCashTotal = 0;
       const OPENING_FLOAT = 500;
 
-      // pos_session for this day — opens 09:00 SAST (07:00 UTC)
       const sessionOpen = new Date(date);
-      sessionOpen.setHours(7, 0, 0, 0); // 09:00 SAST = 07:00 UTC
+      sessionOpen.setHours(7, 0, 0, 0);
+
       sessionsToInsert.push({
         id: crypto.randomUUID(),
         tenant_id: TENANT_ID,
@@ -157,7 +186,6 @@ Deno.serve(async (req) => {
         const orderRef = genRef(date, seq++);
         const payMethod = pickPayment();
 
-        // Pick 1–4 items
         const itemCount = Math.floor(Math.random() * 4) + 1;
         const selectedItems: { item: (typeof items)[0]; qty: number }[] = [];
         const usedIds = new Set<string>();
@@ -168,7 +196,6 @@ Deno.serve(async (req) => {
           if (!pool.length) continue;
           const item = pool[Math.floor(Math.random() * pool.length)];
           usedIds.add(item.id);
-          // 15% chance of bulk (2-3 units)
           const qty = Math.random() < 0.85 ? 1 : Math.floor(Math.random() * 2) + 2;
           selectedItems.push({ item, qty });
         }
@@ -176,18 +203,13 @@ Deno.serve(async (req) => {
         if (!selectedItems.length) continue;
 
         const total = selectedItems.reduce((s, { item, qty }) => s + item.sell_price * qty, 0);
-
-        // Track cash for EOD
         if (payMethod === 'cash') dayCashTotal += total;
 
-        // Set realistic time
         const hour = pickHour();
         const minute = Math.floor(Math.random() * 60);
         const second = Math.floor(Math.random() * 60);
         const orderTime = new Date(date);
         orderTime.setHours(hour, minute, second, 0);
-
-        // Adjust for timezone (SAST = UTC+2)
         const utcTime = new Date(orderTime.getTime() - 2 * 60 * 60 * 1000);
 
         ordersToInsert.push({
@@ -223,7 +245,6 @@ Deno.serve(async (req) => {
             created_at: utcTime.toISOString(),
           });
 
-          // stock_movement for this line item
           movementsToInsert.push({
             id: crypto.randomUUID(),
             tenant_id: TENANT_ID,
@@ -237,12 +258,11 @@ Deno.serve(async (req) => {
         }
       }
 
-      // eod_cash_up for this day — 20:00 SAST (18:00 UTC)
       const systemCash = OPENING_FLOAT + dayCashTotal;
-      const variance = 0.95 + Math.random() * 0.10; // ±5%
+      const variance = 0.95 + Math.random() * 0.10;
       const countedCash = Math.round(systemCash * variance * 100) / 100;
       const eodTime = new Date(date);
-      eodTime.setHours(18, 0, 0, 0); // 20:00 SAST = 18:00 UTC
+      eodTime.setHours(18, 0, 0, 0);
 
       eodsToInsert.push({
         id: crypto.randomUUID(),
@@ -250,43 +270,36 @@ Deno.serve(async (req) => {
         cashup_date: dateStr,
         system_cash_total: systemCash.toFixed(2),
         counted_cash: countedCash.toFixed(2),
-        // DO NOT insert variance — it is GENERATED (LL-198)
         notes: SIM_TAG,
         created_at: eodTime.toISOString(),
       });
     }
 
-    // Insert in batches
     let ordersInserted = 0, itemsInserted = 0, movementsInserted = 0;
 
     for (let i = 0; i < ordersToInsert.length; i += 100) {
-      const batch = ordersToInsert.slice(i, i + 100);
-      const { error } = await supabase.from('orders').insert(batch);
+      const { error } = await supabase.from('orders').insert(ordersToInsert.slice(i, i + 100));
       if (error) throw new Error('orders insert: ' + error.message);
-      ordersInserted += batch.length;
+      ordersInserted += Math.min(100, ordersToInsert.length - i);
     }
 
     for (let i = 0; i < orderItemsToInsert.length; i += 200) {
-      const batch = orderItemsToInsert.slice(i, i + 200);
-      const { error } = await supabase.from('order_items').insert(batch);
+      const { error } = await supabase.from('order_items').insert(orderItemsToInsert.slice(i, i + 200));
       if (error) throw new Error('order_items insert: ' + error.message);
-      itemsInserted += batch.length;
+      itemsInserted += Math.min(200, orderItemsToInsert.length - i);
     }
 
     for (let i = 0; i < movementsToInsert.length; i += 200) {
-      const batch = movementsToInsert.slice(i, i + 200);
-      const { error } = await supabase.from('stock_movements').insert(batch);
+      const { error } = await supabase.from('stock_movements').insert(movementsToInsert.slice(i, i + 200));
       if (error) throw new Error('stock_movements insert: ' + error.message);
-      movementsInserted += batch.length;
+      movementsInserted += Math.min(200, movementsToInsert.length - i);
     }
 
-    // pos_sessions — batch insert
     if (sessionsToInsert.length > 0) {
       const { error } = await supabase.from('pos_sessions').insert(sessionsToInsert);
       if (error) throw new Error('pos_sessions insert: ' + error.message);
     }
 
-    // eod_cash_ups — batch insert
     if (eodsToInsert.length > 0) {
       const { error } = await supabase.from('eod_cash_ups').insert(eodsToInsert);
       if (error) throw new Error('eod_cash_ups insert: ' + error.message);
@@ -296,7 +309,8 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      version: '2.0',
+      version: '3.0',
+      tenant_id: TENANT_ID,
       summary: {
         days_simulated: DAYS,
         orders_created: ordersInserted,

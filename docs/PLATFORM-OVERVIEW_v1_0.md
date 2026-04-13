@@ -469,3 +469,95 @@ Alt schema registry (intentionally different from tokens.js):
 - FI_T: HQFoodIntelligence.js (slate ink palette + 9 composite styles)
 
 *Update: WP-UNIFY session close · 13 April 2026*
+
+---
+*Update: 14 April 2026 — WP-DEMO-AUDIT retrospective + coherence failure discovery*
+
+## DEMO TENANT STATUS (14 Apr 2026)
+
+| Tenant | Profile | Phase 0-4 | Trading data | Notes |
+|---|---|---|---|---|
+| MediCare Dispensary | cannabis_dispensary | Complete | via dispensing_log | All 5 phases verified |
+| Metro Hardware | general_retail | Nav/isolation done | 0 real orders | sim-pos-sales not yet run for this tenant |
+| Medi Recreational | cannabis_retail | Complete | 1,758 real orders | Shell orders cancelled |
+| The Garden Bistro | food_beverage | Phase 4 pending | 3,388 real orders | Shell orders cancelled |
+
+## CRITICAL FINDING: COHERENCE FAILURE CLASS (discovered 14 Apr 2026)
+
+The tenant-isolation audit (Layer 1 — query filter scan) checks that data
+belongs to the right tenant. It does NOT check that data makes business sense.
+
+**Shell orders** (orders with no order_items records) are financially real —
+they appear in revenue, P&L, and Dashboard KPIs — but operationally hollow:
+no stock moves, no top sellers, no COGS. They are produced by the old
+sim-pos-sales mechanism and any POS integration that creates order headers
+without order_items.
+
+**Symptom pattern that exposes them:**
+- Dashboard TODAY'S SALES >> Daily Trading TRANSACTIONS (same day, same tenant)
+- "Zero sales recorded in last 30 days" AI insight alongside non-zero revenue
+- "Top Sellers: No sales recorded today" alongside positive order count
+- P&L revenue inconsistent with 30-day chart scale
+- Selling more in one day than total inventory value at cost
+
+**Scale found on 14 Apr 2026:**
+- Metro Hardware: 786 shell orders, R3.57M phantom revenue — ALL cancelled
+- Garden Bistro: 390 shell orders, R125k phantom revenue — ALL cancelled
+- Medi Recreational: 182 shell orders, R202k phantom revenue — ALL cancelled
+
+**Fix applied:** `UPDATE orders SET status='cancelled' WHERE NOT EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id=orders.id)`
+
+## THREE-LAYER AUDIT (updated 14 Apr 2026)
+
+Every agent must run all three layers in order. No layer can be skipped.
+
+**Layer 1 — Tenant isolation** (`python3 docs/audit_tenant_isolation.py`)
+Catches: query bleed, stale closures, hardcoded profile labels.
+Must exit 0 before browser opens.
+
+**Layer 2 — Data completeness** (paste docs/PREFLIGHT-SQL.md into Supabase)
+Catches: AVCO=0, sell_price=0, missing expenses, wrong category items.
+All MUST_BE_0 rows must return 0.
+
+**Layer 3 — Data coherence** (bottom section of docs/PREFLIGHT-SQL.md)
+Catches: shell orders, daily revenue spikes, orphaned stock movements.
+Added 14 Apr 2026 after discovering shell orders inflating financials.
+
+## SIM-POS-SALES (sim-pos-sales edge function)
+
+**v2.0:** Complete POS simulation — orders + order_items + stock_movements +
+pos_sessions + eod_cash_ups. All tagged `notes='sim_data_v1'` for easy wipe.
+Does NOT deduct actual inventory quantities.
+
+**v3.0 (14 Apr 2026):** Parameterized — accepts tenant_id in request body.
+Was hardcoded to Medi Recreational (b1bad266-...) in v2.
+Now works for any tenant that has inventory_items with sell_price > 0.
+
+**Trigger timing:** Day BEFORE demo day (May 11 for May 12 demo).
+CANNOT be triggered from Claude.ai (RULE 0Q).
+Trigger from: Supabase Studio > Edge Functions > sim-pos-sales > Invoke.
+Body: `{"tenant_id": "TENANT_UUID", "days": 30, "orders_per_day": 12}`
+
+**LOOP-001 — STILL OPEN:** Metro Hardware needs sim triggered before demo.
+Metro tenant_id: 57156762-deb8-4721-a1f3-0c6d7c2a67d8
+
+**Wipe command** (per tenant, from Supabase Studio):
+```sql
+DELETE FROM eod_cash_ups WHERE notes='sim_data_v1' AND tenant_id='TENANT_ID';
+DELETE FROM pos_sessions WHERE notes='sim_data_v1' AND tenant_id='TENANT_ID';
+DELETE FROM stock_movements WHERE notes='sim_data_v1' AND tenant_id='TENANT_ID';
+DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE notes='sim_data_v1' AND tenant_id='TENANT_ID');
+DELETE FROM orders WHERE notes='sim_data_v1' AND tenant_id='TENANT_ID';
+```
+
+## RULES ADDED THIS SESSION
+
+**RULE-COH-001:** Before any visual verify, run coherence checks from
+docs/PREFLIGHT-SQL.md (Layer 3). Shell orders MUST be 0. If today's
+revenue is > 3x the 30-day daily average, investigate before proceeding.
+
+**RULE-COH-002:** Any orders record with no matching order_items is a
+phantom record. Cancel it. Never let phantom records reach a demo screen.
+
+**RULE-COH-003:** Revenue coherence check — today's revenue must not
+exceed total stock value at cost. If it does, the data is synthetic.
