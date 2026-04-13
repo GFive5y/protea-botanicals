@@ -394,12 +394,13 @@ export default function HQBalanceSheet() {
         setPayablesCount(payRes.data.length);
       }
 
-      // OPEX accruals (unpaid opex expenses — optional memo)
+      // OPEX accruals (unpaid opex expenses only — paid expenses drop out)
       const opexRes = await supabase
         .from("expenses")
         .select("amount_zar")
         .eq("tenant_id", tenantId)
-        .eq("category", "opex");
+        .eq("category", "opex")
+        .neq("payment_status", "paid");
       if (opexRes.data) {
         setOpexAccruals(
           opexRes.data.reduce((s, e) => s + parseFloat(e.amount_zar || 0), 0),
