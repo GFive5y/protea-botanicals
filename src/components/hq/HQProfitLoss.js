@@ -1072,11 +1072,7 @@ export default function HQProfitLoss() {
     setLoading(true);
     const errors = {};
     const [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11] = await Promise.all([
-      supabase
-        .from("orders")
-        .select("id, created_at, total, status, items_count, currency")
-        .eq("tenant_id", tenantId)
-        .not("status", "in", '("cancelled","failed")'),
+      supabase.rpc("get_tenant_orders_for_pl", { p_tenant_id: tenantId }),
       supabase
         .from("purchase_orders")
         .select(
