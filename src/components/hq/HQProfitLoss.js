@@ -848,8 +848,7 @@ function DataBadge({ label, ok, count }) {
 export default function HQProfitLoss() {
   const { fxRate, fxLoading } = useFxRate();
   const usdZar = fxRate?.usd_zar || 18.5;
-  const { tenant, industryProfile } = useTenant();
-  const tenantId = tenant?.id;
+  const { tenant, tenantId, industryProfile } = useTenant();
 
   const ctx = usePageContext("pl", null);
 
