@@ -1068,7 +1068,8 @@ export default function HQProfitLoss() {
   }, [tenantId]);
 
   const fetchAll = useCallback(async () => {
-    if (!tenantId) return;
+    if (!tenantId) { console.warn("[PL-fetchAll] skipped — tenantId is null"); return; }
+    console.log("[PL-fetchAll] RUNNING with tenantId:", tenantId);
     setLoading(true);
     const errors = {};
     const [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11] = await Promise.all([
@@ -1109,6 +1110,7 @@ export default function HQProfitLoss() {
     if (r2.error) errors.pos = r2.error.message;
     if (r3.error) errors.cogs = r3.error.message;
     if (r7.error) errors.loyalty = r7.error.message;
+    console.log("[PL-fetchAll] RESULTS:", { orders: (r1.data||[]).length, ordersErr: r1.error?.message, pos: (r2.data||[]).length, cogs: (r3.data||[]).length, inv: (r11.data||[]).length });
     setOrders(r1.data || []);
     setPurchaseOrders(r2.data || []);
     setRecipes(r3.data || []);
@@ -1145,6 +1147,7 @@ export default function HQProfitLoss() {
   }, [tenantId]);
 
   useEffect(() => {
+    console.log("[PL-effect] fetchAll effect fired, tenantId:", tenantId);
     fetchAll();
   }, [fetchAll]);
 
