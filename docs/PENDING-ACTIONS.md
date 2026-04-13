@@ -33,10 +33,6 @@ Status: OPEN — fixes landed (ae5a3ce, dcd9569, c1b3c5b), not yet verified
 Action: Open each tenant portal, confirm zero cross-tenant data bleed.
 Close when: All 4 dashboards verified clean.
 
-### LOOP-003 — Layer 1 audit pass (exit code 0)
-Status: OPEN — script exists, not yet confirmed 0 BLEED post all fixes
-Action: Run python3 docs/audit_tenant_isolation.py. Must exit 0.
-Close when: Script runs clean.
 
 ---
 
@@ -51,6 +47,10 @@ Status: Known permanent limitation — scan_logs has no tenant_id column
 ---
 
 ## CLOSED LOOPS
+
+### CLOSED-008 — Layer 1 audit pass (exit code 0)
+Closed: 13 April 2026
+All tenant-scoped queries in all HQ components have explicit .eq("tenant_id", tenantId).
 
 ### CLOSED-001 — WP-DEMO-AUDIT: All 4 tenants seeded
 Closed: 13 April 2026
