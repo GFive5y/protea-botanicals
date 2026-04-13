@@ -1068,7 +1068,6 @@ export default function HQProfitLoss() {
   }, [tenantId]);
 
   const fetchAll = useCallback(async () => {
-    if (!tenantId) return;
     setLoading(true);
     const errors = {};
     const [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11] = await Promise.all([
@@ -1114,7 +1113,6 @@ export default function HQProfitLoss() {
     if (r3.error) errors.cogs = r3.error.message;
     if (r7.error) errors.loyalty = r7.error.message;
     setOrders(r1.data || []);
-    console.log("[PL] raw orders from DB:", { tenantId, count: (r1.data||[]).length, error: r1.error?.message });
     setPurchaseOrders(r2.data || []);
     setRecipes(r3.data || []);
     setSupplierProducts(r4.data || []);
@@ -1153,6 +1151,10 @@ export default function HQProfitLoss() {
     fetchAll();
   }, [fetchAll]);
 
+  useEffect(() => {
+    if (tenantId) fetchAll();
+  }, [tenantId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // v2.3: realtime revenue tiles
   useEffect(() => {
     const sub = supabase
@@ -1178,7 +1180,6 @@ export default function HQProfitLoss() {
   const filteredOrders = orders.filter((o) =>
     periodFilter(o.created_at, period, customFrom, customTo),
   );
-  console.log("[PL] period filter:", { period, ordersTotal: orders.length, filteredCount: filteredOrders.length, firstDate: orders[0]?.created_at, lastDate: orders[orders.length-1]?.created_at });
   // GAP-01: orders.total is VAT-inclusive. Divide by 1.15 to get ex-VAT revenue.
   // SA VAT = 15%. This affects all downstream calculations: grossProfit,
   // grossMarginPct, netProfit, netMarginPct, FX scenario, loyalty cost %.
