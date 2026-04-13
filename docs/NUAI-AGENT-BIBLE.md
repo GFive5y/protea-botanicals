@@ -548,6 +548,27 @@ Read once. Used throughout this Bible and BUILD-LOG.md.
   Always record schema changes in BUILD-LOG.md so future agents can reconstruct
   current DB state without grep'ing for non-existent migration files.
 
+## WP-DEMO-AUDIT + Financial RPC Architecture (14 Apr 2026 — Session v270)
+
+- **LL-209 — PostgREST 1000-ROW DEFAULT CAP**:
+  PostgREST silently caps all SELECT results at 1000 rows. Any component that
+  fetches an unbounded large table and filters client-side by date will silently
+  return wrong data at scale. Always pass date filters to the DB server-side.
+  See docs/LL-POSTGREST-ROW-CAP_v1_0.md for full chronicle.
+
+- **LL-210 — SINGLE-SOURCE FINANCIAL AGGREGATION**:
+  Financial aggregations across orders / expenses / journals / vat MUST use
+  tenant_financial_period (per tenant) or hq_financial_period (cross-tenant).
+  Direct from('orders').select or from('expenses').select for financial period
+  calculations in components is a violation. New components doing ad-hoc
+  aggregation will produce numbers that disagree with the rest of the platform.
+  Whitelist: components needing raw row-level access for editing (journal entry
+  editor, expense form, order detail) are exempt.
+  Reference RPCs:
+    tenant_financial_period(p_tenant_id, p_since, p_until) -> jsonb
+    hq_financial_period(p_since, p_until, p_industry_filter) -> jsonb
+  Both enforce 9 contract invariants. See SESSION-STATE_v270.
+
 ## WP-STOREFRONT-WIZARD Discoveries (10 Apr 2026 — Session v228)
 
 - **LL-214 — TESTING PROTOCOL — MANDATORY**:
