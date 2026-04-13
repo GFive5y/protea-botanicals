@@ -656,7 +656,7 @@ const FOOD_BEVERAGE_WATERFALL = [
     id: "inventory", label: "Inventory", icon: Package, color: "#1A3D2B",
     tabs: [
       { id: "stock",           label: "Stock Control",      desc: "Raw materials \u00b7 FEFO \u00b7 movements \u00b7 AVCO" },
-      { id: "supply-chain",    label: "Suppliers & POs",    desc: "Produce orders \u00b7 delivery receipt \u00b7 GRN" },
+      { id: "procurement",     label: "Suppliers & POs",    desc: "Purchase orders \u00b7 suppliers \u00b7 GRN" },
     ],
   },
   {
