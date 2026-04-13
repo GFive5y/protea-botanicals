@@ -559,6 +559,7 @@ export default function HQOverview({ onNavigate }) {
           .from("orders")
           .select("total")
           .eq("tenant_id", tenantId)
+          .not("status", "in", '("cancelled","failed")')
           .gte("created_at", monthStart.toISOString());
         setPlStats({
           revenueMTD: (ordersData || []).reduce(
