@@ -748,11 +748,12 @@ export default function HQPricing() {
       supabase
         .from("product_cogs")
         .select("*")
+        .eq("tenant_id", _tid)
         .eq("is_active", true)
         .order("product_name"),
       supabase.from("supplier_products").select("*").eq("is_active", true),
       supabase.from("local_inputs").select("*").eq("is_active", true),
-      supabase.from("product_pricing").select("*"),
+      supabase.from("product_pricing").select("*").eq("tenant_id", _tid),
       _tid
         ? supabase
             .from("loyalty_config")
@@ -768,7 +769,7 @@ export default function HQPricing() {
     if (r5.data) setLoyaltyConfig(r5.data);
     setLoading(false);
     if (!selectedId && r1.data?.length > 0) setSelectedId(r1.data[0].id);
-  }, [selectedId]);
+  }, [selectedId, tenant]);
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
@@ -812,7 +813,7 @@ export default function HQPricing() {
       return;
     }
     showToast(`${channelId} price saved`);
-    const { data } = await supabase.from("product_pricing").select("*");
+    const { data } = await supabase.from("product_pricing").select("*").eq("tenant_id", tenant?.id);
     setPricing(data || []);
     setPricingVersion((v) => v + 1);
   };
