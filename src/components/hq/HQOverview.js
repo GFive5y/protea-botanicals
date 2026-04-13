@@ -590,12 +590,14 @@ export default function HQOverview({ onNavigate }) {
           supabase
             .from("product_pricing")
             .select("product_cogs_id,channel,sell_price_zar")
+            .eq("tenant_id", tenantId)
             .eq("channel", "retail"),
           supabase
             .from("product_cogs")
             .select(
               "id,hardware_item_id,hardware_qty,terpene_item_id,terpene_qty_g,distillate_input_id,distillate_qty_ml,packaging_input_id,packaging_qty,labour_input_id,labour_qty,other_cost_zar",
-            ),
+            )
+            .eq("tenant_id", tenantId),
           supabase
             .from("supplier_products")
             .select("id,unit_price_usd,category"),

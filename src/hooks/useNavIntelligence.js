@@ -57,10 +57,10 @@ export function useNavIntelligence(tenantId) {
           .order("created_at", { ascending: false })
           .limit(20),
 
-        // 5 — unread customer messages (RLS-scoped, no tenant_id filter needed)
         supabase
           .from("customer_messages")
           .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenantId)
           .is("read_at", null),
       ]);
 

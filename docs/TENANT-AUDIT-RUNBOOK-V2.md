@@ -79,3 +79,15 @@ git push origin main
 | Metro Hardware | 398 items avco=0 | UPDATE weighted_avg_cost = sell_price*0.40 |
 | Medi Recreational | 172 items avco=0, 5 sell=0 | Fix AVCO + set prices |
 | Garden Bistro | 12 items avco=0 | UPDATE weighted_avg_cost = sell_price*0.35 |
+
+---
+## Metro Hardware — Phase 4 Complete (HEAD 88a8fe9)
+
+Demo-path bleed check: CLEAN
+Hook-level check: CLEAN
+Pre-existing codebase bleeds: ~90 (mutation handlers + sub-components)
+Classification: not demo-blocking
+Action: WP-TENANT-ISOLATION post-demo backlog
+
+useHQIntelStrip.js false positive: uses .in("tenant_id", tids) — audit script
+only checks .eq("tenant_id") and misses the cross-tenant .in() pattern.

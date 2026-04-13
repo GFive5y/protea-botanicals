@@ -109,7 +109,7 @@ const CATEGORY_COLORS = {
 
 export default function HQAnalytics() {
   const ctx = usePageContext("hq-analytics", null);
-  const { tenant } = useTenant();
+  const { tenant, tenantId } = useTenant();
   const industryProfile = tenant?.industry_profile || "cannabis_retail";
   const isFoodBev = industryProfile === "food_beverage";
   const isGeneral = industryProfile === "general_retail";
@@ -150,7 +150,8 @@ export default function HQAnalytics() {
             .from("inventory_items")
             .select(
               "id,name,sku,category,unit,quantity_on_hand,reorder_level,cost_price,weighted_avg_cost,sell_price,is_active,supplier_id",
-            );
+            )
+            .eq("tenant_id", tenantId);
           return r.data || [];
         })
       ).filter((i) => i.is_active);
@@ -167,7 +168,8 @@ export default function HQAnalytics() {
           .from("purchase_orders")
           .select(
             "id,po_number,supplier_id,po_status,status,subtotal,currency,landed_cost_zar,usd_zar_rate,order_date,received_date,created_at,purchase_order_items(*)",
-          );
+          )
+          .eq("tenant_id", tenantId);
         return r.data || [];
       });
       result.productionRuns = await safe(async () => {
@@ -181,7 +183,8 @@ export default function HQAnalytics() {
       result.batches = await safe(async () => {
         const r = await supabase
           .from("batches")
-          .select("id,batch_number,product_name,product_type,status");
+          .select("id,batch_number,product_name,product_type,status")
+          .eq("tenant_id", tenantId);
         return r.data || [];
       });
       result.shipments = await safe(async () => {
@@ -204,13 +207,15 @@ export default function HQAnalytics() {
       result.users = await safe(async () => {
         const r = await supabase
           .from("user_profiles")
-          .select("id,role,created_at");
+          .select("id,role,created_at")
+          .eq("tenant_id", tenantId);
         return r.data || [];
       });
       result.loyalty = await safe(async () => {
         const r = await supabase
           .from("loyalty_transactions")
-          .select("points,transaction_type");
+          .select("points,transaction_type")
+          .eq("tenant_id", tenantId);
         return r.error ? [] : r.data || [];
       });
       result.tenants = await safe(async () => {
@@ -223,6 +228,7 @@ export default function HQAnalytics() {
         const r = await supabase
           .from("stock_movements")
           .select("id,item_id,quantity,movement_type,reference,created_at")
+          .eq("tenant_id", tenantId)
           .order("created_at", { ascending: false })
           .limit(50);
         return r.data || [];
@@ -233,6 +239,7 @@ export default function HQAnalytics() {
         const r = await supabase
           .from("orders")
           .select("id,created_at,total,status,items_count")
+          .eq("tenant_id", tenantId)
           .not("status", "in", '("cancelled","failed")')
           .order("created_at", { ascending: false })
           .limit(500);
@@ -247,7 +254,7 @@ export default function HQAnalytics() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tenantId]);
 
   useEffect(() => {
     fetchAll();
