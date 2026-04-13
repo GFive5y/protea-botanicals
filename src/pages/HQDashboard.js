@@ -52,6 +52,7 @@ import ExpenseManager from "../components/hq/ExpenseManager";
 import HQYearEnd from "../components/hq/HQYearEnd";
 import HQVat from "../components/hq/HQVat";
 import HQTenants from "../components/hq/HQTenants";
+import HQTenantProfiles from "../components/hq/HQTenantProfiles";
 import HQEmailLogs from "../components/hq/HQEmailLogs";
 import LiveFXBar from "../components/hq/LiveFXBar";
 import PlatformBar from "../components/PlatformBar";
@@ -72,6 +73,7 @@ const TABS = [
   { id: "vat", label: "VAT", icon: "🏛️", ready: true },
   { id: "year-end-close", label: "Year-End Close", icon: "📅", ready: true },
   { id: "tenants", label: "Tenants", icon: "🏢", ready: true },
+  { id: "tenant-profiles", label: "Tenant Profiles", icon: "🏢", ready: true },
   { id: "hq-production", label: "Production", icon: "⚗️", ready: true },
   { id: "hq-stock", label: "HQ Stock", icon: "=", ready: true },
   { id: "hq-transfers", label: "Transfers", icon: "=", ready: true },
@@ -276,6 +278,7 @@ export default function HQDashboard() {
           {activeTab === "bank-recon" && <HQBankRecon />}
           {activeTab === "fixed-assets" && <HQFixedAssets />}
           {activeTab === "tenants" && <HQTenants />}
+          {activeTab === "tenant-profiles" && <HQTenantProfiles />}
           {activeTab === "costing" && <HQCogs />}
           {activeTab === "pricing" && <HQPricing />}
           {activeTab === "pl" && <HQProfitLoss />}
