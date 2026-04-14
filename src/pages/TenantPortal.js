@@ -1066,17 +1066,8 @@ export default function TenantPortal() {
       supabase.auth.getUser().then(({ data: { user } }) => setCurrentUser(user));
     });
   }, []);
-  const [hasGroup, setHasGroup] = useState(false);
-  useEffect(() => {
-    if (!tenantId) return;
-    import("../services/supabaseClient").then(({ supabase }) => {
-      supabase
-        .from("tenant_group_members")
-        .select("group_id", { count: "exact", head: true })
-        .eq("tenant_id", tenantId)
-        .then(({ count }) => setHasGroup((count || 0) > 0));
-    });
-  }, [tenantId]);
+  // Group Portal button always visible in tenant sidebar — no async gate.
+  // GroupPortal.js handles the "no group" empty state itself.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchFilter, setSearchFilter]         = useState(null);
   const [searchKey, setSearchKey]               = useState(0);
@@ -1249,20 +1240,18 @@ export default function TenantPortal() {
                     }}>
                       {profileBadge.label}
                     </div>
-                    {hasGroup && (
-                      <button
-                        onClick={() => navigate("/group-portal")}
-                        style={{
-                          display: "flex", alignItems: "center", gap: 6,
-                          marginTop: 10, fontSize: 11, color: pAccent,
-                          background: "transparent", border: `1px solid ${pAccent}40`,
-                          borderRadius: 6, padding: "5px 10px", cursor: "pointer",
-                          fontFamily: T.font, width: "100%", fontWeight: 600,
-                        }}
-                      >
-                        {"\u229e"} Group Portal
-                      </button>
-                    )}
+                    <button
+                      onClick={() => navigate("/group-portal")}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 6,
+                        marginTop: 10, fontSize: 11, color: pAccent,
+                        background: "transparent", border: `1px solid ${pAccent}40`,
+                        borderRadius: 6, padding: "5px 10px", cursor: "pointer",
+                        fontFamily: T.font, width: "100%", fontWeight: 600,
+                      }}
+                    >
+                      {"\u229e"} Group Portal
+                    </button>
                     {isOperator && (
                       <button
                         onClick={() => navigate("/hq")}
