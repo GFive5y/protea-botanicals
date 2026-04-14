@@ -28,6 +28,15 @@ import StockIntelligence from "./StockIntelligence";
 import CustomerIntelligence from "./CustomerIntelligence";
 import NetworkIntelligence from "./NetworkIntelligence";
 
+// ─── Industry profile badge map ──────────────────────────────────────────────
+const PROFILE_BADGE = {
+  cannabis_retail:     { label: "RETAIL",     bg: "#E8F5EE", color: "#1A3D2B" },
+  cannabis_dispensary: { label: "DISPENSARY", bg: "#EFF6FF", color: "#1E3A5F" },
+  food_beverage:       { label: "F&B",        bg: "#FFFBEB", color: "#92400E" },
+  general_retail:      { label: "GENERAL",    bg: "#F5F5F5", color: "#424242" },
+  operator:            { label: "HQ",         bg: "#F3F0FF", color: "#4C1D95" },
+};
+
 // ─── Nav items ───────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
   { id: "dashboard",  label: "Network Dashboard" },
@@ -43,7 +52,7 @@ const NAV_ITEMS = [
 ];
 
 export default function GroupPortal() {
-  const { tenantId } = useTenant();
+  const { tenantId, isHQ, switchTenant, allTenants } = useTenant();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -54,6 +63,7 @@ export default function GroupPortal() {
   const [groupType, setGroupType] = useState(null);
   const [groupRoyaltyPct, setGroupRoyaltyPct] = useState(0);
   const [members, setMembers] = useState([]);
+  const [switchingTo, setSwitchingTo] = useState(null); // tenant_id being switched to
 
   // Active tab from ?tab= query param — default "dashboard"
   const params = new URLSearchParams(location.search);
@@ -118,6 +128,31 @@ export default function GroupPortal() {
   // ── Tab switcher ──────────────────────────────────────────────────────────
   const handleNavClick = (tabId) => {
     navigate(`/group-portal?tab=${tabId}`);
+  };
+
+  // ── Store switcher (HQ only) ─────────────────────────────────────────────
+  // Finds the full tenant object from allTenants (already loaded by TenantService
+  // for HQ users). Falls back to a Supabase fetch if not yet in allTenants.
+  const handleStoreSwitch = async (memberTenantId, memberTenantName) => {
+    if (!isHQ || switchingTo) return;
+    setSwitchingTo(memberTenantId);
+    try {
+      let tenantObj = (allTenants || []).find((t) => t.id === memberTenantId);
+      if (!tenantObj) {
+        const { data } = await import("../../services/supabaseClient").then(
+          (m) => m.supabase.from("tenants").select("*").eq("id", memberTenantId).single()
+        );
+        tenantObj = data;
+      }
+      if (tenantObj) {
+        await switchTenant(tenantObj);
+        navigate("/tenant-portal");
+      }
+    } catch (err) {
+      console.error("[GroupPortal] store switch failed:", err);
+    } finally {
+      setSwitchingTo(null);
+    }
   };
 
   // ── Loading state ─────────────────────────────────────────────────────────
@@ -324,14 +359,14 @@ export default function GroupPortal() {
           })}
         </nav>
 
-        {/* Member store list */}
+        {/* Member store list — clickable for HQ users (switchTenant) */}
         <div
           style={{
             borderTop: `1px solid ${T.border}`,
             paddingTop: T.pad.lg,
             display: "flex",
             flexDirection: "column",
-            gap: T.gap.sm,
+            gap: 4,
           }}
         >
           <div
@@ -345,30 +380,60 @@ export default function GroupPortal() {
             }}
           >
             My Stores
+            {isHQ && (
+              <span style={{ marginLeft: 6, fontSize: 9, color: T.ink400, fontWeight: 400, textTransform: "none" }}>
+                · click to switch
+              </span>
+            )}
           </div>
-          {members.map((m) => (
-            <div
-              key={m.tenant_id}
-              style={{
-                fontSize: T.text.sm,
-                color: T.ink700,
-                padding: `${T.pad.xs}px 0`,
-              }}
-            >
-              <div style={{ fontWeight: T.weight.medium }}>
-                {m.tenants?.name || "Unnamed store"}
-              </div>
-              <div
+          {members.map((m) => {
+            const isActive    = m.tenant_id === tenantId;
+            const isSwitching = switchingTo === m.tenant_id;
+            const badge       = PROFILE_BADGE[m.tenants?.industry_profile] || PROFILE_BADGE.general_retail;
+            const canSwitch   = isHQ && !isActive && !switchingTo;
+            return (
+              <button
+                key={m.tenant_id}
+                type="button"
+                disabled={!canSwitch}
+                onClick={() => canSwitch && handleStoreSwitch(m.tenant_id, m.tenants?.name)}
+                title={isHQ && !isActive ? `Switch to ${m.tenants?.name || "this store"}` : undefined}
                 style={{
-                  fontSize: T.text.xs,
-                  color: T.ink400,
-                  marginTop: 2,
+                  textAlign: "left",
+                  background: isActive ? T.accentLight : "transparent",
+                  border: `1px solid ${isActive ? T.accentBd : "transparent"}`,
+                  borderRadius: T.radius.md,
+                  padding: "8px 10px",
+                  cursor: canSwitch ? "pointer" : "default",
+                  opacity: switchingTo && !isSwitching ? 0.45 : 1,
+                  transition: "background 0.15s, opacity 0.15s",
+                  width: "100%",
                 }}
               >
-                {m.role} · {m.tenants?.industry_profile || "unknown"}
-              </div>
-            </div>
-          ))}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
+                  <span style={{
+                    fontSize: T.text.sm,
+                    fontWeight: isActive ? T.weight.semibold : T.weight.medium,
+                    color: isActive ? T.accentText : T.ink700,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {isSwitching ? "Switching\u2026" : (m.tenants?.name || "Unnamed store")}
+                  </span>
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, padding: "1px 5px",
+                    borderRadius: 3, flexShrink: 0,
+                    background: badge.bg, color: badge.color,
+                    letterSpacing: "0.05em",
+                  }}>
+                    {badge.label}
+                  </span>
+                </div>
+                <div style={{ fontSize: T.text.xs, color: isActive ? T.accentMid : T.ink400, marginTop: 2 }}>
+                  {m.role}{isActive ? " \u00b7 viewing" : ""}
+                </div>
+              </button>
+            );
+          })}
         </div>
       </aside>
 
