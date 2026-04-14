@@ -6,158 +6,162 @@
 
 ---
 
-## MEETING DATE — FLEXIBLE
+## MEETING DATE
 **Current CA demo date: 12 May 2026**
-User will notify when this changes. When it changes:
+When this changes:
 1. Update this file (meeting date line above)
-2. Recalculate sim-pos-sales trigger date (= meeting date MINUS 1 day)
-3. Update SESSION-STATE_v281 / SESSION-START-PROMPT with new date
-4. Re-examine all demo day seeded orders and dispensing events for date alignment
-
----
-
-## COMPLETED THIS SESSION (261) — DO NOT DELETE
-
-- ✅ Garden Bistro fin package (complete since Session 260)
-- ✅ Medi Recreational fin package (Session 261)
-- ✅ MediCare Dispensary fin package (Session 261)
-- ✅ Metro Hardware fin package (Session 261)
-- ✅ Nourish Kitchen & Deli fin package (Session 261)
-- ✅ Security incident VL-013 resolved (service_role key rotated, .env untracked)
-
----
-
-## CODE FIXES LANDED — SESSION 261/262 (post-close)
-
-- ✅ CC-01: Fix "Xmo behind" counter logic in Fixed Asset Register — now compares MAX(period_year*12+period_month) in depreciation_entries vs last-complete calendar month. HQFixedAssets.js
-- ✅ CC-02: Cash Flow depreciation add-back — already reads from depreciation_entries as primary source in HQFinancialStatements.js (no journal-first path existed). Verified in place; no change required.
-- ✅ CC-03: IFRS Notes — Note 4 dispensary branch. HQFinancialNotes.js now destructures industryProfile, queries dispensing_log when cannabis_dispensary, reports "Dispensing (N events)" row instead of "POS transactions R0".
-- ✅ CC-04: IFRS BS now nets output vs input VAT. HQFinancialStatements.js computes vatNetPayable, renders "VAT receivable — SARS" in current assets when net is negative, "VAT payable — SARS" in liabilities when net is positive.
-
-## SUPABASE DATA FIXES OUTSTANDING (Session 262 queue)
-
-- [ ] SB-FIX: Metro Hardware VAT number corrected to 4987654321
-- [ ] SB-FIX: Medi Recreational equity_ledger.net_profit_for_year updated to 107,485.66
-- [ ] SB-TODO: Insert Nourish Kitchen April expenses + April dep entries
-- [ ] SB-TODO: Reverse stale 2022/2024 auto-capture journals on Medi Recreational
-- [ ] MANUAL: Categorise 9 unmatched bank lines on MediCare Dispensary before demo
-- [ ] MANUAL: Categorise 9 unmatched bank lines on Metro Hardware before demo
-- [ ] KNOWN: MediCare equity_ledger / IFRS IS profit mismatch — root cause is RPC vs query source mismatch — defer to post-demo
-- [ ] KNOWN: Metro Hardware IFRS BS gap R362k — same root cause, defer to post-demo
-
-## OUTSTANDING — MUST COMPLETE BEFORE 12 MAY 2026
-
-### LOOP-010 — Medi Rec: Run Depreciation (UI action)
-Status: OPEN — backfill DB seed done in Session 261, UI must still post
-Action: /tenant-portal (Medi Rec) → Fixed Assets → Run Depreciation
-  For each of 3 assets, step through every missing month from their
-  respective purchase dates up to Apr 2026, in chronological order.
-  The "Xmo behind" counter must reach 0.
-Close when: No "Xmo behind" warning shows on Fixed Assets tab for
-  FA-001 / FA-002 / FA-003.
-
-### LOOP-011 — All 4 tenants: IFRS Statements Mark Reviewed + Sign-Off
-Status: OPEN
-Action: For each tenant portal (Garden Bistro, Medi Rec, MediCare,
-  Metro Hardware, Nourish Kitchen):
-  1. /tenant-portal → IFRS Statements
-  2. Click "Mark Reviewed" on all 4 statements
-     (IS, BS, Cash Flow, Changes in Equity)
-  3. Complete Auditor Sign-Off where applicable
-Close when: All 20 statements (4 statements × 5 tenants) marked Reviewed.
-
-### LOOP-012 — HR top-up: 3 tenants below RUNBOOK minimum
-Status: OPEN
-Action: Add staff via Supabase MCP using RUNBOOK Phase 5 patterns
-  (staff_profiles + employment_contracts + leave_balances + timesheets):
-  - Medi Recreational: + Store Manager + Cashier (target = 4 staff)
-  - MediCare Dispensary: + Receptionist (target = 3 staff)
-  - Metro Hardware: + Store Manager + Stockroom (target = 4 staff)
-Close when: All 3 tenants reach the RUNBOOK minimum for their industry
-  profile with contracts, leave, and at least one timesheet each.
-
-### LOOP-013 — .gitignore null byte cleanup
-Status: RESOLVED IN SESSION 261/262 CLOSE COMMIT
-Action: .gitignore rewritten as clean UTF-8, null bytes stripped
-Close when: Commit landed — closed automatically.
-
-### LOOP-014 — SESSION 262: verify MediCare IFRS IS shows dispensing revenue
-Status: OPEN — code fix shipped in 0f6cfa0, needs prod verification
-Action: After Vercel Ready on 0f6cfa0 (or later HEAD):
-  1. Open /tenant-portal (MediCare) in incognito per LL-214
-  2. IFRS Statements → Income Statement
-  3. Confirm Revenue line shows dispensing_log-derived figure (not R0)
-  4. Year-End Close → confirm same figure
-Close when: MediCare IFRS IS revenue matches dispensing_log × sell_price
-  per live DB query.
+2. Recalculate sim-pos-sales trigger date (= demo date MINUS 1 day)
+3. Update SESSION-STATE and SESSION-START-PROMPT
+4. Re-examine all seeded orders and dispensing events for date alignment
 
 ---
 
 ## STANDING — DEMO DAY SEQUENCE
 
 - 📅 **11 May 2026**: Run sim-pos-sales for Metro Hardware + Medi Recreational
-  (HQTenants → RUN 30 DAYS button, OR Supabase MCP pg_net.http_post to
-  sim-pos-sales EF). Window must INCLUDE 12 May demo day.
-- 📅 **12 May 2026**: CA demo — 10am
-- 📅 **12 May 2026 09:30**: Pre-demo ritual per SESSION-STATE_v281
-  (incognito visual checklist all 5 tenants)
+  HQTenants → RUN 30 DAYS, OR Supabase MCP pg_net.http_post to sim-pos-sales EF.
+  Window must INCLUDE 12 May demo day.
+- 📅 **12 May 2026 09:30**: Pre-demo ritual (see SESSION-STATE_v281.md)
+- 📅 **12 May 2026 10:00**: CA demo
 
 ---
 
-## KNOWN PERMANENT GAPS (document, do not chase)
+## OUTSTANDING — MUST COMPLETE BEFORE 12 MAY 2026
 
-- POS VAT pipeline: output VAT from orders not in vat_transactions
-- BS equation gap ~R5,617-9,140 per tenant (VAT pipeline — amber banner)
-- Pricing data source red (no product_pricing linked to recipes)
-- Cash flow opening balance not connected to bank recon
-- MediCare IFRS double-counted wages (journal_lines + expenses)
-- Medi Rec IFRS BS gap R1,466.78 (IS vs equity_ledger timing)
-- Metro Hardware IFRS BS gap R362,311.50 (accrued OpEx in main BS only)
+### LOOP-010 — Medi Rec: Run Depreciation (UI action)
+Status: OPEN
+Action: /tenant-portal (Medi Rec) → Fixed Assets → Run Depreciation
+  Step through each missing month for FA-001/FA-002/FA-003 chronologically.
+  CC-01 fixed the display counter bug (91719e5) — the UI should now reach 0.
+Close when: No "Xmo behind" warning on any asset.
+
+### LOOP-011 — All 5 tenants: IFRS Statements Mark Reviewed + Sign-Off
+Status: OPEN
+Action: For each of 5 tenants → IFRS Statements → click Mark Reviewed
+  on all 4 statements (IS, BS, Cash Flow, Changes in Equity) → Auditor Sign-Off.
+  20 statements total.
+Close when: All 20 marked Reviewed.
+
+### LOOP-012 — HR top-up: 3 tenants below RUNBOOK minimum
+Status: OPEN
+Action: Add via Supabase MCP (staff_profiles + employment_contracts +
+  leave_balances + timesheets):
+  - Medi Recreational: +Store Manager +Cashier (target = 4 staff)
+  - MediCare Dispensary: +Receptionist (target = 3 staff)
+  - Metro Hardware: +Store Manager +Stockroom (target = 4 staff)
+Close when: All 3 tenants at RUNBOOK minimum with contracts + leave + timesheet.
+
+### LOOP-014 — MediCare: verify IFRS IS shows dispensing revenue in prod
+Status: OPEN — CC-03 shipped 91719e5, needs visual verification
+Action: Incognito → /tenant-portal (MediCare) → IFRS Statements → Income Statement
+  Confirm Revenue row shows dispensing_log-derived figure, not R0.
+  Protocol: Vercel Ready on 91719e5 confirmed → incognito only (LL-214).
+Close when: IFRS IS revenue matches dispensing_log × sell_price per live DB query.
 
 ---
 
-## WATCH ITEMS — Monitor, no immediate action required
+## KNOWN PERMANENT GAPS (document and explain in demo — do not fix before 12 May)
+
+1. **POS VAT pipeline** — output VAT from POS orders not writing to vat_transactions.
+   Root cause: POS transaction path does not call auto-post-capture EF.
+   Impact: ~R5k BS gap per tenant (amber banner explains it).
+   Why deferred: fixing requires touching live POS order flow + historical backfill.
+   Regression risk outweighs cosmetic gap 4 weeks before demo.
+
+2. **MediCare IFRS BS gap R76,906** — equity_ledger.net_profit (−R418,979) vs
+   IFRS IS calculated profit (−R342,072.76) from different query sources.
+   BS module uses equity_ledger → shows ✓ balanced.
+   IFRS statement recalculates → shows gap.
+   Why deferred: making equity_ledger a computed view requires schema change +
+   RLS migration. Wrong update would break the ✓ BS module.
+
+3. **Metro Hardware IFRS BS gap R362,311** — same root cause as above.
+   Accrued OpEx R347,499 appears as liability in BS module but not in IFRS calc.
+   Why deferred: same architectural fix needed as MediCare.
+
+4. **Cash flow opening balance not wired to bank recon** — cosmetic blank field.
+   Requires prior-period closing balance snapshot table (does not exist).
+   Not on demo critical path.
+
+5. **Pricing data source red (0)** — no product_pricing records linked to recipes.
+   Affects costing dashboard only. Not on demo critical path.
+
+---
+
+## WATCH ITEMS
 
 ### WATCH-001 — SAHPRA export CSV format
-Status: Implemented — not yet tested against real SAHPRA submission requirements
+Implemented — not yet tested against real SAHPRA submission requirements.
 
-### WATCH-002 — Scan activity chart (scan_logs cross-tenant, LL-056)
-Status: Known permanent limitation — scan_logs has no tenant_id column
+### WATCH-002 — Scan activity chart cross-tenant (LL-056)
+scan_logs has no tenant_id column — permanent limitation.
+
+### WATCH-003 — HQTransfer.js atomicity gap
+Per-line loop on ship/receive with no transaction wrapper.
+Partial failures can leave transfers inconsistent.
+Named future build item. Not blocking demo.
 
 ---
 
-## CLOSED LOOPS
+## CLOSED LOOPS — SESSION 261
 
-### CLOSED-LOOP-013 — .gitignore null byte cleanup
-Closed: 14 April 2026 (session 261/262 close commit)
-Null bytes stripped, file rewritten as clean UTF-8.
+### ✅ CLOSED — SB-FIX-001: Metro Hardware VAT number
+Corrected 4123456789 → 4987654321 in tenant_config. All 4 demo tenant
+VAT numbers now unique. Verified: SELECT vat_number, COUNT(*) GROUP BY returns 0 duplicates.
 
-### CLOSED-SECURITY-VL-013 — Service role key leak (14 Apr 2026)
-Closed: 14 April 2026
-Key `default` deleted. New key `production_2026_04` created.
-.env untracked. .gitignore hardened. LL-246 added to Bible.
+### ✅ CLOSED — SB-FIX-002: Medi Rec equity_ledger net_profit
+Updated 102,018.88 → 107,485.66. Total equity now R268,559.88.
+BS gap reduced R10,567 → ~R5,101 (POS VAT pipeline only).
 
-### CLOSED-001 — WP-DEMO-AUDIT: All 4 tenants seeded
-Closed: 13 April 2026
+### ✅ CLOSED — SB-FIX-003: Nourish Kitchen April expenses
+6 expenses inserted. Total expenses 6 → 12 rows, R76k → R151.3k.
 
-### CLOSED-002 — HQOverview.js: 20 tenant isolation fixes
-Closed: 13 April 2026
+### ✅ CLOSED — SB-FIX-004: Nourish Kitchen April depreciation
+3 dep entries for period '4'/2026. fixed_assets register updated.
+Accum dep: R1,513.89 → R3,027.78. NBV: R127,486.11 → R125,972.22.
 
-### CLOSED-003 — HQProduction.js + all HQ components: tenant isolation
-Closed: 13 April 2026
+### ✅ CLOSED — SB-FIX-005: Nourish Kitchen journals
+DEP-FY2026 + OPEX-2026-03 + OPEX-2026-04 posted with balanced journal lines.
+Journal count: 1 → 4.
 
-### CLOSED-004 — MediCare stock_receipts
-Closed: 13 April 2026
+### ✅ CLOSED — SB-FIX-006: Medi Rec stale auto-capture journals
+314859 ×2 (Nov 2024) and 314959 (Nov 2022) → reversed.
+Journal list now shows 11 posted, 3 reversed.
 
-### CLOSED-005 — SAHPRA export button
-Closed: 13 April 2026
+### ✅ CLOSED — SB-FIX-007: Bank recon MediCare (9 lines)
+7 expense lines + 2 dispensing deposit (order) lines categorised.
+matched_type = null/'unmatched' → 0 remaining.
 
-### CLOSED-006 — Dispensary category taxonomy fix
-Closed: 13 April 2026
+### ✅ CLOSED — SB-FIX-008: Bank recon Metro Hardware (9 lines)
+8 expense lines + 1 wholesale deposit (order) line categorised. 0 remaining.
 
-### CLOSED-007 — Session-start-prompt corrected
-Closed: 13 April 2026
+### ✅ CLOSED — SB-FIX-009: Bank recon Medi Recreational (8 lines)
+3 'unmatched' flagged lines (bank fee, marketing, SARS VAT) → expense.
+5 null sim-batch lines → other/order as appropriate. 0 remaining.
 
-### CLOSED-008 — Layer 1 audit pass (exit code 0)
-Closed: 13 April 2026
-All tenant-scoped queries in all HQ components have explicit .eq("tenant_id", tenantId).
+### ✅ CLOSED — CC-01: Fixed Asset monthsBehind counter
+HQFixedAssets.js monthsBehind() rewritten. Compares MAX posted period
+to last complete calendar month. Three call sites updated.
+
+### ✅ CLOSED — CC-02: CF depreciation add-back (verified, no change needed)
+HQFinancialStatements.js already reads depreciation_entries as primary source.
+Nourish Kitchen dep entries will surface correctly.
+
+### ✅ CLOSED — CC-03: IFRS Note 4 dispensary revenue
+HQFinancialNotes.js Note 4 now reads dispensing_log for cannabis_dispensary.
+Reports "Dispensing (N events)" row. Needs prod verification (LOOP-014).
+
+### ✅ CLOSED — CC-04: IFRS BS VAT sign logic
+HQFinancialStatements.js computes vatNetPayable signed.
+vatReceivable in current assets, vatLiability in liabilities. Correct for all profiles.
+
+### ✅ CLOSED — All 4 fin packages (Sessions 260-261)
+Garden Bistro (260) · Medi Recreational (261) · Nourish Kitchen (261)
+MediCare Dispensary (261) · Metro Hardware (261)
+
+### ✅ CLOSED — SECURITY VL-013 (Session 261)
+Service_role key leaked via git add -A. Key rotated. .env untracked.
+LL-246 added to Bible. New key: production_2026_04.
+
+### ✅ CLOSED-001 through CLOSED-008 (Sessions 259-260)
+See prior SESSION-STATE versions for detail.

@@ -1319,6 +1319,165 @@ New rule: LL-246. See VIOLATION_LOG_v1_1.md.
 
 ---
 
+---
+
+## Session 261 — 15 April 2026
+
+### LL-247 — depreciation_entries.period_month is TEXT, not integer
+
+**Rule:** `depreciation_entries.period_month` stores month as TEXT ('3', '4', etc).
+`period_year` is integer. Never compare `period_month = 4` — use `period_month = '4'`.
+
+**Why this matters:** During Session 261 Nourish Kitchen April dep insert, a multi-statement
+query with `WHERE period_month = 4` failed with:
+"operator does not exist: text = integer". The INSERT had already succeeded; only
+the verification SELECT failed. But the error pattern can silently return wrong results
+in application code expecting integer comparison.
+
+**Apply:** All queries on depreciation_entries.period_month must quote the value:
+```sql
+WHERE period_month = '4' AND period_year = 2026
+```
+When reading back for display, cast if needed: `period_month::integer` for ordering.
+
+---
+
+### LL-248 — equity_ledger.net_profit_for_year is manually maintained — verify both sources
+
+**Rule:** `equity_ledger.net_profit_for_year` is a snapshot field, not a computed column.
+It can drift from what the IFRS IS calculates from live journal/expense data.
+Always query both before relying on either.
+
+**Two sources:**
+1. `equity_ledger.net_profit_for_year` → used by Balance Sheet module (shows ✓ / ✗ badge)
+2. IFRS IS calculation → revenue - COGS - sum(expenses FY filter) - depreciation
+
+**When they diverge:**
+- Small delta (< R10,000): UPDATE equity_ledger to match IFRS IS figure. Reduces BS gap.
+- Large delta (MediCare R76k, Metro R362k): root cause is architectural — different expense
+  query paths include/exclude different rows. Investigate before changing. A wrong UPDATE
+  trades a balanced BS module for a balanced IFRS statement. Not always an improvement.
+
+**Safe fix pattern (small delta only):**
+```sql
+UPDATE equity_ledger
+SET net_profit_for_year = [verified IFRS IS figure]
+WHERE tenant_id = '[uuid]' AND financial_year = 'FY2026';
+```
+
+**Verification query before any fix:**
+```sql
+SELECT el.net_profit_for_year AS equity_ledger_value,
+       SUM(jl.debit_amount) - SUM(jl.credit_amount) AS journal_net
+FROM equity_ledger el
+LEFT JOIN journal_entries je ON je.tenant_id = el.tenant_id AND je.financial_year = el.financial_year
+LEFT JOIN journal_lines jl ON jl.journal_id = je.id
+WHERE el.tenant_id = '[uuid]'
+GROUP BY el.net_profit_for_year;
+```
+
+---
+
+### LL-249 — bank_statement_lines.matched_type values and categorisation pattern
+
+**Rule:** `matched_type` on `bank_statement_lines` uses these values:
+- `'expense'` — debit lines matched to expense records
+- `'order'` — credit lines matched to order/revenue records
+- `'other'` — bulk sim-batch lines, opening balances, drawings
+- `'unmatched'` — explicitly flagged as needing categorisation
+- `NULL` — treated as unmatched by the UI; sim-batch lines often land here
+
+**Categorisation pattern (Supabase MCP):**
+```sql
+UPDATE bank_statement_lines
+SET matched_type = 'expense', matched_at = NOW()
+WHERE id IN ('[uuid1]', '[uuid2]');
+```
+
+**Pre-demo verification query:**
+```sql
+SELECT t.name, COUNT(*) AS unmatched
+FROM bank_statement_lines bsl
+JOIN tenants t ON t.id = bsl.tenant_id
+WHERE (bsl.matched_type IS NULL OR bsl.matched_type = 'unmatched')
+  AND bsl.tenant_id IN ('[demo_tenant_ids]')
+GROUP BY t.name;
+```
+Must return 0 rows before demo.
+
+---
+
+### LL-250 — VAT number uniqueness is demo-critical
+
+**Rule:** Every tenant's `tenant_config.vat_number` must be unique across all tenants.
+A CA reviewer will spot duplicate VAT numbers immediately and correctly flag it as
+a data integrity failure.
+
+**Verification query — run at every session start and in pre-demo ritual:**
+```sql
+SELECT vat_number, COUNT(*), STRING_AGG(name, ', ')
+FROM tenant_config tc
+JOIN tenants t ON t.id = tc.tenant_id
+WHERE tc.vat_registered = true
+GROUP BY vat_number
+HAVING COUNT(*) > 1;
+```
+Must return 0 rows. If rows returned: UPDATE the newer tenant's vat_number immediately.
+
+**Discovery:** Session 261 found Medi Recreational and Metro Hardware (Pty) Ltd
+both carrying 4123456789. Metro Hardware corrected to 4987654321.
+
+---
+
+### LL-251 — Anomaly audit before demo: 8-point checklist
+
+Before every CA demo (run via Supabase MCP, not manual UI inspection):
+
+```sql
+-- 1. Duplicate VAT numbers
+SELECT vat_number, COUNT(*) FROM tenant_config tc
+JOIN tenants t ON t.id = tc.tenant_id
+WHERE vat_registered = true GROUP BY vat_number HAVING COUNT(*) > 1;
+
+-- 2. Unmatched bank lines on demo tenants
+SELECT t.name, COUNT(*) FROM bank_statement_lines bsl
+JOIN tenants t ON t.id = bsl.tenant_id
+WHERE (matched_type IS NULL OR matched_type = 'unmatched')
+  AND t.is_active = true GROUP BY t.name;
+
+-- 3. equity_ledger entries for all active tenants (confirm all present)
+SELECT t.name, el.net_profit_for_year, el.share_capital
+FROM equity_ledger el JOIN tenants t ON t.id = el.tenant_id
+WHERE el.financial_year = 'FY2026' ORDER BY t.name;
+
+-- 4. Reversed/stale auto-capture journals (AUTO-CAPTURE type, pre-2025)
+SELECT reference, journal_date, status, financial_year FROM journal_entries
+WHERE journal_type = 'AUTO-CAPTURE' AND journal_date < '2025-01-01'
+  AND status = 'posted' AND tenant_id IN ([demo tenant ids]);
+
+-- 5. Depreciation entries coverage (each active asset should have current month)
+SELECT fa.asset_code, MAX(de.period_year * 12 + de.period_month::integer) AS latest_period
+FROM fixed_assets fa
+LEFT JOIN depreciation_entries de ON de.asset_id = fa.id
+WHERE fa.is_active = true GROUP BY fa.asset_code;
+
+-- 6. All demo tenant bank accounts have closing balance > 0
+SELECT t.name, ba.closing_balance FROM bank_accounts ba
+JOIN tenants t ON t.id = ba.tenant_id WHERE t.is_active = true;
+
+-- 7. No demo tenant has zero journal entries
+SELECT t.name, COUNT(*) AS journal_count FROM journal_entries je
+JOIN tenants t ON t.id = je.tenant_id
+WHERE je.status = 'posted' GROUP BY t.name ORDER BY journal_count;
+
+-- 8. VAT filings present for active periods
+SELECT t.name, COUNT(*) AS filed_periods FROM vat_period_filings vpf
+JOIN tenants t ON t.id = vpf.tenant_id WHERE t.is_active = true GROUP BY t.name;
+```
+All 8 queries should return clean results. Investigate any anomalies before demo day.
+
+---
+
 *NUAI-AGENT-BIBLE.md v1.0 · 08 Apr 2026*
 *Maintained by: Claude Code after each major session*
 *Owner reviews: after each WP completion*
