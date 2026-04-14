@@ -155,19 +155,22 @@ export default function HQTenantFinancialSetup({ tenantId, tenantName, onComplet
       return;
     }
 
-    // Write 2: Create equity_ledger row
+    // Write 2: Create or update equity_ledger row
     const { error: equityError } = await supabase
       .from("equity_ledger")
-      .insert({
-        tenant_id: tenantId,
-        financial_year: "FY2026",
-        share_capital: form.share_capital,
-        opening_retained_earnings: form.opening_retained_earnings || 0,
-        net_profit_for_year: null,
-        dividends_declared: 0,
-        owner_drawings: 0,
-        year_end_closed: false,
-      });
+      .upsert(
+        {
+          tenant_id: tenantId,
+          financial_year: "FY2026",
+          share_capital: form.share_capital,
+          opening_retained_earnings: form.opening_retained_earnings || 0,
+          net_profit_for_year: null,
+          dividends_declared: 0,
+          owner_drawings: 0,
+          year_end_closed: false,
+        },
+        { onConflict: "tenant_id,financial_year" }
+      );
 
     if (equityError) {
       // Rollback Write 1
