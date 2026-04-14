@@ -57,6 +57,38 @@ function NoteTable({headers,rows,totals}) {
 function P({children}) { return <p style={{fontSize:13,color:D.ink500,lineHeight:1.7,margin:"10px 0",fontFamily:D.font}}>{children}</p>; }
 function SubHead({label}) { return <div style={{fontSize:11,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.08em",marginTop:20,marginBottom:8,paddingBottom:4,borderBottom:`1px solid ${D.border}`}}>{label}</div>; }
 
+function EditableNote({ tenantId, noteNumber, fy }) {
+  const [content, setContent] = useState(null);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    if (!tenantId) return;
+    supabase.from("financial_statement_notes").select("content").eq("tenant_id", tenantId).eq("financial_year", fy).eq("note_number", noteNumber).maybeSingle()
+      .then(({ data: row }) => { setContent(row?.content || null); setDraft(row?.content || ""); });
+  }, [tenantId, fy, noteNumber]);
+  const save = async () => {
+    setSaving(true);
+    await supabase.from("financial_statement_notes").upsert({ tenant_id: tenantId, financial_year: fy, note_number: noteNumber, content: draft, updated_at: new Date().toISOString() }, { onConflict: "tenant_id,financial_year,note_number" });
+    setContent(draft); setEditing(false); setSaving(false);
+  };
+  if (editing) return (
+    <div style={{ marginTop: 8 }}>
+      <textarea value={draft} onChange={e => setDraft(e.target.value)} style={{ width: "100%", minHeight: 80, padding: 10, fontSize: 13, fontFamily: D.font, border: `1px solid ${D.border}`, borderRadius: 6, resize: "vertical" }} />
+      <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+        <button onClick={save} disabled={saving} style={{ padding: "4px 14px", fontSize: 11, fontWeight: 600, background: D.accent, color: "#fff", border: "none", borderRadius: 4, cursor: "pointer" }}>{saving ? "Saving..." : "Save"}</button>
+        <button onClick={() => { setEditing(false); setDraft(content || ""); }} style={{ padding: "4px 14px", fontSize: 11, background: "#fff", border: `1px solid ${D.border}`, borderRadius: 4, cursor: "pointer" }}>Cancel</button>
+      </div>
+    </div>
+  );
+  return (
+    <div onClick={() => setEditing(true)} style={{ cursor: "pointer", padding: "8px 12px", borderRadius: 6, background: content ? "transparent" : "#FAFAF5", border: content ? "none" : `1px dashed ${D.border}`, marginTop: 8, fontSize: 13, color: content ? D.ink700 : D.ink400, lineHeight: 1.7, fontFamily: D.font }}>
+      {content || "Click to add note content"}
+      <span style={{ marginLeft: 8, fontSize: 10, color: D.ink400 }}>{"\u270E"}</span>
+    </div>
+  );
+}
+
 export default function HQFinancialNotes() {
   const { tenant } = useTenant();
   const tenantId = tenant?.id;
@@ -100,8 +132,10 @@ export default function HQFinancialNotes() {
   const totalFACost = activeFA.reduce((s,a)=>s+(parseFloat(a.purchase_cost)||0),0);
   const totalFAAccDep = activeFA.reduce((s,a)=>s+(parseFloat(a.accumulated_depreciation)||0),0);
   const invByCat = inv.reduce((a,i)=>{a[i.category]=a[i.category]||{qty:0,val:0};a[i.category].qty+=parseFloat(i.quantity_on_hand||0);a[i.category].val+=parseFloat(i.quantity_on_hand||0)*parseFloat(i.weighted_avg_cost||0);return a;},{});
-  const vatOut = fp?.vat?.ytd_output || vat.reduce((s,v)=>s+(parseFloat(v.output_vat)||0),0);
-  const vatIn = fp?.vat?.ytd_input || exp.reduce((s,e)=>s+(parseFloat(e.input_vat_amount)||0),0);
+  // VAT from vat_transactions directly — matches IFRS BS and operational BS
+  const vatOut = vat.reduce((s,v)=>s+(parseFloat(v.output_vat)||0),0);
+  const vatInFromTxn = vat.reduce((s,v)=>s+(parseFloat(v.input_vat)||0),0);
+  const vatIn = vatInFromTxn > 0 ? vatInFromTxn : exp.reduce((s,e)=>s+(parseFloat(e.input_vat_amount)||0),0);
   const shareCapital = parseFloat(eq?.share_capital||0); const openingRE = parseFloat(eq?.opening_retained_earnings||0);
   const netProfit = totalRevenue - totalCogs - totalOpex - totalDep;
   const orderCount = fp?.orders?.paid_count || 0;
@@ -128,6 +162,7 @@ export default function HQFinancialNotes() {
 
       <NoteSection number="2" title="Going Concern" defaultOpen={false}>
         <P>The directors believe preparation on a going concern basis remains appropriate. Revenue of <strong>{fmtZar(totalRevenue)}</strong> was generated YTD. No material uncertainties exist.</P>
+        <EditableNote tenantId={tenantId} noteNumber={2} fy={`FY${CURRENT_YEAR}`} />
       </NoteSection>
 
       <NoteSection number="3" title="Critical Estimates and Judgements" defaultOpen={false}>
@@ -149,6 +184,7 @@ export default function HQFinancialNotes() {
 
       <NoteSection number="6" title="Directors' Remuneration" defaultOpen={false}>
         <P>No separate directors' remuneration disclosed. Staff costs in Note 5.</P>
+        <EditableNote tenantId={tenantId} noteNumber={6} fy={`FY${CURRENT_YEAR}`} />
       </NoteSection>
 
       <NoteSection number="7" title="Property, Plant and Equipment">
@@ -186,10 +222,12 @@ export default function HQFinancialNotes() {
 
       <NoteSection number="13" title="Related Party Transactions" defaultOpen={false}>
         <P>All related party transactions at arm's length. No outstanding loans.</P>
+        <EditableNote tenantId={tenantId} noteNumber={13} fy={`FY${CURRENT_YEAR}`} />
       </NoteSection>
 
       <NoteSection number="14" title="Events After Reporting Date" defaultOpen={false}>
         <P>No material post-reporting events. Prepared {PREPARED_DATE}.</P>
+        <EditableNote tenantId={tenantId} noteNumber={14} fy={`FY${CURRENT_YEAR}`} />
       </NoteSection>
 
       <NoteSection number="15" title="Standards Not Yet Effective" defaultOpen={false}>

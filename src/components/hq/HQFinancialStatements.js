@@ -251,7 +251,7 @@ export default function HQFinancialStatements() {
     try {
       const { start, end, startDate, endDate } = bounds;
       // Use canonical RPC for income statement data (LL-210, LL-209)
-      const [fpRes, expensesRes, depRes, equityRes, inventoryRes, faRes, invoicesRes, payablesRes, vatExpRes, bslRes] = await Promise.all([
+      const [fpRes, expensesRes, depRes, equityRes, inventoryRes, faRes, invoicesRes, payablesRes, vatExpRes, bslRes, vatTxnRes] = await Promise.all([
         supabase.rpc("tenant_financial_period", { p_tenant_id: tenantId, p_since: start, p_until: end }),
         supabase.from("expenses").select("*").eq("tenant_id", tenantId).gte("expense_date", startDate).lte("expense_date", endDate),
         supabase.from("depreciation_entries").select("depreciation,period_month,period_year").eq("tenant_id", tenantId),
@@ -262,6 +262,7 @@ export default function HQFinancialStatements() {
         supabase.from("purchase_orders").select("landed_cost_zar,po_status").eq("tenant_id", tenantId).in("po_status", ["pending", "confirmed", "ordered"]),
         supabase.from("expenses").select("input_vat_amount").eq("tenant_id", tenantId).gt("input_vat_amount", 0),
         supabase.from("bank_statement_lines").select("balance").eq("tenant_id", tenantId).order("statement_date", { ascending: false }).order("created_at", { ascending: false }).limit(1),
+        supabase.from("vat_transactions").select("output_vat,input_vat").eq("tenant_id", tenantId),
       ]);
 
       const fp = fpRes.data || {};
@@ -300,8 +301,10 @@ export default function HQFinancialStatements() {
       const fixedAssetsCost = (faRes.data || []).reduce((s, a) => s + (parseFloat(a.purchase_cost || 0)), 0);
       const fixedAssetsAD = (faRes.data || []).reduce((s, a) => s + (parseFloat(a.accumulated_depreciation || 0)), 0);
       const fixedAssetsNBV = Math.max(0, fixedAssetsCost - fixedAssetsAD);
-      const vatInput = fp.vat?.ytd_input || (vatExpRes.data || []).reduce((s, e) => s + (parseFloat(e.input_vat_amount) || 0), 0);
-      const vatOutput = fp.vat?.ytd_output || 0;
+      // VAT from vat_transactions directly — matches operational BS (HQBalanceSheet.js)
+      const vatOutput = (vatTxnRes.data || []).reduce((s, t) => s + (parseFloat(t.output_vat) || 0), 0);
+      const vatInputFromTxn = (vatTxnRes.data || []).reduce((s, t) => s + (parseFloat(t.input_vat) || 0), 0);
+      const vatInput = vatInputFromTxn > 0 ? vatInputFromTxn : (vatExpRes.data || []).reduce((s, e) => s + (parseFloat(e.input_vat_amount) || 0), 0);
       const vatLiability = Math.max(0, Math.round((vatOutput - vatInput) * 100) / 100);
       const eqData = equityRes.data;
       const shareCapital = parseFloat(eqData?.share_capital || 0);
