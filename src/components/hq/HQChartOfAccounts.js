@@ -4,6 +4,13 @@ import { supabase } from "../../services/supabaseClient";
 import { T } from "../../styles/tokens";
 
 const ORDER = ["asset", "liability", "equity", "revenue", "expense"];
+const TYPE_LABELS = {
+  asset: "Assets", assets: "Assets",
+  liability: "Liabilities", liabilities: "Liabilities", liabilitys: "Liabilities",
+  equity: "Equity", equitys: "Equity",
+  revenue: "Revenue", revenues: "Revenue",
+  expense: "Expenses", expenses: "Expenses",
+};
 
 export default function HQChartOfAccounts() {
   const { tenantId } = useTenant();
@@ -34,7 +41,7 @@ export default function HQChartOfAccounts() {
       {sorted.map(type => (
         <div key={type} style={{ marginBottom: 20 }}>
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: T.ink500, padding: "6px 0", borderBottom: `2px solid ${T.border}`, marginBottom: 4 }}>
-            {type}s ({groups[type].length})
+            {TYPE_LABELS[type] || type} ({groups[type].length})
           </div>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <tbody>{groups[type].map(r => (

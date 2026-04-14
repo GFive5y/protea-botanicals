@@ -249,63 +249,70 @@ export default function HQFinancialStatements() {
     setLoading(true);
     try {
       const { start, end, startDate, endDate } = bounds;
-      const [ordersRes, orderItemsRes, expensesRes, depRes, equityRes, inventoryRes, faRes, invoicesRes, payablesRes, cfOrdersRes, cfPoRes, vatTxnRes] = await Promise.all([
-        supabase.from("orders").select("id,total,created_at,status").eq("tenant_id", tenantId).not("status", "in", '("cancelled","failed")').gte("created_at", start).lte("created_at", end),
-        supabase.from("order_items").select("order_id,quantity,line_total,product_name,product_metadata"),
+      // Use canonical RPC for income statement data (LL-210, LL-209)
+      const [fpRes, expensesRes, depRes, equityRes, inventoryRes, faRes, invoicesRes, payablesRes, vatExpRes] = await Promise.all([
+        supabase.rpc("tenant_financial_period", { p_tenant_id: tenantId, p_since: start, p_until: end }),
         supabase.from("expenses").select("*").eq("tenant_id", tenantId).gte("expense_date", startDate).lte("expense_date", endDate),
-        supabase.from("depreciation_entries").select("depreciation").eq("tenant_id", tenantId),
+        supabase.from("depreciation_entries").select("depreciation,period_month,period_year").eq("tenant_id", tenantId),
         supabase.from("equity_ledger").select("*").eq("tenant_id", tenantId).eq("financial_year", selectedFY === "custom" ? currentFY : selectedFY).maybeSingle(),
         supabase.from("inventory_items").select("quantity_on_hand,weighted_avg_cost,is_active").eq("tenant_id", tenantId).eq("is_active", true),
         supabase.from("fixed_assets").select("purchase_cost,accumulated_depreciation,is_active").eq("tenant_id", tenantId).eq("is_active", true),
         supabase.from("invoices").select("total_amount,status,invoice_type").eq("tenant_id", tenantId).not("status", "eq", "paid"),
         supabase.from("purchase_orders").select("landed_cost_zar,po_status").eq("tenant_id", tenantId).in("po_status", ["pending", "confirmed", "ordered"]),
-        supabase.from("orders").select("total").eq("tenant_id", tenantId).not("status", "in", '("cancelled","failed")').gte("created_at", start).lte("created_at", end),
-        supabase.from("purchase_orders").select("landed_cost_zar").eq("tenant_id", tenantId).in("po_status", ["received", "complete"]),
-        supabase.from("vat_transactions").select("output_vat,input_vat").eq("tenant_id", tenantId),
+        supabase.from("expenses").select("input_vat_amount").eq("tenant_id", tenantId).gt("input_vat_amount", 0),
       ]);
 
-      // Income Statement
-      const paidOrders = (ordersRes.data || []).filter(o => o.status === "paid");
-      const orderIds = new Set(paidOrders.map(o => o.id));
-      const revenue = paidOrders.reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
-      const oiFiltered = (orderItemsRes.data || []).filter(oi => orderIds.has(oi.order_id));
-      const cogs = oiFiltered.reduce((s, oi) => { const avco = parseFloat(oi.product_metadata?.weighted_avg_cost || 0); return s + (oi.quantity || 0) * avco; }, 0);
+      const fp = fpRes.data || {};
+
+      // Income Statement — from canonical RPC
+      const revenue = fp.revenue?.ex_vat || 0;
+      const cogs = fp.cogs?.actual || 0;
       const grossProfit = revenue - cogs;
       const grossMarginPct = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
       const opexExpenses = (expensesRes.data || []).filter(e => ["opex", "wages", "tax", "other"].includes(e.category));
       const capexExpenses = (expensesRes.data || []).filter(e => e.category === "capex");
-      const totalOpex = opexExpenses.reduce((s, e) => s + (parseFloat(e.amount_zar) || 0), 0);
+      const totalOpex = fp.opex?.total || opexExpenses.reduce((s, e) => s + (parseFloat(e.amount_zar) || 0), 0);
       const capexPaid = capexExpenses.reduce((s, e) => s + (parseFloat(e.amount_zar) || 0), 0);
       const opexMap = {};
       opexExpenses.forEach(e => { const k = e.subcategory || "Other operating expenses"; opexMap[k] = (opexMap[k] || 0) + (parseFloat(e.amount_zar) || 0); });
       const opexLines = Object.entries(opexMap).map(([label, amount]) => ({ label, amount }));
-      const depreciationTotal = (depRes.data || []).reduce((s, e) => s + (parseFloat(e.depreciation) || 0), 0);
+      // Depreciation filtered by period
+      const startYear = new Date(start).getFullYear();
+      const startMonth = new Date(start).getMonth() + 1;
+      const endYear = new Date(end).getFullYear();
+      const endMonth = new Date(end).getMonth() + 1;
+      const depreciationTotal = (depRes.data || []).filter(e => {
+        const y = e.period_year; const m = e.period_month;
+        return (y > startYear || (y === startYear && m >= startMonth)) && (y < endYear || (y === endYear && m <= endMonth));
+      }).reduce((s, e) => s + (parseFloat(e.depreciation) || 0), 0);
       const netProfit = grossProfit - totalOpex - depreciationTotal;
       const netMarginPct = revenue > 0 ? (netProfit / revenue) * 100 : 0;
       setIncomeData({ revenue, cogs, grossProfit, grossMarginPct, opexLines, totalOpex, depreciationTotal, netProfit, netMarginPct });
 
-      // Balance Sheet
+      // Balance Sheet — use RPC + direct queries for point-in-time values
       const inventoryValue = (inventoryRes.data || []).reduce((s, i) => s + (parseFloat(i.quantity_on_hand || 0) * parseFloat(i.weighted_avg_cost || 0)), 0);
       const receivables = (invoicesRes.data || []).filter(i => i.invoice_type !== "purchase").reduce((s, i) => s + (parseFloat(i.total_amount || 0)), 0);
       const payables = (payablesRes.data || []).reduce((s, po) => s + (parseFloat(po.landed_cost_zar || 0)), 0);
       const fixedAssetsCost = (faRes.data || []).reduce((s, a) => s + (parseFloat(a.purchase_cost || 0)), 0);
       const fixedAssetsAD = (faRes.data || []).reduce((s, a) => s + (parseFloat(a.accumulated_depreciation || 0)), 0);
-      const fixedAssetsNBV = fixedAssetsCost > 0 ? fixedAssetsCost - fixedAssetsAD : capexPaid;
-      const vatOutput = (vatTxnRes.data || []).reduce((s, t) => s + (parseFloat(t.output_vat) || 0), 0);
-      const vatInput  = (vatTxnRes.data || []).reduce((s, t) => s + (parseFloat(t.input_vat)  || 0), 0);
+      const fixedAssetsNBV = Math.max(0, fixedAssetsCost - fixedAssetsAD);
+      const vatInput = (vatExpRes.data || []).reduce((s, e) => s + (parseFloat(e.input_vat_amount) || 0), 0);
+      const vatOutput = fp.vat?.output || 0;
       const vatLiability = Math.max(0, Math.round((vatOutput - vatInput) * 100) / 100);
       const eqData = equityRes.data;
-      const shareCapital = eqData?.share_capital || 0;
-      const openingRE = eqData?.opening_retained_earnings || 0;
+      const shareCapital = parseFloat(eqData?.share_capital || 0);
+      const openingRE = parseFloat(eqData?.opening_retained_earnings || 0);
       const totalEquity = shareCapital + openingRE + netProfit;
-      const balanced = Math.abs((inventoryValue + receivables + fixedAssetsNBV) - (payables + vatLiability + totalEquity)) < 2;
+      const totalAssets = inventoryValue + receivables + fixedAssetsNBV;
+      const totalLiabilities = payables + vatLiability;
+      const balanced = Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 2;
       setBsData({ inventoryValue, receivables, fixedAssetsNBV, fixedAssetsCost, fixedAssetsAccDep: fixedAssetsAD, payables, vatLiability, shareCapital, openingRetained: openingRE, currentYearPL: netProfit, totalEquity, balanced });
 
-      // Cash Flow
+      // Cash Flow — from RPC
       const netOperating = netProfit + depreciationTotal;
       const netInvesting = -capexPaid;
       const netCash = netOperating + netInvesting;
-      setCfData({ netProfit, depreciationTotal, cashFromCustomers: revenue, cashToSuppliers: 0, opexPaid: totalOpex, capexPaid, netOperating, netInvesting, netCash });
+      setCfData({ netProfit, depreciationTotal, cashFromCustomers: fp.cash?.from_customers || revenue, cashToSuppliers: fp.cash?.to_suppliers || 0, opexPaid: totalOpex, capexPaid, netOperating, netInvesting, netCash });
 
       // Equity
       setEquityData({ shareCapital, openingRetained: openingRE, currentYearPL: netProfit });

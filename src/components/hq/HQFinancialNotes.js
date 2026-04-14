@@ -14,7 +14,7 @@ const D = {
   shadow: T.shadow?.sm || "0 1px 4px rgba(0,0,0,0.08)",
 };
 
-const fmtZar = (n) => `R\u202F${(parseFloat(n)||0).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+const fmtZar = (n) => { const v = Math.round((parseFloat(n)||0)*100)/100; return `R\u202F${v.toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})}`; };
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-ZA",{day:"numeric",month:"long",year:"numeric"}) : "\u2014";
 const CURRENT_YEAR = new Date().getFullYear();
 const PREPARED_DATE = new Date().toLocaleDateString("en-ZA",{day:"numeric",month:"long",year:"numeric"});
@@ -67,18 +67,20 @@ export default function HQFinancialNotes() {
     if (!tenantId) return; setLoading(true);
     try {
       const ys = `${CURRENT_YEAR}-01-01`;
-      const [cfgR,invR,faR,eqR,baR,expR,ordR,vatR,depR] = await Promise.all([
+      const [cfgR,invR,faR,eqR,baR,expR,ordR,vatR,depR,bslR] = await Promise.all([
         supabase.from("tenant_config").select("*").eq("tenant_id",tenantId).maybeSingle(),
         supabase.from("inventory_items").select("quantity_on_hand, weighted_avg_cost, category, is_active").eq("tenant_id",tenantId).eq("is_active",true),
         supabase.from("fixed_assets").select("*").eq("tenant_id",tenantId),
         supabase.from("equity_ledger").select("*").eq("tenant_id",tenantId).eq("financial_year",`FY${CURRENT_YEAR}`).maybeSingle(),
         supabase.from("bank_accounts").select("*").eq("tenant_id",tenantId),
-        supabase.from("expenses").select("subcategory, category, amount_zar").eq("tenant_id",tenantId).gte("expense_date",ys),
+        supabase.from("expenses").select("subcategory, category, amount_zar, input_vat_amount").eq("tenant_id",tenantId).gte("expense_date",ys),
         supabase.from("orders").select("total, created_at, status").eq("tenant_id",tenantId).gte("created_at",ys).not("status","in",'("cancelled","failed")'),
         supabase.from("vat_transactions").select("*").eq("tenant_id",tenantId).gte("transaction_date",ys),
         supabase.from("depreciation_entries").select("depreciation").eq("tenant_id",tenantId).eq("period_year",CURRENT_YEAR),
+        supabase.from("bank_statement_lines").select("balance,statement_date").eq("tenant_id",tenantId).order("statement_date",{ascending:false}).limit(1),
       ]);
-      setData({cfg:cfgR.data,inv:invR.data||[],fa:faR.data||[],eq:eqR.data,ba:baR.data||[],exp:expR.data||[],ord:ordR.data||[],vat:vatR.data||[],dep:depR.data||[]});
+      const closingBalance = bslR.data?.[0]?.balance || null;
+      setData({cfg:cfgR.data,inv:invR.data||[],fa:faR.data||[],eq:eqR.data,ba:baR.data||[],exp:expR.data||[],ord:ordR.data||[],vat:vatR.data||[],dep:depR.data||[],closingBalance});
     } catch(_){} finally{setLoading(false);}
   },[tenantId]);
   useEffect(()=>{fetchAll();},[fetchAll]);
@@ -165,8 +167,8 @@ export default function HQFinancialNotes() {
 
       <NoteSection number="10" title="Cash and Cash Equivalents">
         {ba.length===0?<P>No bank accounts linked. Complete Financial Setup.</P>:<>
-          <NoteTable headers={["Account","Bank","Type","Balance (ZAR)"]} rows={ba.map(a=>[a.account_name,a.bank_name,a.account_type,fmtZar(a.opening_balance||0)])}/>
-          <P>Primary bank: <strong>{ba[0]?.bank_name}</strong>. All balances in ZAR.</P>
+          <NoteTable headers={["Account","Bank","Type","Closing Balance (ZAR)"]} rows={ba.map(a=>[a.account_name,a.bank_name,a.account_type,fmtZar(data.closingBalance != null ? data.closingBalance : (a.opening_balance||0))])}/>
+          <P>Primary bank: <strong>{ba[0]?.bank_name}</strong>. All balances in ZAR. Closing balance from latest bank statement.</P>
         </>}
       </NoteSection>
 
