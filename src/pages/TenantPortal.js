@@ -309,11 +309,6 @@ const WATERFALL = [
         label: "Staff",
         desc: "Directory \u00b7 profiles \u00b7 timesheets",
       },
-      {
-        id: "hr-dashboard",
-        label: "HR Dashboard \u2192",
-        desc: "Calendar \u00b7 timesheets \u00b7 leave \u00b7 contracts \u00b7 payroll",
-      },
     ],
   },
 ];
@@ -450,69 +445,33 @@ const CANNABIS_RETAIL_WATERFALL = [
   },
   {
     id: "intelligence",
-    label: "Reports",
+    label: "Financials",
     icon: TrendingUp,
     color: "#991B1B",
     tabs: [
-      {
-        id: "pl",
-        label: "Profit & Loss",
-        desc: "Live revenue \u00b7 COGS \u00b7 net margin \u00b7 margin by product",
-      },
-      {
-        id: "expenses",
-        label: "Expenses",
-        desc: "OPEX tracking \u00b7 categories \u00b7 P&L feed",
-      },
-      {
-        id: "analytics",
-        label: "Analytics",
-        desc: "Scans \u00b7 customer data \u00b7 trends",
-      },
-      {
-        id: "reorder",
-        label: "Reorder",
-        desc: "Stock alerts \u00b7 procurement triggers",
-      },
-      {
-        id: "balance-sheet",
-        label: "Balance Sheet",
-        desc: "Assets \u00b7 liabilities \u00b7 cash flow",
-      },
-      {
-        id: "costing",
-        label: "Costing",
-        desc: "Per-SKU margin \u00b7 recipe COGS \u00b7 FX impact",
-      },
-      {
-        id: "forecast",
-        label: "Forecast",
-        desc: "30-day projection \u00b7 stock depletion \u00b7 cash flow",
-      },
-      {
-        id: "year-end",
-        label: "Year-End Close",
-        desc: "Lock year \u00b7 post retained earnings \u00b7 archive period",
-      },
-      {
-        id: "journals",
-        label: "Journals",
-        desc: "Accruals \u00b7 PAYE \u00b7 prepayments \u00b7 corrections",
-      },
-      {
-        id: "vat",
-        label: "VAT",
-        desc: "VAT201 returns \u00b7 output \u00b7 input \u00b7 SARS filing",
-      },
-      {
-        id: "bank-recon",
-        label: "Bank Recon",
-        desc: "Statement import \u00b7 match transactions \u00b7 reconcile",
-      },
+      { id: "pl",                label: "Profit & Loss",     desc: "Live revenue \u00b7 COGS \u00b7 net margin \u00b7 margin by product" },
+      { id: "expenses",          label: "Expenses",          desc: "OPEX tracking \u00b7 categories \u00b7 P&L feed" },
+      { id: "balance-sheet",     label: "Balance Sheet",     desc: "Assets \u00b7 liabilities \u00b7 equity" },
+      { id: "bank-recon",        label: "Bank Recon",        desc: "Statement import \u00b7 match transactions \u00b7 reconcile" },
+      { id: "journals",          label: "Journals",          desc: "Accruals \u00b7 PAYE \u00b7 prepayments \u00b7 corrections" },
+      { id: "vat",               label: "VAT",               desc: "VAT201 returns \u00b7 output \u00b7 input \u00b7 SARS filing" },
       { id: "fixed-assets",      label: "Fixed Assets",      desc: "PPE register \u00b7 depreciation \u00b7 NBV" },
+      { id: "year-end",          label: "Year-End Close",    desc: "Lock year \u00b7 post retained earnings \u00b7 archive period" },
       { id: "fin-statements",    label: "IFRS Statements",   desc: "4 IFRS statements \u00b7 auditor sign-off" },
       { id: "fin-notes",         label: "Financial Notes",   desc: "IFRS disclosure notes \u00b7 15 notes" },
       { id: "chart-of-accounts", label: "Chart of Accounts", desc: "Account codes \u00b7 types \u00b7 structure" },
+    ],
+  },
+  {
+    id: "analytics",
+    label: "Analytics",
+    icon: TrendingUp,
+    color: "#1E3A5F",
+    tabs: [
+      { id: "analytics", label: "Analytics", desc: "Scans \u00b7 customer data \u00b7 acquisition \u00b7 trends" },
+      { id: "reorder",   label: "Reorder",   desc: "Stock alerts \u00b7 velocity scoring \u00b7 procurement triggers" },
+      { id: "costing",   label: "Costing",   desc: "Per-SKU margin \u00b7 recipe COGS \u00b7 FX impact" },
+      { id: "forecast",  label: "Forecast",  desc: "30-day projection \u00b7 stock depletion \u00b7 cash flow" },
     ],
   },
   {
@@ -697,7 +656,7 @@ const CANNABIS_ROLE_SECTIONS = {
   staff:      ["home", "sales", "customers"],
   hr:         ["home", "people"],
   management: ["home", "inventory", "operations", "sales", "customers", "people"],
-  admin:      ["home", "inventory", "procurement", "operations", "sales", "customers", "intelligence", "people"],
+  admin:      ["home", "inventory", "procurement", "operations", "sales", "customers", "intelligence", "analytics", "people"],
   retailer:   ["home", "sales", "customers"],
   customer:   ["home"],
 };

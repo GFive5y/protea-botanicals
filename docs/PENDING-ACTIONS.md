@@ -103,6 +103,46 @@ Named future build item. Not blocking demo.
 
 ---
 
+## BACKLOG — FUTURE BUILD ITEMS (post-demo, no date constraint)
+
+### BACKLOG-001 — Contextual action intelligence in the breadcrumb header
+Logged: 15 April 2026 · Session 262 nav audit
+Context: The TenantPortal breadcrumb bar (48px, below GlobalSearch) currently
+  shows WHERE the user is (Home › Financials › Balance Sheet) but not WHAT
+  they should do next. The next-generation upgrade is a per-tab context registry
+  that feeds the breadcrumb area with 1-3 relevant quick actions:
+  Example: Balance Sheet → "▶ Run depreciation · Last updated: today · FY2026 ✓"
+  Example: Daily Trading → "▶ Cash-Up · Yesterday R12,450 · Trend: ↑ 8%"
+  Example: VAT → "▶ File VAT201 · Period P4 overdue · R14,230 payable"
+Architecture: A CONTEXT_REGISTRY constant (tabId → { actions, metrics }) in
+  TenantPortal.js feeds the breadcrumb strip. Actions call setActiveTab() or
+  open modals. Metrics are fetched by the AINSBar intelligence layer and passed
+  down as props — no new DB calls needed.
+Impact on demo: CA sees the system anticipate their next action. Positions NuAi
+  as genuinely intelligent, not just a data dashboard.
+Build cost: Medium. Requires a context registry + breadcrumb upgrade + wiring
+  to existing useNavIntelligence data. No DB changes. No new EFs.
+Pre-requisite: Complete WP-UNIFY Tier 1 first (breadcrumb bar needs to be on
+  token system before adding components to it).
+
+---
+
+## CLOSED LOOPS — SESSION 262
+
+### ✅ CLOSED — CC-05: Tenant Portal nav — Reports split + hr-dashboard fix
+Session 262 · 15 April 2026
+Two changes to src/pages/TenantPortal.js CANNABIS_RETAIL_WATERFALL:
+  (a) "Reports" (15-item section) split into "Financials" (11 items: accounting
+      operations + IFRS outputs) and "Analytics" (4 items: insights + planning).
+      Section id "intelligence" kept for Financials to preserve breadcrumb
+      history. New section id "analytics" added. CANNABIS_ROLE_SECTIONS
+      updated to whitelist "analytics" for admin role.
+  (b) hr-dashboard tab removed from Team section — tab had no renderTab case
+      and rendered the "coming soon" fallback. CA-critical fix.
+Applies to: CANNABIS_RETAIL_WATERFALL only. Other waterfalls unchanged this session.
+
+---
+
 ## CLOSED LOOPS — SESSION 261
 
 ### ✅ CLOSED — SB-FIX-001: Metro Hardware VAT number
