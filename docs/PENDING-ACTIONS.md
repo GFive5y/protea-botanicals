@@ -58,6 +58,13 @@ Action: Incognito → /tenant-portal (MediCare) → IFRS Statements → Income S
   Protocol: Vercel Ready on 91719e5 confirmed → incognito only (LL-214).
 Close when: IFRS IS revenue matches dispensing_log × sell_price per live DB query.
 
+### LOOP-015 — Loyalty warning banner source unidentified
+Status: OPEN · Added Session 282
+Symptom: Warning banner on some tenant portals referencing "no rows" or
+  "config row" or "rewards engine". Source component not yet found.
+Next step: grep -r "no rows\|config row\|rewards engine" src/
+Files ruled out: AINSBar.js, useNavIntelligence.js, HQLoyalty.js, IntelStrip.js.
+
 ---
 
 ## KNOWN PERMANENT GAPS (document and explain in demo — do not fix before 12 May)
@@ -100,6 +107,10 @@ scan_logs has no tenant_id column — permanent limitation.
 Per-line loop on ship/receive with no transaction wrapper.
 Partial failures can leave transfers inconsistent.
 Named future build item. Not blocking demo.
+
+### WATCH-004 — Eybna unpriced products
+HC-0002, BB-LYCHEE-0002, 6-PH-0002 still no sell price.
+Action: Admin Stock → set sell prices for these 3 items.
 
 ---
 
@@ -169,6 +180,35 @@ Outstanding items — do not chase before 12 May unless time permits:
     all group members. Verify is_hq_user() bypass is not required for
     the group owner viewing member data (member_can_see_group covers reads
     but the joined table queries may hit per-table RLS).
+
+---
+
+## CLOSED LOOPS — SESSION 282 (15 April 2026)
+
+### ✅ CLOSED — CC-07: Group Portal button unconditional render
+Session 282 · commit 93cdf5f · src/pages/TenantPortal.js
+Removed hasGroup async gate. Button always renders. GroupPortal.js handles empty state.
+Fixed Unicode escape bugs in JSX.
+
+### ✅ CLOSED — CC-08: Group Portal in ADMIN_PAGES
+Session 282 · src/hooks/useNavConfig.js
+Added Group Portal to ADMIN_PAGES Platform section (was HQ_PAGES only).
+Lesson LL-258: check ALL 4 nav arrays when adding nav items.
+
+### ✅ CLOSED — CC-09: RLS infinite recursion on tenant_groups
+Session 282 · Supabase MCP (no code commit)
+Dropped recursive policy. Created get_my_group_ids() SECURITY DEFINER function.
+New policy calls function. Lesson LL-262.
+
+### ✅ CLOSED — CC-10: StoreComparison bar chart colors
+Session 282 · commit cffb546 · src/components/group/StoreComparison.js
+T.neutralLight (≈ white) replaced with BAR_PALETTE (6 distinct colors).
+barColor embedded in chartData. tenantId added to useMemo deps. Lesson LL-263.
+
+### ✅ CLOSED — Local git sync recovery
+Session 282 · no commit (local fix only)
+git pull failed. Recovered with: git fetch + reset --hard origin/main + npm install.
+Lessons LL-260, LL-261.
 
 ---
 

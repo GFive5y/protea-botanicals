@@ -335,3 +335,134 @@ LL-191: loyalty_transactions column = transaction_type. NOT type/loyalty_type/ev
 *Preserves LL-001 through LL-173 from SESSION-CORE v2.3*
 *LL-174 through LL-191 are in SESSION-CORE v2.8/v2.9 body text*
 *LL list is SACRED — never abbreviate, never skip entries*
+
+---
+
+## LL-252 through LL-263 — Sessions 262-282 (April 15, 2026)
+
+LL-252: StockIntelPanel.js saleOuts memo filtered movement_type === 'sale_out' ONLY.
+'sale_out' = wholesale only (LL-189). POS uses 'sale_pos'.
+Fix: filter OR: ['sale_out','sale_pos'].includes(m.movement_type)
+Apply to ANY future component reading stock_movements for sales data.
+
+LL-253: auth.users SQL direct INSERT — all token fields MUST be explicit empty
+strings (NOT null) or GoTrue throws 500 on password grant:
+confirmation_token='', recovery_token='', email_change_token_new='',
+email_change='', phone_change='', phone_change_token='',
+email_change_token_current='', reauthentication_token=''
+email_change_confirm_status=0 (integer)
+Also: auth.identities row (no 'email' column — generated), is_sso_user=false,
+is_anonymous=false, deleted_at=null.
+Use DO $$ block with gen_random_uuid() for consistent UUID across
+auth.users, auth.identities, and user_profiles.
+
+LL-254: RLS infinite recursion between related tables.
+Trigger pattern:
+  Policy A on table_X: USING (id IN (SELECT col FROM table_Y ...))
+  Policy B on table_Y: USING (col IN (SELECT id FROM table_X ...))
+PostgreSQL evaluates both simultaneously → infinite loop.
+Error: "infinite recursion detected in policy for relation 'table_X'"
+Fix: DROP recursive policy on table_X. CREATE FUNCTION that reads
+table_Y with SECURITY DEFINER (bypasses RLS). New policy on table_X
+calls function.
+Applied to tenant_groups/tenant_group_members April 15, 2026.
+Function: get_my_group_ids() on project uvicrqapgzcdvozxrreo.
+
+LL-255: T.neutralLight ≈ #F4F4F3 (near-white).
+NEVER use as chart bar fill on white/light background — bars are invisible.
+Use named palette arrays instead.
+Pattern: BAR_PALETTE = ['#2D6A4F','#1E3A5F','#7C3AED','#92400E','#0F766E','#6B21A8']
+Embed barColor into chartData useMemo. Current store = T.accent.
+Apply to any future Recharts BarChart with per-series coloring.
+
+LL-256: Diverged local repo recovery.
+Symptom: git pull aborts — "Your local changes would be overwritten"
+Causes: (a) modified tracked files, (b) untracked files conflicting with origin
+DO NOT use git stash — doesn't help with untracked file conflicts.
+Fix:
+  git fetch origin
+  git reset --hard origin/main
+  npm install    ← always needed after hard reset
+  npm start
+
+LL-257: Vercel service worker cache — "Finish update" button.
+When "Finish update" appears: new JS bundle is deployed BUT browser
+is running an old bundle from a prior service worker.
+Ctrl+Shift+R does NOT reliably clear SW caches.
+Existing incognito tab = still old SW.
+ONLY reliable fix: open a BRAND NEW incognito window.
+Diagnostic: bug on Vercel but NOT localhost → SW cache.
+Bug on BOTH → code issue. Fix the code.
+
+LL-258: useNavConfig.js has FOUR separate page arrays:
+  HQ_PAGES    → /hq route, isHQ users
+  ADMIN_PAGES → /admin route, role='admin' store users
+  HR_PAGES    → /hr route
+  STAFF_PAGES → /staff route
+New nav item visible in multiple contexts MUST be in ALL relevant arrays.
+Group Portal was in HQ_PAGES (Session 262) but NOT ADMIN_PAGES →
+store admins never saw it until Session 282.
+Verify: grep -n 'Group Portal' src/hooks/useNavConfig.js → 2 lines.
+
+LL-259: Always check localhost before blaming Vercel cache.
+Vercel bug + "Finish update" visible → check localhost first.
+localhost same bug → code issue, not cache.
+localhost correct → Vercel SW cache (LL-257).
+Multiple sessions wasted assuming cache when root cause was code.
+
+LL-260: git pull "would be overwritten" — full recovery.
+Error lists both modified tracked files AND untracked conflicting files.
+git stash only handles tracked changes, not untracked conflicts.
+Full safe sequence:
+  git fetch origin
+  git reset --hard origin/main
+  npm install
+  npm start
+git reset --hard discards ALL local tracked changes and brings HEAD to origin/main.
+Untracked files that don't conflict remain in place (not a problem).
+
+LL-261: qrcode.react (or any package) missing after git reset --hard.
+Symptom: "Module not found: Error: Can't resolve 'qrcode.react'"
+Cause: reset restores package.json from origin/main, node_modules out of sync.
+Fix: npm install immediately after any git reset --hard.
+Applies to ANY missing package error after a hard reset.
+
+LL-262: Group Portal "infinite recursion" — full diagnosis and fix.
+UI error: "Could not load network: infinite recursion detected
+in policy for relation 'tenant_groups'"
+Diagnostic SQL:
+  SELECT policyname, cmd, qual FROM pg_policies
+  WHERE tablename IN ('tenant_groups','tenant_group_members')
+  ORDER BY tablename, policyname;
+Look for policies on each table referencing the other in qual.
+Fix (Supabase MCP):
+  DROP POLICY IF EXISTS "member_can_read_own_group" ON tenant_groups;
+  CREATE OR REPLACE FUNCTION get_my_group_ids()
+  RETURNS SETOF uuid LANGUAGE sql SECURITY DEFINER STABLE AS $$
+    SELECT group_id FROM tenant_group_members
+    WHERE tenant_id = user_tenant_id();
+  $$;
+  CREATE POLICY "member_can_read_own_group" ON tenant_groups
+  FOR SELECT TO public USING (id IN (SELECT get_my_group_ids()));
+See also LL-254 for the general pattern.
+
+LL-263: StoreComparison.js bar chart invisible — full fix pattern.
+Symptom: only current store bar visible (green). All others invisible.
+Cause: Cell fill = T.neutralLight (≈ white) for non-current stores.
+Fix:
+  Step 1 — Add above chartData useMemo:
+    const BAR_PALETTE = ['#2D6A4F','#1E3A5F','#7C3AED',
+                         '#92400E','#0F766E','#6B21A8'];
+  Step 2 — In chartData useMemo, add barColor + tenantId to deps:
+    sortedStores.map((s, idx) => ({
+      ...
+      barColor: s.tenantId === tenantId
+        ? T.accent
+        : BAR_PALETTE[idx % BAR_PALETTE.length],
+    }))
+    deps: [sortedStores, tenantId]   ← tenantId was missing → stale
+  Step 3 — Cell:
+    <Cell key={entry.tenantId} fill={entry.barColor} />
+Apply this pattern to any future chart needing per-series colors.
+
+*LL-252 through LL-263 added: Session 282 · April 15, 2026*
