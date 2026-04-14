@@ -5,8 +5,9 @@
 // WP-Z: PlatformBar replaces AlertsBar — wired below LiveFXBar
 // ★ v4.0: WP-NAV Sub-B — sidebar handles all tab routing
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { supabase } from "../services/supabaseClient";
 import { useTenant } from "../services/tenantService";
 import { T } from "../styles/tokens";
 
@@ -50,6 +51,8 @@ import HQBankRecon from "../components/hq/HQBankRecon";
 import HQFixedAssets from "../components/hq/HQFixedAssets";
 import ExpenseManager from "../components/hq/ExpenseManager";
 import HQYearEnd from "../components/hq/HQYearEnd";
+import HQFinancialStatements from "../components/hq/HQFinancialStatements";
+import HQFinancialNotes from "../components/hq/HQFinancialNotes";
 import HQVat from "../components/hq/HQVat";
 import HQTenants from "../components/hq/HQTenants";
 import HQTenantProfiles from "../components/hq/HQTenantProfiles";
@@ -98,6 +101,10 @@ const TABS = [
   { id: "costing", label: "Costing", icon: "🧮", ready: true },
   { id: "pl", label: "P&L", icon: "📉", ready: true },
   { id: "balance-sheet", label: "Balance Sheet", icon: "⚖️", ready: true },
+  { id: "financial-statements", label: "IFRS Statements", icon: "📋", ready: true },
+  { id: "financial-notes", label: "Financial Notes", icon: "📝", ready: true },
+  { id: "year-end", label: "Year-End Close", icon: "🔒", ready: true },
+  { id: "chart-of-accounts", label: "Chart of Accounts", icon: "📊", ready: true },
   { id: "forecast", label: "Forecast", icon: "🔮", ready: true },
   { id: "analytics", label: "Analytics", icon: "📈", ready: true },
   { id: "geo-analytics", label: "Geo Analytics", icon: "🗺️", ready: true },
@@ -117,6 +124,39 @@ const TABS = [
   { id: "wholesale-orders", label: "Wholesale Orders", ready: true },
   { id: "shops", label: "Shops", icon: "🏪", ready: true },
 ];
+
+function ChartOfAccountsView({ tenantId }) {
+  const [rows, setRows] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  React.useEffect(() => {
+    if (!tenantId) return;
+    supabase.from("chart_of_accounts").select("account_code,account_name,account_type,account_subtype,is_active")
+      .eq("tenant_id", tenantId).order("account_code").then(({ data }) => { setRows(data || []); setLoading(false); });
+  }, [tenantId]);
+  if (loading) return <div style={{ padding: 40, textAlign: "center", color: "#888" }}>Loading...</div>;
+  if (!rows.length) return <div style={{ padding: 40, textAlign: "center", color: "#888" }}>No chart of accounts for this tenant.</div>;
+  return (
+    <div style={{ fontFamily: T.font }}>
+      <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Chart of Accounts ({rows.length} accounts)</h3>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+        <thead><tr style={{ borderBottom: `2px solid ${T.border}`, textAlign: "left" }}>
+          <th style={{ padding: "8px 12px", fontWeight: 600, color: T.ink500 }}>Code</th>
+          <th style={{ padding: "8px 12px", fontWeight: 600, color: T.ink500 }}>Account Name</th>
+          <th style={{ padding: "8px 12px", fontWeight: 600, color: T.ink500 }}>Type</th>
+          <th style={{ padding: "8px 12px", fontWeight: 600, color: T.ink500 }}>Subtype</th>
+        </tr></thead>
+        <tbody>{rows.map(r => (
+          <tr key={r.account_code} style={{ borderBottom: `1px solid ${T.border}`, opacity: r.is_active ? 1 : 0.5 }}>
+            <td style={{ padding: "6px 12px", fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>{r.account_code}</td>
+            <td style={{ padding: "6px 12px" }}>{r.account_name}</td>
+            <td style={{ padding: "6px 12px", textTransform: "capitalize" }}>{r.account_type}</td>
+            <td style={{ padding: "6px 12px", color: T.ink500 }}>{r.account_subtype || "\u2014"}</td>
+          </tr>
+        ))}</tbody>
+      </table>
+    </div>
+  );
+}
 
 export default function HQDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -309,6 +349,10 @@ export default function HQDashboard() {
           {activeTab === "expenses" && <ExpenseManager />}
           {activeTab === "vat" && <HQVat />}
           {activeTab === "year-end-close" && <HQYearEnd />}
+          {activeTab === "year-end" && <HQYearEnd />}
+          {activeTab === "financial-statements" && <HQFinancialStatements />}
+          {activeTab === "financial-notes" && <HQFinancialNotes />}
+          {activeTab === "chart-of-accounts" && <ChartOfAccountsView tenantId={tenant?.id} />}
           {activeTab === "email-logs" && <HQEmailLogs />}
         </div>
       </div>
