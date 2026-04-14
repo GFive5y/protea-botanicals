@@ -42,6 +42,11 @@ two-agent operating procedure. See docs/CLAUDE-COLLABORATION-PROTOCOL.md.
    ls docs/SESSION-STATE* | sort | tail -1
    Read BOTH in full before any task.
 
+2.5  Read these three files next:
+   docs/SYSTEM-GROUND-TRUTH.md   <- current tenant state from live DB
+   docs/SCHEMA-REFERENCE.md      <- correct production table names
+   docs/PREFLIGHT-SQL.md         <- pre-flight checks before any demo
+
 3. Read docs/NUAI-AGENT-BIBLE.md
    → all rules (240+ LLs) — this is the canonical rule source
 
@@ -263,9 +268,11 @@ For HEAD:               run git log --oneline -1
 ## SESSION CLOSE PROTOCOL
 
 At end of every session, Claude Code must:
+0. Run: python3 docs/update_ground_truth.py
+   -> regenerates SYSTEM-GROUND-TRUTH.md from live DB before committing
 1. Append a date-stamped addendum to SESSION-STATE_v[current].md
 2. Write NEXT-SESSION-PROMPT_v[next].md with HEAD hash
-3. Commit both: "docs: SESSION-STATE + NEXT-SESSION-PROMPT v[N]"
+3. Commit all: "docs: SESSION-STATE + NEXT-SESSION-PROMPT v[N]"
 
 Claude.ai must confirm the state is accurate before session close.
 
