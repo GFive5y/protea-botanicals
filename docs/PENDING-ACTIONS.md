@@ -185,6 +185,16 @@ Outstanding items — do not chase before 12 May unless time permits:
 
 ## CLOSED LOOPS — SESSION 282 (15 April 2026)
 
+### ✅ CLOSED — DOC-001: SESSION-START-PROMPT.md stale entry point
+Session 282 · 15 April 2026
+Root cause: NEXT-SESSION-PROMPT_v282.md was created instead of updating
+SESSION-START-PROMPT.md in-place. Left entry point at Session 261 state.
+Fix: SESSION-START-PROMPT.md rewritten in-place with Session 282 state.
+LL-264 added to archive documenting the pattern and how to avoid it.
+The versioned NEXT-SESSION-PROMPT_v282.md is a historical record only —
+it is NOT the entry point. SESSION-START-PROMPT.md IS the entry point.
+
+
 ### ✅ CLOSED — CC-07: Group Portal button unconditional render
 Session 282 · commit 93cdf5f · src/pages/TenantPortal.js
 Removed hasGroup async gate. Button always renders. GroupPortal.js handles empty state.

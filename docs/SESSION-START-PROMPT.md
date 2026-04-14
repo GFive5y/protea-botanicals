@@ -1,6 +1,9 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 15 April 2026 — Session 261
+## Updated: 15 April 2026 — Session 282
+## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
+## Detail lives in the loop docs. This file is the entry point only.
+## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
 
 ---
 
@@ -10,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 91719e5
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: de41ec6
 
 ---
 
@@ -18,13 +21,13 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 1. `docs/PLATFORM-OVERVIEW_v1_0.md`
 2. `docs/NUAI-AGENT-BIBLE.md`
-3. `docs/SESSION-STATE_v281.md`
-4. `docs/PENDING-ACTIONS.md`
-5. `docs/VIOLATION_LOG_v1_1.md`
+3. `docs/PENDING-ACTIONS.md`
+4. `docs/VIOLATION_LOG_v1_1.md`
+5. `docs/LL-ARCHIVE_v1_0.md` (LL-252 through LL-264 are new this session)
 
 After reading, confirm out loud:
-- Current HEAD (should be 91719e5)
-- All 5 demo tenant fin package status (ALL COMPLETE — do not re-run financials)
+- Current HEAD (should be de41ec6)
+- Group Portal status (COMPLETE — 6 stores, all tabs verified 15 Apr 2026)
 - All open loops from PENDING-ACTIONS.md
 - Any new violations
 
@@ -37,186 +40,175 @@ IF DEMO DATE CHANGES: update PENDING-ACTIONS.md first, then this file.
 
 ---
 
-## CURRENT STATE — 15 April 2026 — Session 261 Close
+## CURRENT STATE — 15 April 2026 — Session 282 Close
 
 ### FINANCIAL PACKAGE — ALL 5 DEMO TENANTS COMPLETE
-All financial data, bank reconciliations, fixed assets, VAT, journals,
-IFRS statements, and equity ledger entries are done and verified.
-DO NOT re-run financial seeding. DO NOT touch equity_ledger without
-reading LL-248 first. All bank recons are at 0 unmatched lines.
+DO NOT re-run financial seeding. DO NOT touch equity_ledger without LL-248.
+All bank recons at 0 unmatched lines.
 
-| Tenant | ID prefix | Industry | VAT No | Fin Suite | Bank Recon |
-|---|---|---|---|---|---|
-| The Garden Bistro | 7d50ea34 | food_beverage | (demo) | ✅ COMPLETE | ✅ 0 unmatched |
-| Medi Recreational | b1bad266 | cannabis_retail | 4123456789 | ✅ COMPLETE | ✅ 0 unmatched |
-| Nourish Kitchen & Deli | 944547e3 | food_beverage | 4345678912 | ✅ COMPLETE | ✅ 0 unmatched |
-| MediCare Dispensary | 8b9cb8e6 | cannabis_dispensary | 4067891234 | ✅ COMPLETE | ✅ 0 unmatched |
-| Metro Hardware (Pty) Ltd | 57156762 | general_retail | 4987654321 | ✅ COMPLETE | ✅ 0 unmatched |
-| Pure Premium THC Vapes | f8ff8d07 | cannabis_retail | not VAT reg | No fin suite | — |
+| Tenant | Industry | Fin Suite | Bank Recon |
+|---|---|---|---|
+| The Garden Bistro | food_beverage | ✅ COMPLETE | ✅ 0 unmatched |
+| Medi Recreational | cannabis_retail | ✅ COMPLETE | ✅ 0 unmatched |
+| Nourish Kitchen & Deli | food_beverage | ✅ COMPLETE | ✅ 0 unmatched |
+| MediCare Dispensary | cannabis_dispensary | ✅ COMPLETE | ✅ 0 unmatched |
+| Metro Hardware (Pty) Ltd | general_retail | ✅ COMPLETE | ✅ 0 unmatched |
 
-### CODE FIXES LANDED (91719e5)
-- CC-01: Fixed asset "Xmo behind" counter — monthsBehind() now correct (HQFixedAssets.js)
-- CC-02: CF depreciation add-back verified reading depreciation_entries (no change needed)
-- CC-03: IFRS Note 4 dispensary branch — reads dispensing_log (HQFinancialNotes.js)
-- CC-04: IFRS BS VAT sign logic — nets output vs input, correct asset/liability placement
+### GROUP PORTAL — COMPLETE (Session 282)
+NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
+Combined Revenue MTD: R705,557 · Margin: 64.8% · Stock: R3.85M AVCO.
+
+Button wired into ALL nav contexts (LL-258 — all 4 arrays):
+  - TenantPortal.js — unconditional render, no hasGroup gate (CC-07, 93cdf5f)
+  - useNavConfig HQ_PAGES — Platform section (Session 262)
+  - useNavConfig ADMIN_PAGES — Platform section (CC-08)
+RLS infinite recursion fixed: get_my_group_ids() SECURITY DEFINER in prod (CC-09)
+Bar chart: BAR_PALETTE 6-color palette, T.neutralLight removed (CC-10, LL-263)
+
+### ALL CODE FIXES LANDED — SESSIONS 261–282
+CC-01: Fixed asset monthsBehind() counter (HQFixedAssets.js)
+CC-02: CF depreciation add-back verified (no change needed)
+CC-03: IFRS Note 4 dispensary revenue branch (HQFinancialNotes.js)
+CC-04: IFRS BS VAT sign logic (HQFinancialStatements.js)
+CC-05: TenantPortal nav Reports split + hr-dashboard tab removed
+CC-06: Group Portal — 5 demo tenants + nav wired (9ef682a, 93cdf5f)
+CC-07: TenantPortal Group Portal button unconditional render
+CC-08: ADMIN_PAGES Group Portal entry (useNavConfig.js)
+CC-09: RLS fix — get_my_group_ids() SECURITY DEFINER (Supabase MCP)
+CC-10: StoreComparison BAR_PALETTE visible bar colors
 
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - LOOP-010: Medi Rec — Run Depreciation via UI (step through each missing month)
-- LOOP-011: All 5 tenants — Mark Reviewed + Auditor Sign-Off on all 4 IFRS statements each
-- LOOP-012: HR top-up — Medi Rec +2 staff, MediCare +1 staff, Metro Hardware +2 staff
-- LOOP-014: MediCare — verify CC-03 IFRS IS shows dispensing revenue in prod (incognito)
+- LOOP-011: All 5 tenants — IFRS Mark Reviewed + Auditor Sign-Off (20 statements)
+- LOOP-012: HR top-up — Medi Rec +2, MediCare +1, Metro +2 staff via Supabase MCP
+- LOOP-014: MediCare — verify IFRS IS shows dispensing revenue in prod (new incognito)
+- LOOP-015: Loyalty warning banner — source unidentified
+  Next: grep -r "no rows\|config row\|rewards engine" src/
+  Ruled out: AINSBar.js, useNavIntelligence.js, HQLoyalty.js, IntelStrip.js
 
-### KNOWN PERMANENT GAPS — NOTE, DO NOT CHASE BEFORE 12 MAY
-1. POS VAT pipeline — output VAT from orders not in vat_transactions (~R5k BS gap, amber banner)
-2. MediCare IFRS BS gap R76,906 — equity_ledger vs IFRS IS source mismatch (architectural fix)
-3. Metro Hardware IFRS BS gap R362,311 — same root cause as above
+### KNOWN PERMANENT GAPS — DO NOT CHASE BEFORE 12 MAY
+1. POS VAT pipeline — ~R5k BS gap per tenant (amber banner explains it)
+2. MediCare IFRS BS gap R76,906 — equity_ledger vs IFRS IS source mismatch
+3. Metro Hardware IFRS BS gap R362,311 — same root cause
 4. Cash flow opening balance — not wired to bank recon
 5. Pricing data source red (0) — no product_pricing linked to recipes
 
 ---
 
-## SESSION 262 — PRIMARY OBJECTIVE: FULL DEMO PACKAGE AUDIT
+## DEMO LOGIN SHEET
 
-Financial calculations are complete. Session 262 begins a full structured
-audit of the demo experience for every tenant, working through each portal
-systematically. The financial suite audit is DONE. We now audit everything
-else — starting with navigation.
-
-### THE AUDIT SEQUENCE (run for every demo tenant in order)
-
-**Tenant order:**
-1. Medi Recreational (cannabis_retail) — most complete, start here
-2. The Garden Bistro (food_beverage) — second most complete
-3. MediCare Dispensary (cannabis_dispensary) — clinically complex
-4. Nourish Kitchen & Deli (food_beverage) — newest, leanest data
-5. Metro Hardware (Pty) Ltd (general_retail) — sim data only
-
-**For each tenant, the audit runs in this fixed sequence:**
+| Store | Email | Industry |
+|---|---|---|
+| HQ / Master | admin@protea.dev | operator |
+| Medi Can Dispensary | medican@nuai.dev | cannabis_dispensary |
+| Medi Recreational | HQ switch only | cannabis_retail |
+| MediCare Dispensary | jane@jane.co.za | cannabis_dispensary |
+| Metro Hardware | johan@metro-hardware.co.za | general_retail |
+| The Garden Bistro | annette@duplessis.co.za | food_beverage |
+| Nourish Kitchen & Deli | nourish@nuai.dev / NourishDemo2026! | food_beverage |
 
 ---
 
-### STEP 1 — NAV BAR INTERROGATION
+## QUICK DEBUG PROTOCOL
 
-Before touching a single line of code or data, run the full brainstorming
-sequence below on the tenant's navigation bar. This is a thinking exercise
-first, not a build exercise. The output is a written brief. Code comes later.
+### "Bug on Vercel"
+Check localhost FIRST. Same bug → code issue. Only on Vercel → SW cache.
+Fix: open NEW incognito window. Not refresh. Not existing incognito tab. (LL-257, LL-259)
 
-**A — WHO IS THIS NAV SERVING?**
-Identify the three distinct users of this nav:
-- The tenant user (business owner / manager logging into their portal daily)
-- The admin operator (store manager running day-to-day floor operations)
-- The owner (Gerhardt — demoing to a CA, showing commercial completeness)
-Ask for each: what job are they trying to do the moment they open this portal?
-What is the first question they need answered? Does the nav answer it within
-one click?
+### "Group Portal: infinite recursion detected in tenant_groups"
+Already fixed in prod. If it returns:
+  SELECT policyname, qual FROM pg_policies WHERE tablename = 'tenant_groups';
+  Redeploy get_my_group_ids() SECURITY DEFINER. See LL-262.
 
-**B — FUNCTIONAL INTEGRITY CHECK**
-For every nav item visible in the current UI:
-- Does the route resolve to a working screen?
-- Is the screen populated with real or realistic data for this tenant?
-- Does the label on the nav item match what the screen actually does?
-- Is there anything on the screen that the nav item does NOT advertise
-  (hidden functionality the user would miss)?
-- Is there anything the user clearly needs that has no nav item at all?
-State each finding as: [NAV ITEM] → [STATUS: working / broken / mislabelled /
-missing / unpopulated]. No assumptions — read the source file.
+### "Group Portal: Could not load network"
+  SELECT * FROM tenant_group_members WHERE tenant_id = '<id>';
+  If 0 rows: tenant not in group. Add via Supabase MCP.
 
-**C — DEEP RESEARCH: NAVIGATION SCIENCE**
-Search for and synthesise the most relevant research and studies on navigation
-design and its effects on users. This search is not confined to SaaS or ERP —
-draw from any domain where the research is strong:
-- Cognitive load studies on navigation depth and breadth trade-offs
-- Eye-tracking research on how users actually scan and process nav menus
-- The effect of nav structure on task completion rate and time-on-task
-- Studies on label clarity — how users interpret navigation words
-- Research on progressive disclosure vs full exposure in enterprise software
-- How navigation structure affects perceived system competence and trust
-- Any counter-intuitive findings that challenge standard UX wisdom
-Produce a brief (200-300 words) of the most actionable findings specifically
-relevant to an ERP portal used by a business owner who logs in daily.
+### "npm start fails: Can't resolve qrcode.react"
+  npm install then npm start (LL-261)
 
-**D — LEADER ANALYSIS: HOW THE BEST SOLVE THIS**
-Analyse how the leading SaaS platforms handle navigation for their primary
-user. The question is not "what do they look like" — it is "what problem
-are they solving and what can we learn." Include at minimum:
-- Shopify Admin (merchant daily driver)
-- Xero (accountant-grade financial nav)
-- Lightspeed (retail POS + back-office nav)
-- Notion (information-dense, deeply nested nav)
-- Linear (power-user, keyboard-first nav)
-- One SA-specific or emerging market equivalent if relevant
-For each: what does their nav prioritise, what does it hide, what is the
-insight we can take. Then synthesise: what does NuAi's nav do well, where
-does it fall short, what is the single highest-leverage change.
+### "git pull fails: would be overwritten by merge"
+  git fetch origin && git reset --hard origin/main && npm install (LL-260)
+  Never git stash when untracked files are listed as conflicting.
 
-**E — BRIEF OUTPUT**
-Produce a structured written brief covering A through D before any code or
-data work is proposed. The brief must conclude with:
-- Top 3 nav improvements for this specific tenant's portal
-- Ranked by: impact on demo impression / impact on daily user value / build cost
-- A clear statement of what we will build this session vs what goes to backlog
+### "Nav item missing for some user roles"
+  useNavConfig.js has 4 arrays: HQ_PAGES, ADMIN_PAGES, HR_PAGES, STAFF_PAGES
+  New item must be in ALL relevant arrays. (LL-258)
+  Verify: grep -n 'Group Portal' src/hooks/useNavConfig.js → must return 2 lines
+
+### "Bar chart bars invisible"
+  T.neutralLight ≈ #F4F4F3 (near-white). Never use as chart fill. (LL-263)
+  Use BAR_PALETTE. See StoreComparison.js for the pattern.
 
 ---
 
-### STEP 2 — SCREEN-BY-SCREEN UX AUDIT
-After nav, work through each screen the nav item leads to.
-For each screen:
-- Data populated? (real / sim / empty)
-- Labels accurate?
-- Any broken states, loading errors, or zero-state screens a CA would see?
-- Does it tell a coherent business story for this tenant?
-Record findings. Prioritise fixes.
+## CRITICAL RULES
 
-### STEP 3 — CROSS-TENANT CONSISTENCY CHECK
-After all 5 tenants are audited:
-- Which industry-specific features are present in one tenant but missing in another?
-- Which shared features behave differently across tenants (data format, empty states)?
-- What is the single most jarring inconsistency a CA would notice?
+RULE 0Q: NEVER push from Claude.ai. Claude Code (local terminal) ONLY.
+LL-075: Disk is truth. Read file before assuming state from docs.
+LL-083: Truncated reads drop data silently. Verify line count.
+LL-120: ALL Anthropic API calls via ai-copilot EF. NEVER from React.
+LL-127: Hooks before early returns. No exceptions.
+LL-185: GitHub:get_file_contents before ANY edit this session.
+LL-189: movement_type = 'sale_pos' for POS. 'sale_out' = wholesale ONLY.
+LL-191: loyalty_transactions.transaction_type (not type/loyalty_type).
+LL-205: Every new DB table needs hq_all_ RLS bypass policy.
+LL-206: const { tenantId, industryProfile } = useTenant();
+LL-231: Dispensary revenue = dispensing_log. NOT orders.
+LL-246: NEVER git add -A. Specific files only. (service_role key rotated once already)
+LL-247: depreciation_entries.period_month is TEXT — quote it: '4' not 4.
+LL-248: equity_ledger.net_profit_for_year can drift — verify both sources.
+LL-250: All demo VAT numbers must be unique.
+LL-251: Run 8-point anomaly audit SQL at every session start.
+LL-252: StockIntelPanel saleOuts: filter sale_out OR sale_pos.
+LL-253: auth.users SQL: all token fields must be '' not null.
+LL-254: RLS circular ref: SECURITY DEFINER function to break cycle.
+LL-255: T.neutralLight ≈ white. Never use for chart bar fills.
+LL-256: Diverged local: git fetch + reset --hard + npm install.
+LL-257: Vercel SW cache: new incognito window, not refresh.
+LL-258: useNavConfig: 4 arrays — update ALL relevant ones.
+LL-259: Check localhost before assuming Vercel bug = cache.
+LL-260: git pull blocked → git reset --hard origin/main.
+LL-261: qrcode.react missing after reset → npm install.
+LL-262: tenant_groups RLS recursion → get_my_group_ids() SECURITY DEFINER.
+LL-263: T.neutralLight invisible on white → BAR_PALETTE for chart bars.
+LL-264: NEVER create NEXT-SESSION-PROMPT_vXXX.md. Update SESSION-START-PROMPT.md
+         in-place instead. Versioned handoff files go stale immediately and leave
+         this file (the actual entry point) un-updated. See LL-264 in archive.
 
 ---
-
-## CRITICAL RULES (read these at every session start)
-
-- **RULE 0Q**: NEVER push_files or create_or_update_file from Claude.ai. Ever.
-  All writes go through Claude Code as ONE complete instruction block.
-- **LL-246**: NEVER use git add -A or git add . — always specific files by name.
-- **LL-221**: Read source file in full before any edit or plan.
-- **LL-214**: Test in incognito after Vercel Ready — never Ctrl+R in regular window.
-- **LL-205**: Every new DB table needs hq_all_ RLS bypass policy.
-- **LL-206**: const { tenantId, industryProfile } = useTenant();
-- **LL-231**: Dispensary revenue = dispensing_log, not orders table.
-- **LL-247**: depreciation_entries.period_month is TEXT — always quote: '4' not 4.
-- **LL-248**: equity_ledger.net_profit_for_year can drift — verify both sources before updating.
-- **LL-250**: All demo tenant VAT numbers must be unique — run uniqueness query before demo.
-- **LL-251**: Run the 8-point anomaly audit SQL (in Bible) at every session start.
 
 ## PRE-DEMO RITUAL (30 min before — 12 May 2026 09:30)
 1. Run LL-251 8-point anomaly audit SQL — all 8 queries clean
 2. Run audit_tenant_isolation.py — must exit 0
-3. Visual checklist incognito: P&L → Balance Sheet → Journals → VAT →
-   Fixed Assets → Bank Recon → Nav bar → each nav item loads correctly
-   Repeat for all 5 demo tenants
-4. Confirm sim-pos-sales ran 11 May (check stock_movements for recent sale_pos rows)
-5. Confirm HEAD matches expected commit — git status clean
+3. Visual checklist new incognito: P&L → BS → Journals → VAT →
+   Fixed Assets → Bank Recon → Group Portal → Nav for each tenant
+4. Confirm sim-pos-sales ran 11 May (stock_movements has recent sale_pos rows)
+5. git status clean, HEAD matches expected commit
 
 ---
 
-## THE BIGGER PICTURE — WHY THIS AUDIT MATTERS
+## NEXT PRIORITIES (choose with owner at session start)
+1. LOOP-010/011/012 — Pre-demo financial hygiene
+2. LOOP-015 — Loyalty warning banner grep
+3. Medi Rec Financials walkthrough — 11 tabs
+4. 11 May sim-pos-sales — STANDING ALERT, cannot miss
+5. Eybna unpriced products — HC-0002, BB-LYCHEE-0002, 6-PH-0002
 
-Every session must leave the next agent with more of the big picture, not less.
-The financial suite proves NuAi can do accounting. The nav audit proves NuAi
-can be used. A CA reviewing this platform will spend 30 seconds on the balance
-sheet and 5 minutes navigating. If the nav is confusing, disconnected, or
-unpopulated, the financial accuracy becomes irrelevant.
+---
 
-The structured audit sequence (nav → screens → cross-tenant) exists because:
-1. It catches problems a financial-only audit misses
-2. It forces us to think like the actual user, not the developer
-3. It produces a brief that can be handed to any new agent who joins mid-session
-4. It compounds — each session's audit findings become the next session's build priorities
+## HOW TO UPDATE THIS FILE (do this at every session end via Claude Code)
 
-The goal is not just a demo that passes on 12 May. The goal is a platform
-that any business owner would want to use every day. The nav audit is where
-that work begins.
+1. Update HEAD to current commit
+2. Update session number in header line 3
+3. Update CURRENT STATE with what completed this session
+4. Update OPEN LOOPS (close completed, add new)
+5. Add any new LLs to CRITICAL RULES
+6. Commit:
+     git add docs/SESSION-START-PROMPT.md docs/LL-ARCHIVE_v1_0.md docs/PENDING-ACTIONS.md
+     git commit -m "docs(S###): update session docs in-place"
+     git push origin main
 
-*SESSION-START-PROMPT — Updated 15 April 2026 — Session 261*
+NEVER create NEXT-SESSION-PROMPT_vXXX.md. (LL-264)
+
+*SESSION-START-PROMPT · NuAi Platform · No version number · Updated each session in-place*

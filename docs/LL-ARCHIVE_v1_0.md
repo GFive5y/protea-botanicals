@@ -466,3 +466,45 @@ Fix:
 Apply this pattern to any future chart needing per-series colors.
 
 *LL-252 through LL-263 added: Session 282 · April 15, 2026*
+
+---
+
+## LL-264 — Session 282 (15 April 2026) — Doc System Design Violation
+
+LL-264: NEVER create a versioned NEXT-SESSION-PROMPT_vXXX.md as a session handoff.
+This pattern was the OLD system. SESSION-START-PROMPT.md is the CURRENT system.
+It was specifically designed to replace versioned handoff files because they:
+  (a) go stale immediately after the session that created them
+  (b) fragment the entry point — next agent doesn't know which file to read
+  (c) duplicate information already live in PENDING-ACTIONS, LL-ARCHIVE, and
+      the Bible — creating three sources of truth that drift apart
+  (d) leave SESSION-START-PROMPT.md un-updated, which is the only file
+      agents actually paste at session start
+
+The correct end-of-session doc workflow is:
+  1. Update SESSION-START-PROMPT.md IN-PLACE (no version number, same file)
+     - Update HEAD to current commit
+     - Update session number in header
+     - Update CURRENT STATE section with what completed
+     - Update OPEN LOOPS list
+     - Add new critical LLs to CRITICAL RULES section
+  2. Append new LLs to docs/LL-ARCHIVE_v1_0.md
+  3. Update docs/PENDING-ACTIONS.md (close completed loops, add new ones)
+  4. Commit all three: git add docs/SESSION-START-PROMPT.md
+     docs/LL-ARCHIVE_v1_0.md docs/PENDING-ACTIONS.md
+  5. git push origin main
+
+SESSION-START-PROMPT.md IS the entry point. Keep it current.
+If you catch yourself writing "NEXT-SESSION-PROMPT_vXXX.md" — STOP.
+Open SESSION-START-PROMPT.md and update it instead.
+
+Blast radius when violated: the primary entry point goes stale. Next agent
+pastes it, gets wrong HEAD, wrong session objective, missing loops, and
+may re-do completed work or miss critical open items.
+
+Applied: Session 282 created NEXT-SESSION-PROMPT_v282.md instead of
+updating SESSION-START-PROMPT.md. SESSION-START-PROMPT.md was left at
+Session 261 state (HEAD 91719e5) while true state was Session 282 (HEAD de41ec6).
+Fixed same session by Claude Code in-place update.
+
+*LL-264 added: Session 282 · April 15, 2026*
