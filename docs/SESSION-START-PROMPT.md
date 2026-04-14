@@ -217,10 +217,9 @@ LL-265: Production URL is protea-botanicals.vercel.app — never use preview URL
 ---
 
 ## NEXT PRIORITIES (choose with owner at session start)
-1. **WP-DS6-UNIFICATION** — full site visual unification to Group Portal standard.
-   See docs/WP-DS6-UNIFICATION-BRIEF.md for the design brief. Owner will provide
-   screenshots of Group Portal vs legacy pages at session start. This is the
-   Priority 1 work for Session 284.
+1. **WP-DS6-UNIFICATION** — Root cause diagnosed Session 284. Read ROOT CAUSE
+   section in WP-DS6-UNIFICATION-BRIEF.md FIRST. Execute Steps 1–3 before any
+   colour work. AppShell.css + TenantPageFrame fix 80% of the gap in <50 lines.
 2. LOOP-NEW-005 — MediCare Revenue MTD dispensary source fix (Claude Code)
 3. LOOP-NEW-006 — MediCare IFRS BS gap R76,906 recalibration (Supabase MCP)
 4. LOOP-010/011 — Pre-demo financial hygiene (UI Run Depreciation + IFRS sign-off)
