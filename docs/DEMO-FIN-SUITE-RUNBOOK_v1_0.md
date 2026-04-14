@@ -297,13 +297,13 @@ CHECK:
 
 ## QUICK REFERENCE — TENANT IDs
 
-| Tenant | tenant_id | Industry | Priority |
+| Tenant | tenant_id | Industry | Fin Suite |
 |---|---|---|---|
-| The Garden Bistro | 7d50ea34-9bb2-46da-825a-956d0e4023e1 | food_beverage | DONE |
-| Medi Recreational | b1bad266-ceb4-4558-bbc3-22cfeeeafe74 | cannabis_retail | Session 261 |
-| Nourish Kitchen & Deli | 944547e3-ce9f-44e0-a284-43ebe1ed898f | food_beverage | Session 261 |
-| MediCare Dispensary | 8b9cb8e6-1eb9-4e3e-8d7f-2a8a4aa7395b | cannabis_dispensary | Session 261 |
-| Metro Hardware (Pty) Ltd | 57156762-deb8-4721-a1f3-0c6d7c2a67d8 | general_retail | Session 261 (sim data only) |
+| The Garden Bistro | 7d50ea34-9bb2-46da-825a-956d0e4023e1 | food_beverage | COMPLETE ✅ |
+| Medi Recreational | b1bad266-ceb4-4558-bbc3-22cfeeeafe74 | cannabis_retail | COMPLETE ✅ |
+| Nourish Kitchen & Deli | 944547e3-ce9f-44e0-a284-43ebe1ed898f | food_beverage | COMPLETE ✅ |
+| MediCare Dispensary | 8b9cb8e6-1eb9-4e3e-8d7f-2a8a4aa7395b | cannabis_dispensary | COMPLETE ✅ |
+| Metro Hardware (Pty) Ltd | 57156762-deb8-4721-a1f3-0c6d7c2a67d8 | general_retail | COMPLETE ✅ |
 | Pure Premium THC Vapes | f8ff8d07-7688-44a7-8714-5941ab4ceaa5 | cannabis_retail | Not VAT registered |
 
 ---
@@ -343,4 +343,39 @@ CHECK:
    RLS: tenant_own_notes + hq_all_financial_statement_notes.
 
 ---
+
+## SESSION 261 LESSONS LEARNED
+
+9. **equity_ledger.share_capital is the BS balancing lever.**
+   After Run Depreciation posts new entries in the UI, PPE NBV changes.
+   This shifts Total Assets and breaks the BS equation. Always re-check
+   equity_ledger after any UI dep posting. Formula:
+   share_capital = Total_Assets - Total_Liabilities - net_profit_for_year
+
+10. **payment_status = 'paid' removes expenses from BS accrued liabilities.**
+    The main Balance Sheet shows accrued OpEx = SUM(expenses WHERE
+    payment_status = 'unpaid' AND category NOT IN wages).
+    Garden Bistro has all expenses 'paid' → no accrued liabilities.
+    Metro Hardware has all expenses 'unpaid' → R347,499 accrued.
+    When seeding expenses for a new tenant, set payment_status = 'paid'
+    unless you specifically want them in accrued liabilities.
+
+11. **inventory_items.weighted_avg_cost is what the BS uses for inventory.**
+    NOT cost_price. cost_price is the purchase price field.
+    weighted_avg_cost is recalculated by the AVCO trigger on every movement.
+    Always query weighted_avg_cost for BS inventory value.
+
+12. **MediCare revenue does NOT come from the orders table.**
+    LL-231 is implemented in HQProfitLoss.js and (as of 0f6cfa0) in
+    HQFinancialStatements.js and HQYearEnd.js. Source:
+    dispensing_log joined to inventory_items, quantity_dispensed × sell_price.
+    The tenant_financial_period RPC also returns R0 revenue for dispensary
+    tenants — do not use RPC revenue figures for MediCare.
+
+13. **NEVER use git add -A. See LL-246.**
+    Service_role key leaked in session 261 because git add -A staged .env.
+    Always: git add <specific files>. Always: git status before commit.
+
+---
 *DEMO-FIN-SUITE-RUNBOOK v1.0 -- Produced from Session 260 -- Garden Bistro audit*
+*Updated Session 261/262 Close — 14 April 2026 — all 5 demo tenants COMPLETE*

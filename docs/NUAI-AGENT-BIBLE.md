@@ -1260,6 +1260,65 @@ immediately — it is silently broken for all HQ users.
 
 ---
 
+---
+
+## LL-246 — NEVER USE git add -A (14 April 2026 — Security Incident)
+
+**Rule:** Claude Code MUST NEVER use `git add -A` or `git add .`
+on the NuAi repository. Always add specific files by name:
+  git add src/components/hq/HQVat.js src/components/hq/HQForecast.js
+
+**Why this exists:** In session 261 commit 1fd1a87, `git add -A`
+staged .env which contained SUPABASE_SERVICE_ROLE_KEY. The file was
+pushed to the public repo. The key had full RLS bypass on all 109
+tables. It was exposed for ~14 hours. GitHub secret scanning detected
+it. The key was rotated immediately and audit logs confirmed no breach,
+but the incident was entirely avoidable.
+
+**Required pre-commit checklist:**
+1. `git status` — check every staged file, no .env files anywhere
+2. `git diff --cached` — review every line being committed
+3. Only then: `git commit -m "..."`
+
+**If .env appears in `git status` as modified:**
+  `git checkout -- .env` to discard changes before staging anything.
+
+**Files that must NEVER be committed:**
+  .env / .env.local / .env.*.local / .env.production
+  Any file containing: SUPABASE_SERVICE_ROLE_KEY, API_KEY,
+  SECRET_KEY, PRIVATE_KEY, JWT_SECRET
+
+**Current .gitignore protects:** .env, .env.local, .env.*.local
+  (as of commit 8c5a512 — verified)
+
+---
+
+## Session 261/262 Close — 14 April 2026
+
+HEAD: 8c5a512
+
+All 5 demo tenants have complete financial packages:
+  Garden Bistro (food_beverage) — COMPLETE (Session 260)
+  Medi Recreational (cannabis_retail) — COMPLETE (Session 261)
+  MediCare Dispensary (cannabis_dispensary) — COMPLETE (Session 261)
+  Metro Hardware (general_retail) — COMPLETE (Session 261)
+  Nourish Kitchen & Deli (food_beverage) — COMPLETE (Session 261)
+
+All BS equations balance. See SESSION-STATE_v281.md for exact figures.
+
+Key code ships this session:
+  IFRS dispensary revenue branch (LL-231) — 0f6cfa0
+  VAT input VAT fix — 1fd1a87
+  Forecast sign fix — 1fd1a87
+  Cash Flow financing activities — 1fd1a87
+  Pay Calculator hourly rate — 1fd1a87
+  Security: .env untracked — 8c5a512
+
+Security incident: VL-013. Service_role key leaked + rotated.
+New rule: LL-246. See VIOLATION_LOG_v1_1.md.
+
+---
+
 *NUAI-AGENT-BIBLE.md v1.0 · 08 Apr 2026*
 *Maintained by: Claude Code after each major session*
 *Owner reviews: after each WP completion*

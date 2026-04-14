@@ -430,3 +430,35 @@ Five interventions now for the same rule. Significant trust damage.
 The three-Claude workflow exists for a reason. Claude.ai broke it.
 All files that were attempted in the push must now be written via
 Claude Code as a corrective action.
+
+---
+
+## VL-013 — SERVICE ROLE KEY LEAKED IN PUBLIC REPO VIA `git add -A`
+Date: 14 April 2026
+Session: 261
+Commit: 1fd1a87
+Rule violated: CLAUDE.md — "prefer adding specific files by name
+  rather than using git add -A, which can accidentally include
+  sensitive files (.env, credentials)"
+What happened: Claude Code ran `git add -A` in the pre-demo fix commit.
+  .env had been locally modified (SUPABASE_SERVICE_ROLE_KEY=... added).
+  .env was being tracked by git (not in .gitignore at the time for
+  active tracking — .gitignore cannot un-track already-committed files).
+  The service_role key was pushed to the public repo and exposed for
+  ~14 hours before detection via GitHub secret scanning alert.
+Blast radius: Full RLS bypass on all 109 tables across 9 tenants.
+  Schedule 6 dispensing_log accessible. POPIA implications.
+Remediation:
+  1. New secret API key `production_2026_04` created in Supabase
+  2. Old `default` secret key deleted
+  3. Audit logs reviewed — clean, no breach confirmed
+  4. .env untracked (git rm --cached .env) — commit 8c5a512
+  5. .env.example created with placeholder vars
+  6. .gitignore hardened: .env, .env.local, .env.*.local
+New rule added: LL-246
+Prevention: Claude Code must NEVER use `git add -A`. Use
+  `git add <specific file> <specific file>` on every commit.
+  Run `git status` and `git diff --cached` before every commit.
+
+*Note: VL-012 is already used for the 10 Apr push_files incident.
+This is logged as VL-013 to preserve the existing numbering.*
