@@ -127,7 +127,78 @@ Pre-requisite: Complete WP-UNIFY Tier 1 first (breadcrumb bar needs to be on
 
 ---
 
+### BACKLOG-003 — WP-TENANT-GROUPS outstanding items (post-demo)
+Logged: 15 April 2026 · Session 262
+
+Group "NuAi Demo Portfolio" (a55373b2) now has 6 members:
+  Medi Can Dispensary (franchisor) · Medi Recreational · The Garden Bistro
+  Nourish Kitchen & Deli · MediCare Dispensary · Metro Hardware (Pty) Ltd
+All 5 demo tenants with complete financials are in the group.
+Group Portal button wired into every tenant sidebar (TenantPortal.js hasGroup).
+RLS fix applied: member_can_read_own_group policy on tenant_groups.
+
+Outstanding items — do not chase before 12 May unless time permits:
+
+  GP-001 — Shared Loyalty tab: disabled (Phase 2 label in NAV_ITEMS).
+    Requires loyalty_group_id schema addition to loyalty_transactions.
+    Customer earns at Store A, redeems at Store B across the network.
+    Build estimate: 1 session (schema + edge function + tab component).
+
+  GP-002 — Combined P&L cross-industry aggregation needs review.
+    The group now has 4 industry profiles (cannabis_retail, cannabis_dispensary,
+    food_beverage, general_retail). CombinedPL.js uses tenant_financial_period RPC
+    for each member. Verify the RPC returns correct figures for each profile.
+    Dispensary revenue = dispensing_log (LL-231). Check CombinedPL handles this.
+
+  GP-003 — GroupTransfer.js atomicity gap (LL-243 open).
+    Per-line ship/receive loop has no DB transaction wrapper.
+    Partial failures can leave transfers inconsistent. Named future build item.
+
+  GP-004 — Invite-by-email for new stores (LL-243).
+    GroupSettings Phase 5 only supports adding existing tenants by UUID paste.
+    A new EF is needed to atomically create tenant + insert group membership.
+    Build estimate: 1 session.
+
+  GP-005 — Network Intelligence royalty calculations.
+    royalty_percentage column exists (numeric) but no calculation runs against it.
+    Royalty tracking = network_revenue × royalty_percentage per franchisee.
+    Currently shows 0.00% for all members.
+
+  GP-006 — Revenue Intelligence / Stock Intelligence cross-tenant RLS.
+    These components query inventory_items, orders, stock_movements across
+    all group members. Verify is_hq_user() bypass is not required for
+    the group owner viewing member data (member_can_see_group covers reads
+    but the joined table queries may hit per-table RLS).
+
+---
+
 ## CLOSED LOOPS — SESSION 262
+
+### ✅ CLOSED — CC-06: Group Portal — all 5 demo tenants linked + nav bar wired
+Session 262 · 15 April 2026
+
+DB changes (Supabase MCP — no code commit):
+  - Added 4 tenants to group a55373b2 (NuAi Demo Portfolio):
+    The Garden Bistro (franchisee) · Nourish Kitchen & Deli (franchisee)
+    MediCare Dispensary (franchisee) · Metro Hardware (franchisee)
+  - Renamed group: "Medi Can Franchise Network" → "NuAi Demo Portfolio"
+  - Changed group_type: "franchise" → "portfolio"
+  - Created RLS policy "member_can_read_own_group" on tenant_groups:
+    FOR SELECT USING (id IN (SELECT group_id FROM tenant_group_members
+    WHERE tenant_id = user_tenant_id()))
+    Without this, franchisee tenants got null on the tenant_groups join in GroupPortal.js.
+
+Code change (this commit · TenantPortal.js):
+  - hasGroup state: fetches tenant_group_members count on mount.
+  - "⊞ Group Portal" button in sidebar header, below profile badge.
+    Styled in pAccent colour (profile-adaptive). Visible only when hasGroup = true.
+    Sits above the existing "← HQ Operator View" button for HQ users.
+  - Fixed pre-existing JSX escape bug on HQ Operator View arrow (`\u2190` literal
+    was rendering as text; now wrapped in `{"\u2190"}` expression).
+
+All 6 group members can now navigate to /group-portal from their tenant sidebar.
+Combined P&L, Revenue Intelligence, Stock Intelligence, Customer Intelligence
+and Network Intelligence all aggregate across all 6 members.
 
 ### ✅ CLOSED — CC-05: Tenant Portal nav — Reports split + hr-dashboard fix
 Session 262 · 15 April 2026
