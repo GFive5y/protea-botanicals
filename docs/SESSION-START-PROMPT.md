@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 15 April 2026 — Session 282
+## Updated: 15 April 2026 — Session 283
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: de41ec6
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 5802a7c
 
 ---
 
@@ -40,7 +40,15 @@ IF DEMO DATE CHANGES: update PENDING-ACTIONS.md first, then this file.
 
 ---
 
-## CURRENT STATE — 15 April 2026 — Session 282 Close
+## CURRENT STATE — 15 April 2026 — Session 283 Close
+
+### SIGNAL SYSTEM LIVE (Session 283 · commit 5802a7c)
+useFinSignals hook + FinAlertHoverCard + FinWalkInBrief shipped.
+3 tabs active: balance-sheet, vat, pl. Unified 5-min data source, hover cards
+on fin nav items, dashboard walk-in brief above Operations Health. AINS dispatch
+stubbed as TODO (navigate actions only in v1). Acceptance: 7 of 8 validated
+outputs match exactly; Nourish BS remains null (order_items cost_price data gap,
+see LOOP-NEW-004).
 
 ### FINANCIAL PACKAGE — ALL 5 DEMO TENANTS COMPLETE
 DO NOT re-run financial seeding. DO NOT touch equity_ledger without LL-248.
@@ -80,11 +88,20 @@ CC-10: StoreComparison BAR_PALETTE visible bar colors
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - LOOP-010: Medi Rec — Run Depreciation via UI (step through each missing month)
 - LOOP-011: All 5 tenants — IFRS Mark Reviewed + Auditor Sign-Off (20 statements)
-- LOOP-012: HR top-up — Medi Rec +2, MediCare +1, Metro +2 staff via Supabase MCP
-- LOOP-014: MediCare — verify IFRS IS shows dispensing revenue in prod (new incognito)
 - LOOP-015: Loyalty warning banner — source unidentified
   Next: grep -r "no rows\|config row\|rewards engine" src/
   Ruled out: AINSBar.js, useNavIntelligence.js, HQLoyalty.js, IntelStrip.js
+- LOOP-NEW-004: Nourish Kitchen order_items cost_price = 0 — balance sheet
+  signal returns null because the canonical RPC computes R0 COGS.
+  Fix via Supabase MCP: seed cost_price on Nourish order_items so the
+  tenant_financial_period RPC returns a real cogs.actual figure.
+  Do NOT add a fallback COGS source to checkBalanceSheet.js — code is
+  correct, RPC is canonical per LL-210. Fix the data.
+
+### CLOSED THIS SESSION (283)
+- LOOP-012: HR top-up — CLOSED (Medi Rec, MediCare, Metro all at RUNBOOK minimum)
+- LOOP-014: MediCare IFRS IS dispensing revenue verify — CLOSED (NEW-002 fix in 4fdafcd)
+- Signal system (useFinSignals + hover cards + walk-in brief) — SHIPPED in 5802a7c
 
 ### KNOWN PERMANENT GAPS — DO NOT CHASE BEFORE 12 MAY
 1. POS VAT pipeline — ~R5k BS gap per tenant (amber banner explains it)
