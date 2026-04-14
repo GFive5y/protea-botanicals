@@ -452,7 +452,7 @@ export default function HQOverview({ onNavigate }) {
           .select("id,name,sku,quantity_on_hand,reorder_level,unit")
           .eq("tenant_id", tenantId)
           .eq("is_active", true)
-          .lt("quantity_on_hand", 10)
+          .lte("quantity_on_hand", 0)
           .order("quantity_on_hand", { ascending: true })
           .limit(50);
         if (!r.error) lowStockData = r.data || [];

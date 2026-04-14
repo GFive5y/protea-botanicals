@@ -185,14 +185,14 @@ async function buildPills(tabId, tenantId, intel) {
       const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
         .toISOString();
       const [txR, activeR] = await Promise.allSettled([
-        supabase.from("loyalty_transactions").select("points_amount,transaction_type")
+        supabase.from("loyalty_transactions").select("points,transaction_type")
           .eq("tenant_id", tenantId).gte("created_at", monthStart),
         supabase.from("loyalty_transactions").select("user_id")
           .eq("tenant_id", tenantId).gte("created_at", new Date(Date.now() - 7*24*60*60*1000).toISOString()),
       ]);
       const txs          = txR.status === "fulfilled" ? txR.value.data || [] : [];
-      const issued       = txs.filter(t => t.transaction_type === "earn")
-        .reduce((s, t) => s + (t.points_amount || 0), 0);
+      const issued       = txs.filter(t => (t.transaction_type || '').toLowerCase().includes('earn'))
+        .reduce((s, t) => s + (t.points || 0), 0);
       const activeCust   = txR.status === "fulfilled"
         ? new Set((activeR.status === "fulfilled" ? activeR.value.data || [] : []).map(t => t.user_id)).size : 0;
       return [

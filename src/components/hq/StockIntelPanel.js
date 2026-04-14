@@ -971,11 +971,12 @@ export default function StockIntelPanel({
   );
   const thirtyDaysAgo = useMemo(() => new Date(Date.now() - 30 * 86400000), []);
 
+  // LL-189: sale_pos (POS tills) + sale_out (wholesale). Both represent outgoing sales.
   const saleOuts = useMemo(
     () =>
       movements.filter(
         (m) =>
-          m.movement_type === "sale_out" &&
+          (m.movement_type === "sale_out" || m.movement_type === "sale_pos") &&
           new Date(m.created_at) > thirtyDaysAgo,
       ),
     [movements, thirtyDaysAgo],
@@ -1306,7 +1307,7 @@ export default function StockIntelPanel({
       if (!dayMap[key])
         dayMap[key] = { count: 0, saleOuts: 0, purchases: 0, adjustments: 0 };
       dayMap[key].count++;
-      if (m.movement_type === "sale_out") dayMap[key].saleOuts++;
+      if (m.movement_type === "sale_out" || m.movement_type === "sale_pos") dayMap[key].saleOuts++;
       if (m.movement_type === "purchase_in") dayMap[key].purchases++;
       if (m.movement_type === "adjustment") dayMap[key].adjustments++;
     });
