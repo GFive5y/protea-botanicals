@@ -276,13 +276,14 @@ export default function HQFinancialStatements() {
       const opexMap = {};
       opexExpenses.forEach(e => { const k = e.subcategory || "Other operating expenses"; opexMap[k] = (opexMap[k] || 0) + (parseFloat(e.amount_zar) || 0); });
       const opexLines = Object.entries(opexMap).map(([label, amount]) => ({ label, amount }));
-      // Depreciation filtered by period
+      // Depreciation filtered by period — period_month is text ("Jan","Feb",...) not integer
+      const MONTH_MAP = {Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
       const startYear = new Date(start).getFullYear();
       const startMonth = new Date(start).getMonth() + 1;
       const endYear = new Date(end).getFullYear();
       const endMonth = new Date(end).getMonth() + 1;
       const depreciationTotal = (depRes.data || []).filter(e => {
-        const y = e.period_year; const m = e.period_month;
+        const y = e.period_year; const m = MONTH_MAP[e.period_month] || 0;
         return (y > startYear || (y === startYear && m >= startMonth)) && (y < endYear || (y === endYear && m <= endMonth));
       }).reduce((s, e) => s + (parseFloat(e.depreciation) || 0), 0);
       const netProfit = grossProfit - totalOpex - depreciationTotal;
@@ -296,8 +297,8 @@ export default function HQFinancialStatements() {
       const fixedAssetsCost = (faRes.data || []).reduce((s, a) => s + (parseFloat(a.purchase_cost || 0)), 0);
       const fixedAssetsAD = (faRes.data || []).reduce((s, a) => s + (parseFloat(a.accumulated_depreciation || 0)), 0);
       const fixedAssetsNBV = Math.max(0, fixedAssetsCost - fixedAssetsAD);
-      const vatInput = (vatExpRes.data || []).reduce((s, e) => s + (parseFloat(e.input_vat_amount) || 0), 0);
-      const vatOutput = fp.vat?.output || 0;
+      const vatInput = fp.vat?.ytd_input || (vatExpRes.data || []).reduce((s, e) => s + (parseFloat(e.input_vat_amount) || 0), 0);
+      const vatOutput = fp.vat?.ytd_output || 0;
       const vatLiability = Math.max(0, Math.round((vatOutput - vatInput) * 100) / 100);
       const eqData = equityRes.data;
       const shareCapital = parseFloat(eqData?.share_capital || 0);

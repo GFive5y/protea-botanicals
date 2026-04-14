@@ -1696,11 +1696,13 @@ export default function HQProfitLoss() {
           ok={!dataErrors.cogs && recipes.length >= 0}
           count={recipes.length}
         />
-        <DataBadge
-          label="Pricing"
-          ok={pricing.length > 0}
-          count={pricing.length}
-        />
+        <span title="No sell prices linked to recipes in HQ \u2192 Pricing tab. Wagyu Beef Burger and Lamb Shank Proven\u00e7ale are selling below AVCO cost \u2014 connect pricing records to surface margin alerts.">
+          <DataBadge
+            label="Pricing"
+            ok={pricing.length > 0}
+            count={pricing.length}
+          />
+        </span>
         <DataBadge
           label="Loyalty"
           ok={!dataErrors.loyalty}

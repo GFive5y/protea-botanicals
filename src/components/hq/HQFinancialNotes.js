@@ -67,20 +67,21 @@ export default function HQFinancialNotes() {
     if (!tenantId) return; setLoading(true);
     try {
       const ys = `${CURRENT_YEAR}-01-01`;
-      const [cfgR,invR,faR,eqR,baR,expR,ordR,vatR,depR,bslR] = await Promise.all([
+      const [cfgR,invR,faR,eqR,baR,expR,vatR,depR,bslR,fpRes] = await Promise.all([
         supabase.from("tenant_config").select("*").eq("tenant_id",tenantId).maybeSingle(),
         supabase.from("inventory_items").select("quantity_on_hand, weighted_avg_cost, category, is_active").eq("tenant_id",tenantId).eq("is_active",true),
         supabase.from("fixed_assets").select("*").eq("tenant_id",tenantId),
         supabase.from("equity_ledger").select("*").eq("tenant_id",tenantId).eq("financial_year",`FY${CURRENT_YEAR}`).maybeSingle(),
         supabase.from("bank_accounts").select("*").eq("tenant_id",tenantId),
         supabase.from("expenses").select("subcategory, category, amount_zar, input_vat_amount").eq("tenant_id",tenantId).gte("expense_date",ys),
-        supabase.from("orders").select("total, created_at, status").eq("tenant_id",tenantId).gte("created_at",ys).not("status","in",'("cancelled","failed")'),
         supabase.from("vat_transactions").select("*").eq("tenant_id",tenantId).gte("transaction_date",ys),
         supabase.from("depreciation_entries").select("depreciation").eq("tenant_id",tenantId).eq("period_year",CURRENT_YEAR),
         supabase.from("bank_statement_lines").select("balance,statement_date").eq("tenant_id",tenantId).order("statement_date",{ascending:false}).limit(1),
+        supabase.rpc("tenant_financial_period",{p_tenant_id:tenantId,p_since:`${CURRENT_YEAR}-01-01T00:00:00Z`,p_until:new Date().toISOString()}),
       ]);
       const closingBalance = bslR.data?.[0]?.balance || null;
-      setData({cfg:cfgR.data,inv:invR.data||[],fa:faR.data||[],eq:eqR.data,ba:baR.data||[],exp:expR.data||[],ord:ordR.data||[],vat:vatR.data||[],dep:depR.data||[],closingBalance});
+      const fp = fpRes.data || {};
+      setData({cfg:cfgR.data,inv:invR.data||[],fa:faR.data||[],eq:eqR.data,ba:baR.data||[],exp:expR.data||[],vat:vatR.data||[],dep:depR.data||[],closingBalance,fp});
     } catch(_){} finally{setLoading(false);}
   },[tenantId]);
   useEffect(()=>{fetchAll();},[fetchAll]);
@@ -88,20 +89,22 @@ export default function HQFinancialNotes() {
   if (loading) return <div style={{textAlign:"center",padding:60,color:D.ink500,fontFamily:D.font}}>Loading notes\u2026</div>;
   if (!data) return null;
 
-  const {cfg,inv,fa,eq,ba,exp,ord,vat,dep} = data;
-  const totalRevenue = ord.reduce((s,o)=>s+(parseFloat(o.total)||0),0);
+  const {cfg,inv,fa,eq,ba,exp,vat,dep,fp} = data;
+  const totalRevenue = fp?.revenue?.ex_vat || 0;
+  const totalCogs = fp?.cogs?.actual || 0;
   const invValue = inv.reduce((s,i)=>s+(parseFloat(i.quantity_on_hand||0)*parseFloat(i.weighted_avg_cost||0)),0);
   const opexBySub = exp.filter(e=>["opex","wages","tax","other"].includes(e.category)).reduce((a,e)=>{const k=e.subcategory||"Other";a[k]=(a[k]||0)+(parseFloat(e.amount_zar)||0);return a;},{});
-  const totalOpex = Object.values(opexBySub).reduce((s,v)=>s+v,0);
+  const totalOpex = fp?.opex?.total || Object.values(opexBySub).reduce((s,v)=>s+v,0);
   const totalDep = dep.reduce((s,d)=>s+(parseFloat(d.depreciation)||0),0);
   const activeFA = fa.filter(a=>a.is_active); const disposedFA = fa.filter(a=>!a.is_active);
   const totalFACost = activeFA.reduce((s,a)=>s+(parseFloat(a.purchase_cost)||0),0);
   const totalFAAccDep = activeFA.reduce((s,a)=>s+(parseFloat(a.accumulated_depreciation)||0),0);
   const invByCat = inv.reduce((a,i)=>{a[i.category]=a[i.category]||{qty:0,val:0};a[i.category].qty+=parseFloat(i.quantity_on_hand||0);a[i.category].val+=parseFloat(i.quantity_on_hand||0)*parseFloat(i.weighted_avg_cost||0);return a;},{});
-  const vatOut = vat.reduce((s,v)=>s+(parseFloat(v.output_vat)||0),0);
-  const vatIn = vat.reduce((s,v)=>s+(parseFloat(v.input_vat)||0),0);
-  const shareCapital = eq?.share_capital||0; const openingRE = eq?.opening_retained_earnings||0;
-  const netProfit = totalRevenue-totalOpex;
+  const vatOut = fp?.vat?.ytd_output || vat.reduce((s,v)=>s+(parseFloat(v.output_vat)||0),0);
+  const vatIn = fp?.vat?.ytd_input || exp.reduce((s,e)=>s+(parseFloat(e.input_vat_amount)||0),0);
+  const shareCapital = parseFloat(eq?.share_capital||0); const openingRE = parseFloat(eq?.opening_retained_earnings||0);
+  const netProfit = totalRevenue - totalCogs - totalOpex - totalDep;
+  const orderCount = fp?.orders?.paid_count || 0;
 
   return (
     <div style={{fontFamily:D.font,color:D.ink700,maxWidth:900}}>
@@ -136,7 +139,7 @@ export default function HQFinancialNotes() {
 
       <NoteSection number="4" title="Revenue">
         <NoteTable headers={["Source",`${CURRENT_YEAR} (ZAR)`,"Prior (ZAR)"]} rows={[["POS transactions",fmtZar(totalRevenue),"\u2014"],["Online sales","\u2014","\u2014"]]} totals={["Total Revenue",fmtZar(totalRevenue),"\u2014"]}/>
-        <P>{ord.length} transactions processed. All standard-rated.</P>
+        <P>{orderCount} transactions processed. All standard-rated.</P>
       </NoteSection>
 
       <NoteSection number="5" title="Operating Expenses">
