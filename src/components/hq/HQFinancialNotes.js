@@ -233,9 +233,10 @@ export default function HQFinancialNotes() {
         </>}
       </NoteSection>
 
-      {cfg?.vat_registered&&<NoteSection number="11" title="Value Added Tax">
-        <NoteTable headers={["VAT",`${CURRENT_YEAR} (ZAR)`,"Prior (ZAR)"]} rows={[["Output VAT",fmtZar(vatOut),"\u2014"],["Input VAT",`(${fmtZar(vatIn)})`,"\u2014"]]} totals={[vatOut-vatIn>=0?"Net Payable":"Net Refund",fmtZar(Math.abs(vatOut-vatIn)),"\u2014"]}/>
+      {cfg?.vat_registered&&<NoteSection number="11" title="Value Added Tax (posted vat_transactions \u2014 current filing period)">
+        <NoteTable headers={["VAT (current filing period)",`${CURRENT_YEAR} (ZAR)`,"Prior (ZAR)"]} rows={[["Output VAT",fmtZar(vatOut),"\u2014"],["Input VAT",`(${fmtZar(vatIn)})`,"\u2014"]]} totals={[vatOut-vatIn>=0?"Net Payable":"Net Refund",fmtZar(Math.abs(vatOut-vatIn)),"\u2014"]}/>
         <P>VAT No: <strong>{cfg.vat_number}</strong>. Bi-monthly. Invoice basis. 15%.</P>
+        <P>Note 11 reflects output/input VAT for the current filing period as recorded in vat_transactions. The YTD VAT liability shown on the Balance Sheet may include prior filed periods and accrued output VAT from POS orders not yet flowed through the VAT pipeline (known structural gap).</P>
       </NoteSection>}
 
       <NoteSection number="12" title="Equity and Share Capital">

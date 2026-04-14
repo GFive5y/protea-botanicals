@@ -108,10 +108,10 @@ function IncomeStatement({ data, tenantName, periodLabel, financialYear, status 
 
 // ── Statement 2: Balance Sheet ────────────────────────────────────────────────
 function BalanceSheetStatement({ data, tenantName, asAtLabel, financialYear, status }) {
-  const { inventoryValue, cashAtBank, receivables, fixedAssetsNBV, fixedAssetsCost, fixedAssetsAccDep, payables, vatLiability, vatReceivable = 0, shareCapital, openingRetained, currentYearPL, totalEquity, balanced } = data;
+  const { inventoryValue, cashAtBank, receivables, fixedAssetsNBV, fixedAssetsCost, fixedAssetsAccDep, payables, vatLiability, vatReceivable = 0, opexAccruals = 0, shareCapital, openingRetained, currentYearPL, totalEquity, balanced } = data;
   const totalCurrentAssets = inventoryValue + (cashAtBank || 0) + receivables + vatReceivable;
   const totalAssets = totalCurrentAssets + fixedAssetsNBV;
-  const totalLiabilities = payables + vatLiability;
+  const totalLiabilities = payables + vatLiability + opexAccruals;
   return (
     <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C.border}`, overflow: "hidden", marginBottom: 24 }}>
       <Letterhead tenantName={tenantName} statementTitle="Statement 2 of 4" statementSubtitle="Statement of Financial Position" periodLabel={`As at ${asAtLabel}`} status={status} financialYear={financialYear} />
@@ -136,6 +136,7 @@ function BalanceSheetStatement({ data, tenantName, asAtLabel, financialYear, sta
           <SSection label="Current Liabilities" />
           <SRow label="Trade and other payables" current={payables} indent={1} sub="Open purchase orders" />
           {vatLiability > 0 && <SRow label="VAT payable \u2014 SARS" current={vatLiability} indent={1} />}
+          {opexAccruals > 0 && <SRow label="Accrued operating expenses" current={opexAccruals} indent={1} sub="Unpaid opex at reporting date" />}
           <SRow label="Total Liabilities" current={totalLiabilities} bold shade />
           <SSection label="Equity" />
           <SRow label="Share capital" current={shareCapital} indent={1} />
@@ -297,7 +298,9 @@ export default function HQFinancialStatements() {
       const grossMarginPct = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
       const opexExpenses = (expensesRes.data || []).filter(e => ["opex", "wages", "tax", "other"].includes(e.category));
       const capexExpenses = (expensesRes.data || []).filter(e => e.category === "capex");
-      const totalOpex = fp.opex?.total || opexExpenses.reduce((s, e) => s + (parseFloat(e.amount_zar) || 0), 0);
+      // FIX A5: prefer FY-filtered client-side sum over fp.opex.total — RPC may include pre-FY data
+      // expensesRes is filtered by expense_date between startDate/endDate (the FY window)
+      const totalOpex = opexExpenses.reduce((s, e) => s + (parseFloat(e.amount_zar) || 0), 0) || (fp.opex?.total || 0);
       const capexPaid = capexExpenses.reduce((s, e) => s + (parseFloat(e.amount_zar) || 0), 0);
       const opexMap = {};
       opexExpenses.forEach(e => { const k = e.subcategory || "Other operating expenses"; opexMap[k] = (opexMap[k] || 0) + (parseFloat(e.amount_zar) || 0); });
@@ -324,6 +327,11 @@ export default function HQFinancialStatements() {
       const fixedAssetsCost = (faRes.data || []).reduce((s, a) => s + (parseFloat(a.purchase_cost || 0)), 0);
       const fixedAssetsAD = (faRes.data || []).reduce((s, a) => s + (parseFloat(a.accumulated_depreciation || 0)), 0);
       const fixedAssetsNBV = Math.max(0, fixedAssetsCost - fixedAssetsAD);
+      // FIX A1: accrued operating expenses — unpaid opex category (matches HQBalanceSheet.js)
+      // Sourced from already-fetched expensesRes (FY-window filtered); category='opex' AND not paid.
+      const opexAccruals = (expensesRes.data || [])
+        .filter(e => e.category === "opex" && e.payment_status !== "paid")
+        .reduce((s, e) => s + (parseFloat(e.amount_zar) || 0), 0);
       // VAT from vat_transactions directly — matches operational BS (HQBalanceSheet.js)
       const vatOutput = (vatTxnRes.data || []).reduce((s, t) => s + (parseFloat(t.output_vat) || 0), 0);
       const vatInputFromTxn = (vatTxnRes.data || []).reduce((s, t) => s + (parseFloat(t.input_vat) || 0), 0);
@@ -337,9 +345,9 @@ export default function HQFinancialStatements() {
       const openingRE = parseFloat(eqData?.opening_retained_earnings || 0);
       const totalEquity = shareCapital + openingRE + netProfit;
       const totalAssets = inventoryValue + cashAtBank + receivables + fixedAssetsNBV + vatReceivable;
-      const totalLiabilities = payables + vatLiability;
+      const totalLiabilities = payables + vatLiability + opexAccruals;
       const balanced = Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 2;
-      setBsData({ inventoryValue, cashAtBank, receivables, fixedAssetsNBV, fixedAssetsCost, fixedAssetsAccDep: fixedAssetsAD, payables, vatLiability, vatReceivable, shareCapital, openingRetained: openingRE, currentYearPL: netProfit, totalEquity, balanced });
+      setBsData({ inventoryValue, cashAtBank, receivables, fixedAssetsNBV, fixedAssetsCost, fixedAssetsAccDep: fixedAssetsAD, payables, vatLiability, vatReceivable, opexAccruals, shareCapital, openingRetained: openingRE, currentYearPL: netProfit, totalEquity, balanced });
 
       // Cash Flow — from RPC + financing from bank_statement_lines keywords
       const netOperating = netProfit + depreciationTotal;

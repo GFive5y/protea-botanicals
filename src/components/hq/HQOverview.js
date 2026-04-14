@@ -304,8 +304,9 @@ export default function HQOverview({ onNavigate }) {
   const fetchDispensingRevenue = useCallback(async () => {
     if (industryProfile !== "cannabis_dispensary" || !tenantId) return;
     try {
+      // FIX A8: rolling 30-day window to align with detail waterfall label
       const now = new Date();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const monthStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
       const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
       const todayEnd   = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
@@ -552,12 +553,15 @@ export default function HQOverview({ onNavigate }) {
       }
 
       try {
-        const monthStart = new Date();
-        monthStart.setDate(1);
-        monthStart.setHours(0, 0, 0, 0);
+        // FIX A8: rolling 30-day window to match the detail waterfall below.
+        // Calendar MTD on the 15th = 15 days of data which doesn't match a
+        // 30-day rolling detail section and looks broken to a CA reviewer.
+        const since = new Date();
+        since.setDate(since.getDate() - 30);
+        since.setHours(0, 0, 0, 0);
         const { data: fp } = await supabase.rpc("tenant_financial_period", {
           p_tenant_id: tenantId,
-          p_since: monthStart.toISOString(),
+          p_since: since.toISOString(),
           p_until: new Date().toISOString(),
         });
         setPlStats({
@@ -1687,7 +1691,7 @@ export default function HQOverview({ onNavigate }) {
           </>
         )}
         <MetricTile
-          label={industryProfile === "cannabis_dispensary" ? "Dispensing Revenue MTD" : "Revenue MTD"}
+          label={industryProfile === "cannabis_dispensary" ? "Dispensing Revenue (30d)" : "Revenue (last 30d)"}
           value={(() => {
             if (industryProfile === "cannabis_dispensary") {
               if (!dispensingRevMTD) return "—";
@@ -1698,8 +1702,8 @@ export default function HQOverview({ onNavigate }) {
               : "—";
           })()}
           subLabel={industryProfile === "cannabis_dispensary"
-            ? `${dispensingRevMTD?.count ?? 0} dispensing events this month`
-            : "this month"}
+            ? `${dispensingRevMTD?.count ?? 0} dispensing events · rolling 30 days`
+            : "rolling 30 days"}
           sub={(() => {
             const margin = isCannabisRetail
               ? cannabisStock?.avgMargin
