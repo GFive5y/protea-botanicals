@@ -1024,7 +1024,7 @@ export default function HQTenants() {
         supabase
           .from("tenant_config")
           .select(
-            "tenant_id,tier,feature_hq,feature_ai_basic,feature_ai_full,feature_medical,feature_white_label,feature_wholesale,feature_hr,ai_queries_daily,staff_seats,trial_ends_at,billing_cycle",
+            "tenant_id,tier,financial_setup_complete,financial_year_start,feature_hq,feature_ai_basic,feature_ai_full,feature_medical,feature_white_label,feature_wholesale,feature_hr,ai_queries_daily,staff_seats,trial_ends_at,billing_cycle",
           ),
         supabase
           .from("tenant_usage_log")
@@ -1814,32 +1814,26 @@ export default function HQTenants() {
                       </div>
                     </div>
                   {/* Financial Setup */}
-                  <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${T.bg}` }}>
-                    <div style={{ ...sLabel, marginBottom: 8 }}>Financial Setup</div>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                      {!cfg.financial_setup_complete && (
-                        <button
-                          onClick={() => setSetupModalTenant(tenant)}
-                          style={{ padding: "6px 14px", fontSize: 11, fontWeight: 600, fontFamily: T.font, background: T.warning, color: "#fff", border: "none", borderRadius: 4, cursor: "pointer" }}
-                        >
-                          Complete Financial Setup
-                        </button>
-                      )}
-                      {cfg.financial_setup_complete && (
-                        <span style={{ fontSize: 11, color: T.success, fontWeight: 600, fontFamily: T.font }}>
-                          Setup complete
-                        </span>
-                      )}
-                      {cfg.financial_setup_complete && (
-                        <button
-                          onClick={() => recalcNetProfit(tenant.id)}
-                          disabled={recalcStatus[tenant.id] === "loading"}
-                          style={{ padding: "6px 14px", fontSize: 11, fontWeight: 600, fontFamily: T.font, background: T.accentLight, color: T.accent, border: `1px solid ${T.accent}`, borderRadius: 4, cursor: "pointer" }}
-                        >
-                          {recalcStatus[tenant.id] === "loading" ? "Calculating..." : recalcStatus[tenant.id] === "done" ? "Done" : "Recalculate P&L"}
-                        </button>
-                      )}
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #eee" }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "#888", marginBottom: 8 }}>
+                      Financial Setup
                     </div>
+                    {!cfg.financial_setup_complete ? (
+                      <button
+                        onClick={() => setSetupModalTenant(tenant)}
+                        style={{ padding: "6px 14px", background: "#f59e0b", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}
+                      >
+                        Complete Financial Setup
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => recalcNetProfit(tenant.id)}
+                        disabled={recalcStatus[tenant.id] === "loading"}
+                        style={{ padding: "6px 14px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}
+                      >
+                        {recalcStatus[tenant.id] === "loading" ? "Calculating..." : recalcStatus[tenant.id] === "done" ? "Done" : "Recalculate P\u0026L"}
+                      </button>
+                    )}
                   </div>
 
                   {/* Delete tenant */}
