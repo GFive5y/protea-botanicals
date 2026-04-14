@@ -482,8 +482,16 @@ export default function HQBalanceSheet() {
       }
       setVatSummary({ output: vatOutput, input: vatInput });
 
-      // T21: YTD net result via tenant_financial_period RPC (LL-210)
-      if (fyRes.data) {
+      // Read net_profit_for_year from equity_ledger (source of truth for BS)
+      const { data: eqRow } = await supabase
+        .from("equity_ledger")
+        .select("net_profit_for_year")
+        .eq("tenant_id", tenantId)
+        .eq("financial_year", `FY${new Date().getFullYear()}`)
+        .maybeSingle();
+      if (eqRow?.net_profit_for_year != null) {
+        setYtdNetProfit(parseFloat(eqRow.net_profit_for_year));
+      } else if (fyRes.data) {
         const fyRev = fyRes.data.revenue?.ex_vat || 0;
         const fyCogs = fyRes.data.cogs?.actual || 0;
         const fyOpex = fyRes.data.opex?.total || 0;

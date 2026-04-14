@@ -108,8 +108,26 @@ export default function HQYearEnd() {
         }
       });
 
-      const gross = revenue - cogs;
-      const netProfit = gross - opex;
+      let gross = revenue - cogs;
+      let netProfit = gross - opex;
+
+      // Fallback: if journals have no revenue, use canonical RPC
+      if (revenue === 0) {
+        const yr = parseInt(activeFY.replace("FY", ""), 10) || new Date().getFullYear();
+        const { data: fp } = await supabase.rpc("tenant_financial_period", {
+          p_tenant_id: tenantId,
+          p_since: `${yr}-01-01T00:00:00+00:00`,
+          p_until: `${yr}-12-31T23:59:59+00:00`,
+        });
+        if (fp) {
+          revenue = fp.revenue?.ex_vat || 0;
+          cogs = fp.cogs?.actual || 0;
+          opex = fp.opex?.total || 0;
+          gross = revenue - cogs;
+          netProfit = gross - opex;
+        }
+      }
+
       setPnl({ revenue, cogs, gross, opex, capex, netProfit });
 
       // Build closing journal preview

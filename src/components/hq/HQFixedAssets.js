@@ -349,7 +349,10 @@ export default function HQFixedAssets() {
             <span style={{ ...S.bsVal, color: '#15803d', fontSize: 20, fontWeight: 800 }}>{fmt(totalNBV)}</span>
           </div>
         </div>
-        {anyBehind && <div style={{ fontSize: 12, color: '#b45309', marginTop: 10, padding: "8px 12px", background: "#FFFBEB", borderRadius: 6, border: "1px solid #F59E0B" }}>{"\u26A0"} <strong>5 months of depreciation unposted (Nov 2025 \u2013 Mar 2026).</strong> Click Run Depreciation and select each month to catch up. NBV is overstated until posted.</div>}
+        {anyBehind && (() => {
+          const maxBehind = Math.max(...assets.map(a => monthsBehind(a)));
+          return <div style={{ fontSize: 12, color: '#b45309', marginTop: 10, padding: "8px 12px", background: "#FFFBEB", borderRadius: 6, border: "1px solid #F59E0B" }}>{"\u26A0"} <strong>{maxBehind} month{maxBehind !== 1 ? "s" : ""} of depreciation unposted.</strong> Click Run Depreciation and select each month to catch up. NBV is overstated until posted.</div>;
+        })()}
       </div>
 
       {/* ── RUN DEP MODAL ──────────────────────────────────────────────── */}

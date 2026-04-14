@@ -109,7 +109,7 @@ export default function HQFinancialNotes() {
         supabase.from("vat_transactions").select("*").eq("tenant_id",tenantId).gte("transaction_date",ys),
         supabase.from("depreciation_entries").select("depreciation").eq("tenant_id",tenantId).eq("period_year",CURRENT_YEAR),
         supabase.from("bank_statement_lines").select("balance,statement_date").eq("tenant_id",tenantId).order("statement_date",{ascending:false}).limit(1),
-        supabase.rpc("tenant_financial_period",{p_tenant_id:tenantId,p_since:`${CURRENT_YEAR}-01-01T00:00:00Z`,p_until:`${CURRENT_YEAR}-12-31T23:59:59Z`}),
+        supabase.rpc("tenant_financial_period",{p_tenant_id:tenantId,p_since:new Date(CURRENT_YEAR,0,1).toISOString(),p_until:new Date(CURRENT_YEAR,11,31,23,59,59).toISOString()}),
       ]);
       const closingBalance = bslR.data?.[0]?.balance || null;
       const fp = fpRes.data || {};
@@ -137,7 +137,7 @@ export default function HQFinancialNotes() {
   const vatInFromTxn = vat.reduce((s,v)=>s+(parseFloat(v.input_vat)||0),0);
   const vatIn = vatInFromTxn > 0 ? vatInFromTxn : exp.reduce((s,e)=>s+(parseFloat(e.input_vat_amount)||0),0);
   const shareCapital = parseFloat(eq?.share_capital||0); const openingRE = parseFloat(eq?.opening_retained_earnings||0);
-  const netProfit = totalRevenue - totalCogs - totalOpex - totalDep;
+  const netProfit = eq?.net_profit_for_year != null ? parseFloat(eq.net_profit_for_year) : (totalRevenue - totalCogs - totalOpex - totalDep);
   const orderCount = fp?.orders?.paid_count || 0;
 
   return (
