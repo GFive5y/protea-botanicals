@@ -205,7 +205,7 @@ function ChangesInEquityStatement({ data, tenantName, periodLabel, financialYear
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function HQFinancialStatements() {
-  const { tenant } = useTenant();
+  const { tenant, industryProfile } = useTenant();
   const tenantId = tenant?.id;
 
   const currentFY = `FY${new Date().getFullYear()}`;
@@ -269,9 +269,29 @@ export default function HQFinancialStatements() {
 
       const fp = fpRes.data || {};
 
-      // Income Statement — from canonical RPC
-      const revenue = fp.revenue?.ex_vat || 0;
-      const cogs = fp.cogs?.actual || 0;
+      // LL-231: Cannabis dispensary revenue/cogs from dispensing_log x inventory_items, not orders/RPC
+      let dispensingRevenue = 0;
+      let dispensingCOGS = 0;
+      if (industryProfile === "cannabis_dispensary") {
+        const { data: dispensingData } = await supabase
+          .from("dispensing_log")
+          .select("quantity_dispensed,dispensed_at,inventory_items!inner(sell_price,cost_price,weighted_avg_cost)")
+          .eq("tenant_id", tenantId)
+          .eq("is_voided", false)
+          .gte("dispensed_at", startDate)
+          .lte("dispensed_at", endDate + "T23:59:59");
+        (dispensingData || []).forEach(d => {
+          const q = parseFloat(d.quantity_dispensed) || 0;
+          const sell = parseFloat(d.inventory_items?.sell_price) || 0;
+          const cost = parseFloat(d.inventory_items?.weighted_avg_cost) || parseFloat(d.inventory_items?.cost_price) || 0;
+          dispensingRevenue += q * sell;
+          dispensingCOGS += q * cost;
+        });
+      }
+
+      // Income Statement — from canonical RPC (dispensary branch per LL-231)
+      const revenue = industryProfile === "cannabis_dispensary" ? dispensingRevenue : (fp.revenue?.ex_vat || 0);
+      const cogs = industryProfile === "cannabis_dispensary" ? dispensingCOGS : (fp.cogs?.actual || 0);
       const grossProfit = revenue - cogs;
       const grossMarginPct = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
       const opexExpenses = (expensesRes.data || []).filter(e => ["opex", "wages", "tax", "other"].includes(e.category));
@@ -324,13 +344,14 @@ export default function HQFinancialStatements() {
       const financingOutflow = (finRes.data || []).reduce((s, l) => s + (parseFloat(l.debit_amount) || 0), 0);
       const netFinancing = financingInflow - financingOutflow;
       const netCash = netOperating + netInvesting + netFinancing;
-      setCfData({ netProfit, depreciationTotal, cashFromCustomers: fp.cash?.from_customers || revenue, cashToSuppliers: fp.cash?.to_suppliers || 0, opexPaid: totalOpex, capexPaid, netOperating, netInvesting, financingInflow, financingOutflow, netFinancing, netCash });
+      const cashFromCustomers = industryProfile === "cannabis_dispensary" ? dispensingRevenue : (fp.cash?.from_customers || revenue);
+      setCfData({ netProfit, depreciationTotal, cashFromCustomers, cashToSuppliers: fp.cash?.to_suppliers || 0, opexPaid: totalOpex, capexPaid, netOperating, netInvesting, financingInflow, financingOutflow, netFinancing, netCash });
 
       // Equity
       setEquityData({ shareCapital, openingRetained: openingRE, currentYearPL: netProfit });
     } catch (err) { console.error("HQFinancialStatements fetch error:", err); }
     finally { setLoading(false); }
-  }, [tenantId, bounds, selectedFY, currentFY]);
+  }, [tenantId, bounds, selectedFY, currentFY, industryProfile]);
 
   useEffect(() => { fetchData(); fetchStatus(); }, [fetchData, fetchStatus]);
 

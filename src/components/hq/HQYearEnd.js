@@ -41,7 +41,7 @@ function StepBar({step}){
 }
 
 export default function HQYearEnd() {
-  const { tenantId } = useTenant();
+  const { tenantId, industryProfile } = useTenant();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(true);
   const [pnl, setPnl] = useState(null);
@@ -128,6 +128,30 @@ export default function HQYearEnd() {
         }
       }
 
+      // LL-231: Cannabis dispensary revenue from dispensing_log x inventory_items (not orders)
+      if (industryProfile === "cannabis_dispensary") {
+        const yr = parseInt(activeFY.replace("FY", ""), 10) || new Date().getFullYear();
+        const { data: dispensingData } = await supabase
+          .from("dispensing_log")
+          .select("quantity_dispensed,dispensed_at,inventory_items!inner(sell_price,cost_price,weighted_avg_cost)")
+          .eq("tenant_id", tenantId)
+          .eq("is_voided", false)
+          .gte("dispensed_at", `${yr}-01-01T00:00:00+00:00`)
+          .lte("dispensed_at", `${yr}-12-31T23:59:59+00:00`);
+        let dRev = 0, dCogs = 0;
+        (dispensingData || []).forEach(d => {
+          const q = parseFloat(d.quantity_dispensed) || 0;
+          const sell = parseFloat(d.inventory_items?.sell_price) || 0;
+          const cost = parseFloat(d.inventory_items?.weighted_avg_cost) || parseFloat(d.inventory_items?.cost_price) || 0;
+          dRev += q * sell;
+          dCogs += q * cost;
+        });
+        revenue = dRev;
+        cogs = dCogs;
+        gross = revenue - cogs;
+        netProfit = gross - opex;
+      }
+
       setPnl({ revenue, cogs, gross, opex, capex, netProfit });
 
       // Build closing journal preview
@@ -141,7 +165,7 @@ export default function HQYearEnd() {
     } finally {
       setLoading(false);
     }
-  }, [tenantId]);
+  }, [tenantId, industryProfile]);
 
   useEffect(() => { loadPnl(); }, [loadPnl]);
 
