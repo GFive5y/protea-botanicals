@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { INDUSTRY_PROFILES } from "../../constants/industryProfiles";
 import TenantSetupWizard from "./TenantSetupWizard";
+import HQTenantFinancialSetup from "./HQTenantFinancialSetup";
 import { T } from "../../styles/tokens";
 
 // Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
@@ -976,11 +977,38 @@ export default function HQTenants() {
   const [simWiping, setSimWiping] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [setupModalTenant, setSetupModalTenant] = useState(null);
+  const [recalcStatus, setRecalcStatus] = useState({});
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 4000);
   };
+
+  async function recalcNetProfit(tid) {
+    setRecalcStatus(s => ({ ...s, [tid]: "loading" }));
+    try {
+      const tcfg = configs[tid] || {};
+      const fyStart = tcfg.financial_year_start || "03-01";
+      const mo = parseInt(fyStart.split("-")[0], 10);
+      const yr = (new Date().getMonth() + 1) >= mo ? new Date().getFullYear() : new Date().getFullYear() - 1;
+      const { data: plData } = await supabase.rpc("tenant_financial_period", {
+        p_tenant_id: tid,
+        p_since: `${yr}-${fyStart}T00:00:00+00:00`,
+        p_until: new Date().toISOString(),
+      });
+      if (plData) {
+        const net = (plData.revenue?.ex_vat || 0) - (plData.cogs?.actual || 0) - (plData.opex?.paid || 0);
+        await supabase.from("equity_ledger").update({ net_profit_for_year: net }).eq("tenant_id", tid).eq("financial_year", "FY2026");
+        setRecalcStatus(s => ({ ...s, [tid]: "done" }));
+        showToast(`Net profit updated: R${Math.round(net).toLocaleString()}`);
+      }
+    } catch (e) {
+      console.error("[Recalc]", e);
+      setRecalcStatus(s => ({ ...s, [tid]: "error" }));
+      showToast("Recalculate failed: " + e.message, "error");
+    }
+  }
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -1785,6 +1813,35 @@ export default function HQTenants() {
                           ))}
                       </div>
                     </div>
+                  {/* Financial Setup */}
+                  <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${T.bg}` }}>
+                    <div style={{ ...sLabel, marginBottom: 8 }}>Financial Setup</div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                      {!cfg.financial_setup_complete && (
+                        <button
+                          onClick={() => setSetupModalTenant(tenant)}
+                          style={{ padding: "6px 14px", fontSize: 11, fontWeight: 600, fontFamily: T.font, background: T.warning, color: "#fff", border: "none", borderRadius: 4, cursor: "pointer" }}
+                        >
+                          Complete Financial Setup
+                        </button>
+                      )}
+                      {cfg.financial_setup_complete && (
+                        <span style={{ fontSize: 11, color: T.success, fontWeight: 600, fontFamily: T.font }}>
+                          Setup complete
+                        </span>
+                      )}
+                      {cfg.financial_setup_complete && (
+                        <button
+                          onClick={() => recalcNetProfit(tenant.id)}
+                          disabled={recalcStatus[tenant.id] === "loading"}
+                          style={{ padding: "6px 14px", fontSize: 11, fontWeight: 600, fontFamily: T.font, background: T.accentLight, color: T.accent, border: `1px solid ${T.accent}`, borderRadius: 4, cursor: "pointer" }}
+                        >
+                          {recalcStatus[tenant.id] === "loading" ? "Calculating..." : recalcStatus[tenant.id] === "done" ? "Done" : "Recalculate P&L"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Delete tenant */}
                   {PROTECTED_TENANT_IDS.has(tenant.id) ? (
                     <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${T.bg}`, fontSize: 11, color: T.ink500, fontFamily: T.font }}>
@@ -1834,6 +1891,16 @@ export default function HQTenants() {
             );
           })}
         </div>
+      )}
+
+      {setupModalTenant && (
+        <HQTenantFinancialSetup
+          tenantId={setupModalTenant.id}
+          tenantName={setupModalTenant.name}
+          industryProfile={setupModalTenant.industry_profile}
+          existingConfig={configs[setupModalTenant.id]}
+          onComplete={() => { setSetupModalTenant(null); fetchAll(); }}
+        />
       )}
     </div>
   );
