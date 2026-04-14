@@ -88,7 +88,7 @@ import {
 } from "lucide-react";
 
 const T = {
-  bg: "#FAFAF9",
+  bg: "#ffffff",
   sidebar: "#ffffff",
   border: "#ECEAE6",
   accent: "#1A3D2B",
@@ -1463,13 +1463,13 @@ export default function TenantPortal() {
 
             {/* Content */}
             {fullBleed ? (
-              <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", background: "#faf9f6" }}>
+              <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", background: "#ffffff" }}>
                 <div style={{ ...INNER, flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", padding: "12px 24px 0", boxSizing: "border-box" }}>
                   {renderTab(activeTab, tenantId, industryProfile, setActiveTab, searchKey, searchFilter)}
                 </div>
               </div>
             ) : (
-              <div style={{ flex: 1, overflowY: "auto", background: "#faf9f6" }}>
+              <div style={{ flex: 1, overflowY: "auto", background: "#ffffff" }}>
                 <div style={{ ...INNER, padding: "24px 28px", boxSizing: "border-box" }}>
                   {activeTab === "overview" && <FinWalkInBrief signals={finSignals} />}
                   {renderTab(activeTab, tenantId, industryProfile, setActiveTab, searchKey, searchFilter)}
@@ -1480,7 +1480,7 @@ export default function TenantPortal() {
             {/* Footer */}
             <div style={{
               height: 28, flexShrink: 0, borderTop: `1px solid ${T.border}`,
-              background: "#faf9f6", display: "flex", alignItems: "center",
+              background: "#ffffff", display: "flex", alignItems: "center",
               padding: "0 20px", gap: 16,
             }}>
               <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.04em" }}>
