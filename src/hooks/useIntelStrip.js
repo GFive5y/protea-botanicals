@@ -124,9 +124,34 @@ async function buildPills(tabId, tenantId, intel) {
         p_since: monthStart.toISOString(),
         p_until: new Date().toISOString(),
       });
-      const revMtd   = fp?.revenue?.ex_vat || 0;
-      const cogsMtd  = fp?.cogs?.actual || 0;
-      const expMtd   = fp?.opex?.total || 0;
+      let revMtd   = fp?.revenue?.ex_vat || 0;
+      let cogsMtd  = fp?.cogs?.actual || 0;
+      const expMtd = fp?.opex?.total || 0;
+      // LL-231: cannabis_dispensary revenue = dispensing_log × sell_price, not orders/RPC
+      // The tenant_financial_period RPC returns 0 for dispensary profiles — override.
+      const { data: tenantRow } = await supabase
+        .from("tenants")
+        .select("industry_profile")
+        .eq("id", tenantId)
+        .maybeSingle();
+      if (tenantRow?.industry_profile === "cannabis_dispensary") {
+        const { data: dispensingData } = await supabase
+          .from("dispensing_log")
+          .select("quantity_dispensed,inventory_items!inner(sell_price,cost_price,weighted_avg_cost)")
+          .eq("tenant_id", tenantId)
+          .eq("is_voided", false)
+          .gte("dispensed_at", monthStart.toISOString());
+        let dRev = 0, dCogs = 0;
+        (dispensingData || []).forEach(d => {
+          const q = parseFloat(d.quantity_dispensed) || 0;
+          const sell = parseFloat(d.inventory_items?.sell_price) || 0;
+          const cost = parseFloat(d.inventory_items?.weighted_avg_cost) || parseFloat(d.inventory_items?.cost_price) || 0;
+          dRev  += q * sell;
+          dCogs += q * cost;
+        });
+        revMtd  = dRev;
+        cogsMtd = dCogs;
+      }
       const grossPft = revMtd - cogsMtd;
       const margin   = revMtd > 0 ? (grossPft / revMtd) * 100 : 0;
       return [

@@ -103,14 +103,14 @@ export function useNavIntelligence(tenantId) {
         .sort((a, b) => (a.quantity_on_hand || 0) - (b.quantity_on_hand || 0))[0];
 
       // ── Orders ─────────────────────────────────────────────────────
-      const todayOrders  = todayR.status === "fulfilled" ? todayR.value.data || [] : [];
-      const todayCount   = todayOrders.length;
-      const todayRev     = todayOrders.reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
+      let todayOrders  = todayR.status === "fulfilled" ? todayR.value.data || [] : [];
+      let todayCount   = todayOrders.length;
+      let todayRev     = todayOrders.reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
 
-      const mtdOrders    = mtdR.status === "fulfilled" ? mtdR.value.data || [] : [];
-      const mtdCount     = mtdOrders.length;
-      const mtdRevIncl   = mtdOrders.reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
-      const mtdRevExcl   = Math.round((mtdRevIncl / 1.15) * 100) / 100;
+      let mtdOrders    = mtdR.status === "fulfilled" ? mtdR.value.data || [] : [];
+      let mtdCount     = mtdOrders.length;
+      let mtdRevIncl   = mtdOrders.reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
+      let mtdRevExcl   = Math.round((mtdRevIncl / 1.15) * 100) / 100;
 
       // Best day this month (for % comparison)
       const dayTotals = {};
@@ -118,7 +118,42 @@ export function useNavIntelligence(tenantId) {
         const d = o.created_at.slice(0, 10);
         dayTotals[d] = (dayTotals[d] || 0) + (parseFloat(o.total) || 0);
       });
-      const bestDayRev  = Math.max(...Object.values(dayTotals), 0);
+      let bestDayRev  = Math.max(...Object.values(dayTotals), 0);
+
+      // LL-231: cannabis_dispensary — revenue from dispensing_log × sell_price, not orders.
+      // MediCare Dispensary shows R0 on every revenue pill until this override runs.
+      const { data: tenantRow } = await supabase
+        .from("tenants")
+        .select("industry_profile")
+        .eq("id", tenantId)
+        .maybeSingle();
+      if (tenantRow?.industry_profile === "cannabis_dispensary") {
+        const { data: dispensingData } = await supabase
+          .from("dispensing_log")
+          .select("quantity_dispensed,dispensed_at,inventory_items!inner(sell_price)")
+          .eq("tenant_id", tenantId)
+          .eq("is_voided", false)
+          .gte("dispensed_at", monthStart);
+        const events = dispensingData || [];
+        const rowRev = (e) => (parseFloat(e.quantity_dispensed) || 0) * (parseFloat(e.inventory_items?.sell_price) || 0);
+        // Today
+        const todayEvents = events.filter((e) => e.dispensed_at >= todayStart);
+        todayCount = todayEvents.length;
+        todayRev   = todayEvents.reduce((s, e) => s + rowRev(e), 0);
+        // MTD
+        mtdCount   = events.length;
+        mtdRevIncl = events.reduce((s, e) => s + rowRev(e), 0);
+        mtdRevExcl = Math.round((mtdRevIncl / 1.15) * 100) / 100;
+        // Rebuild dayTotals from dispensing events
+        Object.keys(dayTotals).forEach((k) => delete dayTotals[k]);
+        events.forEach((e) => {
+          const d = (e.dispensed_at || "").slice(0, 10);
+          if (!d) return;
+          dayTotals[d] = (dayTotals[d] || 0) + rowRev(e);
+        });
+        bestDayRev = Math.max(...Object.values(dayTotals), 0);
+      }
+
       const todayVsBest = bestDayRev > 0
         ? Math.round((todayRev / bestDayRev) * 100)
         : null;
