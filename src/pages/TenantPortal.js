@@ -60,6 +60,7 @@ import HQJournals from "../components/hq/HQJournals";
 import HQVat from "../components/hq/HQVat";
 import HQBankRecon from "../components/hq/HQBankRecon";
 import HQFinancialNotes from "../components/hq/HQFinancialNotes";
+import HQChartOfAccounts from "../components/hq/HQChartOfAccounts";
 import HQSmartCapture from "../components/hq/HQSmartCapture";
 import HQForecast from "../components/hq/HQForecast";
 import HQYearEnd from "../components/hq/HQYearEnd";
@@ -305,6 +306,7 @@ const WATERFALL = [
         label: "Year-End Close",
         desc: "Lock year \u00b7 post retained earnings \u00b7 archive period",
       },
+      { id: "chart-of-accounts", label: "Chart of Accounts", desc: "Account codes \u00b7 types \u00b7 structure" },
     ],
   },
   {
@@ -504,6 +506,8 @@ const CANNABIS_RETAIL_WATERFALL = [
         label: "Year-End Close",
         desc: "Lock year \u00b7 post retained earnings \u00b7 archive period",
       },
+      { id: "fin-notes", label: "Financial Notes", desc: "IFRS disclosure notes \u00b7 accounting policies" },
+      { id: "chart-of-accounts", label: "Chart of Accounts", desc: "Account codes \u00b7 types \u00b7 structure" },
       {
         id: "journals",
         label: "Journals",
@@ -529,6 +533,8 @@ const CANNABIS_RETAIL_WATERFALL = [
         label: "IFRS Statements",
         desc: "Income Statement \u00b7 Balance Sheet \u00b7 Cash Flow \u00b7 Changes in Equity",
       },
+      { id: "fin-notes", label: "Financial Notes", desc: "IFRS disclosure notes \u00b7 accounting policies" },
+      { id: "chart-of-accounts", label: "Chart of Accounts", desc: "Account codes \u00b7 types \u00b7 structure" },
     ],
   },
   {
@@ -592,6 +598,8 @@ const CANNABIS_DISPENSARY_WATERFALL = [
       { id: "balance-sheet",label: "Balance Sheet",    desc: "Assets \u00b7 liabilities \u00b7 equity" },
       { id: "forecast",     label: "Forecast",         desc: "30-day cash flow \u00b7 stock depletion projection" },
       { id: "year-end",     label: "Year-End Close",   desc: "Lock year \u00b7 post retained earnings \u00b7 archive" },
+      { id: "fin-notes",   label: "Financial Notes",  desc: "IFRS disclosure notes \u00b7 accounting policies" },
+      { id: "chart-of-accounts", label: "Chart of Accounts", desc: "Account codes \u00b7 types \u00b7 structure" },
     ],
   },
   {
@@ -772,6 +780,8 @@ const GENERAL_RETAIL_WATERFALL = [
       { id: "bank-recon",      label: "Bank Recon",       desc: "Statement import \u00b7 match \u00b7 reconcile" },
       { id: "forecast",        label: "Forecast",         desc: "30-day projection \u00b7 stock depletion" },
       { id: "year-end",        label: "Year-End Close",   desc: "Lock year \u00b7 retained earnings \u00b7 archive" },
+      { id: "fin-notes",       label: "Financial Notes",  desc: "IFRS disclosure notes \u00b7 accounting policies" },
+      { id: "chart-of-accounts", label: "Chart of Accounts", desc: "Account codes \u00b7 types \u00b7 structure" },
     ],
   },
   {
@@ -859,7 +869,8 @@ function renderTab(tabId, tenantId, industryProfile, onTabChange, searchKey, sea
     case "journals":       return <HQJournals />;
     case "vat":            return <HQVat />;
     case "bank-recon":     return <HQBankRecon />;
-    case "fin-notes":      return <HQFinancialNotes />;
+    case "fin-notes":          return <HQFinancialNotes />;
+    case "chart-of-accounts":  return <HQChartOfAccounts />;
     case "forecast":       return <HQForecast />;
     case "year-end":       return <HQYearEnd />;
     case "fin-statements": return <HQFinancialStatements />;
