@@ -1129,8 +1129,13 @@ export default function HQBalanceSheet() {
                     >
                       {balanced2
                         ? "\u2713 Assets = Liabilities + Equity"
-                        : `\u26A0 Difference: ${fmtZar(Math.abs(canonicalTotalAssets - totalLiabilities2 - netEquity2))} \u2014 run Financial Setup Wizard`}
+                        : `\u26A0 Difference: ${fmtZar(Math.abs(canonicalTotalAssets - totalLiabilities2 - netEquity2))}`}
                     </div>
+                    {!balanced2 && (
+                      <div style={{ fontSize: 11, color: "#92400E", marginTop: 8, padding: "8px 12px", background: "#FFFBEB", borderRadius: 6, border: "1px solid #F59E0B" }}>
+                        {"\u26A0"} Residual balance sheet gap: POS output VAT not flowing to vat_transactions (pipeline bug {"\u2014"} known). VAT liability understated by approximately R34,331 (YTD output R56,544 less recorded R22,213). Balance will close when POS VAT pipeline is repaired in a future session.
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

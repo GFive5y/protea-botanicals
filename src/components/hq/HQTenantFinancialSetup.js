@@ -190,7 +190,7 @@ export default function HQTenantFinancialSetup({ tenantId, tenantName, onComplet
         p_until: new Date().toISOString(),
       });
       if (plData) {
-        const netProfit = (plData.revenue?.ex_vat || 0) - (plData.cogs?.actual || 0) - (plData.opex?.paid || 0);
+        const netProfit = (plData.revenue?.ex_vat || 0) - (plData.cogs?.actual || 0) - (plData.opex?.total || plData.opex?.paid || 0);
         await supabase.from("equity_ledger").update({ net_profit_for_year: netProfit }).eq("tenant_id", tenantId).eq("financial_year", "FY2026");
       }
     } catch (_) {

@@ -988,17 +988,14 @@ export default function HQTenants() {
   async function recalcNetProfit(tid) {
     setRecalcStatus(s => ({ ...s, [tid]: "loading" }));
     try {
-      const tcfg = configs[tid] || {};
-      const fyStart = tcfg.financial_year_start || "03-01";
-      const mo = parseInt(fyStart.split("-")[0], 10);
-      const yr = (new Date().getMonth() + 1) >= mo ? new Date().getFullYear() : new Date().getFullYear() - 1;
+      const yr = new Date().getFullYear();
       const { data: plData } = await supabase.rpc("tenant_financial_period", {
         p_tenant_id: tid,
-        p_since: `${yr}-${fyStart}T00:00:00+00:00`,
-        p_until: new Date().toISOString(),
+        p_since: `${yr}-01-01T00:00:00+00:00`,
+        p_until: `${yr}-12-31T23:59:59+00:00`,
       });
       if (plData) {
-        const net = (plData.revenue?.ex_vat || 0) - (plData.cogs?.actual || 0) - (plData.opex?.paid || 0);
+        const net = (plData.revenue?.ex_vat || 0) - (plData.cogs?.actual || 0) - (plData.opex?.total || plData.opex?.paid || 0);
         await supabase.from("equity_ledger").update({ net_profit_for_year: net }).eq("tenant_id", tid).eq("financial_year", "FY2026");
         setRecalcStatus(s => ({ ...s, [tid]: "done" }));
         showToast(`Net profit updated: R${Math.round(net).toLocaleString()}`);
