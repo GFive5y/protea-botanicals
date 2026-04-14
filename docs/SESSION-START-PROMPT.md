@@ -26,7 +26,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 5. `docs/LL-ARCHIVE_v1_0.md` (LL-252 through LL-264 are new this session)
 
 After reading, confirm out loud:
-- Current HEAD (should be de41ec6)
+- Current HEAD (should be 5802a7c or later — the docs commit on top of it is self-referential)
 - Group Portal status (COMPLETE — 6 stores, all tabs verified 15 Apr 2026)
 - All open loops from PENDING-ACTIONS.md
 - Any new violations
@@ -42,13 +42,14 @@ IF DEMO DATE CHANGES: update PENDING-ACTIONS.md first, then this file.
 
 ## CURRENT STATE — 15 April 2026 — Session 283 Close
 
-### SIGNAL SYSTEM LIVE (Session 283 · commit 5802a7c)
-useFinSignals hook + FinAlertHoverCard + FinWalkInBrief shipped.
-3 tabs active: balance-sheet, vat, pl. Unified 5-min data source, hover cards
-on fin nav items, dashboard walk-in brief above Operations Health. AINS dispatch
-stubbed as TODO (navigate actions only in v1). Acceptance: 7 of 8 validated
-outputs match exactly; Nourish BS remains null (order_items cost_price data gap,
-see LOOP-NEW-004).
+### SIGNAL SYSTEM LIVE — Session 283 (commit 5802a7c)
+useFinSignals + FinAlertHoverCard + FinWalkInBrief deployed.
+Three fin tabs active: balance-sheet, vat, pl.
+All 8 acceptance tests passing including Nourish Kitchen (LOOP-NEW-004 fixed
+via Supabase MCP — order_items seeded with weighted_avg_cost in product_metadata).
+Walk-in brief renders above Operations Health on dashboard. Hover card fires
+on fin nav items with active alerts. Unified 5-min data source. AINS dispatch
+stubbed as TODO (navigate actions only in v1).
 
 ### FINANCIAL PACKAGE — ALL 5 DEMO TENANTS COMPLETE
 DO NOT re-run financial seeding. DO NOT touch equity_ledger without LL-248.
@@ -91,22 +92,29 @@ CC-10: StoreComparison BAR_PALETTE visible bar colors
 - LOOP-015: Loyalty warning banner — source unidentified
   Next: grep -r "no rows\|config row\|rewards engine" src/
   Ruled out: AINSBar.js, useNavIntelligence.js, HQLoyalty.js, IntelStrip.js
-- LOOP-NEW-004: Nourish Kitchen order_items cost_price = 0 — balance sheet
-  signal returns null because the canonical RPC computes R0 COGS.
-  Fix via Supabase MCP: seed cost_price on Nourish order_items so the
-  tenant_financial_period RPC returns a real cogs.actual figure.
-  Do NOT add a fallback COGS source to checkBalanceSheet.js — code is
-  correct, RPC is canonical per LL-210. Fix the data.
+- LOOP-NEW-005: MediCare Revenue MTD header shows R0 — reads from orders, must
+  read from dispensing_log for cannabis_dispensary profile per LL-231. Claude
+  Code fix: find Revenue MTD tile in dispensary dashboard component, switch
+  data source. Same pattern as the IFRS IS fix in CC-03 / 0f6cfa0.
+- LOOP-NEW-006: MediCare IFRS BS gap R76,906 — same root cause as Metro's
+  R362k gap before Session 283 fixes. Fix via Supabase MCP using the same
+  pattern: run the A5 OpEx date-filter equivalent, then recalibrate
+  equity_ledger. Schedule next session.
 
 ### CLOSED THIS SESSION (283)
 - LOOP-012: HR top-up — CLOSED (Medi Rec, MediCare, Metro all at RUNBOOK minimum)
 - LOOP-014: MediCare IFRS IS dispensing revenue verify — CLOSED (NEW-002 fix in 4fdafcd)
+- LOOP-016: R12,500 bank debit — CLOSED (created and closed same session;
+  resolved as Crown Electric forklift service invoice)
+- LOOP-NEW-004: Nourish Kitchen order_items cost_price — CLOSED (Supabase MCP
+  seed: 240 items, 6 products rotating, weighted_avg_cost in product_metadata.
+  BS signal now fires amber/1, 72 days of cover. Verified.)
 - Signal system (useFinSignals + hover cards + walk-in brief) — SHIPPED in 5802a7c
 
 ### KNOWN PERMANENT GAPS — DO NOT CHASE BEFORE 12 MAY
 1. POS VAT pipeline — ~R5k BS gap per tenant (amber banner explains it)
-2. MediCare IFRS BS gap R76,906 — equity_ledger vs IFRS IS source mismatch
-3. Metro Hardware IFRS BS gap R362,311 — same root cause
+2. MediCare IFRS BS gap R76,906 — tracked as LOOP-NEW-006 (fix next session)
+3. Metro Hardware IFRS BS gap — CLOSED Session 283 (A1 accrued opex + A5 FY filter in b281bb8)
 4. Cash flow opening balance — not wired to bank recon
 5. Pricing data source red (0) — no product_pricing linked to recipes
 
@@ -192,6 +200,9 @@ LL-263: T.neutralLight invisible on white → BAR_PALETTE for chart bars.
 LL-264: NEVER create NEXT-SESSION-PROMPT_vXXX.md. Update SESSION-START-PROMPT.md
          in-place instead. Versioned handoff files go stale immediately and leave
          this file (the actual entry point) un-updated. See LL-264 in archive.
+LL-265: Production URL is protea-botanicals.vercel.app — never use preview URLs
+         (f520llkld format). Preview URLs serve frozen builds and will show stale
+         behaviour that doesn't match what's on main.
 
 ---
 
@@ -206,11 +217,16 @@ LL-264: NEVER create NEXT-SESSION-PROMPT_vXXX.md. Update SESSION-START-PROMPT.md
 ---
 
 ## NEXT PRIORITIES (choose with owner at session start)
-1. LOOP-010/011/012 — Pre-demo financial hygiene
-2. LOOP-015 — Loyalty warning banner grep
-3. Medi Rec Financials walkthrough — 11 tabs
-4. 11 May sim-pos-sales — STANDING ALERT, cannot miss
-5. Eybna unpriced products — HC-0002, BB-LYCHEE-0002, 6-PH-0002
+1. **WP-DS6-UNIFICATION** — full site visual unification to Group Portal standard.
+   See docs/WP-DS6-UNIFICATION-BRIEF.md for the design brief. Owner will provide
+   screenshots of Group Portal vs legacy pages at session start. This is the
+   Priority 1 work for Session 284.
+2. LOOP-NEW-005 — MediCare Revenue MTD dispensary source fix (Claude Code)
+3. LOOP-NEW-006 — MediCare IFRS BS gap R76,906 recalibration (Supabase MCP)
+4. LOOP-010/011 — Pre-demo financial hygiene (UI Run Depreciation + IFRS sign-off)
+5. LOOP-015 — Loyalty warning banner grep
+6. 11 May sim-pos-sales — STANDING ALERT, cannot miss
+7. Eybna unpriced products — HC-0002, BB-LYCHEE-0002, 6-PH-0002
 
 ---
 
