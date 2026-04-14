@@ -374,7 +374,7 @@ export default function HQForecast() {
               fontSize: 24, fontWeight: 600, color: tile.color, fontVariantNumeric: "tabular-nums",
               letterSpacing: "-0.02em", lineHeight: 1,
             }}>
-              {fmtZar(Math.abs(tile.value))}
+              {tile.value < 0 ? "\u2212" : ""}{fmtZar(Math.abs(tile.value))}
             </div>
             {tile.sub && <div style={{ fontSize: 10, color: T.ink500, marginTop: 4 }}>{tile.sub}</div>}
             <div style={{ fontSize: 10, color: T.ink300, marginTop: 4 }}>

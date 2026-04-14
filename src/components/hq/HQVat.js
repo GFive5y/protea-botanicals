@@ -160,7 +160,7 @@ export default function HQVat() {
     const txns = vatTxns.filter(t => t.vat_period === pid);
     // T26: output VAT from orderStats (RPC), not vatTxns
     const outputVat    = orderStats[pid]?.outputVat || txns.reduce((s, t) => s + (parseFloat(t.output_vat) || 0), 0);
-    const inputVat     = expenseStats[pid]?.totalInputVat || txns.reduce((s, t) => s + (parseFloat(t.input_vat) || 0), 0);
+    const inputVat     = txns.reduce((s, t) => s + (parseFloat(t.input_vat) || 0), 0) || expenseStats[pid]?.totalInputVat || 0;
     const exclusiveRev = txns.filter(t => t.transaction_type === "output").reduce((s, t) => s + (parseFloat(t.exclusive_amount) || 0), 0);
     const inclusiveRev = txns.filter(t => t.transaction_type === "output").reduce((s, t) => s + (parseFloat(t.inclusive_amount) || 0), 0);
     return {
@@ -494,7 +494,7 @@ export default function HQVat() {
 
   // ── DASHBOARD — YTD from period sums (T23: uses tenant_vat_periods RPC)
   const ytdOutput = Object.values(orderStats).reduce((s, p) => s + (p.outputVat || 0), 0);
-  const ytdInput  = Object.values(expenseStats).reduce((s, p) => s + (p.totalInputVat || 0), 0) || (expensesInputVat || 0);
+  const ytdInput  = vatTxns.reduce((s, t) => s + (parseFloat(t.input_vat) || 0), 0) || Object.values(expenseStats).reduce((s, p) => s + (p.totalInputVat || 0), 0) || (expensesInputVat || 0);
   const ytdNet    = ytdOutput - ytdInput;
 
   return (

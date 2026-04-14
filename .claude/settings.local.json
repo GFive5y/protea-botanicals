@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(git add:*)",
+      "Bash(CI=false npm run build)",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "mcp__claude_ai_Supabase__get_edge_function",
+      "Bash(npx supabase:*)",
+      "mcp__claude_ai_Supabase__deploy_edge_function",
+      "Bash(git commit:*)",
+      "Bash(xxd .env.local)",
+      "Bash(grep -n \"^SUPABASE\\\\|^TENANT\\\\|^\\\\`;\" src/components/ProteaAI.js)",
+      "Bash(CI=false npx react-scripts build)"
+    ]
+  }
+}

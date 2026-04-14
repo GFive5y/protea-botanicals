@@ -151,7 +151,7 @@ function BalanceSheetStatement({ data, tenantName, asAtLabel, financialYear, sta
 
 // ── Statement 3: Cash Flow ────────────────────────────────────────────────────
 function CashFlowStatement({ data, tenantName, periodLabel, financialYear, status }) {
-  const { netProfit, depreciationTotal, netOperating, capexPaid, netInvesting, netCash } = data;
+  const { netProfit, depreciationTotal, netOperating, capexPaid, netInvesting, netCash, financingInflow, financingOutflow, netFinancing } = data;
   return (
     <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C.border}`, overflow: "hidden", marginBottom: 24 }}>
       <Letterhead tenantName={tenantName} statementTitle="Statement 3 of 4" statementSubtitle="Statement of Cash Flows" periodLabel={periodLabel} status={status} financialYear={financialYear} />
@@ -166,13 +166,14 @@ function CashFlowStatement({ data, tenantName, periodLabel, financialYear, statu
         <SRow label="Purchase of property, plant and equipment" current={capexPaid} indent={1} negative sub="Capital expenditure from expense records" />
         <SRow label="Net cash used in investing activities" current={netInvesting} bold shade />
         <SSection label="Financing Activities" />
-        <SRow label="Capital contributions / loan movements" current={0} indent={1} sub="Not yet tracked \u2014 add financing category to expenses" />
-        <SRow label="Net cash from financing activities" current={0} bold shade />
+        <SRow label="Capital contributions / owner injections" current={financingInflow || 0} indent={1} />
+        <SRow label="Loan repayments / owner drawings" current={-(financingOutflow || 0)} indent={1} negative />
+        <SRow label="Net cash from financing activities" current={netFinancing || 0} bold shade />
         <div style={{ background: netCash >= 0 ? "#F0FDF4" : "#FEF2F2", borderTop: `2px solid ${netCash >= 0 ? "#6EE7B7" : "#FECACA"}`, borderBottom: `2px solid ${netCash >= 0 ? "#6EE7B7" : "#FECACA"}` }}>
           <SRow label="Net increase / (decrease) in cash and cash equivalents" current={netCash} bold />
         </div>
       </div>
-      <StatementNote text="Simplified indirect method: starts with net profit, adds back depreciation (non-cash). Working capital movements (inventory change, receivables, payables) are not yet included \u2014 these require prior period snapshots. Cash balance not yet connected to bank reconciliation. Full indirect method available in Phase B." />
+      <StatementNote text="Simplified indirect method: starts with net profit, adds back depreciation (non-cash). Financing activities identified from bank statement lines containing equity / capital / shareholder loan / owner keywords. Working capital movements (inventory change, receivables, payables) are not yet included \u2014 these require prior period snapshots. Full indirect method available in Phase B." />
     </div>
   );
 }
@@ -251,7 +252,7 @@ export default function HQFinancialStatements() {
     try {
       const { start, end, startDate, endDate } = bounds;
       // Use canonical RPC for income statement data (LL-210, LL-209)
-      const [fpRes, expensesRes, depRes, equityRes, inventoryRes, faRes, invoicesRes, payablesRes, vatExpRes, bslRes, vatTxnRes] = await Promise.all([
+      const [fpRes, expensesRes, depRes, equityRes, inventoryRes, faRes, invoicesRes, payablesRes, vatExpRes, bslRes, vatTxnRes, finRes] = await Promise.all([
         supabase.rpc("tenant_financial_period", { p_tenant_id: tenantId, p_since: start, p_until: end }),
         supabase.from("expenses").select("*").eq("tenant_id", tenantId).gte("expense_date", startDate).lte("expense_date", endDate),
         supabase.from("depreciation_entries").select("depreciation,period_month,period_year").eq("tenant_id", tenantId),
@@ -263,6 +264,7 @@ export default function HQFinancialStatements() {
         supabase.from("expenses").select("input_vat_amount").eq("tenant_id", tenantId).gt("input_vat_amount", 0),
         supabase.from("bank_statement_lines").select("balance").eq("tenant_id", tenantId).order("statement_date", { ascending: false }).order("created_at", { ascending: false }).limit(1),
         supabase.from("vat_transactions").select("output_vat,input_vat").eq("tenant_id", tenantId),
+        supabase.from("bank_statement_lines").select("credit_amount,debit_amount,description,statement_date").eq("tenant_id", tenantId).gte("statement_date", startDate).lte("statement_date", endDate).or("description.ilike.%EQUITY%,description.ilike.%INJECTION%,description.ilike.%CAPITAL CONTRIBUTION%,description.ilike.%SHAREHOLDER LOAN%,description.ilike.%DIRECTOR LOAN%,description.ilike.%OWNER%"),
       ]);
 
       const fp = fpRes.data || {};
@@ -315,11 +317,14 @@ export default function HQFinancialStatements() {
       const balanced = Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 2;
       setBsData({ inventoryValue, cashAtBank, receivables, fixedAssetsNBV, fixedAssetsCost, fixedAssetsAccDep: fixedAssetsAD, payables, vatLiability, shareCapital, openingRetained: openingRE, currentYearPL: netProfit, totalEquity, balanced });
 
-      // Cash Flow — from RPC
+      // Cash Flow — from RPC + financing from bank_statement_lines keywords
       const netOperating = netProfit + depreciationTotal;
       const netInvesting = -capexPaid;
-      const netCash = netOperating + netInvesting;
-      setCfData({ netProfit, depreciationTotal, cashFromCustomers: fp.cash?.from_customers || revenue, cashToSuppliers: fp.cash?.to_suppliers || 0, opexPaid: totalOpex, capexPaid, netOperating, netInvesting, netCash });
+      const financingInflow = (finRes.data || []).reduce((s, l) => s + (parseFloat(l.credit_amount) || 0), 0);
+      const financingOutflow = (finRes.data || []).reduce((s, l) => s + (parseFloat(l.debit_amount) || 0), 0);
+      const netFinancing = financingInflow - financingOutflow;
+      const netCash = netOperating + netInvesting + netFinancing;
+      setCfData({ netProfit, depreciationTotal, cashFromCustomers: fp.cash?.from_customers || revenue, cashToSuppliers: fp.cash?.to_suppliers || 0, opexPaid: totalOpex, capexPaid, netOperating, netInvesting, financingInflow, financingOutflow, netFinancing, netCash });
 
       // Equity
       setEquityData({ shareCapital, openingRetained: openingRE, currentYearPL: netProfit });
