@@ -77,7 +77,7 @@ export default function HQFinancialNotes() {
         supabase.from("vat_transactions").select("*").eq("tenant_id",tenantId).gte("transaction_date",ys),
         supabase.from("depreciation_entries").select("depreciation").eq("tenant_id",tenantId).eq("period_year",CURRENT_YEAR),
         supabase.from("bank_statement_lines").select("balance,statement_date").eq("tenant_id",tenantId).order("statement_date",{ascending:false}).limit(1),
-        supabase.rpc("tenant_financial_period",{p_tenant_id:tenantId,p_since:`${CURRENT_YEAR}-01-01T00:00:00Z`,p_until:new Date().toISOString()}),
+        supabase.rpc("tenant_financial_period",{p_tenant_id:tenantId,p_since:`${CURRENT_YEAR}-01-01T00:00:00Z`,p_until:`${CURRENT_YEAR}-12-31T23:59:59Z`}),
       ]);
       const closingBalance = bslR.data?.[0]?.balance || null;
       const fp = fpRes.data || {};

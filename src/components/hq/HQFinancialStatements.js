@@ -108,8 +108,8 @@ function IncomeStatement({ data, tenantName, periodLabel, financialYear, status 
 
 // ── Statement 2: Balance Sheet ────────────────────────────────────────────────
 function BalanceSheetStatement({ data, tenantName, asAtLabel, financialYear, status }) {
-  const { inventoryValue, receivables, fixedAssetsNBV, fixedAssetsCost, fixedAssetsAccDep, payables, vatLiability, shareCapital, openingRetained, currentYearPL, totalEquity, balanced } = data;
-  const totalCurrentAssets = inventoryValue + receivables;
+  const { inventoryValue, cashAtBank, receivables, fixedAssetsNBV, fixedAssetsCost, fixedAssetsAccDep, payables, vatLiability, shareCapital, openingRetained, currentYearPL, totalEquity, balanced } = data;
+  const totalCurrentAssets = inventoryValue + (cashAtBank || 0) + receivables;
   const totalAssets = totalCurrentAssets + fixedAssetsNBV;
   const totalLiabilities = payables + vatLiability;
   return (
@@ -123,6 +123,7 @@ function BalanceSheetStatement({ data, tenantName, asAtLabel, financialYear, sta
           <SSection label="Assets" />
           <SSection label="Current Assets" />
           <SRow label="Inventories (at AVCO)" current={inventoryValue} indent={1} sub="Weighted average cost per unit" />
+          {cashAtBank > 0 && <SRow label="Cash and Cash Equivalents" current={cashAtBank} indent={1} sub="Closing balance from bank reconciliation" />}
           <SRow label="Trade and other receivables" current={receivables} indent={1} sub="Unpaid invoices" />
           <SRow label="Total Current Assets" current={totalCurrentAssets} bold shade />
           <SSection label="Non-Current Assets" />
@@ -250,7 +251,7 @@ export default function HQFinancialStatements() {
     try {
       const { start, end, startDate, endDate } = bounds;
       // Use canonical RPC for income statement data (LL-210, LL-209)
-      const [fpRes, expensesRes, depRes, equityRes, inventoryRes, faRes, invoicesRes, payablesRes, vatExpRes] = await Promise.all([
+      const [fpRes, expensesRes, depRes, equityRes, inventoryRes, faRes, invoicesRes, payablesRes, vatExpRes, bslRes] = await Promise.all([
         supabase.rpc("tenant_financial_period", { p_tenant_id: tenantId, p_since: start, p_until: end }),
         supabase.from("expenses").select("*").eq("tenant_id", tenantId).gte("expense_date", startDate).lte("expense_date", endDate),
         supabase.from("depreciation_entries").select("depreciation,period_month,period_year").eq("tenant_id", tenantId),
@@ -260,6 +261,7 @@ export default function HQFinancialStatements() {
         supabase.from("invoices").select("total_amount,status,invoice_type").eq("tenant_id", tenantId).not("status", "eq", "paid"),
         supabase.from("purchase_orders").select("landed_cost_zar,po_status").eq("tenant_id", tenantId).in("po_status", ["pending", "confirmed", "ordered"]),
         supabase.from("expenses").select("input_vat_amount").eq("tenant_id", tenantId).gt("input_vat_amount", 0),
+        supabase.from("bank_statement_lines").select("balance").eq("tenant_id", tenantId).order("statement_date", { ascending: false }).order("created_at", { ascending: false }).limit(1),
       ]);
 
       const fp = fpRes.data || {};
@@ -292,6 +294,7 @@ export default function HQFinancialStatements() {
 
       // Balance Sheet — use RPC + direct queries for point-in-time values
       const inventoryValue = (inventoryRes.data || []).reduce((s, i) => s + (parseFloat(i.quantity_on_hand || 0) * parseFloat(i.weighted_avg_cost || 0)), 0);
+      const cashAtBank = parseFloat(bslRes.data?.[0]?.balance || 0);
       const receivables = (invoicesRes.data || []).filter(i => i.invoice_type !== "purchase").reduce((s, i) => s + (parseFloat(i.total_amount || 0)), 0);
       const payables = (payablesRes.data || []).reduce((s, po) => s + (parseFloat(po.landed_cost_zar || 0)), 0);
       const fixedAssetsCost = (faRes.data || []).reduce((s, a) => s + (parseFloat(a.purchase_cost || 0)), 0);
@@ -304,10 +307,10 @@ export default function HQFinancialStatements() {
       const shareCapital = parseFloat(eqData?.share_capital || 0);
       const openingRE = parseFloat(eqData?.opening_retained_earnings || 0);
       const totalEquity = shareCapital + openingRE + netProfit;
-      const totalAssets = inventoryValue + receivables + fixedAssetsNBV;
+      const totalAssets = inventoryValue + cashAtBank + receivables + fixedAssetsNBV;
       const totalLiabilities = payables + vatLiability;
       const balanced = Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 2;
-      setBsData({ inventoryValue, receivables, fixedAssetsNBV, fixedAssetsCost, fixedAssetsAccDep: fixedAssetsAD, payables, vatLiability, shareCapital, openingRetained: openingRE, currentYearPL: netProfit, totalEquity, balanced });
+      setBsData({ inventoryValue, cashAtBank, receivables, fixedAssetsNBV, fixedAssetsCost, fixedAssetsAccDep: fixedAssetsAD, payables, vatLiability, shareCapital, openingRetained: openingRE, currentYearPL: netProfit, totalEquity, balanced });
 
       // Cash Flow — from RPC
       const netOperating = netProfit + depreciationTotal;
