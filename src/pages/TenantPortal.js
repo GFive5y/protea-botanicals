@@ -4,7 +4,7 @@
 //   2. Replace dead "+" AI pill with AIFixture + slimmer account strip
 //      AIFixture: proactive daily brief, cycling insights, NuAI typographic mark
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTenant } from "../services/tenantService";
 import { profileOverrides, getTokens } from "../styles/tokens";
@@ -76,6 +76,9 @@ import AIFixture from "../components/AIFixture";
 import { IntelligenceProvider } from "../contexts/IntelligenceContext";
 import { useNavIntelligence } from "../hooks/useNavIntelligence";
 import { useIntelStrip } from "../hooks/useIntelStrip";
+import { useFinSignals } from "../hooks/useFinSignals";
+import FinWalkInBrief from "../components/shared/FinWalkInBrief";
+import FinAlertHoverCard from "../components/shared/FinAlertHoverCard";
 import IntelStrip from "../components/IntelStrip";
 import AINSBar from "../components/shared/AINSBar";
 import AccountBubble from "../components/AccountBubble";
@@ -834,12 +837,13 @@ function renderTab(tabId, tenantId, industryProfile, onTabChange, searchKey, sea
   }
 }
 
-function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, onExpand, badge, tabInsights, accentLit = T.accentLit, tabBadges = {} }) {
+function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, onExpand, badge, tabInsights, accentLit = T.accentLit, tabBadges = {}, finSignals = {}, onFinAlertAction }) {
   const isActiveSection = section.tabs.some((t) => t.id === activeTab);
   const [open, setOpen] = useState(defaultOpen || section.alwaysOpen || isActiveSection);
   const effectiveOpen = open || isActiveSection;
   const NavIcon = section.icon;
   const [hovering, setHovering] = useState(false);
+  const [hoveredTab, setHoveredTab] = useState(null); // { tabId, rect } for fin hover card
 
   if (collapsed) {
     return (
@@ -969,11 +973,19 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, 
         <div style={{ paddingBottom: section.alwaysOpen ? 0 : 4 }}>
           {section.tabs.map((tab) => {
             const active = activeTab === tab.id;
+            const finSig = finSignals?.[tab.id];
+            const hasFinAlerts = finSig && finSig.alertCount > 0;
             return (
               <button
                 key={tab.id}
                 onClick={() => onSelect(tab.id)}
                 title={tab.desc}
+                onMouseEnter={(e) => {
+                  if (hasFinAlerts) {
+                    setHoveredTab({ tabId: tab.id, rect: e.currentTarget.getBoundingClientRect() });
+                  }
+                }}
+                onMouseLeave={() => setHoveredTab(null)}
                 style={{
                   display: "flex", alignItems: "center", width: "100%",
                   padding: section.alwaysOpen ? "9px 16px" : "7px 16px 7px 36px",
@@ -1015,6 +1027,14 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, 
             );
           })}
         </div>
+      )}
+      {hoveredTab && finSignals?.[hoveredTab.tabId]?.alertCount > 0 && (
+        <FinAlertHoverCard
+          alerts={finSignals[hoveredTab.tabId].alerts}
+          severity={finSignals[hoveredTab.tabId].severity}
+          anchorRect={hoveredTab.rect}
+          onAction={onFinAlertAction}
+        />
       )}
     </div>
   );
@@ -1077,6 +1097,31 @@ export default function TenantPortal() {
   const intelData    = intelligence?.data;
   const { badges, clearBadge } = useBadges(tenantId);
 
+  // Unified financial alert signal system — Layer 1 hook
+  const { signals: finSignals } = useFinSignals(tenantId);
+
+  // Layer 2 — merge useBadges + finSignals into tabBadges
+  // useBadges owns operational alerts (vat overdue, dupes, unmatched). finSignals adds
+  // health signals (inventory days, wage ratio, days-to-deadline). On the vat tab,
+  // useBadges wins when its count > 0 (real overdue filings); otherwise finSignals fills.
+  const mergedBadges = useMemo(() => {
+    const sevToVariant = { red: "danger", amber: "warning" };
+    const merged = { ...badges };
+    Object.entries(finSignals || {}).forEach(([tabId, sig]) => {
+      if (!sig || !sig.alertCount || !sevToVariant[sig.severity]) return;
+      if (tabId === "vat" && badges.vat?.count > 0) return; // useBadges.vat wins on collision
+      merged[tabId] = { count: sig.alertCount, severity: sevToVariant[sig.severity] };
+    });
+    return merged;
+  }, [badges, finSignals]);
+
+  // Action dispatcher for hover-card fix buttons
+  const handleFinAlertAction = useCallback((action) => {
+    if (!action) return;
+    if (action.type === "navigate" && action.tab) setActiveTab(action.tab);
+    // TODO: AINS dispatch — { type: 'ains', question: ... } once mechanism exists
+  }, []);
+
   // WP-AINS Phase 3 — IntelStrip pills for current tab
   const { pills: intelPills, loading: intelStripLoading } =
     useIntelStrip(activeTab, tenantId, intelData);
@@ -1084,8 +1129,8 @@ export default function TenantPortal() {
   const sectionBadge = (sectionId) => {
     const sec = activeWaterfall.find(s => s.id === sectionId);
     const tabIds = sec?.tabs.map(t => t.id) || [];
-    const tabCount = tabIds.reduce((sum, id) => sum + (badges[id]?.count || 0), 0);
-    const tabSeverity = tabIds.some(id => badges[id]?.severity === "danger") ? "danger" : "warning";
+    const tabCount = tabIds.reduce((sum, id) => sum + (mergedBadges[id]?.count || 0), 0);
+    const tabSeverity = tabIds.some(id => mergedBadges[id]?.severity === "danger") ? "danger" : "warning";
     if (tabCount > 0) return { count: tabCount, variant: tabSeverity };
     if (!intelData) return null;
     switch (sectionId) {
@@ -1294,7 +1339,9 @@ export default function TenantPortal() {
                   badge={sectionBadge(section.id)}
                   tabInsights={tabInsights}
                   accentLit={pAccentLit}
-                  tabBadges={badges}
+                  tabBadges={mergedBadges}
+                  finSignals={finSignals}
+                  onFinAlertAction={handleFinAlertAction}
                 />
               ))}
             </div>
@@ -1424,6 +1471,7 @@ export default function TenantPortal() {
             ) : (
               <div style={{ flex: 1, overflowY: "auto", background: "#faf9f6" }}>
                 <div style={{ ...INNER, padding: "24px 28px", boxSizing: "border-box" }}>
+                  {activeTab === "overview" && <FinWalkInBrief signals={finSignals} />}
                   {renderTab(activeTab, tenantId, industryProfile, setActiveTab, searchKey, searchFilter)}
                 </div>
               </div>
@@ -1467,7 +1515,7 @@ export default function TenantPortal() {
                 </div>
                 <div style={{ flex: 1, paddingTop: 6, paddingBottom: 16 }}>
                   {visibleSections.map((section, i) => (
-                    <SidebarSection key={section.id} section={section} activeTab={activeTab} onSelect={handleTabSelect} defaultOpen={i <= 1} badge={sectionBadge(section.id)} tabInsights={tabInsights} accentLit={pAccentLit} tabBadges={badges} />
+                    <SidebarSection key={section.id} section={section} activeTab={activeTab} onSelect={handleTabSelect} defaultOpen={i <= 1} badge={sectionBadge(section.id)} tabInsights={tabInsights} accentLit={pAccentLit} tabBadges={mergedBadges} finSignals={finSignals} onFinAlertAction={handleFinAlertAction} />
                   ))}
                 </div>
                 <div style={{ padding: "10px 16px 14px", borderTop: `1px solid ${T.border}`, fontSize: 10, color: T.ink300 }}>
