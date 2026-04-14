@@ -88,6 +88,17 @@ const SORT_OPTIONS = [
   { id: "stock", label: "Stock health" },
 ];
 
+// Distinct visible colours for bar chart — cycle if > 6 stores.
+// Current store always uses T.accent (dark green). Others get a unique colour.
+const BAR_PALETTE = [
+  "#2D6A4F", // deep green
+  "#1E3A5F", // navy
+  "#7C3AED", // violet
+  "#92400E", // amber-brown
+  "#0F766E", // teal
+  "#6B21A8", // purple
+];
+
 // ─── Main component ─────────────────────────────────────────────────────────
 
 export default function StoreComparison({
@@ -249,12 +260,16 @@ export default function StoreComparison({
   // ── Bar chart data (same order as sortedStores) ────────────────────────
   const chartData = useMemo(
     () =>
-      sortedStores.map((s) => ({
+      sortedStores.map((s, idx) => ({
         name: truncate(s.name, 15),
         revenue: s.revenue || 0,
         tenantId: s.tenantId,
+        barColor:
+          s.tenantId === tenantId
+            ? T.accent
+            : BAR_PALETTE[idx % BAR_PALETTE.length],
       })),
-    [sortedStores],
+    [sortedStores, tenantId],
   );
 
   const toggleProducts = (tid) => {
@@ -510,9 +525,7 @@ export default function StoreComparison({
                 {chartData.map((entry) => (
                   <Cell
                     key={entry.tenantId}
-                    fill={
-                      entry.tenantId === tenantId ? T.accent : T.neutralLight
-                    }
+                    fill={entry.barColor}
                   />
                 ))}
               </Bar>
