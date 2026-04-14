@@ -19,6 +19,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { T } from "../../styles/tokens";
+import HQTenantFinancialSetup from "./HQTenantFinancialSetup";
 
 const fmtZar = (n) => {
   if (n == null) return "—";
@@ -214,6 +215,10 @@ export default function HQTenantProfiles() {
   const [selected, setSelected] = useState(null);
   const [showInactive, setShowInactive] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [setupModalTenant, setSetupModalTenant] = useState(null);
+  const [recalcStatus, setRecalcStatus] = useState({});
+  const [editingVat, setEditingVat] = useState(null);
+  const [vatEditValue, setVatEditValue] = useState("");
 
   useEffect(() => { loadData(); }, []);
 
@@ -288,6 +293,39 @@ export default function HQTenantProfiles() {
     setLoading(false);
   }
 
+  async function recalcNetProfit(tid) {
+    setRecalcStatus(s => ({ ...s, [tid]: "loading" }));
+    try {
+      const { data: tc } = await supabase.from("tenant_config").select("financial_year_start").eq("tenant_id", tid).maybeSingle();
+      const fyStart = tc?.financial_year_start || "03-01";
+      const fyYear = new Date().getFullYear();
+      const mo = parseInt(fyStart.split("-")[0], 10);
+      const yr = (new Date().getMonth() + 1) >= mo ? fyYear : fyYear - 1;
+      const { data: plData } = await supabase.rpc("tenant_financial_period", {
+        p_tenant_id: tid,
+        p_since: `${yr}-${fyStart}T00:00:00+00:00`,
+        p_until: new Date().toISOString(),
+      });
+      if (plData) {
+        const net = (plData.revenue?.ex_vat || 0) - (plData.cogs?.actual || 0) - (plData.opex?.paid || 0);
+        await supabase.from("equity_ledger").update({ net_profit_for_year: net }).eq("tenant_id", tid).eq("financial_year", "FY2026");
+        setRecalcStatus(s => ({ ...s, [tid]: "done" }));
+        loadData();
+      }
+    } catch (e) {
+      console.error("[Recalc]", e);
+      setRecalcStatus(s => ({ ...s, [tid]: "error" }));
+    }
+  }
+
+  async function saveVatNumber(tid) {
+    if (!vatEditValue.trim() || vatEditValue.includes("@")) return;
+    await supabase.from("tenant_config").update({ vat_number: vatEditValue.trim() }).eq("tenant_id", tid);
+    setEditingVat(null);
+    setVatEditValue("");
+    loadData();
+  }
+
   const visible = tenants.filter(t => showInactive ? true : t.is_active);
   const activeCount = tenants.filter(t => t.is_active).length;
   const setupCount = tenants.filter(t => {
@@ -341,11 +379,58 @@ export default function HQTenantProfiles() {
 
       {/* Profile panel */}
       {selected ? (
-        <ProfilePanel tenant={selected} bugs={bugMap[selected.id] || []} />
+        <>
+          <ProfilePanel tenant={selected} bugs={bugMap[selected.id] || []} />
+          {/* Action buttons */}
+          <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+            {(() => {
+              const cfg = Array.isArray(selected.tenant_config) ? selected.tenant_config[0] : selected.tenant_config;
+              const eq = Array.isArray(selected.equity_ledger) ? selected.equity_ledger[0] : selected.equity_ledger;
+              return (
+                <>
+                  {!cfg?.financial_setup_complete && (
+                    <button onClick={() => setSetupModalTenant(selected)} style={{ padding: "8px 18px", borderRadius: 6, border: "none", background: T.warning, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      Complete Financial Setup
+                    </button>
+                  )}
+                  {cfg?.financial_setup_complete && eq?.net_profit_for_year == null && (
+                    <button onClick={() => recalcNetProfit(selected.id)} disabled={recalcStatus[selected.id] === "loading"} style={{ padding: "8px 18px", borderRadius: 6, border: `1px solid ${T.accent}`, background: T.accentLight, color: T.accent, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      {recalcStatus[selected.id] === "loading" ? "Calculating..." : recalcStatus[selected.id] === "done" ? "Done" : "Recalculate P&L"}
+                    </button>
+                  )}
+                  {cfg?.vat_number?.includes("@") && (
+                    editingVat === selected.id ? (
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <input value={vatEditValue} onChange={e => setVatEditValue(e.target.value)} placeholder="Enter SARS VAT number" style={{ padding: "6px 10px", fontSize: 12, border: `1px solid ${T.border}`, borderRadius: 4, width: 180 }} />
+                        <button onClick={() => saveVatNumber(selected.id)} disabled={!vatEditValue.trim() || vatEditValue.includes("@")} style={{ padding: "6px 12px", borderRadius: 4, border: "none", background: T.accent, color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>Save</button>
+                        <button onClick={() => setEditingVat(null)} style={{ padding: "6px 12px", borderRadius: 4, border: `1px solid ${T.border}`, background: "#fff", fontSize: 11, cursor: "pointer" }}>Cancel</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => { setEditingVat(selected.id); setVatEditValue(""); }} style={{ padding: "8px 18px", borderRadius: 6, border: `1px solid ${T.danger}`, background: "#FEE2E2", color: T.danger, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                        Fix VAT Number
+                      </button>
+                    )
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        </>
       ) : (
         <div style={{ textAlign: "center", padding: 40, color: T.ink400, fontSize: 13 }}>
           Select a tenant above to view their financial profile.
         </div>
+      )}
+
+      {/* Setup modal */}
+      {setupModalTenant && (
+        <HQTenantFinancialSetup
+          tenantId={setupModalTenant.id}
+          tenantName={setupModalTenant.name}
+          industryProfile={setupModalTenant.industry_profile}
+          existingConfig={setupModalTenant.tenant_config}
+          onComplete={() => { setSetupModalTenant(null); loadData(); }}
+        />
       )}
     </div>
   );
