@@ -90,7 +90,7 @@ function EditableNote({ tenantId, noteNumber, fy }) {
 }
 
 export default function HQFinancialNotes() {
-  const { tenant } = useTenant();
+  const { tenant, industryProfile } = useTenant();
   const tenantId = tenant?.id;
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -113,17 +113,39 @@ export default function HQFinancialNotes() {
       ]);
       const closingBalance = bslR.data?.[0]?.balance || null;
       const fp = fpRes.data || {};
-      setData({cfg:cfgR.data,inv:invR.data||[],fa:faR.data||[],eq:eqR.data,ba:baR.data||[],exp:expR.data||[],vat:vatR.data||[],dep:depR.data||[],closingBalance,fp});
+      // LL-231 / CC-03: cannabis_dispensary revenue + cogs from dispensing_log x inventory_items
+      let dispensingRevenue = 0;
+      let dispensingCOGS = 0;
+      let dispensingCount = 0;
+      if (industryProfile === "cannabis_dispensary") {
+        const { data: dispensingData } = await supabase
+          .from("dispensing_log")
+          .select("quantity_dispensed,inventory_items!inner(sell_price,cost_price,weighted_avg_cost)")
+          .eq("tenant_id", tenantId)
+          .eq("is_voided", false)
+          .gte("dispensed_at", `${CURRENT_YEAR}-01-01T00:00:00+00:00`)
+          .lte("dispensed_at", `${CURRENT_YEAR}-12-31T23:59:59+00:00`);
+        (dispensingData || []).forEach(d => {
+          const q = parseFloat(d.quantity_dispensed) || 0;
+          const sell = parseFloat(d.inventory_items?.sell_price) || 0;
+          const cost = parseFloat(d.inventory_items?.weighted_avg_cost) || parseFloat(d.inventory_items?.cost_price) || 0;
+          dispensingRevenue += q * sell;
+          dispensingCOGS += q * cost;
+          dispensingCount += 1;
+        });
+      }
+      setData({cfg:cfgR.data,inv:invR.data||[],fa:faR.data||[],eq:eqR.data,ba:baR.data||[],exp:expR.data||[],vat:vatR.data||[],dep:depR.data||[],closingBalance,fp,dispensingRevenue,dispensingCOGS,dispensingCount});
     } catch(_){} finally{setLoading(false);}
-  },[tenantId]);
+  },[tenantId,industryProfile]);
   useEffect(()=>{fetchAll();},[fetchAll]);
 
   if (loading) return <div style={{textAlign:"center",padding:60,color:D.ink500,fontFamily:D.font}}>Loading notes\u2026</div>;
   if (!data) return null;
 
-  const {cfg,inv,fa,eq,ba,exp,vat,dep,fp} = data;
-  const totalRevenue = fp?.revenue?.ex_vat || 0;
-  const totalCogs = fp?.cogs?.actual || 0;
+  const {cfg,inv,fa,eq,ba,exp,vat,dep,fp,dispensingRevenue,dispensingCOGS,dispensingCount} = data;
+  const isDispensary = industryProfile === "cannabis_dispensary";
+  const totalRevenue = isDispensary ? (dispensingRevenue || 0) : (fp?.revenue?.ex_vat || 0);
+  const totalCogs = isDispensary ? (dispensingCOGS || 0) : (fp?.cogs?.actual || 0);
   const invValue = inv.reduce((s,i)=>s+(parseFloat(i.quantity_on_hand||0)*parseFloat(i.weighted_avg_cost||0)),0);
   const opexBySub = exp.filter(e=>["opex","wages","tax","other"].includes(e.category)).reduce((a,e)=>{const k=e.subcategory||"Other";a[k]=(a[k]||0)+(parseFloat(e.amount_zar)||0);return a;},{});
   const totalOpex = fp?.opex?.total || Object.values(opexBySub).reduce((s,v)=>s+v,0);
@@ -173,7 +195,7 @@ export default function HQFinancialNotes() {
       </NoteSection>
 
       <NoteSection number="4" title="Revenue">
-        <NoteTable headers={["Source",`${CURRENT_YEAR} (ZAR)`,"Prior (ZAR)"]} rows={[["POS transactions",fmtZar(totalRevenue),"\u2014"],["Online sales","\u2014","\u2014"]]} totals={["Total Revenue",fmtZar(totalRevenue),"\u2014"]}/>
+        <NoteTable headers={["Source",`${CURRENT_YEAR} (ZAR)`,"Prior (ZAR)"]} rows={[[isDispensary ? `Dispensing (${dispensingCount} events)` : "POS transactions",fmtZar(totalRevenue),"\u2014"],[isDispensary ? "Online sales" : "Online sales","\u2014","\u2014"]]} totals={["Total Revenue",fmtZar(totalRevenue),"\u2014"]}/>
         <P>{orderCount} transactions processed. All standard-rated.</P>
       </NoteSection>
 

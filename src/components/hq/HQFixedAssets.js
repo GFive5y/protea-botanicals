@@ -50,12 +50,23 @@ const expectedAccumDep = (asset) => {
   return Math.min(monthly * elapsed, maxDep);
 };
 
-const monthsBehind = (asset) => {
+// Compare latest posted depreciation period to last-complete period (previous calendar month)
+// Returns months behind based on period presence, not cumulative amount. See CC-01.
+const monthsBehind = (asset, depHistory = []) => {
   const monthly = monthlyDep(asset);
   if (monthly === 0) return 0;
-  const accumulated = Number(asset.accumulated_depreciation);
-  const expected = expectedAccumDep(asset);
-  return Math.max(0, Math.round((expected - accumulated) / monthly));
+  const assetEntries = depHistory.filter(d => d.asset_id === asset.id);
+  if (assetEntries.length === 0) {
+    // No posted entries at all — fall back to elapsed-months calc
+    return Math.max(0, monthsElapsed(asset.purchase_date));
+  }
+  const latestPosted = Math.max(
+    ...assetEntries.map(d => d.period_year * 12 + (MONTHS_SHORT.indexOf(d.period_month) + 1))
+  );
+  // Last complete period = previous calendar month (today's month is still in progress)
+  const now = new Date();
+  const lastCompletePeriod = now.getFullYear() * 12 + now.getMonth(); // getMonth() is 0-based = previous month index+1
+  return Math.max(0, lastCompletePeriod - latestPosted);
 };
 
 const remainingMonths = (asset) => {
@@ -121,7 +132,7 @@ export default function HQFixedAssets() {
   const totalAccumDep = assets.reduce((s, a) => s + Number(a.accumulated_depreciation), 0);
   const totalNBV = assets.reduce((s, a) => s + Number(a.net_book_value), 0);
   const totalMonthly = assets.reduce((s, a) => s + monthlyDep(a), 0);
-  const anyBehind = assets.some(a => monthsBehind(a) > 0);
+  const anyBehind = assets.some(a => monthsBehind(a, depHistory) > 0);
   const yearOptions = [new Date().getFullYear() - 1, new Date().getFullYear()];
 
   // ── Run Depreciation ───────────────────────────────────────────────────────
@@ -245,7 +256,7 @@ export default function HQFixedAssets() {
         {assets.map(asset => {
           const isOpen = expandedId === asset.id;
           const cfg = catCfg(asset.asset_category);
-          const behind = monthsBehind(asset);
+          const behind = monthsBehind(asset, depHistory);
           const monthly = monthlyDep(asset);
           const depPct = Number(asset.purchase_cost) > 0
             ? (Number(asset.accumulated_depreciation) / (Number(asset.purchase_cost) - Number(asset.residual_value))) * 100 : 0;
@@ -350,7 +361,7 @@ export default function HQFixedAssets() {
           </div>
         </div>
         {anyBehind && (() => {
-          const maxBehind = Math.max(...assets.map(a => monthsBehind(a)));
+          const maxBehind = Math.max(...assets.map(a => monthsBehind(a, depHistory)));
           return <div style={{ fontSize: 12, color: '#b45309', marginTop: 10, padding: "8px 12px", background: "#FFFBEB", borderRadius: 6, border: "1px solid #F59E0B" }}>{"\u26A0"} <strong>{maxBehind} month{maxBehind !== 1 ? "s" : ""} of depreciation unposted.</strong> Click Run Depreciation and select each month to catch up. NBV is overstated until posted.</div>;
         })()}
       </div>

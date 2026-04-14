@@ -108,8 +108,8 @@ function IncomeStatement({ data, tenantName, periodLabel, financialYear, status 
 
 // ── Statement 2: Balance Sheet ────────────────────────────────────────────────
 function BalanceSheetStatement({ data, tenantName, asAtLabel, financialYear, status }) {
-  const { inventoryValue, cashAtBank, receivables, fixedAssetsNBV, fixedAssetsCost, fixedAssetsAccDep, payables, vatLiability, shareCapital, openingRetained, currentYearPL, totalEquity, balanced } = data;
-  const totalCurrentAssets = inventoryValue + (cashAtBank || 0) + receivables;
+  const { inventoryValue, cashAtBank, receivables, fixedAssetsNBV, fixedAssetsCost, fixedAssetsAccDep, payables, vatLiability, vatReceivable = 0, shareCapital, openingRetained, currentYearPL, totalEquity, balanced } = data;
+  const totalCurrentAssets = inventoryValue + (cashAtBank || 0) + receivables + vatReceivable;
   const totalAssets = totalCurrentAssets + fixedAssetsNBV;
   const totalLiabilities = payables + vatLiability;
   return (
@@ -125,6 +125,7 @@ function BalanceSheetStatement({ data, tenantName, asAtLabel, financialYear, sta
           <SRow label="Inventories (at AVCO)" current={inventoryValue} indent={1} sub="Weighted average cost per unit" />
           {cashAtBank > 0 && <SRow label="Cash and Cash Equivalents" current={cashAtBank} indent={1} sub="Closing balance from bank reconciliation" />}
           <SRow label="Trade and other receivables" current={receivables} indent={1} sub="Unpaid invoices" />
+          {vatReceivable > 0 && <SRow label="VAT receivable \u2014 SARS" current={vatReceivable} indent={1} sub="Input VAT exceeds output VAT for the period" />}
           <SRow label="Total Current Assets" current={totalCurrentAssets} bold shade />
           <SSection label="Non-Current Assets" />
           {fixedAssetsCost > 0 ? (<><SRow label="PPE \u2014 Cost" current={fixedAssetsCost} indent={1} /><SRow label="PPE \u2014 Accumulated depreciation" current={fixedAssetsAccDep} indent={1} negative /><SRow label="Total PPE (Net Book Value)" current={fixedAssetsNBV} bold shade /></>) : (<SRow label="Property, plant and equipment" current={0} indent={1} sub="No fixed assets registered" />)}
@@ -327,15 +328,18 @@ export default function HQFinancialStatements() {
       const vatOutput = (vatTxnRes.data || []).reduce((s, t) => s + (parseFloat(t.output_vat) || 0), 0);
       const vatInputFromTxn = (vatTxnRes.data || []).reduce((s, t) => s + (parseFloat(t.input_vat) || 0), 0);
       const vatInput = vatInputFromTxn > 0 ? vatInputFromTxn : (vatExpRes.data || []).reduce((s, e) => s + (parseFloat(e.input_vat_amount) || 0), 0);
-      const vatLiability = Math.max(0, Math.round((vatOutput - vatInput) * 100) / 100);
+      // CC-04: net output vs input — positive = liability, negative = receivable
+      const vatNetPayable = Math.round((vatOutput - vatInput) * 100) / 100;
+      const vatLiability = vatNetPayable > 0 ? vatNetPayable : 0;
+      const vatReceivable = vatNetPayable < 0 ? Math.abs(vatNetPayable) : 0;
       const eqData = equityRes.data;
       const shareCapital = parseFloat(eqData?.share_capital || 0);
       const openingRE = parseFloat(eqData?.opening_retained_earnings || 0);
       const totalEquity = shareCapital + openingRE + netProfit;
-      const totalAssets = inventoryValue + cashAtBank + receivables + fixedAssetsNBV;
+      const totalAssets = inventoryValue + cashAtBank + receivables + fixedAssetsNBV + vatReceivable;
       const totalLiabilities = payables + vatLiability;
       const balanced = Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 2;
-      setBsData({ inventoryValue, cashAtBank, receivables, fixedAssetsNBV, fixedAssetsCost, fixedAssetsAccDep: fixedAssetsAD, payables, vatLiability, shareCapital, openingRetained: openingRE, currentYearPL: netProfit, totalEquity, balanced });
+      setBsData({ inventoryValue, cashAtBank, receivables, fixedAssetsNBV, fixedAssetsCost, fixedAssetsAccDep: fixedAssetsAD, payables, vatLiability, vatReceivable, shareCapital, openingRetained: openingRE, currentYearPL: netProfit, totalEquity, balanced });
 
       // Cash Flow — from RPC + financing from bank_statement_lines keywords
       const netOperating = netProfit + depreciationTotal;

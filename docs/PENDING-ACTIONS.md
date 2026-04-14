@@ -27,6 +27,24 @@ User will notify when this changes. When it changes:
 
 ---
 
+## CODE FIXES LANDED — SESSION 261/262 (post-close)
+
+- ✅ CC-01: Fix "Xmo behind" counter logic in Fixed Asset Register — now compares MAX(period_year*12+period_month) in depreciation_entries vs last-complete calendar month. HQFixedAssets.js
+- ✅ CC-02: Cash Flow depreciation add-back — already reads from depreciation_entries as primary source in HQFinancialStatements.js (no journal-first path existed). Verified in place; no change required.
+- ✅ CC-03: IFRS Notes — Note 4 dispensary branch. HQFinancialNotes.js now destructures industryProfile, queries dispensing_log when cannabis_dispensary, reports "Dispensing (N events)" row instead of "POS transactions R0".
+- ✅ CC-04: IFRS BS now nets output vs input VAT. HQFinancialStatements.js computes vatNetPayable, renders "VAT receivable — SARS" in current assets when net is negative, "VAT payable — SARS" in liabilities when net is positive.
+
+## SUPABASE DATA FIXES OUTSTANDING (Session 262 queue)
+
+- [ ] SB-FIX: Metro Hardware VAT number corrected to 4987654321
+- [ ] SB-FIX: Medi Recreational equity_ledger.net_profit_for_year updated to 107,485.66
+- [ ] SB-TODO: Insert Nourish Kitchen April expenses + April dep entries
+- [ ] SB-TODO: Reverse stale 2022/2024 auto-capture journals on Medi Recreational
+- [ ] MANUAL: Categorise 9 unmatched bank lines on MediCare Dispensary before demo
+- [ ] MANUAL: Categorise 9 unmatched bank lines on Metro Hardware before demo
+- [ ] KNOWN: MediCare equity_ledger / IFRS IS profit mismatch — root cause is RPC vs query source mismatch — defer to post-demo
+- [ ] KNOWN: Metro Hardware IFRS BS gap R362k — same root cause, defer to post-demo
+
 ## OUTSTANDING — MUST COMPLETE BEFORE 12 MAY 2026
 
 ### LOOP-010 — Medi Rec: Run Depreciation (UI action)
