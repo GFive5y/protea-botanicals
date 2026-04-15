@@ -4180,7 +4180,7 @@ export default function HQLoyalty() {
         style={{
           padding: "24px 28px 0",
           borderBottom: `1px solid ${T.border}`,
-          background: T.surface,
+          background: "transparent",
         }}
       >
         <div
