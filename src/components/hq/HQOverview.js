@@ -1301,8 +1301,8 @@ export default function HQOverview({ onNavigate }) {
                 <span style={{ display: "flex", flexDirection: "column", gap: 1 }}>
                   <span style={{
                     fontSize: 10,
-                    color: "#9CA3AF",
-                    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                    color: T.ink400,
+                    fontFamily: T.font,
                   }}>
                     R{Math.round(todaySummary.ydayRev).toLocaleString("en-ZA")} yesterday
                   </span>
@@ -1310,7 +1310,7 @@ export default function HQOverview({ onNavigate }) {
                     fontSize: 11,
                     fontWeight: 600,
                     color: todaySummary.ydayDelta >= 0 ? "#059669" : "#DC2626",
-                    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                    fontFamily: T.font,
                   }}>
                     {todaySummary.ydayDelta >= 0 ? "\u2191" : "\u2193"}
                     {Math.abs(todaySummary.ydayDelta).toFixed(1)}% vs yesterday
@@ -1321,8 +1321,8 @@ export default function HQOverview({ onNavigate }) {
                 <span style={{ display: "flex", flexDirection: "column", gap: 1, marginTop: 2 }}>
                   <span style={{
                     fontSize: 10,
-                    color: "#9CA3AF",
-                    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                    color: T.ink400,
+                    fontFamily: T.font,
                   }}>
                     R{Math.round(todaySummary.weekAgoRev).toLocaleString("en-ZA")} {todaySummary.weekAgoLabel}
                   </span>
@@ -1330,7 +1330,7 @@ export default function HQOverview({ onNavigate }) {
                     fontSize: 11,
                     fontWeight: 600,
                     color: todaySummary.weekAgoDelta >= 0 ? "#059669" : "#DC2626",
-                    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                    fontFamily: T.font,
                   }}>
                     {todaySummary.weekAgoDelta >= 0 ? "\u2191" : "\u2193"}
                     {Math.abs(todaySummary.weekAgoDelta).toFixed(1)}% vs {todaySummary.weekAgoLabel}
@@ -1379,9 +1379,9 @@ export default function HQOverview({ onNavigate }) {
                         }}/>
                         <span style={{
                           fontSize: 10,
-                          color: "#6B7280",
+                          color: T.ink400,
                           fontWeight: 500,
-                          fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                          fontFamily: T.font,
                         }}>
                           {m.label}
                         </span>
@@ -1390,7 +1390,7 @@ export default function HQOverview({ onNavigate }) {
                         fontSize: 11,
                         fontWeight: 600,
                         color: m.color,
-                        fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                        fontFamily: T.font,
                         fontVariantNumeric: "tabular-nums",
                       }}>
                         {todayPayments[m.key].txns}
@@ -1399,7 +1399,7 @@ export default function HQOverview({ onNavigate }) {
                         fontSize: 11,
                         fontWeight: 600,
                         color: m.color,
-                        fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                        fontFamily: T.font,
                         fontVariantNumeric: "tabular-nums",
                       }}>
                         R{Math.round(todayPayments[m.key].revenue).toLocaleString("en-ZA")}
@@ -1441,14 +1441,14 @@ export default function HQOverview({ onNavigate }) {
               return (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "0 6px", alignItems: "center", marginTop: 2 }}>
                   {todaySummary.avgItems > 0 && (
-                    <span style={{ color: "#6B7280", fontSize: 10 }}>
+                    <span style={{ color: T.ink400, fontSize: 10 }}>
                       {todaySummary.avgItems.toFixed(1)} items avg
                     </span>
                   )}
                   {todaySummary.bestDow && (
                     <>
                       <span style={{ color: "#D1D5DB" }}>&middot;</span>
-                      <span style={{ color: "#6B7280", fontSize: 10 }}>
+                      <span style={{ color: T.ink400, fontSize: 10 }}>
                         best day: {todaySummary.bestDow}
                       </span>
                     </>
@@ -1460,7 +1460,7 @@ export default function HQOverview({ onNavigate }) {
                         fontSize: 11,
                         fontWeight: 600,
                         color: vsSevenD >= 0 ? "#059669" : "#DC2626",
-                        fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                        fontFamily: T.font,
                       }}>
                         {vsSevenD >= 0 ? "\u2191" : "\u2193"}
                         {Math.abs(vsSevenD).toFixed(0)}% vs 7d avg
@@ -1496,8 +1496,8 @@ export default function HQOverview({ onNavigate }) {
               gap: 14,
               marginBottom: 8,
               fontSize: 10,
-              color: "#6B7280",
-              fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+              color: T.ink400,
+              fontFamily: T.font,
               flexWrap: "wrap",
             }}>
               {[
@@ -1549,16 +1549,16 @@ export default function HQOverview({ onNavigate }) {
                     const entry = revenueTrend.find((e) => e.date === label);
                     return (
                       <div style={{
-                        background: "white",
-                        border: "0.5px solid #E2E8F0",
-                        borderRadius: 8,
+                        background: T.surface,
+                        border: `1px solid ${T.border}`,
+                        borderRadius: T.radius.md,
                         padding: "10px 14px",
                         fontFamily: T.font,
                         fontSize: 12,
                         boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                         minWidth: 160,
                       }}>
-                        <div style={{ fontWeight: 600, color: "#111827", marginBottom: 4 }}>
+                        <div style={{ fontWeight: 600, color: T.ink900, marginBottom: 4 }}>
                           {entry?.fullDate || label}
                           {entry?.phName && (
                             <span style={{ marginLeft: 6, fontSize: 10, color: "#A78BFA", fontWeight: 500 }}>
@@ -1569,7 +1569,7 @@ export default function HQOverview({ onNavigate }) {
                         {payload.map((p) => (
                           p.value != null && (
                             <div key={p.name} style={{ display: "flex", justifyContent: "space-between", gap: 16, color: "#374151" }}>
-                              <span style={{ color: "#6B7280" }}>{p.name}</span>
+                              <span style={{ color: T.ink500 }}>{p.name}</span>
                               <span style={{ fontWeight: 500 }}>
                                 R {Number(p.value).toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                               </span>
@@ -1728,8 +1728,8 @@ export default function HQOverview({ onNavigate }) {
                 <span>{marginLine}</span>
                 <span style={{
                   fontSize: 10,
-                  color: "#6B7280",
-                  fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                  color: T.ink400,
+                  fontFamily: T.font,
                 }}>
                   {fmt(runRate)}/day run rate · projected {fmt(projected)}
                 </span>
@@ -1774,7 +1774,7 @@ export default function HQOverview({ onNavigate }) {
                         fontWeight: 600,
                         lineHeight: 1.3,
                         color: a.daysLeft <= 7 ? "#DC2626" : "#D97706",
-                        fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                        fontFamily: T.font,
                       }}
                     >
                       {(a.name || "").length > 20 ? a.name.slice(0, 20) + "…" : (a.name || "—")}
@@ -2208,7 +2208,7 @@ export default function HQOverview({ onNavigate }) {
                       marginLeft: "auto",
                       fontSize: 11,
                       fontWeight: 500,
-                      color: "#111827",
+                      color: T.ink900,
                       fontFamily: T.font,
                       fontVariantNumeric: "tabular-nums",
                     }}>
@@ -2426,7 +2426,7 @@ export default function HQOverview({ onNavigate }) {
                 style={{
                   fontFamily: T.font,
                   fontSize: 28,
-                  fontWeight: 400,
+                  fontWeight: 700,
                   color: T.success,
                   lineHeight: 1,
                   letterSpacing: "-0.02em",
@@ -2828,7 +2828,7 @@ function SectionLabel({ label }) {
   return (
     <div
       style={{
-        fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+        fontFamily: T.font,
         fontSize: 11,
         fontWeight: 700,
         letterSpacing: "0.08em",
@@ -2853,12 +2853,7 @@ function SectionLabel({ label }) {
   );
 }
 
-const SEMANTIC = {
-  success: { text: "#166534", bg: "#F0FDF4", bd: "#BBF7D0" },
-  warning: { text: "#92400E", bg: "#FFFBEB", bd: "#FDE68A" },
-  danger: { text: "#991B1B", bg: "#FEF2F2", bd: "#FECACA" },
-  info: { text: "#1E3A5F", bg: "#EFF6FF", bd: "#BFDBFE" },
-};
+// SEMANTIC removed — was dead code (replaced by MetricTile SEMANTIC_STYLES below)
 
 function MarginGauge({ value, color }) {
   const pct = Math.min(Math.max((value || 0) / 100, 0), 1);
@@ -2907,7 +2902,7 @@ function MarginGauge({ value, color }) {
         dominantBaseline="middle"
         fill={color}
         fontSize="28"
-        fontWeight="400"
+        fontWeight="700"
         fontFamily={T.font}
         style={{ fontVariantNumeric: "tabular-nums" }}
       >
@@ -2961,10 +2956,10 @@ function MetricTile({
   delta,
 }) {
   const SEMANTIC_STYLES = {
-    success: { border: "#059669", text: "#059669", bg: "rgba(5,150,105,0.07)",   bd: "rgba(5,150,105,0.2)"  },
-    warning: { border: "#D97706", text: "#D97706", bg: "rgba(215,119,6,0.07)",   bd: "rgba(215,119,6,0.2)"  },
-    danger:  { border: "#DC2626", text: "#DC2626", bg: "rgba(220,38,38,0.07)",   bd: "rgba(220,38,38,0.18)" },
-    info:    { border: "#2563EB", text: "#2563EB", bg: "rgba(37,99,235,0.07)",   bd: "rgba(37,99,235,0.18)" },
+    success: { border: T.success, text: T.successText || T.success, bg: T.successLight, bd: T.successBd },
+    warning: { border: T.warning, text: T.warningText || T.warning, bg: T.warningLight, bd: T.warningBd },
+    danger:  { border: T.danger,  text: T.dangerText  || T.danger,  bg: T.dangerLight,  bd: T.dangerBd  },
+    info:    { border: T.info,    text: T.infoText    || T.info,    bg: T.infoLight,    bd: T.infoBd    },
   };
   const s = semantic ? SEMANTIC_STYLES[semantic] : null;
   const clickable = !!onClick;
@@ -2976,8 +2971,8 @@ function MetricTile({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: "#FFFFFF",
-        border: "0.5px solid #E5E7EB",
+        background: T.surface,
+        border: `1px solid ${T.border}`,
         borderRadius: T.radius.lg,
         padding: "18px 20px 16px",
         cursor: clickable ? "pointer" : "default",
@@ -3000,12 +2995,12 @@ function MetricTile({
       >
         <span
           style={{
-            fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+            fontFamily: T.font,
             fontSize: 10,
             fontWeight: 700,
             letterSpacing: "0.08em",
             textTransform: "uppercase",
-            color: "#6B7280",
+            color: T.ink400,
           }}
         >
           {label}
@@ -3014,8 +3009,8 @@ function MetricTile({
           <span
             style={{
               fontSize: 9,
-              color: "#9CA3AF",
-              fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+              color: T.ink400,
+              fontFamily: T.font,
               display: "flex",
               alignItems: "center",
               gap: 2,
@@ -3039,7 +3034,7 @@ function MetricTile({
       >
         <div
           style={{
-            fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+            fontFamily: T.font,
             fontSize: 28,
             fontWeight: 600,
             lineHeight: 1,
@@ -3071,9 +3066,9 @@ function MetricTile({
       {subLabel && (
         <div
           style={{
-            fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+            fontFamily: T.font,
             fontSize: 10,
-            color: "#9CA3AF",
+            color: T.ink400,
             letterSpacing: "0.02em",
             marginBottom: sub ? 6 : 0,
           }}
@@ -3089,9 +3084,9 @@ function MetricTile({
             display: "inline-flex",
             alignItems: "center",
             fontSize: 11,
-            fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+            fontFamily: T.font,
             fontWeight: s ? 600 : 400,
-            color: s ? s.text : "#6B7280",
+            color: s ? s.text : T.ink500,
           }}
         >
           {sub}
@@ -3130,11 +3125,11 @@ function btn(variant, size) {
     padding: size === "sm" ? "6px 12px" : "9px 16px",
   };
   const variants = {
-    primary: { background: "#1A3D2B", color: "white" },
+    primary: { background: T.accent, color: "#fff" },
     ghost: {
       background: "transparent",
-      color: "#2C2C2C",
-      border: "1px solid #E2E2E2",
+      color: T.ink900,
+      border: `1px solid ${T.border}`,
     },
   };
   return { ...base, ...(variants[variant] || variants.primary) };
