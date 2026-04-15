@@ -73,8 +73,9 @@ const sKPILabel = {
 const sKPISub = {
   fontSize: "11px",
   fontFamily: T.font,
-  color: T.ink500,
-  marginTop: "4px",
+  color: T.ink400,
+  marginTop: "8px",
+  lineHeight: 1.5,
 };
 const sTh = {
   textAlign: "left",
@@ -104,15 +105,7 @@ const sSection = {
   padding: T.inset.card,
   marginBottom: T.gap.lg,
 };
-const sSectionHead = {
-  fontSize: "11px",
-  fontWeight: 700,
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
-  color: T.ink400,
-  marginBottom: "12px",
-  fontFamily: T.font,
-};
+// sSectionHead removed — replaced by SectionHead component with accent bar
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 function zar(n) {
@@ -1016,33 +1009,16 @@ export default function HQTradingDashboard() {
 
       {/* ── Hourly chart (SAST hours) ── */}
       <div style={{ ...sSection, marginBottom: 16 }}>
-        <div
-          style={{
-            ...sSectionHead,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
+        <SectionHead
+          right={
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              <LegendDot colour={T.accentMid} label="Today" />
+              <LegendDot colour={T.border} label="Yesterday" />
+            </div>
+          }
         >
-          <span>
-            Revenue by hour{" "}
-            <span
-              style={{
-                fontWeight: 400,
-                color: T.ink500,
-                fontSize: 10,
-                textTransform: "none",
-                letterSpacing: 0,
-              }}
-            >
-              (SAST)
-            </span>
-          </span>
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <LegendDot colour={T.accentMid} label="Today" />
-            <LegendDot colour={T.border} label="Yesterday" />
-          </div>
-        </div>
+          Revenue by hour (SAST)
+        </SectionHead>
         <ResponsiveContainer width="100%" height={200}>
           <BarChart
             data={hourlyData}
@@ -1097,48 +1073,43 @@ export default function HQTradingDashboard() {
       >
         {/* Top sellers */}
         <div style={sSection}>
-          <div
-            style={{
-              ...sSectionHead,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 8,
-            }}
+          <SectionHead
+            right={
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <ModeToggle
+                  active={topSellersMode === "qty"}
+                  onClick={() => setTopSellersMode("qty")}
+                  label="Units"
+                />
+                <ModeToggle
+                  active={topSellersMode === "revenue"}
+                  onClick={() => setTopSellersMode("revenue")}
+                  label="Revenue"
+                />
+                <button
+                  onClick={() => setHistoryOpen(true)}
+                  style={{
+                    padding: "3px 10px",
+                    background: "transparent",
+                    border: `1px solid ${T.accentBd}`,
+                    borderRadius: T.radius.sm,
+                    color: T.accentMid,
+                    fontSize: "10px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    fontFamily: T.font,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    marginLeft: 4,
+                  }}
+                >
+                  History
+                </button>
+              </div>
+            }
           >
-            <span>Top sellers today</span>
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <ModeToggle
-                active={topSellersMode === "qty"}
-                onClick={() => setTopSellersMode("qty")}
-                label="Units"
-              />
-              <ModeToggle
-                active={topSellersMode === "revenue"}
-                onClick={() => setTopSellersMode("revenue")}
-                label="Revenue"
-              />
-              <button
-                onClick={() => setHistoryOpen(true)}
-                style={{
-                  padding: "3px 10px",
-                  background: "transparent",
-                  border: `1px solid ${T.accentBd}`,
-                  borderRadius: T.radius.sm,
-                  color: T.accentMid,
-                  fontSize: "10px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  fontFamily: T.font,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                  marginLeft: 4,
-                }}
-              >
-                History
-              </button>
-            </div>
-          </div>
+            Top sellers today
+          </SectionHead>
           {topSellers.length === 0 ? (
             <EmptyState msg="No sales recorded today" />
           ) : (
@@ -1204,7 +1175,7 @@ export default function HQTradingDashboard() {
 
         {/* Payment split */}
         <div style={sSection}>
-          <div style={sSectionHead}>Payment methods</div>
+          <SectionHead>Payment methods</SectionHead>
           {paymentSplit.length === 0 ? (
             <EmptyState msg="No sales recorded today" />
           ) : (
@@ -1277,7 +1248,7 @@ export default function HQTradingDashboard() {
       {/* ── Category breakdown ── */}
       {catBreakdown.length > 0 && (
         <div style={sSection}>
-          <div style={sSectionHead}>Category breakdown — today</div>
+          <SectionHead>Category breakdown — today</SectionHead>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {catBreakdown.map(({ cat, revenue, qty }, i) => {
               const barPct =
@@ -1650,12 +1621,15 @@ function ThirtyDayChart({ data }) {
   const maxRev = Math.max(...data.map((d) => d.revenue), 1); // eslint-disable-line no-unused-vars
   return (
     <div style={{ ...sSection, marginBottom: 16 }}>
-      <div style={{ ...sSectionHead, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span>Revenue — last 30 days</span>
-        <span style={{ fontSize: 10, color: T.ink500, fontWeight: 400, textTransform: "none", letterSpacing: 0, fontFamily: T.font }}>
-          today highlighted
-        </span>
-      </div>
+      <SectionHead
+        right={
+          <span style={{ fontSize: 10, color: T.ink500, fontFamily: T.font }}>
+            today highlighted
+          </span>
+        }
+      >
+        Revenue — last 30 days
+      </SectionHead>
       <ResponsiveContainer width="100%" height={120}>
         <BarChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barSize={14}>
           <XAxis
@@ -1711,6 +1685,47 @@ function EmptyState({ msg }) {
       }}
     >
       {msg}
+    </div>
+  );
+}
+
+function SectionHead({ children, right }) {
+  return (
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 12,
+    }}>
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+      }}>
+        <span style={{
+          display: "inline-block",
+          width: 3,
+          height: 14,
+          borderRadius: 2,
+          background: T.accent,
+          flexShrink: 0,
+        }} />
+        <span style={{
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: T.ink400,
+          fontFamily: T.font,
+        }}>
+          {children}
+        </span>
+      </div>
+      {right && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {right}
+        </div>
+      )}
     </div>
   );
 }
@@ -1969,33 +1984,28 @@ function HistoryPanel({ tenantId, onClose }) {
 
             {/* Top sellers */}
             <div style={{ marginBottom: 20 }}>
-              <div
-                style={{
-                  ...sSectionHead,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
+              <SectionHead
+                right={
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <ModeToggle
+                      active={topMode === "qty"}
+                      onClick={() => setTopMode("qty")}
+                      label="Units"
+                    />
+                    <ModeToggle
+                      active={topMode === "revenue"}
+                      onClick={() => setTopMode("revenue")}
+                      label="Revenue"
+                    />
+                  </div>
+                }
               >
-                <span>
-                  Top sellers —{" "}
-                  {viewMode === "month"
+                {`Top sellers — ${
+                  viewMode === "month"
                     ? `${MONTH_NAMES[selMonth]} ${selYear}`
-                    : HISTORY_PRESETS[preset].label.toLowerCase()}
-                </span>
-                <div style={{ display: "flex", gap: 4 }}>
-                  <ModeToggle
-                    active={topMode === "qty"}
-                    onClick={() => setTopMode("qty")}
-                    label="Units"
-                  />
-                  <ModeToggle
-                    active={topMode === "revenue"}
-                    onClick={() => setTopMode("revenue")}
-                    label="Revenue"
-                  />
-                </div>
-              </div>
+                    : HISTORY_PRESETS[preset].label.toLowerCase()
+                }`}
+              </SectionHead>
               {histTopSellers.length === 0 ? (
                 <EmptyState msg="No sales in this period" />
               ) : (
@@ -2047,12 +2057,13 @@ function HistoryPanel({ tenantId, onClose }) {
             {/* Category breakdown */}
             {histCatBreakdown.length > 0 && (
               <div>
-                <div style={sSectionHead}>
-                  Category breakdown —{" "}
-                  {viewMode === "month"
-                    ? `${MONTH_NAMES[selMonth]} ${selYear}`
-                    : HISTORY_PRESETS[preset].label.toLowerCase()}
-                </div>
+                <SectionHead>
+                  {`Category breakdown — ${
+                    viewMode === "month"
+                      ? `${MONTH_NAMES[selMonth]} ${selYear}`
+                      : HISTORY_PRESETS[preset].label.toLowerCase()
+                  }`}
+                </SectionHead>
                 <div
                   style={{ display: "flex", flexDirection: "column", gap: 8 }}
                 >
