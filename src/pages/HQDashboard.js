@@ -161,10 +161,10 @@ export default function HQDashboard() {
           <div>
             <h1
               style={{
-                fontFamily: "'Outfit', 'Helvetica Neue', Arial, sans-serif",
+                fontFamily: T.font,
                 fontSize: "24px",
-                fontWeight: 300,
-                color: T.accentText,
+                fontWeight: 600,
+                color: T.ink900,
                 margin: "0 0 2px",
               }}
             >
@@ -172,9 +172,9 @@ export default function HQDashboard() {
             </h1>
             <p
               style={{
-                color: T.ink700,
+                color: T.ink500,
                 fontSize: "13px",
-                fontWeight: 300,
+                fontWeight: 400,
                 margin: 0,
               }}
             >
@@ -187,9 +187,9 @@ export default function HQDashboard() {
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <span
                 style={{
-                  fontSize: "10px",
+                  fontSize: "11px",
                   fontWeight: 600,
-                  letterSpacing: "0.15em",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   color: T.ink700,
                 }}
@@ -213,7 +213,7 @@ export default function HQDashboard() {
                 style={{
                   padding: "6px 10px",
                   border: "1px solid " + T.border,
-                  borderRadius: "2px",
+                  borderRadius: T.radius.sm,
                   fontFamily: T.font,
                   fontSize: "12px",
                   color: T.ink900,
@@ -240,7 +240,7 @@ export default function HQDashboard() {
                     background: "#0A0A0A",
                     color: "#00E87A",
                     border: "1px solid rgba(0,232,122,0.3)",
-                    borderRadius: "2px",
+                    borderRadius: T.radius.sm,
                     fontFamily: T.font,
                     fontSize: "11px",
                     fontWeight: 600,
