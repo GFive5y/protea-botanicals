@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
+import { T } from "../../styles/tokens";
 
 const EMPLOYMENT_TYPES = ["full_time", "part_time", "contractor", "casual"];
 const STATUSES = ["active", "on_leave", "terminated", "suspended"];
