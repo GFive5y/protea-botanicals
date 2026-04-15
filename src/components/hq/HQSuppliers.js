@@ -4,34 +4,23 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
+import { T as DS } from "../../styles/tokens";
 
 const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+  ...DS,
+  ink150:   DS.border,
+  ink075:   DS.bg,
+  ink050:   DS.surface,
+  successBg: DS.successLight,
+  warningBg: DS.warningLight,
+  dangerBg:  DS.dangerLight,
+  infoBg:    DS.infoLight,
+  accentLit: DS.accentLight,
+  shadow:    DS.shadow.sm,
 };
 const C = {
   bg: T.ink075,
-  surface: "#ffffff",
+  surface: DS.surface,
   border: T.ink150,
   text: T.ink900,
   muted: T.ink500,
@@ -104,7 +93,7 @@ function Badge({ label, color = C.info, bg = C.infoDim }) {
         background: bg,
         color,
         border: `1px solid ${color}`,
-        borderRadius: 4,
+        borderRadius: T.radius.sm,
         padding: "2px 8px",
         fontSize: 11,
         fontWeight: 600,
@@ -124,7 +113,7 @@ function Card({ children, style = {}, onClick }) {
       style={{
         background: C.surface,
         border: `1px solid ${C.border}`,
-        borderRadius: 6,
+        borderRadius: T.radius.md,
         padding: 16,
         marginBottom: 12,
         cursor: onClick ? "pointer" : "default",
@@ -149,7 +138,7 @@ function Input({ label, ...props }) {
         style={{
           background: C.bg,
           border: `1px solid ${C.border}`,
-          borderRadius: 6,
+          borderRadius: T.radius.md,
           color: C.text,
           padding: "8px 12px",
           width: "100%",
@@ -176,7 +165,7 @@ function Select({ label, children, ...props }) {
         style={{
           background: C.bg,
           border: `1px solid ${C.border}`,
-          borderRadius: 6,
+          borderRadius: T.radius.md,
           color: C.text,
           padding: "8px 12px",
           width: "100%",
@@ -284,7 +273,7 @@ function EditProductPanel({ product, suppliers, onClose, onSaved }) {
               color: C.text,
               fontWeight: 700,
               fontSize: 18,
-              fontFamily: "T.font",
+              fontFamily: T.font,
             }}
           >
             Edit Product
@@ -346,7 +335,7 @@ function EditProductPanel({ product, suppliers, onClose, onSaved }) {
         style={{
           background: C.accentDim,
           border: `1px solid ${C.accent}40`,
-          borderRadius: 6,
+          borderRadius: T.radius.md,
           padding: "12px 14px",
           marginBottom: 14,
         }}
@@ -360,7 +349,7 @@ function EditProductPanel({ product, suppliers, onClose, onSaved }) {
             marginBottom: 8,
           }}
         >
-          💲 Pricing
+          Pricing
         </div>
         <div
           style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
@@ -429,7 +418,7 @@ function EditProductPanel({ product, suppliers, onClose, onSaved }) {
           style={{
             background: C.bg,
             border: `1px solid ${C.border}`,
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             color: C.text,
             padding: "8px 12px",
             width: "100%",
@@ -447,7 +436,7 @@ function EditProductPanel({ product, suppliers, onClose, onSaved }) {
             background: C.dangerDim,
             border: `1px solid ${C.danger}30`,
             borderLeft: `3px solid ${C.danger}`,
-            borderRadius: 4,
+            borderRadius: T.radius.sm,
             padding: "8px 12px",
             color: C.danger,
             fontSize: 12,
@@ -464,7 +453,7 @@ function EditProductPanel({ product, suppliers, onClose, onSaved }) {
           style={{
             flex: 1,
             padding: "12px",
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             border: `1px solid ${C.border}`,
             background: "none",
             color: C.muted,
@@ -483,7 +472,7 @@ function EditProductPanel({ product, suppliers, onClose, onSaved }) {
             background: C.accent,
             color: "#fff",
             border: "none",
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             padding: "12px 24px",
             cursor: saving ? "not-allowed" : "pointer",
             fontWeight: 600,
@@ -569,7 +558,7 @@ function AddSupplierPanel({ onClose, onSaved }) {
               color: C.text,
               fontWeight: 700,
               fontSize: 18,
-              fontFamily: "T.font",
+              fontFamily: T.font,
             }}
           >
             Add New Supplier
@@ -595,7 +584,7 @@ function AddSupplierPanel({ onClose, onSaved }) {
         style={{
           background: C.bg,
           border: `1px solid ${C.border}`,
-          borderRadius: 6,
+          borderRadius: T.radius.md,
           padding: 16,
           marginBottom: 16,
         }}
@@ -640,7 +629,7 @@ function AddSupplierPanel({ onClose, onSaved }) {
         </div>
       </div>
       {form.currency === "ZAR" && (
-        <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: T.radius.md, padding: 16, marginBottom: 16 }}>
           <div style={{ color: C.muted, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 12 }}>
             VAT Registration
           </div>
@@ -662,7 +651,7 @@ function AddSupplierPanel({ onClose, onSaved }) {
         style={{
           background: C.bg,
           border: `1px solid ${C.border}`,
-          borderRadius: 6,
+          borderRadius: T.radius.md,
           padding: 16,
           marginBottom: 16,
         }}
@@ -707,7 +696,7 @@ function AddSupplierPanel({ onClose, onSaved }) {
             background: C.dangerDim,
             border: `1px solid ${C.danger}30`,
             borderLeft: `3px solid ${C.danger}`,
-            borderRadius: 4,
+            borderRadius: T.radius.sm,
             padding: "8px 12px",
             color: C.danger,
             fontSize: 12,
@@ -724,7 +713,7 @@ function AddSupplierPanel({ onClose, onSaved }) {
           background: C.accent,
           color: "#fff",
           border: "none",
-          borderRadius: 6,
+          borderRadius: T.radius.md,
           padding: "12px 24px",
           cursor: saving ? "not-allowed" : "pointer",
           fontWeight: 600,
@@ -821,7 +810,7 @@ function AddProductPanel({ suppliers, onClose, onSaved }) {
             color: C.text,
             fontWeight: 700,
             fontSize: 18,
-            fontFamily: "T.font",
+            fontFamily: T.font,
           }}
         >
           Add Supplier Product
@@ -931,7 +920,7 @@ function AddProductPanel({ suppliers, onClose, onSaved }) {
           style={{
             background: C.bg,
             border: `1px solid ${C.border}`,
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             color: C.text,
             padding: "8px 12px",
             width: "100%",
@@ -954,7 +943,7 @@ function AddProductPanel({ suppliers, onClose, onSaved }) {
           background: C.accent,
           color: "#fff",
           border: "none",
-          borderRadius: 6,
+          borderRadius: T.radius.md,
           padding: "12px 24px",
           cursor: "pointer",
           fontWeight: 600,
@@ -1035,7 +1024,7 @@ function AddLocalInputPanel({ onClose, onSaved }) {
             color: C.text,
             fontWeight: 700,
             fontSize: 18,
-            fontFamily: "T.font",
+            fontFamily: T.font,
           }}
         >
           Add Local Input
@@ -1101,7 +1090,7 @@ function AddLocalInputPanel({ onClose, onSaved }) {
           style={{
             background: C.bg,
             border: `1px solid ${C.border}`,
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             color: C.text,
             padding: "8px 12px",
             width: "100%",
@@ -1123,7 +1112,7 @@ function AddLocalInputPanel({ onClose, onSaved }) {
           background: C.accent,
           color: "#fff",
           border: "none",
-          borderRadius: 6,
+          borderRadius: T.radius.md,
           padding: "12px 24px",
           cursor: "pointer",
           fontWeight: 600,
@@ -1165,7 +1154,7 @@ function ShippingCalculator({ fx }) {
           fontSize: 15,
         }}
       >
-        📦 Shipping Cost Calculator
+        Shipping Cost Calculator
       </div>
       <div
         style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}
@@ -1214,7 +1203,7 @@ function ShippingCalculator({ fx }) {
             marginTop: 8,
             padding: 16,
             background: C.bg,
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             border: `1px solid ${C.border}`,
           }}
         >
@@ -1355,10 +1344,10 @@ export default function HQSuppliers() {
   };
 
   const tabs = [
-    { id: "catalogue", label: "📦 Product Catalogue" },
-    { id: "local", label: "🇿🇦 Local Inputs" },
-    { id: "shipping", label: "✈️ Shipping Calculator" },
-    { id: "suppliers", label: "🏢 Supplier List" },
+    { id: "catalogue", label: "Product Catalogue" },
+    { id: "local", label: "Local Inputs" },
+    { id: "shipping", label: "Shipping Calculator" },
+    { id: "suppliers", label: "Supplier List" },
   ];
 
   if (loading)
@@ -1402,7 +1391,7 @@ export default function HQSuppliers() {
             background: C.accent,
             color: "#fff",
             border: "none",
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             padding: "8px 18px",
             cursor: "pointer",
             fontWeight: 600,
@@ -1422,7 +1411,7 @@ export default function HQSuppliers() {
           padding: "10px 16px",
           background: C.primaryDark,
           border: `1px solid ${C.primaryDark}`,
-          borderRadius: 6,
+          borderRadius: T.radius.md,
           marginBottom: 16,
           flexWrap: "wrap",
         }}
@@ -1462,7 +1451,7 @@ export default function HQSuppliers() {
           style={{
             background: "none",
             border: "1px solid rgba(255,255,255,0.3)",
-            borderRadius: 4,
+            borderRadius: T.radius.sm,
             color: "rgba(255,255,255,0.8)",
             fontSize: 11,
             padding: "2px 8px",
@@ -1497,7 +1486,7 @@ export default function HQSuppliers() {
                     ? `2px solid ${categoryColor[cat]}`
                     : `1px solid ${C.border}`,
                 borderLeft: `3px solid ${categoryColor[cat]}`,
-                borderRadius: 6,
+                borderRadius: T.radius.md,
                 padding: 14,
                 cursor: "pointer",
                 textAlign: "center",
@@ -1579,7 +1568,7 @@ export default function HQSuppliers() {
               style={{
                 background: C.surface,
                 border: `1px solid ${C.border}`,
-                borderRadius: 6,
+                borderRadius: T.radius.md,
                 color: C.text,
                 padding: "6px 12px",
                 fontSize: 13,
@@ -1598,7 +1587,7 @@ export default function HQSuppliers() {
               style={{
                 background: C.surface,
                 border: `1px solid ${C.border}`,
-                borderRadius: 6,
+                borderRadius: T.radius.md,
                 color: C.text,
                 padding: "6px 12px",
                 fontSize: 13,
@@ -1772,7 +1761,7 @@ export default function HQSuppliers() {
                             background: missingPrice ? C.accent : "none",
                             border: `1px solid ${missingPrice ? C.accent : C.border}`,
                             color: missingPrice ? "#fff" : C.muted,
-                            borderRadius: 4,
+                            borderRadius: T.radius.sm,
                             padding: "3px 10px",
                             cursor: "pointer",
                             fontSize: 11,
@@ -1796,7 +1785,7 @@ export default function HQSuppliers() {
                             background: "none",
                             border: `1px solid ${C.border}`,
                             color: C.muted,
-                            borderRadius: 4,
+                            borderRadius: T.radius.sm,
                             padding: "2px 8px",
                             cursor: "pointer",
                             fontSize: 11,
@@ -1866,7 +1855,7 @@ export default function HQSuppliers() {
                 background: C.accent,
                 color: "#fff",
                 border: "none",
-                borderRadius: 6,
+                borderRadius: T.radius.md,
                 padding: "7px 16px",
                 cursor: "pointer",
                 fontWeight: 600,
@@ -1946,7 +1935,7 @@ export default function HQSuppliers() {
                                 style={{
                                   background: C.bg,
                                   border: `1px solid ${C.border}`,
-                                  borderRadius: 4,
+                                  borderRadius: T.radius.sm,
                                   color: C.text,
                                   padding: "4px 8px",
                                   width: 140,
@@ -1967,7 +1956,7 @@ export default function HQSuppliers() {
                                 style={{
                                   background: C.bg,
                                   border: `1px solid ${C.border}`,
-                                  borderRadius: 4,
+                                  borderRadius: T.radius.sm,
                                   color: C.text,
                                   padding: "4px 8px",
                                   width: 80,
@@ -1987,7 +1976,7 @@ export default function HQSuppliers() {
                                 style={{
                                   background: C.bg,
                                   border: `1px solid ${C.border}`,
-                                  borderRadius: 4,
+                                  borderRadius: T.radius.sm,
                                   color: C.text,
                                   padding: "4px 8px",
                                   width: 120,
@@ -2007,7 +1996,7 @@ export default function HQSuppliers() {
                                 style={{
                                   background: C.bg,
                                   border: `1px solid ${C.border}`,
-                                  borderRadius: 4,
+                                  borderRadius: T.radius.sm,
                                   color: C.text,
                                   padding: "4px 8px",
                                   width: "100%",
@@ -2028,7 +2017,7 @@ export default function HQSuppliers() {
                                   background: C.accent,
                                   border: "none",
                                   color: "#fff",
-                                  borderRadius: 4,
+                                  borderRadius: T.radius.sm,
                                   padding: "3px 10px",
                                   cursor: "pointer",
                                   fontSize: 11,
@@ -2043,7 +2032,7 @@ export default function HQSuppliers() {
                                   background: "none",
                                   border: `1px solid ${C.border}`,
                                   color: C.muted,
-                                  borderRadius: 4,
+                                  borderRadius: T.radius.sm,
                                   padding: "3px 8px",
                                   cursor: "pointer",
                                   fontSize: 11,
@@ -2103,7 +2092,7 @@ export default function HQSuppliers() {
                                   background: "none",
                                   border: `1px solid ${C.border}`,
                                   color: C.muted,
-                                  borderRadius: 4,
+                                  borderRadius: T.radius.sm,
                                   padding: "2px 8px",
                                   cursor: "pointer",
                                   fontSize: 11,
@@ -2134,7 +2123,7 @@ export default function HQSuppliers() {
           <ShippingCalculator fx={fx} />
           <Card>
             <div style={{ color: C.text, fontWeight: 600, marginBottom: 12 }}>
-              📋 DDP Air Rate Card
+              DDP Air Rate Card
             </div>
             <table
               style={{
@@ -2231,7 +2220,7 @@ export default function HQSuppliers() {
                 background: C.accent,
                 color: "#fff",
                 border: "none",
-                borderRadius: 6,
+                borderRadius: T.radius.md,
                 padding: "8px 18px",
                 cursor: "pointer",
                 fontWeight: 600,
@@ -2264,7 +2253,7 @@ export default function HQSuppliers() {
                           color: C.text,
                           fontWeight: 700,
                           fontSize: 15,
-                          fontFamily: "T.font",
+                          fontFamily: T.font,
                         }}
                       >
                         {s.name}
@@ -2301,7 +2290,7 @@ export default function HQSuppliers() {
                           color: C.accent,
                           fontWeight: 700,
                           fontSize: 20,
-                          fontFamily: "T.font",
+                          fontFamily: T.font,
                         }}
                       >
                         {sProds.length}
@@ -2326,7 +2315,7 @@ export default function HQSuppliers() {
                           style={{
                             background: C.bg,
                             border: `1px solid ${C.border}`,
-                            borderRadius: 4,
+                            borderRadius: T.radius.sm,
                             padding: "3px 8px",
                             fontSize: 11,
                             color: C.muted,
@@ -2389,7 +2378,7 @@ export default function HQSuppliers() {
                     )}
                     {s.currency === "ZAR" && (
                       <button onClick={async () => { const newVal = s.vat_registered !== true; await supabase.from("suppliers").update({ vat_registered: newVal }).eq("id", s.id); load(); }}
-                        style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, border: `1px solid ${C.border}`, background: "none", cursor: "pointer", color: C.muted }}>
+                        style={{ fontSize: 11, padding: "2px 8px", borderRadius: T.radius.sm, border: `1px solid ${C.border}`, background: "none", cursor: "pointer", color: C.muted }}>
                         {s.vat_registered === true ? "Mark not registered" : "Mark registered"}
                       </button>
                     )}
