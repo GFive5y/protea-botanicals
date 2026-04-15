@@ -17,7 +17,7 @@ const sharedStyles = `
     background: ${T.accent};
     color: white;
     border: none;
-    border-radius: 2px;
+    border-radius: 4px;
     font-size: 11px;
     letter-spacing: 0.2em;
     text-transform: uppercase;
@@ -30,7 +30,7 @@ const sharedStyles = `
     width: 100%;
     padding: 12px 16px;
     border: 1px solid ${T.border};
-    border-radius: 2px;
+    border-radius: 4px;
     font-size: 14px;
     box-sizing: border-box;
     outline: none;
@@ -174,7 +174,7 @@ export default function WholesalePortal() {
     pending: T.warning,
     confirmed: T.accentMid,
     shipped: T.info,
-    delivered: "#555",
+    delivered: T.ink700,
   };
 
   return (
@@ -187,7 +187,7 @@ export default function WholesalePortal() {
           background: `linear-gradient(135deg, ${T.accent} 0%, ${T.accentMid} 100%)`,
           padding: "64px 24px",
           textAlign: "center",
-          borderRadius: "2px",
+          borderRadius: T.radius.sm,
           marginBottom: "0",
         }}
       >
@@ -195,7 +195,7 @@ export default function WholesalePortal() {
           className="body-font"
           style={{
             fontSize: "11px",
-            letterSpacing: "0.35em",
+            letterSpacing: "0.08em",
             textTransform: "uppercase",
             color: T.accentLight,
           }}
@@ -229,7 +229,7 @@ export default function WholesalePortal() {
       <div
         style={{
           background: T.warningLight,
-          borderBottom: "1px solid #e0d8cc",
+          borderBottom: `1px solid ${T.border}`,
           padding: "0",
         }}
       >
@@ -257,7 +257,7 @@ export default function WholesalePortal() {
                     : "2px solid transparent",
                 color: activeTab === key ? T.accent : T.ink600,
                 fontSize: "11px",
-                letterSpacing: "0.2em",
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
                 cursor: "pointer",
                 fontWeight: activeTab === key ? 500 : 300,
@@ -274,9 +274,9 @@ export default function WholesalePortal() {
         {success && (
           <div
             style={{
-              background: "#e8f5e9",
+              background: T.successLight,
               border: `1px solid ${T.accentMid}`,
-              borderRadius: "2px",
+              borderRadius: T.radius.sm,
               padding: "16px 24px",
               marginBottom: "24px",
             }}
@@ -299,9 +299,9 @@ export default function WholesalePortal() {
             {/* Product List */}
             <div
               style={{
-                background: "white",
-                border: `1px solid #e8e0d4`,
-                borderRadius: "2px",
+                background: T.surface,
+                border: `1px solid ${T.border}`,
+                borderRadius: T.radius.sm,
                 overflow: "hidden",
                 boxShadow: "0 4px 16px rgba(0,0,0,0.04)",
               }}
@@ -309,7 +309,7 @@ export default function WholesalePortal() {
               <div
                 style={{
                   padding: "24px 32px",
-                  borderBottom: "1px solid #e8e0d4",
+                  borderBottom: `1px solid ${T.border}`,
                 }}
               >
                 <h2
@@ -331,13 +331,13 @@ export default function WholesalePortal() {
                     padding: "20px 32px",
                     borderBottom:
                       i < WHOLESALE_PRODUCTS.length - 1
-                        ? "1px solid #f0ebe2"
+                        ? `1px solid ${T.bg}`
                         : "none",
                     display: "grid",
                     gridTemplateColumns: "1fr auto auto",
                     gap: "16px",
                     alignItems: "center",
-                    background: "white",
+                    background: T.surface,
                   }}
                 >
                   <div>
@@ -355,8 +355,8 @@ export default function WholesalePortal() {
                       className="body-font"
                       style={{
                         fontSize: "11px",
-                        color: "#aaa",
-                        letterSpacing: "0.1em",
+                        color: T.ink500,
+                        letterSpacing: "0.08em",
                       }}
                     >
                       {p.sku} · {p.unit} · MOQ: {p.moq}
@@ -387,7 +387,7 @@ export default function WholesalePortal() {
                         height: "28px",
                         background: T.warningLight,
                         border: `1px solid ${T.border}`,
-                        borderRadius: "2px",
+                        borderRadius: T.radius.sm,
                         cursor: "pointer",
                         fontSize: "16px",
                       }}
@@ -411,9 +411,9 @@ export default function WholesalePortal() {
                         height: "28px",
                         background: T.accent,
                         border: "none",
-                        borderRadius: "2px",
+                        borderRadius: T.radius.sm,
                         cursor: "pointer",
-                        color: "white",
+                        color: T.surface,
                         fontSize: "16px",
                       }}
                     >
@@ -427,9 +427,9 @@ export default function WholesalePortal() {
             {/* Cart Summary */}
             <div
               style={{
-                background: "white",
-                border: "1px solid #e8e0d4",
-                borderRadius: "2px",
+                background: T.surface,
+                border: `1px solid ${T.border}`,
+                borderRadius: T.radius.sm,
                 overflow: "hidden",
                 boxShadow: "0 4px 16px rgba(0,0,0,0.04)",
                 position: "sticky",
@@ -444,7 +444,7 @@ export default function WholesalePortal() {
               >
                 <h2
                   className="shop-font"
-                  style={{ fontSize: "22px", fontWeight: 300, color: "white" }}
+                  style={{ fontSize: "22px", fontWeight: 300, color: T.surface }}
                 >
                   Order Summary
                 </h2>
@@ -454,7 +454,7 @@ export default function WholesalePortal() {
                   <p
                     className="body-font"
                     style={{
-                      color: "#aaa",
+                      color: T.ink500,
                       fontSize: "13px",
                       textAlign: "center",
                       padding: "24px 0",
@@ -475,7 +475,7 @@ export default function WholesalePortal() {
                       >
                         <span
                           className="body-font"
-                          style={{ fontSize: "13px", color: "#555" }}
+                          style={{ fontSize: "13px", color: T.ink700 }}
                         >
                           {p.name} ×{cart[p.id]}
                         </span>
@@ -483,7 +483,7 @@ export default function WholesalePortal() {
                           className="body-font"
                           style={{
                             fontSize: "13px",
-                            color: "#333",
+                            color: T.ink900,
                             fontWeight: 500,
                           }}
                         >
@@ -493,7 +493,7 @@ export default function WholesalePortal() {
                     ))}
                     <div
                       style={{
-                        borderTop: "1px solid #e8e0d4",
+                        borderTop: `1px solid ${T.border}`,
                         paddingTop: "16px",
                         marginTop: "8px",
                         display: "flex",
@@ -535,9 +535,9 @@ export default function WholesalePortal() {
         {activeTab === "history" && (
           <div
             style={{
-              background: "white",
-              border: "1px solid #e8e0d4",
-              borderRadius: "2px",
+              background: T.surface,
+              border: `1px solid ${T.border}`,
+              borderRadius: T.radius.sm,
               overflow: "hidden",
               boxShadow: "0 4px 16px rgba(0,0,0,0.04)",
             }}
@@ -545,7 +545,7 @@ export default function WholesalePortal() {
             <div
               style={{
                 padding: "24px 32px",
-                borderBottom: "1px solid #e8e0d4",
+                borderBottom: `1px solid ${T.border}`,
               }}
             >
               <h2
@@ -558,7 +558,7 @@ export default function WholesalePortal() {
             {orders.length === 0 ? (
               <div style={{ padding: "60px", textAlign: "center" }}>
                 <div style={{ fontSize: "36px", marginBottom: "16px" }}>◎</div>
-                <p className="body-font" style={{ color: "#aaa" }}>
+                <p className="body-font" style={{ color: T.ink500 }}>
                   No orders placed yet.
                 </p>
               </div>
@@ -570,11 +570,11 @@ export default function WholesalePortal() {
                   style={{
                     padding: "20px 32px",
                     borderBottom:
-                      i < orders.length - 1 ? "1px solid #f0ebe2" : "none",
+                      i < orders.length - 1 ? `1px solid ${T.bg}` : "none",
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    background: "white",
+                    background: T.surface,
                     flexWrap: "wrap",
                     gap: "12px",
                   }}
@@ -588,7 +588,7 @@ export default function WholesalePortal() {
                     </p>
                     <p
                       className="body-font"
-                      style={{ fontSize: "12px", color: "#aaa" }}
+                      style={{ fontSize: "12px", color: T.ink500 }}
                     >
                       {new Date(order.created_at).toLocaleDateString("en-ZA", {
                         day: "numeric",
@@ -616,11 +616,11 @@ export default function WholesalePortal() {
                     <span
                       className="body-font"
                       style={{
-                        fontSize: "10px",
-                        letterSpacing: "0.15em",
+                        fontSize: "11px",
+                        letterSpacing: "0.08em",
                         textTransform: "uppercase",
                         padding: "4px 12px",
-                        borderRadius: "2px",
+                        borderRadius: T.radius.sm,
                         background: `${statusColor[order.status] || "#888"}22`,
                         color: statusColor[order.status] || "#888",
                         border: `1px solid ${statusColor[order.status] || "#888"}44`,
