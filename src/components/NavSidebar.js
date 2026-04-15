@@ -229,7 +229,7 @@ export default function NavSidebar() {
                   >
                     <div className="nav-icon-zone">
                       <div className="nav-pill">
-                        <span className="nav-icon">{page.icon}</span>
+                        <span className="nav-icon">{page.Icon ? <page.Icon size={16} strokeWidth={1.75} /> : null}</span>
                       </div>
                     </div>
                     <span className="nav-label">{page.label}</span>
@@ -279,7 +279,7 @@ export default function NavSidebar() {
                 >
                   <div className="nav-icon-zone">
                     <div className="nav-pill">
-                      <span className="nav-icon">{page.icon}</span>
+                      <span className="nav-icon">{page.Icon ? <page.Icon size={16} strokeWidth={1.75} /> : null}</span>
                     </div>
                   </div>
                   <span className="nav-label">{page.label}</span>
@@ -545,7 +545,7 @@ function MobileBar({ config, onNav, location }) {
             onClick={() => onNav(page.path)}
             aria-label={page.label}
           >
-            <span className="nav-mobile-icon">{page.icon}</span>
+            <span className="nav-mobile-icon">{page.Icon ? <page.Icon size={18} strokeWidth={1.75} /> : null}</span>
             <span className="nav-mobile-label">{page.label}</span>
           </button>
         );
