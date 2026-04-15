@@ -458,7 +458,7 @@ export default function CheckoutPage() {
           className="body-font"
           style={{
             fontSize: "11px",
-            letterSpacing: "0.35em",
+            letterSpacing: "0.08em",
             textTransform: "uppercase",
             color: T.accent,
             marginBottom: "24px",
@@ -493,9 +493,9 @@ export default function CheckoutPage() {
           <div
             className="body-font"
             style={{
-              background: "rgba(192,57,43,0.08)",
-              border: "1px solid rgba(192,57,43,0.25)",
-              borderRadius: "2px",
+              background: T.dangerLight,
+              border: `1px solid ${T.dangerBd}`,
+              borderRadius: T.radius.sm,
               padding: "14px 18px",
               marginBottom: "24px",
               display: "flex",
@@ -503,13 +503,13 @@ export default function CheckoutPage() {
               alignItems: "center",
             }}
           >
-            <span style={{ fontSize: "13px", color: "#c0392b" }}>{error}</span>
+            <span style={{ fontSize: "13px", color: T.danger }}>{error}</span>
             <button
               onClick={() => setError(null)}
               style={{
                 background: "none",
                 border: "none",
-                color: "#c0392b",
+                color: T.danger,
                 cursor: "pointer",
                 fontSize: "16px",
                 padding: "0 0 0 12px",
@@ -533,8 +533,8 @@ export default function CheckoutPage() {
             <div
               className="body-font"
               style={{
-                fontSize: "10px",
-                letterSpacing: "0.25em",
+                fontSize: "11px",
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
                 color: T.ink600,
                 fontWeight: "600",
@@ -558,8 +558,8 @@ export default function CheckoutPage() {
                   style={{
                     width: "44px",
                     height: "44px",
-                    borderRadius: "2px",
-                    background: `linear-gradient(135deg, ${item.gradientFrom || "#1b4332"}, ${item.gradientTo || "#2d6a4f"})`,
+                    borderRadius: T.radius.sm,
+                    background: `linear-gradient(135deg, ${item.gradientFrom || T.accentText}, ${item.gradientTo || T.accent})`,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -604,9 +604,9 @@ export default function CheckoutPage() {
           {/* Right: Payment summary */}
           <div
             style={{
-              background: "#f4f0e8",
+              background: T.bg,
               border: `1px solid ${T.border}`,
-              borderRadius: "2px",
+              borderRadius: T.radius.sm,
               padding: "28px",
               position: "sticky",
               top: "80px",
@@ -615,8 +615,8 @@ export default function CheckoutPage() {
             <div
               className="body-font"
               style={{
-                fontSize: "10px",
-                letterSpacing: "0.25em",
+                fontSize: "11px",
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
                 color: T.ink600,
                 fontWeight: "600",
@@ -635,7 +635,7 @@ export default function CheckoutPage() {
             >
               <span
                 className="body-font"
-                style={{ fontSize: "13px", color: "#666" }}
+                style={{ fontSize: "13px", color: T.ink600 }}
               >
                 Subtotal
               </span>
@@ -655,7 +655,7 @@ export default function CheckoutPage() {
             >
               <span
                 className="body-font"
-                style={{ fontSize: "13px", color: "#666" }}
+                style={{ fontSize: "13px", color: T.ink600 }}
               >
                 Shipping
               </span>
@@ -678,7 +678,7 @@ export default function CheckoutPage() {
               >
                 <span
                   className="body-font"
-                  style={{ fontSize: "13px", color: "#2d6a4f" }}
+                  style={{ fontSize: "13px", color: T.accent }}
                 >
                   Points redeemed ({redeemablePts} pts)
                 </span>
@@ -686,7 +686,7 @@ export default function CheckoutPage() {
                   className="body-font"
                   style={{
                     fontSize: "13px",
-                    color: "#2d6a4f",
+                    color: T.accent,
                     fontWeight: 600,
                   }}
                 >
@@ -710,7 +710,7 @@ export default function CheckoutPage() {
                 className="body-font"
                 style={{
                   fontSize: "12px",
-                  letterSpacing: "0.15em",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   fontWeight: "600",
                   color: T.ink900,
@@ -720,7 +720,7 @@ export default function CheckoutPage() {
               </span>
               <span
                 className="shop-font"
-                style={{ fontSize: "28px", color: "#2d6a4f", fontWeight: 600 }}
+                style={{ fontSize: "28px", color: T.accent, fontWeight: 600 }}
               >
                 R
                 {effectiveTotal.toLocaleString(undefined, {
@@ -734,9 +734,9 @@ export default function CheckoutPage() {
             {canRedeem && !submitting && (
               <div
                 style={{
-                  background: "#fff",
+                  background: T.surface,
                   border: `1px solid ${T.border}`,
-                  borderRadius: "2px",
+                  borderRadius: T.radius.sm,
                   padding: "12px 14px",
                   marginBottom: "16px",
                 }}
@@ -755,14 +755,14 @@ export default function CheckoutPage() {
                       style={{
                         fontSize: "12px",
                         fontWeight: 600,
-                        color: "#1b4332",
+                        color: T.accentText,
                       }}
                     >
                       Use {redeemablePts} pts = −R{redeemableZar.toFixed(2)} off
                     </span>
                     <div
                       className="body-font"
-                      style={{ fontSize: "10px", color: "#888", marginTop: 2 }}
+                      style={{ fontSize: "11px", color: T.ink600, marginTop: 2 }}
                     >
                       You have {userPoints} pts · Max{" "}
                       {loyaltyConfig.max_redeem_pct_per_order}% of order
@@ -774,8 +774,8 @@ export default function CheckoutPage() {
                     style={{
                       width: 36,
                       height: 20,
-                      borderRadius: 10,
-                      background: redeemPoints ? "#2d6a4f" : "#ccc",
+                      borderRadius: T.radius.full,
+                      background: redeemPoints ? T.accent : T.border,
                       cursor: "pointer",
                       position: "relative",
                       flexShrink: 0,
@@ -790,7 +790,7 @@ export default function CheckoutPage() {
                         width: 16,
                         height: 16,
                         borderRadius: "50%",
-                        background: "#fff",
+                        background: T.surface,
                         transition: "left 0.2s",
                         boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
                       }}
@@ -801,8 +801,8 @@ export default function CheckoutPage() {
                   <div
                     className="body-font"
                     style={{
-                      fontSize: "10px",
-                      color: "#2d6a4f",
+                      fontSize: "11px",
+                      color: T.accent,
                       fontWeight: 600,
                     }}
                   >
@@ -817,9 +817,9 @@ export default function CheckoutPage() {
             <div
               className="body-font"
               style={{
-                background: "rgba(82,183,136,0.08)",
-                border: "1px solid rgba(82,183,136,0.25)",
-                borderRadius: "2px",
+                background: T.accentLight,
+                border: `1px solid ${T.accentBd}`,
+                borderRadius: T.radius.sm,
                 padding: "12px 14px",
                 marginBottom: "16px",
               }}
@@ -828,7 +828,7 @@ export default function CheckoutPage() {
                 style={{
                   fontSize: "11px",
                   fontWeight: 600,
-                  color: "#2d6a4f",
+                  color: T.accent,
                   marginBottom: 6,
                 }}
               >
@@ -838,7 +838,7 @@ export default function CheckoutPage() {
                 style={{
                   fontFamily: "Cormorant Garamond, serif",
                   fontSize: "24px",
-                  color: "#1b4332",
+                  color: T.accentText,
                   fontWeight: 600,
                   lineHeight: 1,
                 }}
@@ -848,8 +848,8 @@ export default function CheckoutPage() {
               {/* Points breakdown */}
               <div
                 style={{
-                  fontSize: "10px",
-                  color: "#666",
+                  fontSize: "11px",
+                  color: T.ink600,
                   marginTop: 6,
                   lineHeight: 1.7,
                 }}
@@ -863,7 +863,7 @@ export default function CheckoutPage() {
                     </span>
                   )}
                   {showCategoryBonus && (
-                    <span style={{ color: "#1b4332" }}>
+                    <span style={{ color: T.accentText }}>
                       {" "}
                       + {primaryCategory.replace(/_/g, " ")} {categoryMult}×
                     </span>
@@ -872,31 +872,31 @@ export default function CheckoutPage() {
                     <span>
                       {" "}
                       +{" "}
-                      <strong style={{ color: "#b5935a" }}>
+                      <strong style={{ color: T.brandGold }}>
                         {userTier} {tierMult}× tier
                       </strong>
                     </span>
                   )}
                 </div>
                 {firstPurchaseBonus > 0 && (
-                  <div style={{ color: "#2d6a4f", fontWeight: 600 }}>
+                  <div style={{ color: T.accent, fontWeight: 600 }}>
                     + {firstPurchaseBonus} pts first online order bonus!
                   </div>
                 )}
                 {crossSellBonus > 0 && (
-                  <div style={{ color: "#2d6a4f", fontWeight: 600 }}>
+                  <div style={{ color: T.accent, fontWeight: 600 }}>
                     + {crossSellBonus} pts first{" "}
                     {(primaryCategory || "").replace(/_/g, " ")} purchase!
                   </div>
                 )}
                 {referralBonus > 0 && (
-                  <div style={{ color: "#2d6a4f", fontWeight: 600 }}>
+                  <div style={{ color: T.accent, fontWeight: 600 }}>
                     + {referralBonus} pts referral bonus
                   </div>
                 )}
               </div>
               {!showTierBonus && (
-                <div style={{ fontSize: "10px", color: "#888", marginTop: 4 }}>
+                <div style={{ fontSize: "11px", color: T.ink600, marginTop: 4 }}>
                   Reach Silver tier for 1.25× bonus on every purchase!
                 </div>
               )}
@@ -908,8 +908,8 @@ export default function CheckoutPage() {
                 className="body-font"
                 style={{
                   display: "block",
-                  fontSize: "10px",
-                  letterSpacing: "0.15em",
+                  fontSize: "11px",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   color: T.ink600,
                   fontWeight: 600,
@@ -930,13 +930,13 @@ export default function CheckoutPage() {
                   style={{
                     width: "100%",
                     padding: "9px 36px 9px 12px",
-                    border: `1.5px solid ${referralValid === "valid" ? "#52b788" : referralValid === "invalid" ? "#c0392b" : T.border}`,
-                    borderRadius: "2px",
+                    border: `1.5px solid ${referralValid === "valid" ? T.accent : referralValid === "invalid" ? T.danger : T.border}`,
+                    borderRadius: T.radius.sm,
                     fontFamily: "Jost, sans-serif",
                     fontSize: "14px",
                     fontWeight: 600,
-                    letterSpacing: "0.1em",
-                    background: "#fff",
+                    letterSpacing: "0.08em",
+                    background: T.surface,
                     boxSizing: "border-box",
                     outline: "none",
                   }}
@@ -962,7 +962,7 @@ export default function CheckoutPage() {
                       top: "50%",
                       transform: "translateY(-50%)",
                       fontSize: 14,
-                      color: "#52b788",
+                      color: T.accent,
                     }}
                   >
                     ✓
@@ -976,7 +976,7 @@ export default function CheckoutPage() {
                       top: "50%",
                       transform: "translateY(-50%)",
                       fontSize: 14,
-                      color: "#c0392b",
+                      color: T.danger,
                     }}
                   >
                     ✗
@@ -987,7 +987,7 @@ export default function CheckoutPage() {
                 <div
                   style={{
                     fontSize: 11,
-                    color: "#52b788",
+                    color: T.accent,
                     marginTop: 5,
                     fontFamily: "Jost, sans-serif",
                     fontWeight: 600,
@@ -1001,7 +1001,7 @@ export default function CheckoutPage() {
                 <div
                   style={{
                     fontSize: 11,
-                    color: "#c0392b",
+                    color: T.danger,
                     marginTop: 5,
                     fontFamily: "Jost, sans-serif",
                   }}
@@ -1012,7 +1012,7 @@ export default function CheckoutPage() {
               {!referralInput && (
                 <div
                   style={{
-                    fontSize: 10,
+                    fontSize: 11,
                     color: T.ink600,
                     marginTop: 4,
                     fontFamily: "Jost, sans-serif",
@@ -1030,23 +1030,23 @@ export default function CheckoutPage() {
               disabled={submitting}
               style={{
                 width: "100%",
-                background: submitting ? "#888" : "#1b4332",
-                color: "white",
+                background: submitting ? T.ink500 : T.accentText,
+                color: T.surface,
                 border: "none",
-                borderRadius: "2px",
+                borderRadius: T.radius.sm,
                 padding: "14px 24px",
                 fontSize: "12px",
                 fontWeight: "600",
-                letterSpacing: "0.2em",
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
                 cursor: submitting ? "not-allowed" : "pointer",
                 transition: "background 0.15s",
               }}
               onMouseEnter={(e) => {
-                if (!submitting) e.target.style.background = "#2d6a4f";
+                if (!submitting) e.target.style.background = T.accent;
               }}
               onMouseLeave={(e) => {
-                if (!submitting) e.target.style.background = "#1b4332";
+                if (!submitting) e.target.style.background = T.accentText;
               }}
             >
               {submitting ? "Processing…" : "Pay with PayFast"}
@@ -1068,8 +1068,8 @@ export default function CheckoutPage() {
                   style={{
                     width: "14px",
                     height: "14px",
-                    border: "2px solid #e0dbd2",
-                    borderTopColor: "#1b4332",
+                    border: `2px solid ${T.border}`,
+                    borderTopColor: T.accentText,
                     borderRadius: "50%",
                     animation: "protea-spin 0.8s linear infinite",
                   }}
@@ -1108,8 +1108,8 @@ export default function CheckoutPage() {
               <span
                 className="body-font"
                 style={{
-                  fontSize: "9px",
-                  letterSpacing: "0.15em",
+                  fontSize: "11px",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   color: T.ink600,
                 }}
@@ -1119,8 +1119,8 @@ export default function CheckoutPage() {
               <span
                 className="body-font"
                 style={{
-                  fontSize: "9px",
-                  letterSpacing: "0.15em",
+                  fontSize: "11px",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   color: T.ink600,
                 }}
@@ -1135,7 +1135,7 @@ export default function CheckoutPage() {
                 onClick={() => navigate("/cart")}
                 style={{
                   fontSize: "11px",
-                  color: "#2d6a4f",
+                  color: T.accent,
                   textAlign: "center",
                   marginTop: "12px",
                   cursor: "pointer",
