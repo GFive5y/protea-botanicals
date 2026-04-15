@@ -5,17 +5,17 @@
 // LL-165: stock_receipts uses item_id FK on lines
 
 import React, { useState, useEffect, useCallback } from "react";
+import { Printer, Package } from "lucide-react";
 import { supabase } from "../../services/supabaseClient";
 import { T } from "../../styles/tokens";
-const MONO = "'DM Mono','Courier New',monospace";
 
 const sTh = {
   textAlign: "left",
-  padding: "9px 12px",
-  fontSize: "10px",
-  letterSpacing: "0.1em",
+  padding: "11px 12px",
+  fontSize: 11,
+  letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: T.ink500,
+  color: T.ink400,
   borderBottom: `2px solid ${T.border}`,
   fontWeight: 700,
   fontFamily: T.font,
@@ -23,9 +23,9 @@ const sTh = {
   background: T.surface,
 };
 const sTd = {
-  padding: "9px 12px",
+  padding: "11px 12px",
   borderBottom: `1px solid ${T.border}`,
-  fontSize: "13px",
+  fontSize: 13,
   fontFamily: T.font,
   color: T.ink700,
   verticalAlign: "middle",
@@ -33,10 +33,10 @@ const sTd = {
 const sInput = {
   padding: "7px 11px",
   border: `1px solid ${T.border}`,
-  borderRadius: "4px",
-  fontSize: "13px",
+  borderRadius: T.radius.sm,
+  fontSize: 13,
   fontFamily: T.font,
-  background: "#fff",
+  background: T.surface,
   outline: "none",
   boxSizing: "border-box",
 };
@@ -178,7 +178,7 @@ function AVCODiff({ before, after }) {
   const pct = ((after - before) / before) * 100;
   if (Math.abs(pct) < 0.5)
     return (
-      <span style={{ color: T.ink500, fontSize: 11, fontFamily: MONO }}>
+      <span style={{ color: T.ink500, fontSize: 11, fontFamily: T.font }}>
         no change
       </span>
     );
@@ -187,7 +187,7 @@ function AVCODiff({ before, after }) {
     <span
       style={{
         fontSize: 11,
-        fontFamily: MONO,
+        fontFamily: T.font,
         fontWeight: 700,
         color: up ? T.warning : T.success,
       }}
@@ -325,7 +325,7 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
         style={{
           background: T.dangerLight,
           border: `1px solid ${T.dangerBd}`,
-          borderRadius: 6,
+          borderRadius: T.radius.md,
           padding: 16,
         }}
       >
@@ -361,7 +361,7 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
           }}
         >
           This may mean the <code>stock_receipts</code> table doesn't exist yet.
-          Confirm at least one delivery has been received via the 📦 Receive
+          Confirm at least one delivery has been received via the Receive
           Delivery button.
         </div>
         <button
@@ -371,7 +371,7 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
             background: T.accentMid,
             color: "#fff",
             border: "none",
-            borderRadius: 3,
+            borderRadius: T.radius.sm,
             cursor: "pointer",
             fontSize: 11,
             fontFamily: T.font,
@@ -412,7 +412,7 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
             style={{
               padding: "7px 14px",
               border: `1px solid ${T.border}`,
-              borderRadius: 3,
+              borderRadius: T.radius.sm,
               background: "transparent",
               color: T.ink500,
               fontSize: 11,
@@ -432,7 +432,7 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
           gridTemplateColumns: "repeat(3, 1fr)",
           gap: "1px",
           background: T.border,
-          borderRadius: 6,
+          borderRadius: T.radius.lg,
           overflow: "hidden",
           border: `1px solid ${T.border}`,
         }}
@@ -449,7 +449,7 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
           <div
             key={k.label}
             style={{
-              background: "#fff",
+              background: T.surface,
               padding: "14px 18px",
               borderTop: `3px solid ${k.color}`,
             }}
@@ -457,21 +457,21 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
             <div
               style={{
                 fontSize: 20,
-                fontWeight: 400,
-                color: T.ink900,
-                fontFamily: MONO,
-                lineHeight: 1,
-                marginBottom: 4,
-                letterSpacing: "-0.02em",
+              fontWeight: 700,
+              color: T.ink900,
+              fontFamily: T.font,
+              fontVariantNumeric: "tabular-nums",
+              lineHeight: 1,
+              marginBottom: 4,
               }}
             >
               {k.value}
             </div>
             <div
               style={{
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: 700,
-                color: T.ink500,
+                color: T.ink400,
                 textTransform: "uppercase",
                 letterSpacing: "0.1em",
                 fontFamily: T.font,
@@ -499,14 +499,14 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
       ) : filtered.length === 0 ? (
         <div
           style={{
-            background: "#fff",
+            background: T.surface,
             border: `1px solid ${T.border}`,
-            borderRadius: 6,
+            borderRadius: T.radius.lg,
             padding: "48px",
             textAlign: "center",
           }}
         >
-          <div style={{ fontSize: 28, marginBottom: 10 }}>📦</div>
+          <div style={{ marginBottom: 10, color: T.ink400 }}><Package size={36} /></div>
           <div
             style={{
               fontSize: 13,
@@ -523,17 +523,18 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
           <div style={{ fontSize: 12, color: T.ink500, fontFamily: T.font }}>
             {search
               ? "Clear the search to see all receipts."
-              : "Use the 📦 Receive Delivery button to log your first delivery."}
+              : "Use the Receive Delivery button to log your first delivery."}
           </div>
         </div>
       ) : (
         <div
           style={{
-            background: "#fff",
+            background: T.surface,
             border: `1px solid ${T.border}`,
-            borderRadius: 6,
+            borderRadius: T.radius.lg,
             overflow: "hidden",
             boxShadow: T.shadow.sm,
+            padding: "0 16px",
           }}
         >
           <table
@@ -585,7 +586,7 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
                       <td
                         style={{
                           ...sTd,
-                          fontFamily: MONO,
+                          fontFamily: T.font,
                           fontWeight: 700,
                           color: T.accentMid,
                         }}
@@ -605,7 +606,7 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
                         <div style={{ fontSize: 12, color: T.ink700 }}>
                           {fmtDate(r.received_at || r.created_at)}
                         </div>
-                        <div style={{ fontSize: 10, color: T.ink500 }}>
+                        <div style={{ fontSize: 11, color: T.ink500 }}>
                           {fmtTime(r.received_at || r.created_at)}
                         </div>
                       </td>
@@ -615,7 +616,7 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
                         style={{
                           ...sTd,
                           textAlign: "right",
-                          fontFamily: MONO,
+                          fontFamily: T.font,
                           color: T.ink500,
                         }}
                       >
@@ -627,7 +628,7 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
                         style={{
                           ...sTd,
                           textAlign: "right",
-                          fontFamily: MONO,
+                          fontFamily: T.font,
                           fontWeight: 700,
                           color: T.ink900,
                         }}
@@ -654,9 +655,9 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
                         ) : avcoChangedCount > 0 ? (
                           <span
                             style={{
-                              fontSize: 10,
+                              fontSize: 11,
                               padding: "2px 8px",
-                              borderRadius: 3,
+                              borderRadius: T.radius.sm,
                               background: T.warningLight,
                               color: T.warning,
                               border: `1px solid ${T.warningBd}`,
@@ -669,9 +670,9 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
                         ) : isOpen ? (
                           <span
                             style={{
-                              fontSize: 10,
+                              fontSize: 11,
                               padding: "2px 8px",
-                              borderRadius: 3,
+                              borderRadius: T.radius.sm,
                               background: T.successLight,
                               color: T.success,
                               border: `1px solid ${T.successBd}`,
@@ -694,13 +695,13 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
                             onClick={() => toggleExpand(r.id)}
                             style={{
                               padding: "3px 8px",
-                              fontSize: 10,
+                              fontSize: 11,
                               fontFamily: T.font,
                               fontWeight: 600,
                               border: `1px solid ${T.accentBd}`,
                               color: T.accentMid,
                               background: "transparent",
-                              borderRadius: 3,
+                              borderRadius: T.radius.sm,
                               cursor: "pointer",
                               textTransform: "uppercase",
                               letterSpacing: "0.04em",
@@ -720,19 +721,19 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
                             }}
                             style={{
                               padding: "3px 8px",
-                              fontSize: 10,
+                              fontSize: 11,
                               fontFamily: T.font,
                               fontWeight: 600,
                               border: `1px solid ${T.border}`,
                               color: T.ink500,
                               background: "transparent",
-                              borderRadius: 3,
+                              borderRadius: T.radius.sm,
                               cursor: "pointer",
                               textTransform: "uppercase",
                               letterSpacing: "0.04em",
                             }}
                           >
-                            🖨 Print
+                            <Printer size={11} style={{ marginRight: 3, verticalAlign: "middle" }} />Print
                           </button>
                         </div>
                       </td>
@@ -799,7 +800,7 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
                                         key={h}
                                         style={{
                                           ...sTh,
-                                          fontSize: 9,
+                                          fontSize: 11,
                                           padding: "7px 10px",
                                           background: "rgba(255,255,255,0.5)",
                                         }}
@@ -848,7 +849,7 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
                                         <td
                                           style={{
                                             ...sTd,
-                                            fontFamily: MONO,
+                                            fontFamily: T.font,
                                             fontSize: 11,
                                             color: T.ink500,
                                             background: "transparent",
@@ -859,7 +860,7 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
                                         <td
                                           style={{
                                             ...sTd,
-                                            fontFamily: MONO,
+                                            fontFamily: T.font,
                                             fontWeight: 600,
                                             background: "transparent",
                                           }}
@@ -869,7 +870,7 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
                                         <td
                                           style={{
                                             ...sTd,
-                                            fontFamily: MONO,
+                                            fontFamily: T.font,
                                             background: "transparent",
                                           }}
                                         >
@@ -878,7 +879,7 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
                                         <td
                                           style={{
                                             ...sTd,
-                                            fontFamily: MONO,
+                                            fontFamily: T.font,
                                             fontWeight: 700,
                                             color: T.ink700,
                                             background: "transparent",
@@ -889,7 +890,7 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
                                         <td
                                           style={{
                                             ...sTd,
-                                            fontFamily: MONO,
+                                            fontFamily: T.font,
                                             color: T.ink500,
                                             background: "transparent",
                                           }}
@@ -901,7 +902,7 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
                                         <td
                                           style={{
                                             ...sTd,
-                                            fontFamily: MONO,
+                                            fontFamily: T.font,
                                             color: T.ink500,
                                             background: "transparent",
                                           }}
@@ -946,7 +947,7 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
                                     <td
                                       style={{
                                         ...sTd,
-                                        fontFamily: MONO,
+                                        fontFamily: T.font,
                                         fontWeight: 700,
                                         color: T.accentMid,
                                         background: "transparent",
@@ -981,13 +982,13 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
                                             }
                                             style={{
                                               padding: "4px 12px",
-                                              fontSize: 10,
+                                              fontSize: 11,
                                               fontFamily: T.font,
                                               fontWeight: 700,
                                               border: "none",
                                               color: "#fff",
                                               background: T.warning,
-                                              borderRadius: 3,
+                                              borderRadius: T.radius.sm,
                                               cursor: "pointer",
                                               letterSpacing: "0.06em",
                                               textTransform: "uppercase",
