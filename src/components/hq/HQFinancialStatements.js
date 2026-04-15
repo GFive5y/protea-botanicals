@@ -413,9 +413,9 @@ export default function HQFinancialStatements() {
       const { data, error } = await supabase.functions.invoke("generate-financial-statements", {
         body: {
           tenant_id: tenantId,
-          financial_year: financialYear,
-          period_label: periodLabel,
-          tenant_name: tenantName,
+          financial_year: selectedFY === "custom" ? "Custom Period" : selectedFY,
+          period_label: bounds ? bounds.label : "Period not set",
+          tenant_name: tenant?.name || "Business",
           status: currentStatus,
           signed_by: statusRow?.signed_by ?? null,
           signed_at: statusRow?.signed_at ?? null,
@@ -434,7 +434,7 @@ export default function HQFinancialStatements() {
     } finally {
       setDownloading(false);
     }
-  }, [loading, incomeData, bsData, cfData, equityData, tenantId, financialYear, periodLabel, tenantName, currentStatus, statusRow]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loading, incomeData, bsData, cfData, equityData, tenantId, selectedFY, bounds, tenant, currentStatus, statusRow]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (setupComplete === false) return <HQFinancialSetup onComplete={() => setSetupComplete(true)} />;
   if (setupComplete === null) return <div style={{ padding: 60, textAlign: "center", color: C.ink500, fontFamily: C.font }}>Loading{"\u2026"}</div>;
