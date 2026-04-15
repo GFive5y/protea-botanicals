@@ -125,7 +125,7 @@ type S = { y: number };
 function secBar(page: APage, s: S, label: string, fbold: AFont) {
   rect(page, ML, s.y - 2, CW, 13, C.sectionBg);
   dt(page, label, ML + 4, s.y, 7.5, fbold, C.ink500);
-  s.y -= 12;
+  s.y -= 16;
 }
 
 interface RowOpts {
@@ -154,14 +154,17 @@ function row(page: APage, s: S, label: string, value: number | null, opts: RowOp
 }
 
 function netRow(page: APage, s: S, label: string, value: number, pct: number, freg: AFont, fbold: AFont) {
+  // Precision contract: rect top = s.y+15, hr = s.y+16 — both below prev row rect bottom
+  // Gap from previous bold row shade = 3pt. Zero bleed by construction.
   const bg = value >= 0 ? C.hlGreen : C.hlRed;
-  rect(page, ML, s.y - 4, CW, 26, bg);
-  hr(page, s.y + 21, ML, PW - MR, value >= 0 ? rgb(0, 0.65, 0.4) : C.danger, 1.5);
-  dt(page, label, ML + 4, s.y, 10.5, fbold, C.ink900);
-  dt(page, `Net margin: ${safe(pct).toFixed(1)}%`, ML + 4, s.y - 13, 7.5, freg, C.ink500);
-  dtr(page, fmtR(value), PW - MR - 80, s.y, 10.5, fbold, value >= 0 ? C.success : C.danger);
-  dtr(page, "—", PW - MR, s.y, 8.5, freg, C.ink300);
-  s.y -= 26;
+  const lineColor = value >= 0 ? rgb(0, 0.65, 0.4) : C.danger;
+  rect(page, ML, s.y - 9, CW, 24, bg);
+  hr(page, s.y + 16, ML, PW - MR, lineColor, 1.5);
+  dt(page, label, ML + 4, s.y - 2, 10, fbold, C.ink900);
+  dt(page, `Net margin: ${safe(pct).toFixed(1)}%`, ML + 4, s.y - 14, 8, freg, C.ink500);
+  dtr(page, fmtR(value), PW - MR - 80, s.y - 2, 10, fbold, value >= 0 ? C.success : C.danger);
+  dtr(page, "\u2014", PW - MR, s.y - 2, 8.5, freg, C.ink300);
+  s.y -= 30;
 }
 
 function stmtClose(page: APage, freg: AFont) {
@@ -444,12 +447,12 @@ Deno.serve(async (req: Request) => {
     row(p4, s4, "Net profit / (loss) for the period", safe(cf.netProfit), { indent: 1 }, freg, fbold);
     row(p4, s4, "Add: depreciation of PPE (non-cash)", safe(cf.depreciationTotal), { indent: 2 }, freg, fbold);
     row(p4, s4, "Net cash from operating activities", safe(cf.netOperating), { bold: true, shade: true, green: true, sub: "Profit + depreciation add-back (simplified)" }, freg, fbold);
-    s4.y -= 4;
+    s4.y -= 10;
 
     secBar(p4, s4, "INVESTING ACTIVITIES", fbold);
     row(p4, s4, "Purchase of property, plant and equipment", safe(cf.capexPaid ?? 0), { indent: 1, negative: true }, freg, fbold);
     row(p4, s4, "Net cash used in investing activities", safe(cf.netInvesting ?? -safe(cf.capexPaid)), { bold: true, shade: true }, freg, fbold);
-    s4.y -= 4;
+    s4.y -= 10;
 
     secBar(p4, s4, "FINANCING ACTIVITIES", fbold);
     row(p4, s4, "Capital contributions / owner injections", safe(cf.financingInflow ?? 0), { indent: 1 }, freg, fbold);
@@ -458,12 +461,13 @@ Deno.serve(async (req: Request) => {
     s4.y -= 6;
 
     const nc = safe(cf.netCash);
-    rect(p4, ML, s4.y - 4, CW, 26, nc >= 0 ? C.hlGreen : C.hlRed);
-    hr(p4, s4.y + 21, ML, PW - MR, nc >= 0 ? rgb(0, 0.65, 0.4) : C.danger, 1.5);
-    dt(p4, "Net increase / (decrease) in cash and cash equivalents", ML + 4, s4.y, 10, fbold, C.ink900);
-    dtr(p4, fmtR(nc), PW - MR - 80, s4.y, 10, fbold, nc >= 0 ? C.success : C.danger);
-    dtr(p4, "\u2014", PW - MR, s4.y, 8.5, freg, C.ink300);
-    s4.y -= 32;
+    // Same precision contract as netRow — rect top = s4.y+15, hr = s4.y+16
+    rect(p4, ML, s4.y - 9, CW, 24, nc >= 0 ? C.hlGreen : C.hlRed);
+    hr(p4, s4.y + 16, ML, PW - MR, nc >= 0 ? rgb(0, 0.65, 0.4) : C.danger, 1.5);
+    dt(p4, "Net increase / (decrease) in cash and cash equivalents", ML + 4, s4.y - 2, 10, fbold, C.ink900);
+    dtr(p4, fmtR(nc), PW - MR - 80, s4.y - 2, 10, fbold, nc >= 0 ? C.success : C.danger);
+    dtr(p4, "\u2014", PW - MR, s4.y - 2, 8.5, freg, C.ink300);
+    s4.y -= 30;
 
     noteBox(p4, s4, "Simplified indirect method: net profit adjusted for non-cash depreciation. Working capital movements require prior-period snapshots and are not included. Financing activities identified from bank statement keyword matching.", freg);
     stmtClose(p4, freg);
