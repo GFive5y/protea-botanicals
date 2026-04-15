@@ -378,7 +378,7 @@ Deno.serve(async (req: Request) => {
 
     const balanced = Boolean(bs.balanced);
     rect(p3, ML, s3.y - 4, CW, 17, balanced ? C.hlGreen : C.hlRed);
-    dt(p3, balanced ? "\u2713  Assets = Liabilities + Equity" : "\u26A0  Statement does not balance", ML + 4, s3.y, 9, fbold, balanced ? C.success : C.danger);
+    dt(p3, balanced ? "Assets = Liabilities + Equity  [BALANCED]" : "Statement does not balance  [REVIEW REQUIRED]", ML + 4, s3.y, 9, fbold, balanced ? C.success : C.danger);
     s3.y -= 22;
 
     const totalCA = safe(bs.inventoryValue) + safe(bs.cashAtBank) + safe(bs.receivables) + safe(bs.vatReceivable);
@@ -606,7 +606,7 @@ Deno.serve(async (req: Request) => {
 
       const tbOk = Math.abs(tbDr - tbCr) < 1;
       rect(p7, ML, y7 - 4, CW, 16, tbOk ? C.hlGreen : C.hlRed);
-      dt(p7, tbOk ? "\u2713  Trial balance is balanced (Dr = Cr)" : `\u26A0  Out of balance by ${fmtR(Math.abs(tbDr - tbCr))}`, ML + 4, y7, 9, fbold, tbOk ? C.success : C.danger);
+      dt(p7, tbOk ? "Trial balance is balanced  [Dr = Cr]" : `Out of balance by ${fmtR(Math.abs(tbDr - tbCr))}  [REVIEW REQUIRED]`, ML + 4, y7, 9, fbold, tbOk ? C.success : C.danger);
     }
     footer(p7, 7, freg);
 
