@@ -6,9 +6,9 @@
 // LL-160: tenantId as PROP
 
 import React, { useState, useEffect, useCallback } from "react";
+import { Globe, Package, Store, ArrowLeftRight, HelpCircle, AlertTriangle, CheckCircle } from "lucide-react";
 import { supabase } from "../../services/supabaseClient";
 import { T } from "../../styles/tokens";
-const MONO = "'DM Mono','Courier New',monospace";
 
 // Channel display config
 const CHANNEL = {
@@ -17,35 +17,35 @@ const CHANNEL = {
     color: T.info,
     bg: T.infoLight,
     bd: T.infoBd,
-    icon: "🌐",
+    icon: <Globe size={12} />,
   },
   wholesale: {
     label: "Wholesale",
     color: T.warning,
     bg: T.warningLight,
     bd: T.warningBd,
-    icon: "📦",
+    icon: <Package size={12} />,
   },
   retail: {
     label: "Physical Store",
     color: T.accentMid,
     bg: T.accentLight,
     bd: T.accentBd,
-    icon: "🏪",
+    icon: <Store size={12} />,
   },
   transfer: {
     label: "Transfer Hold",
     color: T.ink500,
     bg: T.bg,
     bd: T.border,
-    icon: "🔄",
+    icon: <ArrowLeftRight size={12} />,
   },
   unknown: {
     label: "Untagged",
     color: T.ink500,
     bg: T.bg,
     bd: T.border,
-    icon: "?",
+    icon: <HelpCircle size={12} />,
   },
 };
 
@@ -227,17 +227,11 @@ export default function StockChannelPanel({ tenantId }) {
         }}
       >
         <div>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              color: T.ink500,
-              fontFamily: T.font,
-            }}
-          >
-            Channel Stock Hold
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ display: "inline-block", width: 3, height: 14, borderRadius: 2, background: T.accent, flexShrink: 0 }} />
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: T.ink400, fontFamily: T.font }}>
+              Channel Stock Hold
+            </span>
           </div>
           <div
             style={{
@@ -272,7 +266,7 @@ export default function StockChannelPanel({ tenantId }) {
       {totalHeld === 0 ? (
         /* No reservations state */
         <div style={{ padding: "32px 20px", textAlign: "center" }}>
-          <div style={{ fontSize: 28, marginBottom: 8 }}>✅</div>
+          <div style={{ marginBottom: 8, color: T.success }}><CheckCircle size={32} /></div>
           <div
             style={{
               fontSize: 13,
@@ -327,11 +321,11 @@ export default function StockChannelPanel({ tenantId }) {
                   <div
                     style={{
                       fontSize: 20,
-                      fontWeight: 400,
+                      fontWeight: 700,
                       color: cfg.color,
-                      fontFamily: MONO,
+                      fontFamily: T.font,
                       lineHeight: 1,
-                      letterSpacing: "-0.02em",
+                      fontVariantNumeric: "tabular-nums",
                     }}
                   >
                     {fmtN(totals[ch])}
@@ -367,7 +361,7 @@ export default function StockChannelPanel({ tenantId }) {
                   gap: 6,
                 }}
               >
-                ⚠ {fmtN(totals.unknown)} units in legacy holds (no channel tag).
+                <AlertTriangle size={12} /> {fmtN(totals.unknown)} units in legacy holds (no channel tag).
                 These are older reservations created before the channel system
                 was added.
               </div>
@@ -400,24 +394,24 @@ export default function StockChannelPanel({ tenantId }) {
             </span>
             {[
               {
-                icon: "🌐",
+                icon: <Globe size={12} />,
                 label: "Online",
                 desc: "Soft hold at checkout · releases if abandoned",
               },
               {
-                icon: "📦",
+                icon: <Package size={12} />,
                 label: "Wholesale",
                 desc: "Reserved on order confirm · released on shipment",
               },
               {
-                icon: "🏪",
+                icon: <Store size={12} />,
                 label: "Physical store",
                 desc: "Direct deduct at till · no advance hold (WP-POS pending)",
               },
             ].map(({ icon, label, desc }) => (
               <span
                 key={label}
-                style={{ fontSize: 11, color: T.info, fontFamily: T.font }}
+                style={{ fontSize: 11, color: T.info, fontFamily: T.font, display: "inline-flex", alignItems: "center", gap: 4 }}
               >
                 {icon} <strong>{label}</strong> — {desc}
               </span>
@@ -489,7 +483,7 @@ export default function StockChannelPanel({ tenantId }) {
                             style={{
                               fontSize: 10,
                               color: T.ink300,
-                              fontFamily: MONO,
+                              fontFamily: T.font,
                               marginTop: 2,
                             }}
                           >
@@ -520,7 +514,7 @@ export default function StockChannelPanel({ tenantId }) {
                           style={{
                             ...sTd,
                             textAlign: "right",
-                            fontFamily: MONO,
+                            fontFamily: T.font,
                             fontWeight: 600,
                             color: T.ink700,
                             fontVariantNumeric: "tabular-nums",
@@ -539,7 +533,7 @@ export default function StockChannelPanel({ tenantId }) {
                               style={{
                                 ...sTd,
                                 textAlign: "right",
-                                fontFamily: MONO,
+                                fontFamily: T.font,
                                 fontVariantNumeric: "tabular-nums",
                               }}
                             >
@@ -561,7 +555,7 @@ export default function StockChannelPanel({ tenantId }) {
                           style={{
                             ...sTd,
                             textAlign: "right",
-                            fontFamily: MONO,
+                            fontFamily: T.font,
                             fontWeight: 700,
                             color: isRisky
                               ? T.danger
@@ -608,7 +602,7 @@ export default function StockChannelPanel({ tenantId }) {
                                       color: cfg.color,
                                       border: `1px solid ${cfg.bd}`,
                                       fontWeight: 600,
-                                      fontFamily: MONO,
+                                      fontFamily: T.font,
                                     }}
                                   >
                                     {r.ref}
