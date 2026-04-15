@@ -341,20 +341,20 @@ const isLowFn = (item) =>
 // Module-scoped Lucide world icon map — referenced by both ShopTab and HQStock
 const WORLD_ICON_MAP = {
   all: <Package size={18} color={T.ink400} />,
-  flower: <Leaf size={18} color="#2d6a4f" />,
-  hash: <Gem size={18} color="#6c757d" />,
-  concentrate: <Gem size={18} color="#2980b9" />,
-  vape: <Wind size={18} color="#6c757d" />,
-  preroll: <ScrollText size={18} color="#e67e22" />,
-  edible: <Cookie size={18} color="#e67e22" />,
-  seeds: <Sprout size={18} color="#2d6a4f" />,
-  substrate: <Sprout size={18} color="#40916c" />,
-  nutrients: <FlaskConical size={18} color="#2980b9" />,
-  equipment: <Lightbulb size={18} color="#e67e22" />,
-  wellness: <Heart size={18} color="#2d6a4f" />,
-  papers: <ScrollText size={18} color="#6c757d" />,
-  accessories: <Wrench size={18} color="#6c757d" />,
-  merch: <Shirt size={18} color="#6c757d" />,
+  flower: <Leaf size={18} color={T.accent} />,
+  hash: <Gem size={18} color={T.ink600} />,
+  concentrate: <Gem size={18} color={T.info} />,
+  vape: <Wind size={18} color={T.ink600} />,
+  preroll: <ScrollText size={18} color={T.warning} />,
+  edible: <Cookie size={18} color={T.warning} />,
+  seeds: <Sprout size={18} color={T.accent} />,
+  substrate: <Sprout size={18} color={T.accentMid} />,
+  nutrients: <FlaskConical size={18} color={T.info} />,
+  equipment: <Lightbulb size={18} color={T.warning} />,
+  wellness: <Heart size={18} color={T.accent} />,
+  papers: <ScrollText size={18} color={T.ink600} />,
+  accessories: <Wrench size={18} color={T.ink600} />,
+  merch: <Shirt size={18} color={T.ink600} />,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -598,7 +598,7 @@ function ShopTab({ items, tenantId, onRefresh }) {
                   height: 130,
                   background: item.image_url
                     ? "#f5f5f3"
-                    : `linear-gradient(135deg,${isHidden ? "#888" : "#1A3D2B"} 0%,${isHidden ? "#aaa" : "#2D6A4F"} 100%)`,
+                    : `linear-gradient(135deg,${isHidden ? T.ink500 : T.accentText} 0%,${isHidden ? T.ink400 : T.accent} 100%)`,
                   position: "relative",
                   display: "flex",
                   alignItems: "center",
@@ -1461,7 +1461,7 @@ export default function HQStock() {
                 style={{
                   fontSize: "10px",
                   fontWeight: 700,
-                  color: T.ink500,
+                  color: T.ink400,
                   textTransform: "uppercase",
                   letterSpacing: "0.1em",
                 }}
@@ -2119,7 +2119,7 @@ export default function HQStock() {
                               padding: "2px 7px",
                               borderRadius: "3px",
                               background: T.bg,
-                              color: T.ink500,
+                              color: T.ink400,
                               letterSpacing: "0.1em",
                               textTransform: "uppercase",
                               fontWeight: 700,
@@ -3624,7 +3624,7 @@ export default function HQStock() {
                             padding: "2px 7px",
                             borderRadius: T.radius.sm,
                             background: T.bg,
-                            color: T.ink500,
+                            color: T.ink400,
                             border: "1px solid " + T.border,
                             textTransform: "uppercase",
                             letterSpacing: "0.08em",
@@ -5686,6 +5686,7 @@ export default function HQStock() {
                   background: "none",
                   border: "none",
                   fontSize: 20,
+                  fontVariantNumeric: "tabular-nums",
                   cursor: "pointer",
                   color: T.ink500,
                 }}
