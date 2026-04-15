@@ -65,30 +65,32 @@ const CHART = {
 };
 
 const sCard = {
-  background: "#fff",
+  background: T.surface,
   border: `1px solid ${T.border}`,
-  borderRadius: "6px",
+  borderRadius: T.radius.md,
   padding: "20px",
   boxShadow: T.shadow.sm,
 };
 const sLabel = {
-  fontSize: "10px",
-  letterSpacing: "0.1em",
+  fontSize: "11px",
+  letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: T.ink500,
+  color: T.ink400,
   marginBottom: "6px",
   fontFamily: T.font,
   fontWeight: 700,
 };
 const sTh = {
   textAlign: "left",
-  padding: "10px 12px",
-  fontSize: "9px",
-  letterSpacing: "0.15em",
+  padding: "11px 12px",
+  fontSize: "11px",
+  letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: T.ink500,
+  color: T.ink400,
   borderBottom: `2px solid ${T.border}`,
   fontWeight: 700,
+  fontFamily: T.font,
+  background: T.surface,
 };
 const sTd = {
   padding: "10px 12px",
@@ -390,7 +392,7 @@ export default function HQAnalytics() {
             background: T.accent,
             color: "#fff",
             border: "none",
-            borderRadius: "4px",
+            borderRadius: T.radius.sm,
             fontSize: "10px",
             letterSpacing: "0.1em",
             textTransform: "uppercase",
@@ -431,7 +433,7 @@ export default function HQAnalytics() {
               style={{
                 fontFamily: T.font,
                 fontSize: "22px",
-                fontWeight: 300,
+                fontWeight: 600,
                 color: T.ink900,
                 margin: 0,
               }}
@@ -478,7 +480,7 @@ export default function HQAnalytics() {
             style={{
               background: "transparent",
               border: `1px solid ${T.border}`,
-              borderRadius: "4px",
+              borderRadius: T.radius.sm,
               padding: "7px 14px",
               cursor: "pointer",
               fontFamily: T.font,
@@ -502,7 +504,7 @@ export default function HQAnalytics() {
             padding: "12px 16px",
             background: T.infoLight,
             border: `1px solid ${T.infoBd}`,
-            borderRadius: 6,
+            borderRadius: T.radius.md,
           }}
         >
           <div
@@ -524,9 +526,9 @@ export default function HQAnalytics() {
                 style={{
                   fontSize: 12,
                   color: T.info,
-                  background: "#fff",
+                  background: T.surface,
                   padding: "4px 10px",
-                  borderRadius: 3,
+                  borderRadius: T.radius.sm,
                   border: `1px solid ${T.infoBd}`,
                 }}
               >
@@ -645,7 +647,7 @@ export default function HQAnalytics() {
             background: toast.type === "error" ? T.danger : T.accent,
             color: "#fff",
             padding: "12px 18px",
-            borderRadius: 8,
+            borderRadius: T.radius.md,
             fontSize: 13,
             fontWeight: 600,
             fontFamily: T.font,
@@ -884,7 +886,7 @@ function OverviewAnalytics({ data, industryProfile }) {
                 key={i}
                 style={{
                   padding: "8px 14px",
-                  borderRadius: 4,
+                  borderRadius: T.radius.sm,
                   background: semBg[a.sem],
                   color: semC[a.sem],
                   border: `1px solid ${semBd[a.sem]}`,
@@ -907,7 +909,7 @@ function OverviewAnalytics({ data, industryProfile }) {
           gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
           gap: "1px",
           background: T.border,
-          borderRadius: 6,
+          borderRadius: T.radius.md,
           overflow: "hidden",
           border: `1px solid ${T.border}`,
           boxShadow: T.shadow.sm,
@@ -947,7 +949,7 @@ function OverviewAnalytics({ data, industryProfile }) {
           gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
           gap: "1px",
           background: T.border,
-          borderRadius: 6,
+          borderRadius: T.radius.md,
           overflow: "hidden",
           border: `1px solid ${T.border}`,
           boxShadow: T.shadow.sm,
@@ -990,7 +992,7 @@ function OverviewAnalytics({ data, industryProfile }) {
           gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
           gap: "1px",
           background: T.border,
-          borderRadius: 6,
+          borderRadius: T.radius.md,
           overflow: "hidden",
           border: `1px solid ${T.border}`,
           boxShadow: T.shadow.sm,
@@ -1525,7 +1527,7 @@ function OverviewAnalytics({ data, industryProfile }) {
                       style={{
                         fontSize: 10,
                         padding: "2px 8px",
-                        borderRadius: 3,
+                        borderRadius: T.radius.sm,
                         background:
                           m.movement_type?.includes("out") ||
                           m.movement_type?.includes("Out")
@@ -1652,7 +1654,7 @@ function SupplyChainAnalytics({ data, industryProfile }) {
                   padding: 14,
                   background: T.bg,
                   border: `1px solid ${T.border}`,
-                  borderRadius: 6,
+                  borderRadius: T.radius.md,
                   borderLeft: `3px solid ${CATEGORY_COLORS[cat] || T.ink500}`,
                 }}
               >
@@ -1673,8 +1675,9 @@ function SupplyChainAnalytics({ data, industryProfile }) {
                   style={{
                     fontFamily: T.font,
                     fontSize: 20,
-                    fontWeight: 400,
+                    fontWeight: 700,
                     color: T.ink900,
+                    fontVariantNumeric: "tabular-nums",
                   }}
                 >
                   {d.count} items
@@ -1809,8 +1812,9 @@ function SupplyChainAnalytics({ data, industryProfile }) {
                     style={{
                       fontFamily: T.font,
                       fontSize: 18,
-                      fontWeight: 400,
+                      fontWeight: 700,
                       color: poStatusColors[status] || T.ink500,
+                      fontVariantNumeric: "tabular-nums",
                     }}
                   >
                     {count}
@@ -1859,8 +1863,9 @@ function SupplyChainAnalytics({ data, industryProfile }) {
                     style={{
                       fontFamily: T.font,
                       fontSize: 16,
-                      fontWeight: 400,
+                      fontWeight: 700,
                       color: T.accent,
+                      fontVariantNumeric: "tabular-nums",
                     }}
                   >{`R${s.total.toLocaleString()}`}</span>
                 </div>
@@ -1923,7 +1928,7 @@ function SupplyChainAnalytics({ data, industryProfile }) {
                     style={{
                       fontSize: 9,
                       padding: "2px 6px",
-                      borderRadius: 3,
+                      borderRadius: T.radius.sm,
                       background: T.bg,
                       color: CATEGORY_COLORS[i.category] || T.ink500,
                       textTransform: "uppercase",
@@ -2008,7 +2013,7 @@ function ProductionAnalytics({ data, industryProfile }) {
           gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
           gap: "1px",
           background: T.border,
-          borderRadius: 6,
+          borderRadius: T.radius.md,
           overflow: "hidden",
           border: `1px solid ${T.border}`,
           boxShadow: T.shadow.sm,
@@ -2127,7 +2132,7 @@ function ProductionAnalytics({ data, industryProfile }) {
                           style={{
                             fontSize: 10,
                             padding: "2px 8px",
-                            borderRadius: 3,
+                            borderRadius: T.radius.sm,
                             background: `${statusC[r.status] || T.ink500}18`,
                             color: statusC[r.status] || T.ink500,
                             textTransform: "uppercase",
@@ -2259,7 +2264,7 @@ function DistributionAnalytics({ data }) {
             padding: "12px 16px",
             background: T.dangerLight,
             border: `1px solid ${T.dangerBd}`,
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             fontSize: 13,
             color: T.danger,
             fontWeight: 600,
@@ -2276,7 +2281,7 @@ function DistributionAnalytics({ data }) {
           gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
           gap: "1px",
           background: T.border,
-          borderRadius: 6,
+          borderRadius: T.radius.md,
           overflow: "hidden",
           border: `1px solid ${T.border}`,
           boxShadow: T.shadow.sm,
@@ -2531,7 +2536,7 @@ function ScansAnalytics({ data, industryProfile }) {
                         style={{
                           height: 32,
                           background: T.bg,
-                          borderRadius: 4,
+                          borderRadius: T.radius.sm,
                           overflow: "hidden",
                         }}
                       >
@@ -2540,7 +2545,7 @@ function ScansAnalytics({ data, industryProfile }) {
                             height: "100%",
                             width: `${pct}%`,
                             background: stage.color,
-                            borderRadius: 4,
+                            borderRadius: T.radius.sm,
                             transition: "width 0.4s",
                             display: "flex",
                             alignItems: "center",
@@ -2777,7 +2782,7 @@ function ScansAnalytics({ data, industryProfile }) {
           gridTemplateColumns: "repeat(5,1fr)",
           gap: "1px",
           background: T.border,
-          borderRadius: 6,
+          borderRadius: T.radius.md,
           overflow: "hidden",
           border: `1px solid ${T.border}`,
           boxShadow: T.shadow.sm,
@@ -2920,8 +2925,9 @@ function ScansAnalytics({ data, industryProfile }) {
                     style={{
                       fontFamily: T.font,
                       fontSize: 16,
-                      fontWeight: 400,
+                      fontWeight: 700,
                       color: T.ink900,
+                      fontVariantNumeric: "tabular-nums",
                     }}
                   >
                     {p.count}
@@ -3087,7 +3093,7 @@ function ScansAnalytics({ data, industryProfile }) {
           gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
           gap: "1px",
           background: T.border,
-          borderRadius: 6,
+          borderRadius: T.radius.md,
           overflow: "hidden",
           border: `1px solid ${T.border}`,
           boxShadow: T.shadow.sm,
@@ -3133,26 +3139,26 @@ function KPI({ label, value, semantic, sub }) {
     info: T.info,
   };
   const semBorder = {
-    success: "#16A34A",
-    warning: "#D97706",
-    danger: "#DC2626",
-    info: "#2563EB",
+    success: T.successText || T.success,
+    warning: T.warningText || T.warning,
+    danger:  T.dangerText  || T.danger,
+    info:    T.infoText    || T.info,
   };
   const color = semantic ? semC[semantic] : T.ink900;
   const borderColor = semantic ? semBorder[semantic] : "transparent";
   return (
     <div style={{
-      background: "#fff",
+      background: T.surface,
       padding: "16px 18px",
       borderLeft: `3px solid ${borderColor}`,
     }}>
       <div
         style={{
-          fontSize: "10px",
+          fontSize: "11px",
           fontWeight: 700,
           letterSpacing: "0.08em",
           textTransform: "uppercase",
-          color: "#6B7280",
+          color: T.ink400,
           marginBottom: 8,
           fontFamily: T.font,
         }}
@@ -3163,7 +3169,7 @@ function KPI({ label, value, semantic, sub }) {
         style={{
           fontFamily: T.font,
           fontSize: "22px",
-          fontWeight: 600,
+          fontWeight: 700,
           color,
           lineHeight: 1,
           letterSpacing: "-0.02em",
@@ -3175,8 +3181,8 @@ function KPI({ label, value, semantic, sub }) {
       {sub && (
         <div
           style={{
-            color: "#9CA3AF",
-            fontSize: 10,
+            color: T.ink400,
+            fontSize: 11,
             marginTop: 3,
             fontFamily: T.font,
           }}
@@ -3195,7 +3201,7 @@ function PipelineCard({ stage, items, color }) {
         background: T.bg,
         border: `1px solid ${T.border}`,
         borderLeft: `3px solid ${color}`,
-        borderRadius: 6,
+        borderRadius: T.radius.md,
         padding: 14,
         textAlign: "center",
       }}
