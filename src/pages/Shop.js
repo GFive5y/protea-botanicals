@@ -30,6 +30,7 @@ import { createClient } from "@supabase/supabase-js";
 import ClientHeader from "../components/ClientHeader";
 import { useTenant } from "../services/tenantService";
 import { useStorefront } from "../contexts/StorefrontContext"; // ✦ WP-MULTISITE
+import { T } from "../styles/tokens";
 
 // ── Public/anonymous client for storefront product queries ────────────────────
 // Uses a no-op storage adapter so it NEVER reads the logged-in user's session
@@ -1038,9 +1039,9 @@ function CannabisShopCard({ product, onAddToCart, brandLibrary }) {
   return (
     <div
       style={{
-        background: "#fff",
+        background: T.surface,
         border: `1px solid ${product.inStock ? "#E8E8E4" : "#D0D0CC"}`,
-        borderRadius: 12,
+        borderRadius: T.radius.lg,
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
@@ -1106,12 +1107,12 @@ function CannabisShopCard({ product, onAddToCart, brandLibrary }) {
           >
             <span
               style={{
-                background: "#fff",
+                background: T.surface,
                 color: "#111",
                 fontSize: 10,
                 fontWeight: 700,
                 padding: "4px 12px",
-                borderRadius: 20,
+                borderRadius: T.radius.full,
                 letterSpacing: "0.12em",
                 textTransform: "uppercase",
               }}
@@ -1137,10 +1138,10 @@ function CannabisShopCard({ product, onAddToCart, brandLibrary }) {
               style={{
                 background: "#b5935a",
                 color: "#fff",
-                fontSize: 9,
+                fontSize: 11,
                 fontWeight: 700,
                 padding: "2px 7px",
-                borderRadius: 10,
+                borderRadius: T.radius.full,
                 letterSpacing: "0.07em",
               }}
             >
@@ -1151,10 +1152,10 @@ function CannabisShopCard({ product, onAddToCart, brandLibrary }) {
             style={{
               background: "rgba(0,0,0,0.45)",
               color: "#fff",
-              fontSize: 9,
+              fontSize: 11,
               fontWeight: 600,
               padding: "2px 8px",
-              borderRadius: 10,
+              borderRadius: T.radius.full,
               letterSpacing: "0.07em",
               textTransform: "uppercase",
             }}
@@ -1173,10 +1174,10 @@ function CannabisShopCard({ product, onAddToCart, brandLibrary }) {
               right: 8,
               background: "#FEF2F2",
               color: "#991B1B",
-              fontSize: 9,
+              fontSize: 11,
               fontWeight: 700,
               padding: "2px 7px",
-              borderRadius: 10,
+              borderRadius: T.radius.full,
             }}
           >
             {daysToExpiry}d left
@@ -1190,10 +1191,10 @@ function CannabisShopCard({ product, onAddToCart, brandLibrary }) {
               right: 8,
               background: "#FEF2F2",
               color: "#991B1B",
-              fontSize: 9,
+              fontSize: 11,
               fontWeight: 700,
               padding: "2px 7px",
-              borderRadius: 10,
+              borderRadius: T.radius.full,
             }}
           >
             EXPIRED
@@ -1210,7 +1211,7 @@ function CannabisShopCard({ product, onAddToCart, brandLibrary }) {
               color: "rgba(255,255,255,0.7)",
               fontSize: 8,
               padding: "1px 5px",
-              borderRadius: 6,
+              borderRadius: T.radius.md,
             }}
           >
             ✓ brand
@@ -1231,7 +1232,7 @@ function CannabisShopCard({ product, onAddToCart, brandLibrary }) {
         {product.brand && (
           <div
             style={{
-              fontSize: 9,
+              fontSize: 11,
               fontWeight: 700,
               color: "#52b788",
               letterSpacing: "0.1em",
@@ -1293,7 +1294,7 @@ function CannabisShopCard({ product, onAddToCart, brandLibrary }) {
                 background: adding ? "#52b788" : "#1A3D2B",
                 color: "#fff",
                 border: "none",
-                borderRadius: 6,
+                borderRadius: T.radius.md,
                 fontSize: 11,
                 fontWeight: 600,
                 cursor: "pointer",
@@ -1311,7 +1312,7 @@ function CannabisShopCard({ product, onAddToCart, brandLibrary }) {
                 background: "transparent",
                 color: "#666",
                 border: "1px solid #D0D0CC",
-                borderRadius: 6,
+                borderRadius: T.radius.md,
                 fontSize: 11,
                 fontWeight: 600,
                 cursor: "pointer",
@@ -1580,7 +1581,7 @@ function CannabinoidDonut({ cannabinoids, accentColor }) {
           <span
             className="body-font"
             style={{
-              fontSize: 9,
+              fontSize: 11,
               letterSpacing: "0.2em",
               color: "#888",
               textTransform: "uppercase",
@@ -1608,7 +1609,7 @@ function CannabinoidDonut({ cannabinoids, accentColor }) {
               style={{
                 width: 8,
                 height: 8,
-                borderRadius: 2,
+                borderRadius: T.radius.sm,
                 background: s.color,
                 flexShrink: 0,
               }}
@@ -1646,18 +1647,18 @@ const shopStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=Jost:wght@300;400;500;600&display=swap');
   .shop-font { font-family: 'Cormorant Garamond', Georgia, serif; }
   .body-font { font-family: 'Jost', sans-serif; }
-  .shop-card { background: white; border: 1px solid #e8e0d4; border-radius: 2px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
+  .shop-card { background: white; border: 1px solid #e8e0d4; border-radius: 4px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
   .shop-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
-  .shop-btn { font-family: 'Jost', sans-serif; padding: 11px 28px; background: #1b4332; color: white; border: none; border-radius: 2px; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; transition: background 0.2s; font-weight: 500; display: inline-block; text-decoration: none; text-align: center; }
+  .shop-btn { font-family: 'Jost', sans-serif; padding: 11px 28px; background: #1b4332; color: white; border: none; border-radius: 4px; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; transition: background 0.2s; font-weight: 500; display: inline-block; text-decoration: none; text-align: center; }
   .shop-btn:hover { background: #2d6a4f; }
-  .shop-btn-outline { font-family: 'Jost', sans-serif; padding: 10px 24px; background: transparent; border: 1px solid #1b4332; color: #1b4332; border-radius: 2px; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; transition: all 0.2s; font-weight: 500; text-decoration: none; text-align: center; display: inline-block; }
+  .shop-btn-outline { font-family: 'Jost', sans-serif; padding: 10px 24px; background: transparent; border: 1px solid #1b4332; color: #1b4332; border-radius: 4px; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; transition: all 0.2s; font-weight: 500; text-decoration: none; text-align: center; display: inline-block; }
   .shop-btn-outline:hover { background: #1b4332; color: white; }
-  .shop-filter-btn { font-family: 'Jost', sans-serif; padding: 8px 20px; border: 1px solid #d8d0c4; border-radius: 2px; background: white; color: #666; font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer; transition: all 0.2s; font-weight: 400; white-space: nowrap; }
+  .shop-filter-btn { font-family: 'Jost', sans-serif; padding: 8px 20px; border: 1px solid #d8d0c4; border-radius: 4px; background: white; color: #666; font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer; transition: all 0.2s; font-weight: 400; white-space: nowrap; }
   .shop-filter-btn:hover { border-color: #1b4332; color: #1b4332; }
   .shop-filter-btn.active { background: #1b4332; color: white; border-color: #1b4332; }
-  .shop-effect-tag { font-family: 'Jost', sans-serif; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 10px; border-radius: 2px; font-weight: 400; }
-  .shop-format-badge { font-family: 'Jost', sans-serif; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; padding: 4px 12px; border-radius: 2px; font-weight: 500; }
-  .cs-card { background: #f9f7f2; border: 1px dashed #d8d0c4; border-radius: 2px; padding: 40px 28px; text-align: center; transition: border-color 0.2s; }
+  .shop-effect-tag { font-family: 'Jost', sans-serif; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 10px; border-radius: 4px; font-weight: 400; }
+  .shop-format-badge { font-family: 'Jost', sans-serif; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; padding: 4px 12px; border-radius: 4px; font-weight: 500; }
+  .cs-card { background: #f9f7f2; border: 1px dashed #d8d0c4; border-radius: 4px; padding: 40px 28px; text-align: center; transition: border-color 0.2s; }
   .cs-card:hover { border-color: #b5935a; }
   .shop-footer-link { font-family: 'Jost', sans-serif; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: #555; text-decoration: none; transition: color 0.2s; }
   .shop-footer-link:hover { color: #52b788; }
@@ -1666,14 +1667,14 @@ const shopStyles = `
   .strain-modal-card { background: #faf9f6; border-radius: 4px; width: 100%; max-width: 820px; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 32px 80px rgba(0,0,0,0.55); animation: modalSlideUp 0.3s ease forwards; display: flex; flex-direction: column; }
   .strain-modal-card::-webkit-scrollbar { width: 4px; }
   .strain-modal-card::-webkit-scrollbar-track { background: #f0ebe3; }
-  .strain-modal-card::-webkit-scrollbar-thumb { background: #c8bfb0; border-radius: 2px; }
-  .modal-close-btn { position: absolute; top: 16px; right: 16px; z-index: 10; width: 36px; height: 36px; border-radius: 2px; background: rgba(0,0,0,0.3); border: none; color: white; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; font-family: 'Jost', sans-serif; line-height: 1; }
+  .strain-modal-card::-webkit-scrollbar-thumb { background: #c8bfb0; border-radius: 4px; }
+  .modal-close-btn { position: absolute; top: 16px; right: 16px; z-index: 10; width: 36px; height: 36px; border-radius: 4px; background: rgba(0,0,0,0.3); border: none; color: white; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; font-family: 'Jost', sans-serif; line-height: 1; }
   .modal-close-btn:hover { background: rgba(0,0,0,0.55); }
-  .modal-card { background: white; border: 1px solid #e8e0d4; border-radius: 2px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-  .modal-terpene-card { background: white; border: 1px solid #e8e0d4; border-radius: 2px; padding: 20px 18px; position: relative; overflow: hidden; }
+  .modal-card { background: white; border: 1px solid #e8e0d4; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .modal-terpene-card { background: white; border: 1px solid #e8e0d4; border-radius: 4px; padding: 20px 18px; position: relative; overflow: hidden; }
   .modal-verify-link { font-family: 'Jost', sans-serif; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.55); text-decoration: none; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 2px; transition: color 0.2s, border-color 0.2s; }
   .modal-verify-link:hover { color: white; border-color: rgba(255,255,255,0.5); }
-  .what-numbers-card { background: white; border: 1px solid #e8e0d4; border-radius: 2px; padding: 24px 22px; }
+  .what-numbers-card { background: white; border: 1px solid #e8e0d4; border-radius: 4px; padding: 24px 22px; }
   @keyframes modalFadeIn { from { opacity: 0; } to { opacity: 1; } }
   @keyframes modalSlideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
@@ -1807,7 +1808,7 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
                 alignItems: "center",
                 gap: 5,
                 padding: "4px 12px",
-                borderRadius: 2,
+                borderRadius: T.radius.sm,
                 fontSize: 10,
                 letterSpacing: "0.15em",
                 textTransform: "uppercase",
@@ -1826,7 +1827,7 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
                 alignItems: "center",
                 gap: 5,
                 padding: "4px 12px",
-                borderRadius: 2,
+                borderRadius: T.radius.sm,
                 fontSize: 10,
                 letterSpacing: "0.15em",
                 textTransform: "uppercase",
@@ -1874,7 +1875,7 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
                 letterSpacing: "0.12em",
                 textTransform: "uppercase",
                 padding: "4px 12px",
-                borderRadius: 2,
+                borderRadius: T.radius.sm,
                 color: strain.typeColor,
                 background: `${strain.typeColor}18`,
                 border: `1px solid ${strain.typeColor}40`,
@@ -1892,7 +1893,7 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
                   letterSpacing: "0.12em",
                   textTransform: "uppercase",
                   padding: "4px 12px",
-                  borderRadius: 2,
+                  borderRadius: T.radius.sm,
                   color: "rgba(255,255,255,0.5)",
                   border: "1px solid rgba(255,255,255,0.12)",
                   background: "rgba(255,255,255,0.05)",
@@ -2020,7 +2021,7 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
                 <p
                   className="body-font"
                   style={{
-                    fontSize: 9,
+                    fontSize: 11,
                     color: "#aaa",
                     letterSpacing: "0.15em",
                     textTransform: "uppercase",
@@ -2064,7 +2065,7 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
                   <p
                     className="body-font"
                     style={{
-                      fontSize: 9,
+                      fontSize: 11,
                       letterSpacing: "0.25em",
                       color: "#aaa",
                       textTransform: "uppercase",
@@ -2119,7 +2120,7 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
                     <p
                       className="body-font"
                       style={{
-                        fontSize: 9,
+                        fontSize: 11,
                         letterSpacing: "0.25em",
                         color: "#aaa",
                         textTransform: "uppercase",
@@ -2182,12 +2183,12 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
                     <span
                       className="body-font"
                       style={{
-                        fontSize: 9,
+                        fontSize: 11,
                         letterSpacing: "0.15em",
                         textTransform: "uppercase",
                         fontWeight: 500,
                         padding: "3px 8px",
-                        borderRadius: 2,
+                        borderRadius: T.radius.sm,
                         background: "rgba(181,147,90,0.1)",
                         color: "#b5935a",
                         border: "1px solid rgba(181,147,90,0.2)",
@@ -2298,7 +2299,7 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
                       <span
                         className="body-font"
                         style={{
-                          fontSize: 9,
+                          fontSize: 11,
                           letterSpacing: "0.2em",
                           color: "#ccc",
                           textTransform: "uppercase",
@@ -2325,7 +2326,7 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
                         marginTop: 12,
                         height: 2,
                         background: "#f0ebe3",
-                        borderRadius: 2,
+                        borderRadius: T.radius.sm,
                         overflow: "hidden",
                       }}
                     >
@@ -2387,7 +2388,7 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
                       letterSpacing: "0.15em",
                       textTransform: "uppercase",
                       padding: "4px 12px",
-                      borderRadius: 2,
+                      borderRadius: T.radius.sm,
                       background: "rgba(82,183,136,0.1)",
                       color: "#52b788",
                       border: "1px solid rgba(82,183,136,0.2)",
@@ -2896,7 +2897,7 @@ export default function Shop() {
                   color: "#BF360C",
                   background: "rgba(191,54,12,0.08)",
                   padding: "3px 10px",
-                  borderRadius: 2,
+                  borderRadius: T.radius.sm,
                   border: "1px solid rgba(191,54,12,0.2)",
                 }}
               >
@@ -2909,7 +2910,7 @@ export default function Shop() {
             style={{
               background: "none",
               border: "1px solid #E65100",
-              borderRadius: 2,
+              borderRadius: T.radius.sm,
               padding: "5px 14px",
               cursor: "pointer",
               fontFamily: "Jost, sans-serif",
@@ -3076,7 +3077,7 @@ export default function Shop() {
                 <span
                   className="body-font"
                   style={{
-                    fontSize: 9,
+                    fontSize: 11,
                     letterSpacing: "0.25em",
                     textTransform: "uppercase",
                     color: "rgba(255,255,255,0.35)",
@@ -3475,7 +3476,7 @@ export default function Shop() {
           >
             <button
               className="shop-btn"
-              style={{ background: "white", color: "#1b4332" }}
+              style={{ background: T.surface, color: "#1b4332" }}
               onClick={() => navigate("/loyalty")}
             >
               My Points
@@ -3506,7 +3507,7 @@ export default function Shop() {
             background: "#1b4332",
             color: "white",
             padding: "14px 32px",
-            borderRadius: 2,
+            borderRadius: T.radius.sm,
             boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
             zIndex: 9999,
             display: "flex",
@@ -3705,12 +3706,12 @@ function FoodShopCard({ product, onAddToCart }) {
               padding: "8px 10px",
               background: "#fff8e7",
               border: "1px solid #f0c36d",
-              borderRadius: 2,
+              borderRadius: T.radius.sm,
             }}
           >
             <div
               style={{
-                fontSize: 9,
+                fontSize: 11,
                 letterSpacing: "0.15em",
                 textTransform: "uppercase",
                 color: "#b5935a",
@@ -3729,7 +3730,7 @@ function FoodShopCard({ product, onAddToCart }) {
                     background: "#fff3cd",
                     color: "#856404",
                     border: "1px solid #ffc10740",
-                    fontSize: 9,
+                    fontSize: 11,
                   }}
                 >
                   {a.replace(/_/g, " ")}
@@ -3744,7 +3745,7 @@ function FoodShopCard({ product, onAddToCart }) {
               marginBottom: 12,
               fontSize: 11,
               padding: "5px 8px",
-              borderRadius: 2,
+              borderRadius: T.radius.sm,
               background: isExpired
                 ? "#fdf0ef"
                 : expiryWarning
@@ -3785,7 +3786,7 @@ function FoodShopCard({ product, onAddToCart }) {
               marginBottom: 14,
               padding: "8px 10px",
               background: "#f4f0e8",
-              borderRadius: 2,
+              borderRadius: T.radius.sm,
               fontSize: 12,
               color: "#666",
               lineHeight: 1.5,
@@ -3793,7 +3794,7 @@ function FoodShopCard({ product, onAddToCart }) {
           >
             <strong
               style={{
-                fontSize: 9,
+                fontSize: 11,
                 letterSpacing: "0.12em",
                 textTransform: "uppercase",
                 display: "block",
@@ -3813,14 +3814,14 @@ function FoodShopCard({ product, onAddToCart }) {
               padding: "8px 10px",
               background: "#eff6ff",
               border: "1px solid #bfdbfe",
-              borderRadius: 2,
+              borderRadius: T.radius.sm,
               fontSize: 11,
               color: "#1e3a5f",
             }}
           >
             <strong
               style={{
-                fontSize: 9,
+                fontSize: 11,
                 letterSpacing: "0.12em",
                 textTransform: "uppercase",
                 display: "block",
@@ -3940,14 +3941,14 @@ function GeneralShopCard({ product, onAddToCart }) {
               padding: "8px 10px",
               background: "#eff6ff",
               border: "1px solid #bfdbfe",
-              borderRadius: 2,
+              borderRadius: T.radius.sm,
               fontSize: 11,
               color: "#1e3a5f",
             }}
           >
             <strong
               style={{
-                fontSize: 9,
+                fontSize: 11,
                 letterSpacing: "0.12em",
                 textTransform: "uppercase",
                 display: "block",
