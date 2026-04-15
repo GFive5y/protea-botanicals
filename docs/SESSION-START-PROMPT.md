@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 15 April 2026 — Session 284
+## Updated: 16 April 2026 — Session 285
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -43,7 +43,28 @@ IF DEMO DATE CHANGES: update PENDING-ACTIONS.md first, then this file.
 
 ## CURRENT STATE — 15 April 2026 — Session 284 Close
 
-### DS6 VISUAL UNIFICATION — Session 284 (commit 366dcc3)
+### DS6 VISUAL UNIFICATION — Session 285 (commit 351bc44)
+
+Master visual spec: docs/NUAI-VISUAL-SPEC.md — mandatory before any visual code.
+
+Files unified this session:
+- HQStock.js — DS6 Phase 2a COMPLETE
+  DM Mono → T.font (36x), Outfit → T.font, emoji → Lucide (11x):
+    💰🛒🌐🗑✕✓★⏳📷🌿⚠☰⊞⊟ all replaced
+  LL-267 applied: outer return div has no background (transparent)
+  WORLD_ICON_MAP lifted to module scope — was inside ShopTab (scope bug caught
+  by ESLint, fixed before push). Both ShopTab + HQStock render now reference
+  shared constant.
+  23 Lucide icons in import block.
+
+DS6 Phase 2b OPEN (next session, same file):
+  - fontWeight 300/400 on 22px values → 700 (7 instances)
+  - fontSize 9/10 → 11px floor (43 instances)
+  - borderRadius 6/5 on cards → T.radius.lg 12px (12 instances)
+  - Section labels T.ink500 → T.ink400 + accent bar (13 instances)
+  - WORLD_ICON_MAP hex colours → T tokens (minor hygiene)
+
+Previous session (284):
 
 Master visual spec: docs/NUAI-VISUAL-SPEC.md — mandatory before any visual code.
 
@@ -88,7 +109,10 @@ All bank recons at 0 unmatched lines.
 NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
-- LOOP-NEW-005: MediCare Revenue MTD shows R0 — reads from orders, must read
+- LOOP-DS6-004: HQStock.js DS6 Phase 2b — fontWeight floor, fontSize floor,
+  borderRadius tokens, section label accent bars, WORLD_ICON_MAP token hygiene.
+  7+43+12+13+minor = ~76 targeted edits. Read file first (LL-185).
+- - LOOP-NEW-005: MediCare Revenue MTD shows R0 — reads from orders, must read
   from dispensing_log for cannabis_dispensary profile per LL-231. Claude Code
   fix: find Revenue MTD tile in dispensary dashboard component, switch source.
 - LOOP-NEW-006: MediCare IFRS BS gap R76,906 — equity_ledger recalibration

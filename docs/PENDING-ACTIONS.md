@@ -28,6 +28,20 @@ When this changes:
 
 ## OUTSTANDING — MUST COMPLETE BEFORE 12 MAY 2026
 
+### LOOP-DS6-004 — HQStock.js DS6 Phase 2b (token floor pass)
+Status: OPEN · Added Session 285
+What shipped in 351bc44: DM Mono→Inter (36x), emoji→Lucide (11x), LL-267 outer div, WORLD_ICON_MAP scope fix.
+Remaining in same file:
+  - fontWeight 300/400 on 22px values → 700 (7 instances)
+  - fontSize 9/10 → 11px floor (43 instances)
+  - borderRadius 6/5 on cards → T.radius.lg 12px (12 instances)
+  - Section labels: T.ink500 → T.ink400 + accent bar pattern (13 instances)
+  - WORLD_ICON_MAP hardcoded hex → T tokens (minor)
+Close when: grep confirms 0 instances of fontSize:9, fontSize:10, fontWeight:300,
+  borderRadius:6, borderRadius:5 in HQStock context, AND all section labels
+  use accent bar pattern.
+Read file first (LL-185, RULE 0L). Apply LL-267 check as part of close verification.
+
 ### LOOP-010 — Medi Rec: Run Depreciation (UI action)
 Status: OPEN
 Action: /tenant-portal (Medi Rec) → Fixed Assets → Run Depreciation

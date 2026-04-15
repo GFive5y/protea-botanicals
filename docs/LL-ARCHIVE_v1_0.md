@@ -508,3 +508,32 @@ Session 261 state (HEAD 91719e5) while true state was Session 282 (HEAD de41ec6)
 Fixed same session by Claude Code in-place update.
 
 *LL-264 added: Session 282 · April 15, 2026*
+
+---
+
+## LL-265, LL-266, LL-267 — Sessions 282-284 (April 15, 2026)
+
+LL-265: Production URL is protea-botanicals.vercel.app — NEVER use preview URLs
+(format f520llkld or similar). Preview URLs serve frozen builds and will show
+stale behaviour that doesn't match main. Always test on the production URL
+or localhost.
+
+LL-266: TenantPortal INNER wrapper must NOT use maxWidth or margin: auto.
+Content must fill 100% between sidebar and scrollbar at all zoom levels.
+Individual tab components manage their own internal layout width if needed.
+The grey T.bg side-strips visible when zoomed out are caused by maxWidth
+centering — this is prohibited. Applied Session 284 (LOOP-DS6-001 fix).
+
+LL-267: Tab-level components rendered inside HQDashboard or TenantPortal
+must NOT set background on their outermost return div. Correct layering:
+  Shell (HQDashboard/TenantPortal) — background: T.bg (grey chrome)
+  Tab outer div — background: "transparent" (grey shows through)
+  Page header div — background: T.surface (white sticky header)
+  Tab content — no background (grey shows through)
+  SectionCards/tiles — T.surface (white cards on grey)
+Violating this creates a white middleman box over the grey AppShell chrome.
+Root cause fixed in: HQLoyalty.js (366dcc3), HQDashboard.js (e216d4d),
+HQStock.js (351bc44).
+Applied to: every tab component going forward — check before shipping.
+
+*LL-265 through LL-267 added: Sessions 282-284 · April 15-16, 2026*
