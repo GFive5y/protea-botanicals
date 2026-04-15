@@ -59,9 +59,9 @@ const F = {
 };
 
 const sCard = {
-  background: "#fff",
+  background: T.surface,
   border: `1px solid ${T.border}`,
-  borderRadius: "6px",
+  borderRadius: T.radius.md,
   padding: "20px",
   boxShadow: T.shadow.sm,
 };
@@ -79,8 +79,8 @@ const sBtn = (v = "primary") => ({
   border: ["primary", "danger", "amber"].includes(v)
     ? "none"
     : `1px solid ${T.accentBd}`,
-  borderRadius: "4px",
-  fontSize: "10px",
+  borderRadius: T.radius.sm,
+  fontSize: "11px",
   letterSpacing: "0.1em",
   textTransform: "uppercase",
   fontWeight: 600,
@@ -91,33 +91,35 @@ const sBtn = (v = "primary") => ({
 const sInput = {
   padding: "8px 12px",
   border: `1px solid ${T.border}`,
-  borderRadius: "4px",
+  borderRadius: T.radius.sm,
   fontSize: "13px",
   fontFamily: T.font,
-  background: "#fff",
+  background: T.surface,
   outline: "none",
   width: "100%",
   boxSizing: "border-box",
 };
 const sSelect = { ...sInput, cursor: "pointer" };
 const sLabel = {
-  fontSize: "10px",
-  letterSpacing: "0.1em",
+  fontSize: "11px",
+  letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: T.ink500,
+  color: T.ink400,
   marginBottom: "6px",
   fontFamily: T.font,
   fontWeight: 700,
 };
 const sTh = {
   textAlign: "left",
-  padding: "10px 12px",
-  fontSize: "9px",
-  letterSpacing: "0.15em",
+  padding: "11px 12px",
+  fontSize: "11px",
+  letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: T.ink500,
+  color: T.ink400,
   borderBottom: `2px solid ${T.border}`,
   fontWeight: 700,
+  fontFamily: T.font,
+  background: T.surface,
 };
 const sTd = {
   padding: "10px 12px",
@@ -286,9 +288,9 @@ function LifecycleBadge({ status }) {
   return (
     <span
       style={{
-        fontSize: "9px",
+        fontSize: "11px",
         padding: "2px 8px",
-        borderRadius: "3px",
+        borderRadius: T.radius.sm,
         background: s.bg,
         color: s.color,
         letterSpacing: "0.1em",
@@ -332,9 +334,9 @@ function StatusBadge({ status, yieldPct }) {
   return (
     <span
       style={{
-        fontSize: "9px",
+        fontSize: "11px",
         padding: "2px 8px",
-        borderRadius: "3px",
+        borderRadius: T.radius.sm,
         background: bg,
         color,
         letterSpacing: "0.1em",
@@ -389,7 +391,7 @@ function StockGauge({ label, available, needed, unit, color = T.accentMid }) {
         style={{
           height: "6px",
           background: T.border,
-          borderRadius: "3px",
+          borderRadius: T.radius.sm,
           overflow: "hidden",
         }}
       >
@@ -398,7 +400,7 @@ function StockGauge({ label, available, needed, unit, color = T.accentMid }) {
             width: `${pct}%`,
             height: "100%",
             background: ok ? color : T.danger,
-            borderRadius: "3px",
+            borderRadius: T.radius.sm,
             transition: "width 0.4s ease",
           }}
         />
@@ -502,7 +504,7 @@ function HowItWorksBanner() {
             style={{
               ...sBtn("outline"),
               padding: "4px 12px",
-              fontSize: "9px",
+              fontSize: "11px",
               color: T.info,
               borderColor: T.infoBd,
             }}
@@ -527,10 +529,10 @@ function HowItWorksBanner() {
                     style={{
                       flex: 1,
                       minWidth: 200,
-                      background: "#fff",
+                      background: T.surface,
                       border: `1px solid ${T.border}`,
                       borderLeft: `3px solid ${s.color}`,
-                      borderRadius: 6,
+                      borderRadius: T.radius.md,
                       padding: "14px 16px",
                     }}
                   >
@@ -585,7 +587,7 @@ function HowItWorksBanner() {
                       style={{
                         background: `${s.color}10`,
                         border: `1px solid ${s.color}30`,
-                        borderRadius: 4,
+                        borderRadius: T.radius.sm,
                         padding: "6px 10px",
                         fontFamily: T.font,
                         fontSize: 11,
@@ -626,14 +628,14 @@ function HowItWorksBanner() {
                   style={{
                     background: T.bg,
                     border: `1px solid ${T.border}`,
-                    borderRadius: 6,
+                    borderRadius: T.radius.md,
                     padding: "10px 12px",
                   }}
                 >
                   <div
                     style={{
                       fontFamily: T.font,
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: 700,
                       letterSpacing: "0.1em",
                       textTransform: "uppercase",
@@ -724,7 +726,7 @@ function SetPricePanel({ items, onRefresh }) {
           style={{
             padding: "8px 12px",
             marginBottom: 10,
-            borderRadius: 4,
+            borderRadius: T.radius.sm,
             fontSize: 12,
             fontFamily: T.font,
             background: toast.type === "success" ? T.successLight : T.dangerLight,
@@ -820,7 +822,7 @@ function SetPricePanel({ items, onRefresh }) {
                   <td style={sTd}>
                     <span
                       style={{
-                        fontSize: "9px",
+                        fontSize: "11px",
                         padding: "2px 8px",
                         borderRadius: 3,
                         fontWeight: 700,
@@ -840,7 +842,7 @@ function SetPricePanel({ items, onRefresh }) {
                       style={{
                         ...sBtn(),
                         padding: "5px 14px",
-                        fontSize: "9px",
+                        fontSize: "11px",
                       }}
                     >
                       {saving === i.id ? "..." : "Save"}
@@ -1004,13 +1006,13 @@ function FormatCreatorPanel({ productFormats, industryProfile, onRefresh }) {
     fontSize: "12px",
     fontFamily: T.font,
     border: `1px solid ${T.border}`,
-    borderRadius: "3px",
+    borderRadius: T.radius.sm,
     color: T.ink700,
-    background: "#fff",
+    background: T.surface,
     boxSizing: "border-box",
   };
   const sLabel = {
-    fontSize: "10px",
+    fontSize: "11px",
     fontWeight: 600,
     letterSpacing: "0.08em",
     textTransform: "uppercase",
@@ -1020,7 +1022,7 @@ function FormatCreatorPanel({ productFormats, industryProfile, onRefresh }) {
   };
   const sField = { marginBottom: "14px" };
   const sBadge = {
-    fontSize: "10px",
+    fontSize: "11px",
     fontWeight: 600,
     letterSpacing: "0.08em",
     textTransform: "uppercase",
@@ -1208,7 +1210,7 @@ function FormatCreatorPanel({ productFormats, industryProfile, onRefresh }) {
             <div
               style={{
                 padding: "8px 12px",
-                borderRadius: "3px",
+                borderRadius: T.radius.sm,
                 fontSize: "12px",
                 marginBottom: "12px",
                 background: msg.type === "error" ? T.dangerLight : T.successLight,
@@ -1238,7 +1240,7 @@ function FormatCreatorPanel({ productFormats, industryProfile, onRefresh }) {
         <div>
           <div
             style={{
-              fontSize: "10px",
+              fontSize: "11px",
               fontWeight: 700,
               letterSpacing: "0.1em",
               textTransform: "uppercase",
@@ -1500,13 +1502,13 @@ function BOMEditorPanel({
     fontSize: "12px",
     fontFamily: T.font,
     border: `1px solid ${T.border}`,
-    borderRadius: "3px",
+    borderRadius: T.radius.sm,
     color: T.ink700,
-    background: "#fff",
+    background: T.surface,
     boxSizing: "border-box",
   };
   const sLabelSm = {
-    fontSize: "10px",
+    fontSize: "11px",
     fontWeight: 600,
     letterSpacing: "0.08em",
     textTransform: "uppercase",
@@ -1584,7 +1586,7 @@ function BOMEditorPanel({
               background: T.bg,
               borderRadius: "3px 3px 0 0",
               border: `1px solid ${T.border}`,
-              fontSize: "10px",
+              fontSize: "11px",
               fontWeight: 700,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
@@ -1800,7 +1802,7 @@ function BOMEditorPanel({
                 <div
                   style={{
                     padding: "7px 10px",
-                    borderRadius: "3px",
+                    borderRadius: T.radius.sm,
                     fontSize: "12px",
                     marginBottom: "10px",
                     background: msg.type === "error" ? T.dangerLight : T.successLight,
@@ -2093,8 +2095,8 @@ export default function HQProduction() {
                   marginLeft: "6px",
                   background: T.accent,
                   color: "#fff",
-                  borderRadius: "10px",
-                  fontSize: "9px",
+                  borderRadius: T.radius.md,
+                  fontSize: "11px",
                   padding: "1px 6px",
                   fontWeight: 700,
                 }}
@@ -2108,8 +2110,8 @@ export default function HQProduction() {
                   marginLeft: "4px",
                   background: T.danger,
                   color: "#fff",
-                  borderRadius: "10px",
-                  fontSize: "9px",
+                  borderRadius: T.radius.md,
+                  fontSize: "11px",
                   padding: "1px 6px",
                   fontWeight: 700,
                 }}
@@ -2573,9 +2575,9 @@ function OverviewPanel({
                 <div
                   style={{
                     padding: "8px 14px",
-                    background: "#fff",
+                    background: T.surface,
                     border: `1px solid ${s.color}30`,
-                    borderRadius: 6,
+                    borderRadius: T.radius.md,
                     borderLeft: `3px solid ${s.color}`,
                   }}
                 >
@@ -2604,7 +2606,7 @@ function OverviewPanel({
                   </div>
                   <div
                     style={{
-                      fontSize: 10,
+                      fontSize: 11,
                       color: T.ink500,
                       fontFamily: T.font,
                     }}
@@ -2625,7 +2627,7 @@ function OverviewPanel({
           gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))",
           gap: "1px",
           background: T.border,
-          borderRadius: "6px",
+          borderRadius: T.radius.md,
           overflow: "hidden",
           border: `1px solid ${T.border}`,
           boxShadow: T.shadow.sm,
@@ -2636,7 +2638,7 @@ function OverviewPanel({
             key={c.label}
             onClick={c.click || undefined}
             style={{
-              background: "#fff",
+              background: T.surface,
               padding: "16px 18px",
               cursor: c.click ? "pointer" : "default",
             }}
@@ -2651,7 +2653,7 @@ function OverviewPanel({
           >
             <div
               style={{
-                fontSize: "10px",
+                fontSize: "11px",
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
                 color: T.ink500,
@@ -2750,7 +2752,7 @@ function OverviewPanel({
                       domain={[80, 100]}
                       tick={{
                         fill: T.ink500,
-                        fontSize: 10,
+                        fontSize: 11,
                         fontFamily: T.font,
                       }}
                       axisLine={false}
@@ -2805,7 +2807,7 @@ function OverviewPanel({
                       dataKey="month"
                       tick={{
                         fill: T.ink500,
-                        fontSize: 10,
+                        fontSize: 11,
                         fontFamily: T.font,
                       }}
                       axisLine={false}
@@ -2815,7 +2817,7 @@ function OverviewPanel({
                     <YAxis
                       tick={{
                         fill: T.ink500,
-                        fontSize: 10,
+                        fontSize: 11,
                         fontFamily: T.font,
                       }}
                       axisLine={false}
@@ -2871,7 +2873,7 @@ function OverviewPanel({
               style={{
                 ...sBtn("outline"),
                 padding: "4px 12px",
-                fontSize: "9px",
+                fontSize: "11px",
               }}
             >
               View All →
@@ -3358,7 +3360,7 @@ function BatchesPanel({
         <div
           style={{
             padding: "10px 16px",
-            borderRadius: "4px",
+            borderRadius: T.radius.sm,
             fontSize: "12px",
             fontFamily: T.font,
             fontWeight: 500,
@@ -3379,7 +3381,7 @@ function BatchesPanel({
           gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))",
           gap: "1px",
           background: T.border,
-          borderRadius: "6px",
+          borderRadius: T.radius.md,
           overflow: "hidden",
           border: `1px solid ${T.border}`,
           boxShadow: T.shadow.sm,
@@ -3426,10 +3428,10 @@ function BatchesPanel({
               }[c.semantic]
             : T.ink900;
           return (
-            <div key={i} style={{ background: "#fff", padding: "16px 18px" }}>
+            <div key={i} style={{ background: T.surface, padding: "16px 18px" }}>
               <div
                 style={{
-                  fontSize: "10px",
+                  fontSize: "11px",
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
                   color: T.ink500,
@@ -3528,7 +3530,7 @@ function BatchesPanel({
               gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))",
               gap: "1px",
               background: T.border,
-              borderRadius: "6px",
+              borderRadius: T.radius.md,
               overflow: "hidden",
               border: `1px solid ${T.border}`,
               boxShadow: T.shadow.sm,
@@ -3545,11 +3547,11 @@ function BatchesPanel({
               return (
                 <div
                   key={k.label}
-                  style={{ background: "#fff", padding: "14px 16px" }}
+                  style={{ background: T.surface, padding: "14px 16px" }}
                 >
                   <div
                     style={{
-                      fontSize: "10px",
+                      fontSize: "11px",
                       letterSpacing: "0.1em",
                       textTransform: "uppercase",
                       color: T.ink500,
@@ -3596,8 +3598,8 @@ function BatchesPanel({
               background: filter === f.id ? T.accent : "#fff",
               color: filter === f.id ? "#fff" : f.alert ? T.warning : T.ink500,
               border: `1px solid ${filter === f.id ? T.accent : f.alert ? T.warningBd : T.border}`,
-              borderRadius: "4px",
-              fontSize: "9px",
+              borderRadius: T.radius.sm,
+              fontSize: "11px",
               letterSpacing: "0.1em",
               textTransform: "uppercase",
               cursor: "pointer",
@@ -3613,7 +3615,7 @@ function BatchesPanel({
           style={{
             ...sBtn("outline"),
             padding: "6px 12px",
-            fontSize: "9px",
+            fontSize: "11px",
             marginLeft: "auto",
           }}
         >
@@ -3703,7 +3705,7 @@ function BatchesPanel({
                       style={{
                         ...sTd,
                         fontFamily: T.font,
-                        fontSize: "10px",
+                        fontSize: "11px",
                         color: T.ink500,
                         paddingLeft: "8px",
                       }}
@@ -3718,13 +3720,13 @@ function BatchesPanel({
                           <span
                             style={{
                               display: "block",
-                              fontSize: "9px",
+                              fontSize: "11px",
                               fontWeight: 700,
                               letterSpacing: "0.08em",
                               textTransform: "uppercase",
                               marginTop: "3px",
                               padding: "1px 6px",
-                              borderRadius: "3px",
+                              borderRadius: T.radius.sm,
                               fontFamily: T.font,
                               background:
                                 linkedRun.industry_profile_snapshot ===
@@ -3781,7 +3783,7 @@ function BatchesPanel({
                           if (cp && typeof cp === "object" && cp.chamber_1) {
                             return (
                               <div
-                                style={{ fontSize: "10px", lineHeight: "1.6" }}
+                                style={{ fontSize: "11px", lineHeight: "1.6" }}
                               >
                                 {Object.entries(cp).map(([k, v]) => (
                                   <div key={k} style={{ color: T.accentMid }}>
@@ -3789,7 +3791,7 @@ function BatchesPanel({
                                       style={{
                                         color: T.ink500,
                                         textTransform: "uppercase",
-                                        fontSize: "9px",
+                                        fontSize: "11px",
                                       }}
                                     >
                                       {k.replace("_", " ")}:{" "}
@@ -3856,13 +3858,13 @@ function BatchesPanel({
                           <span
                             style={{
                               display: "block",
-                              fontSize: "9px",
+                              fontSize: "11px",
                               fontWeight: 700,
                               letterSpacing: "0.06em",
                               textTransform: "uppercase",
                               marginTop: "3px",
                               padding: "1px 5px",
-                              borderRadius: "3px",
+                              borderRadius: T.radius.sm,
                               fontFamily: T.font,
                               background:
                                 linkedRun.temperature_zone === "Frozen"
@@ -3897,7 +3899,7 @@ function BatchesPanel({
                         <span style={{ color: T.ink500 }}>—</span>
                       )}
                     </div>
-                    <div style={{ ...sTd, fontSize: "10px" }}>
+                    <div style={{ ...sTd, fontSize: "11px" }}>
                       {linkedRun ? (
                         <span
                           style={{ color: T.success, fontFamily: T.font }}
@@ -3907,9 +3909,9 @@ function BatchesPanel({
                       ) : (
                         <span
                           style={{
-                            fontSize: "9px",
+                            fontSize: "11px",
                             padding: "2px 6px",
-                            borderRadius: "3px",
+                            borderRadius: T.radius.sm,
                             background: T.warningLight,
                             color: T.warning,
                             fontWeight: 600,
@@ -3940,7 +3942,7 @@ function BatchesPanel({
                         style={{
                           ...sBtn("outline"),
                           padding: "3px 8px",
-                          fontSize: "9px",
+                          fontSize: "11px",
                           color: isEditing ? T.ink500 : T.accentMid,
                           borderColor: isEditing ? T.border : T.accentBd,
                         }}
@@ -3954,7 +3956,7 @@ function BatchesPanel({
                           style={{
                             ...sBtn("outline"),
                             padding: "3px 8px",
-                            fontSize: "9px",
+                            fontSize: "11px",
                             color: T.success,
                             borderColor: T.successBd,
                           }}
@@ -3969,7 +3971,7 @@ function BatchesPanel({
                           style={{
                             ...sBtn("outline"),
                             padding: "3px 8px",
-                            fontSize: "9px",
+                            fontSize: "11px",
                             color: T.ink500,
                             borderColor: T.border,
                           }}
@@ -3988,7 +3990,7 @@ function BatchesPanel({
                           style={{
                             ...sBtn("outline"),
                             padding: "3px 8px",
-                            fontSize: "9px",
+                            fontSize: "11px",
                             color: T.danger,
                             borderColor: T.dangerBd,
                           }}
@@ -4004,7 +4006,7 @@ function BatchesPanel({
                             style={{
                               ...sBtn("danger"),
                               padding: "3px 8px",
-                              fontSize: "9px",
+                              fontSize: "11px",
                             }}
                           >
                             {saving
@@ -4018,7 +4020,7 @@ function BatchesPanel({
                             style={{
                               ...sBtn("outline"),
                               padding: "3px 8px",
-                              fontSize: "9px",
+                              fontSize: "11px",
                             }}
                           >
                             No
@@ -4061,7 +4063,7 @@ function BatchesPanel({
                           <div key={key}>
                             <label
                               style={{
-                                fontSize: "10px",
+                                fontSize: "11px",
                                 color: T.ink500,
                                 display: "block",
                                 marginBottom: "3px",
@@ -4087,7 +4089,7 @@ function BatchesPanel({
                         <div>
                           <label
                             style={{
-                              fontSize: "10px",
+                              fontSize: "11px",
                               color: T.ink500,
                               display: "block",
                               marginBottom: "3px",
@@ -4116,7 +4118,7 @@ function BatchesPanel({
                         <div>
                           <label
                             style={{
-                              fontSize: "10px",
+                              fontSize: "11px",
                               color: T.ink500,
                               display: "block",
                               marginBottom: "3px",
@@ -4141,7 +4143,7 @@ function BatchesPanel({
                         <div>
                           <label
                             style={{
-                              fontSize: "10px",
+                              fontSize: "11px",
                               color: T.ink500,
                               display: "block",
                               marginBottom: "3px",
@@ -4165,7 +4167,7 @@ function BatchesPanel({
                         <div>
                           <label
                             style={{
-                              fontSize: "10px",
+                              fontSize: "11px",
                               color: T.ink500,
                               display: "block",
                               marginBottom: "3px",
@@ -4204,7 +4206,7 @@ function BatchesPanel({
                             <div>
                               <label
                                 style={{
-                                  fontSize: "10px",
+                                  fontSize: "11px",
                                   color: T.ink500,
                                   display: "block",
                                   marginBottom: "3px",
@@ -4229,7 +4231,7 @@ function BatchesPanel({
                             <div>
                               <label
                                 style={{
-                                  fontSize: "10px",
+                                  fontSize: "11px",
                                   color: T.ink500,
                                   display: "block",
                                   marginBottom: "3px",
@@ -4312,7 +4314,7 @@ function BatchesPanel({
           style={{
             background: T.warningLight,
             border: `1px solid ${T.warningBd}`,
-            borderRadius: "6px",
+            borderRadius: T.radius.md,
             padding: "16px 18px",
             display: "flex",
             justifyContent: "space-between",
@@ -4736,7 +4738,7 @@ function NewRunPanel({
       {text}
       {hint && (
         <span
-          style={{ color: T.accentMid, marginLeft: "6px", fontSize: "9px" }}
+          style={{ color: T.accentMid, marginLeft: "6px", fontSize: "11px" }}
         >
           {hint}
         </span>
@@ -5142,7 +5144,7 @@ function NewRunPanel({
                 padding: "14px 16px",
                 background: T.warningLight,
                 border: `1px solid ${T.warningBd}`,
-                borderRadius: 6,
+                borderRadius: T.radius.md,
                 marginBottom: 16,
               }}
             >
@@ -5176,7 +5178,7 @@ function NewRunPanel({
                 padding: "12px 16px",
                 background: T.successLight,
                 border: `1px solid ${T.successBd}`,
-                borderRadius: 6,
+                borderRadius: T.radius.md,
                 marginBottom: 16,
               }}
             >
@@ -5266,7 +5268,7 @@ function NewRunPanel({
               style={{
                 padding: "10px 14px",
                 background: T.bg,
-                borderRadius: "4px",
+                borderRadius: T.radius.sm,
                 fontSize: "12px",
                 fontFamily: T.font,
                 color: T.ink700,
@@ -5344,7 +5346,7 @@ function NewRunPanel({
                       onClick={() => set("terpene_pct_override", String(pct))}
                       style={{
                         padding: "5px 12px",
-                        borderRadius: "4px",
+                        borderRadius: T.radius.sm,
                         cursor: "pointer",
                         fontSize: "12px",
                         fontFamily: T.font,
@@ -5383,7 +5385,7 @@ function NewRunPanel({
               {terpNeeded > 0 && planned > 0 && (
                 <p
                   style={{
-                    fontSize: "10px",
+                    fontSize: "11px",
                     color: T.accentMid,
                     margin: "4px 0 0",
                     fontFamily: T.font,
@@ -5467,7 +5469,7 @@ function NewRunPanel({
                   />
                   <p
                     style={{
-                      fontSize: "10px",
+                      fontSize: "11px",
                       color: T.ink500,
                       margin: "3px 0 0",
                       fontFamily: T.font,
@@ -5589,7 +5591,7 @@ function NewRunPanel({
                 style={{
                   background: T.warningLight,
                   border: `1px solid ${T.warningBd}`,
-                  borderRadius: "4px",
+                  borderRadius: T.radius.sm,
                   padding: "14px 16px",
                 }}
               >
@@ -5616,7 +5618,7 @@ function NewRunPanel({
                   {form.allergens_declared ? (
                     <span
                       style={{
-                        fontSize: "10px",
+                        fontSize: "11px",
                         color: T.success,
                         fontFamily: T.font,
                       }}
@@ -5626,7 +5628,7 @@ function NewRunPanel({
                   ) : (
                     <span
                       style={{
-                        fontSize: "10px",
+                        fontSize: "11px",
                         color: T.danger,
                         fontFamily: T.font,
                       }}
@@ -5681,7 +5683,7 @@ function NewRunPanel({
                       ? T.successLight
                       : T.bg,
                     border: `1px solid ${form.allergens_declared ? T.successBd : T.ink200}`,
-                    borderRadius: "3px",
+                    borderRadius: T.radius.sm,
                     color: form.allergens_declared ? T.success : T.ink500,
                     cursor: "pointer",
                     fontFamily: T.font,
@@ -5697,7 +5699,7 @@ function NewRunPanel({
                 style={{
                   background: T.surface,
                   border: `1px solid ${T.border}`,
-                  borderRadius: "4px",
+                  borderRadius: T.radius.sm,
                   padding: "14px 16px",
                 }}
               >
@@ -5721,7 +5723,7 @@ function NewRunPanel({
                       flex: 1,
                       padding: "8px",
                       border: `2px solid ${form.qc_passed === true ? T.successBd : T.ink200}`,
-                      borderRadius: "3px",
+                      borderRadius: T.radius.sm,
                       background:
                         form.qc_passed === true ? T.successLight : "#fff",
                       color: form.qc_passed === true ? T.success : T.ink500,
@@ -5739,7 +5741,7 @@ function NewRunPanel({
                       flex: 1,
                       padding: "8px",
                       border: `2px solid ${form.qc_passed === false ? T.dangerBd : T.ink200}`,
-                      borderRadius: "3px",
+                      borderRadius: T.radius.sm,
                       background:
                         form.qc_passed === false ? T.dangerLight : "#fff",
                       color: form.qc_passed === false ? T.danger : T.ink500,
@@ -5903,7 +5905,7 @@ function NewRunPanel({
                 >
                   <div
                     style={{
-                      fontSize: "10px",
+                      fontSize: "11px",
                       fontWeight: 700,
                       letterSpacing: "0.1em",
                       textTransform: "uppercase",
@@ -6012,7 +6014,7 @@ function NewRunPanel({
                       >
                         <span
                           style={{
-                            fontSize: "10px",
+                            fontSize: "11px",
                             color: T.ink500,
                             fontFamily: T.font,
                           }}
@@ -6034,7 +6036,7 @@ function NewRunPanel({
                               }
                               style={{
                                 padding: "2px 8px",
-                                borderRadius: "3px",
+                                borderRadius: T.radius.sm,
                                 cursor: "pointer",
                                 fontSize: "11px",
                                 fontFamily: T.font,
@@ -6051,7 +6053,7 @@ function NewRunPanel({
                         {ch.cTerpNeeded > 0 && planned > 0 && (
                           <span
                             style={{
-                              fontSize: "10px",
+                              fontSize: "11px",
                               color: T.accentMid,
                               fontFamily: T.font,
                               marginLeft: "4px",
@@ -6231,7 +6233,7 @@ function NewRunPanel({
                   ].map((h) => (
                     <th
                       key={h}
-                      style={{ ...sTh, fontSize: "9px", padding: "6px 10px" }}
+                      style={{ ...sTh, fontSize: "11px", padding: "6px 10px" }}
                     >
                       {h}
                     </th>
@@ -6313,7 +6315,7 @@ function NewRunPanel({
               gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
               gap: "1px",
               background: T.border,
-              borderRadius: "4px",
+              borderRadius: T.radius.sm,
               overflow: "hidden",
               border: `1px solid ${T.border}`,
             }}
@@ -6344,11 +6346,11 @@ function NewRunPanel({
             ].map(([lbl, val, color]) => (
               <div
                 key={lbl}
-                style={{ background: "#fff", padding: "12px 14px" }}
+                style={{ background: T.surface, padding: "12px 14px" }}
               >
                 <div
                   style={{
-                    fontSize: "9px",
+                    fontSize: "11px",
                     letterSpacing: "0.1em",
                     textTransform: "uppercase",
                     color: T.ink500,
@@ -6383,7 +6385,7 @@ function NewRunPanel({
                 padding: "8px 12px",
                 background: T.warningLight,
                 border: `1px solid ${T.warningBd}`,
-                borderRadius: "4px",
+                borderRadius: T.radius.sm,
                 fontSize: "11px",
                 color: T.warning,
                 fontFamily: T.font,
@@ -6454,7 +6456,7 @@ function NewRunPanel({
               <div key={ch.ci} style={{ marginBottom: "10px" }}>
                 <div
                   style={{
-                    fontSize: "10px",
+                    fontSize: "11px",
                     fontWeight: 700,
                     color: T.accentMid,
                     marginBottom: "6px",
@@ -6507,7 +6509,7 @@ function NewRunPanel({
                 <div key={lbl}>
                   <div
                     style={{
-                      fontSize: "9px",
+                      fontSize: "11px",
                       letterSpacing: "0.2em",
                       textTransform: "uppercase",
                       color: T.ink500,
@@ -6601,7 +6603,7 @@ function NewRunPanel({
                 <div key={lbl}>
                   <div
                     style={{
-                      fontSize: "9px",
+                      fontSize: "11px",
                       letterSpacing: "0.2em",
                       textTransform: "uppercase",
                       color: T.ink500,
@@ -6680,7 +6682,7 @@ function NewRunPanel({
               style={{
                 padding: "14px 16px",
                 background: T.bg,
-                borderRadius: "4px",
+                borderRadius: T.radius.sm,
                 marginBottom: "14px",
                 fontSize: "13px",
                 fontFamily: T.font,
@@ -6929,7 +6931,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
           style={{
             padding: "10px 16px",
             marginBottom: "12px",
-            borderRadius: "4px",
+            borderRadius: T.radius.sm,
             fontSize: "12px",
             fontFamily: T.font,
             fontWeight: 500,
@@ -6957,7 +6959,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
         </div>
         <button
           onClick={onRefresh}
-          style={{ ...sBtn("outline"), fontSize: "9px", padding: "6px 12px" }}
+          style={{ ...sBtn("outline"), fontSize: "11px", padding: "6px 12px" }}
         >
           Refresh
         </button>
@@ -7058,7 +7060,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                       style={{
                         ...sBtn("outline"),
                         padding: "4px 10px",
-                        fontSize: "9px",
+                        fontSize: "11px",
                       }}
                     >
                       Edit
@@ -7069,7 +7071,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                         style={{
                           ...sBtn("outline"),
                           padding: "4px 10px",
-                          fontSize: "9px",
+                          fontSize: "11px",
                           color: T.warning,
                           borderColor: T.warningBd,
                         }}
@@ -7094,7 +7096,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                           style={{
                             ...sBtn("outline"),
                             padding: "4px 10px",
-                            fontSize: "9px",
+                            fontSize: "11px",
                             color: T.danger,
                             borderColor: T.dangerBd,
                           }}
@@ -7106,7 +7108,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                           style={{
                             ...sBtn("outline"),
                             padding: "4px 10px",
-                            fontSize: "9px",
+                            fontSize: "11px",
                           }}
                         >
                           No
@@ -7122,7 +7124,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                       style={{
                         ...sBtn("outline"),
                         padding: "4px 10px",
-                        fontSize: "9px",
+                        fontSize: "11px",
                         color: T.danger,
                         borderColor: T.dangerBd,
                       }}
@@ -7134,7 +7136,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                       style={{
                         ...sBtn("outline"),
                         padding: "4px 10px",
-                        fontSize: "9px",
+                        fontSize: "11px",
                       }}
                     >
                       {isOpen ? "▲ Hide" : "▼ Details"}
@@ -7157,7 +7159,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                     <div key={lbl}>
                       <div
                         style={{
-                          fontSize: "9px",
+                          fontSize: "11px",
                           letterSpacing: "0.2em",
                           textTransform: "uppercase",
                           color: T.ink500,
@@ -7199,7 +7201,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                       padding: "8px 12px",
                       background: T.warningLight,
                       border: `1px solid ${T.warningBd}`,
-                      borderRadius: "4px",
+                      borderRadius: T.radius.sm,
                       fontSize: "12px",
                       color: T.warning,
                       fontFamily: T.font,
@@ -7222,7 +7224,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                           padding: "16px",
                           background: T.dangerLight,
                           border: `1px solid ${T.dangerBd}`,
-                          borderRadius: "4px",
+                          borderRadius: T.radius.sm,
                           marginBottom: "14px",
                         }}
                       >
@@ -7283,7 +7285,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                           padding: "16px",
                           background: T.accentLight,
                           border: `1px solid ${T.accentBd}`,
-                          borderRadius: "4px",
+                          borderRadius: T.radius.sm,
                           marginBottom: "14px",
                         }}
                       >
@@ -7411,12 +7413,12 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                               padding: "10px 14px",
                               background: T.bg,
                               border: `1px solid ${T.border}`,
-                              borderRadius: "4px",
+                              borderRadius: T.radius.sm,
                             }}
                           >
                             <div
                               style={{
-                                fontSize: "9px",
+                                fontSize: "11px",
                                 letterSpacing: "0.15em",
                                 textTransform: "uppercase",
                                 color: T.ink500,
@@ -7484,7 +7486,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                             flexWrap: "wrap",
                             padding: "12px 14px",
                             background: T.bg,
-                            borderRadius: "4px",
+                            borderRadius: T.radius.sm,
                             border: `1px solid ${T.border}`,
                           }}
                         >
@@ -7511,7 +7513,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                             <div key={lbl}>
                               <div
                                 style={{
-                                  fontSize: "9px",
+                                  fontSize: "11px",
                                   letterSpacing: "0.15em",
                                   textTransform: "uppercase",
                                   color: T.ink500,
@@ -7538,7 +7540,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                           <div>
                             <div
                               style={{
-                                fontSize: "9px",
+                                fontSize: "11px",
                                 letterSpacing: "0.15em",
                                 textTransform: "uppercase",
                                 color: T.ink500,
@@ -7553,7 +7555,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                               style={{
                                 fontSize: "11px",
                                 padding: "2px 10px",
-                                borderRadius: "3px",
+                                borderRadius: T.radius.sm,
                                 fontWeight: 700,
                                 fontFamily: T.font,
                                 background:
@@ -7626,7 +7628,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                     style={{
                                       marginTop: "8px",
                                       border: `1px solid ${T.border}`,
-                                      borderRadius: "4px",
+                                      borderRadius: T.radius.sm,
                                       overflow: "hidden",
                                     }}
                                   >
@@ -7636,7 +7638,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                         gridTemplateColumns: "1fr 1fr 1fr 1fr",
                                         padding: "6px 10px",
                                         background: T.bg,
-                                        fontSize: "9px",
+                                        fontSize: "11px",
                                         fontWeight: 700,
                                         letterSpacing: "0.1em",
                                         textTransform: "uppercase",
@@ -7696,12 +7698,12 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                 padding: "10px 14px",
                                 background: T.warningLight,
                                 border: `1px solid ${T.warningBd}`,
-                                borderRadius: "4px",
+                                borderRadius: T.radius.sm,
                               }}
                             >
                               <div
                                 style={{
-                                  fontSize: "9px",
+                                  fontSize: "11px",
                                   letterSpacing: "0.15em",
                                   textTransform: "uppercase",
                                   color: T.warning,
@@ -7725,9 +7727,9 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                     <span
                                       key={allergen}
                                       style={{
-                                        fontSize: "10px",
+                                        fontSize: "11px",
                                         padding: "2px 8px",
-                                        borderRadius: "3px",
+                                        borderRadius: T.radius.sm,
                                         background: T.dangerLight,
                                         color: T.danger,
                                         border: `1px solid ${T.dangerBd}`,
@@ -7754,14 +7756,14 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                               padding: "10px 14px",
                               background: T.infoLight,
                               border: `1px solid ${T.infoBd}`,
-                              borderRadius: "4px",
+                              borderRadius: T.radius.sm,
                             }}
                           >
                             {run.fsca_cert_number && (
                               <div>
                                 <div
                                   style={{
-                                    fontSize: "9px",
+                                    fontSize: "11px",
                                     letterSpacing: "0.15em",
                                     textTransform: "uppercase",
                                     color: T.info,
@@ -7787,7 +7789,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                               <div>
                                 <div
                                   style={{
-                                    fontSize: "9px",
+                                    fontSize: "11px",
                                     letterSpacing: "0.15em",
                                     textTransform: "uppercase",
                                     color: T.info,
@@ -7813,7 +7815,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                               <div>
                                 <div
                                   style={{
-                                    fontSize: "9px",
+                                    fontSize: "11px",
                                     letterSpacing: "0.15em",
                                     textTransform: "uppercase",
                                     color: T.info,
@@ -8159,7 +8161,7 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
               style={{
                 padding: "12px 14px",
                 background: T.bg,
-                borderRadius: "4px",
+                borderRadius: T.radius.sm,
                 marginBottom: "12px",
                 fontSize: "12px",
                 fontFamily: T.font,
@@ -8343,7 +8345,7 @@ function AuditPanel({ batches }) {
         <div
           style={{
             padding: "10px 16px",
-            borderRadius: "4px",
+            borderRadius: T.radius.sm,
             fontSize: "12px",
             fontFamily: T.font,
             fontWeight: 500,
@@ -8409,7 +8411,7 @@ function AuditPanel({ batches }) {
                   disabled={loading}
                   style={{
                     ...sBtn("outline"),
-                    fontSize: "9px",
+                    fontSize: "11px",
                     padding: "6px 12px",
                   }}
                 >
@@ -8429,7 +8431,7 @@ function AuditPanel({ batches }) {
               gridTemplateColumns: "repeat(auto-fill,minmax(120px,1fr))",
               gap: "1px",
               background: T.border,
-              borderRadius: 4,
+              borderRadius: T.radius.sm,
               overflow: "hidden",
               border: `1px solid ${T.border}`,
               marginTop: "16px",
@@ -8465,7 +8467,7 @@ function AuditPanel({ batches }) {
                 <div
                   key={i}
                   style={{
-                    background: "#fff",
+                    background: T.surface,
                     padding: "12px 14px",
                     textAlign: "center",
                   }}
@@ -8482,7 +8484,7 @@ function AuditPanel({ batches }) {
                   </div>
                   <div
                     style={{
-                      fontSize: "9px",
+                      fontSize: "11px",
                       letterSpacing: "0.1em",
                       textTransform: "uppercase",
                       color: T.ink500,
@@ -8559,9 +8561,9 @@ function AuditPanel({ batches }) {
                     {batch?.lab_certified && (
                       <span
                         style={{
-                          fontSize: "9px",
+                          fontSize: "11px",
                           padding: "2px 8px",
-                          borderRadius: "3px",
+                          borderRadius: T.radius.sm,
                           background: T.successLight,
                           color: T.success,
                           fontWeight: 700,
@@ -8576,7 +8578,7 @@ function AuditPanel({ batches }) {
                     {batch?.strain && (
                       <span
                         style={{
-                          fontSize: "10px",
+                          fontSize: "11px",
                           color: T.ink500,
                           fontFamily: T.font,
                         }}
@@ -8587,7 +8589,7 @@ function AuditPanel({ batches }) {
                     {batch?.expiry_date && (
                       <span
                         style={{
-                          fontSize: "10px",
+                          fontSize: "11px",
                           color: isExpired ? T.danger : T.ink500,
                           fontFamily: T.font,
                           fontWeight: isExpired ? 600 : 400,
@@ -8608,7 +8610,7 @@ function AuditPanel({ batches }) {
                       onClick={() => setRecallBatchId(batch_id)}
                       style={{
                         ...sBtn("outline"),
-                        fontSize: "9px",
+                        fontSize: "11px",
                         padding: "5px 12px",
                         color: T.warning,
                         borderColor: T.warningBd,
@@ -8638,7 +8640,7 @@ function AuditPanel({ batches }) {
                         disabled={recallLoading}
                         style={{
                           ...sBtn("outline"),
-                          fontSize: "9px",
+                          fontSize: "11px",
                           padding: "4px 10px",
                           color: T.danger,
                           borderColor: T.dangerBd,
@@ -8650,7 +8652,7 @@ function AuditPanel({ batches }) {
                         onClick={() => setRecallBatchId(null)}
                         style={{
                           ...sBtn("outline"),
-                          fontSize: "9px",
+                          fontSize: "11px",
                           padding: "4px 10px",
                         }}
                       >
@@ -8677,7 +8679,7 @@ function AuditPanel({ batches }) {
                   <div key={lbl}>
                     <div
                       style={{
-                        fontSize: "9px",
+                        fontSize: "11px",
                         letterSpacing: "0.2em",
                         textTransform: "uppercase",
                         color: T.ink500,
@@ -8723,7 +8725,7 @@ function AuditPanel({ batches }) {
                           key={h}
                           style={{
                             ...sTh,
-                            fontSize: "9px",
+                            fontSize: "11px",
                             padding: "6px 8px",
                           }}
                         >
@@ -8745,7 +8747,7 @@ function AuditPanel({ batches }) {
                           style={{
                             ...sTd,
                             fontFamily: T.font,
-                            fontSize: "10px",
+                            fontSize: "11px",
                             color: T.ink500,
                             padding: "6px 8px",
                           }}
@@ -8765,9 +8767,9 @@ function AuditPanel({ batches }) {
                         <td style={{ ...sTd, padding: "6px 8px" }}>
                           <span
                             style={{
-                              fontSize: "9px",
+                              fontSize: "11px",
                               padding: "1px 6px",
-                              borderRadius: "3px",
+                              borderRadius: T.radius.sm,
                               background: r.is_active ? T.successLight : T.bg,
                               color: r.is_active ? T.success : T.ink500,
                               fontWeight: 700,
@@ -8779,9 +8781,9 @@ function AuditPanel({ batches }) {
                         <td style={{ ...sTd, padding: "6px 8px" }}>
                           <span
                             style={{
-                              fontSize: "9px",
+                              fontSize: "11px",
                               padding: "1px 6px",
-                              borderRadius: "3px",
+                              borderRadius: T.radius.sm,
                               background: r.claimed ? T.successLight : T.bg,
                               color: r.claimed ? T.success : T.ink500,
                               fontWeight: 700,
