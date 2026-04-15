@@ -53,6 +53,30 @@ Claude.ai  → confirms via get_file_contents (READ ONLY)
 2. Log the violation: "I was about to violate RULE 0Q. Logging VL-NNN."
 3. Write the content in the chat as a Claude Code instruction block instead
 
+**WHY THIS IS HARD TO ENFORCE:** The GitHub MCP connector exposes
+create_or_update_file, push_files, and push_files tools in every
+Claude.ai session. Anthropic does not currently support disabling
+individual tools — it is all-or-nothing. The write tools will ALWAYS
+appear available. They are NOT permitted.
+
+The GitHub token scope is the real gate. If the token is read-only
+(contents:read), write calls will fail. But do not rely on this —
+follow the rule regardless.
+
+**WRITE TOOLS THAT ARE VISIBLE BUT FORBIDDEN IN CLAUDE.AI:**
+- GitHub:create_or_update_file  ← FORBIDDEN
+- GitHub:push_files             ← FORBIDDEN
+- Supabase:deploy_edge_function ← FORBIDDEN
+
+**READ TOOLS THAT ARE PERMITTED:**
+- GitHub:get_file_contents      ← PERMITTED (read only)
+- GitHub:run_secret_scanning    ← PERMITTED (read only)
+- All Supabase SELECT/read ops  ← PERMITTED
+
+If you find yourself about to call a write tool from Claude.ai,
+STOP. Write the exact Claude Code instruction instead and give it
+to the human to run in their terminal.
+
 ## CLAUDE CODE INSTRUCTION FORMAT — MANDATORY
 
 Every instruction from Claude.ai to Claude Code must be:
