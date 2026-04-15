@@ -41,7 +41,7 @@ const sInput = {
   borderRadius: "4px",
   fontSize: "13px",
   fontFamily: T.font,
-  background: "#fff",
+  background: T.surface,
   outline: "none",
   width: "100%",
   boxSizing: "border-box",
@@ -459,7 +459,7 @@ function ShopTab({ items, tenantId, onRefresh }) {
             right: 24,
             zIndex: 999,
             padding: "10px 18px",
-            borderRadius: 8,
+            borderRadius: T.radius.md,
             background: toast.type === "error" ? T.danger : T.success,
             color: "#fff",
             fontSize: 12,
@@ -478,7 +478,7 @@ function ShopTab({ items, tenantId, onRefresh }) {
           gridTemplateColumns: "repeat(4,1fr)",
           gap: "1px",
           background: T.border,
-          borderRadius: 8,
+          borderRadius: T.radius.md,
           overflow: "hidden",
           border: `1px solid ${T.border}`,
           marginBottom: 20,
@@ -535,7 +535,7 @@ function ShopTab({ items, tenantId, onRefresh }) {
           style={{
             padding: "7px 10px",
             border: `1px solid ${T.border}`,
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             fontSize: 12,
             fontFamily: T.font,
             width: 220,
@@ -585,9 +585,9 @@ function ShopTab({ items, tenantId, onRefresh }) {
             <div
               key={item.id}
               style={{
-                background: "#fff",
+                background: T.surface,
                 border: `1px solid ${T.border}`,
-                borderRadius: 10,
+                borderRadius: T.radius.lg,
                 overflow: "hidden",
                 opacity: isHidden ? 0.65 : 1,
               }}
@@ -638,10 +638,10 @@ function ShopTab({ items, tenantId, onRefresh }) {
                         ? "#b5935a"
                         : "#666",
                     color: "#fff",
-                    fontSize: 8,
+                    fontSize: 11,
                     fontWeight: 700,
                     padding: "2px 7px",
-                    borderRadius: 10,
+                    borderRadius: T.radius.lg,
                     letterSpacing: "0.1em",
                   }}
                 >
@@ -657,10 +657,10 @@ function ShopTab({ items, tenantId, onRefresh }) {
                       right: 6,
                       background: "#b5935a",
                       color: "#fff",
-                      fontSize: 8,
+                      fontSize: 11,
                       fontWeight: 700,
                       padding: "2px 7px",
-                      borderRadius: 10,
+                      borderRadius: T.radius.lg,
                     }}
                   >
                     <Star size={9} fill="currentColor" strokeWidth={0} style={{marginRight:2,verticalAlign:"middle"}} />FEATURED
@@ -1070,7 +1070,7 @@ export default function HQStock() {
             right: 0,
             width: "420px",
             height: "100vh",
-            background: "#fff",
+            background: T.surface,
             borderLeft: "1px solid " + T.border,
             boxShadow: "-4px 0 24px rgba(0,0,0,0.08)",
             zIndex: 1000,
@@ -1381,7 +1381,7 @@ export default function HQStock() {
             gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))",
             gap: "1px",
             background: T.border,
-            borderRadius: "6px",
+            borderRadius: T.radius.lg,
             overflow: "hidden",
             border: "1px solid " + T.border,
           }}
@@ -1439,7 +1439,7 @@ export default function HQStock() {
             <div
               key={k.label}
               style={{
-                background: "#fff",
+                background: T.surface,
                 padding: "16px 18px",
                 borderTop: "3px solid " + k.top,
               }}
@@ -1481,7 +1481,7 @@ export default function HQStock() {
             style={{
               background: T.warningLight,
               border: "1px solid " + T.warningBd,
-              borderRadius: "6px",
+              borderRadius: T.radius.lg,
               padding: "14px 18px",
             }}
           >
@@ -1617,7 +1617,7 @@ export default function HQStock() {
             style={{
               background: T.infoLight,
               border: "1px solid " + T.infoBd,
-              borderRadius: "6px",
+              borderRadius: T.radius.lg,
               padding: "14px 18px",
             }}
           >
@@ -1648,7 +1648,7 @@ export default function HQStock() {
                   <div
                     key={item.id}
                     style={{
-                      background: "#fff",
+                      background: T.surface,
                       border: "1px solid " + T.infoBd,
                       borderRadius: "4px",
                       padding: "10px 12px",
@@ -1714,7 +1714,7 @@ export default function HQStock() {
             style={{
               background: T.warningLight,
               border: "1px solid " + T.warningBd,
-              borderRadius: "6px",
+              borderRadius: T.radius.lg,
               padding: "14px 18px",
             }}
           >
@@ -1807,7 +1807,7 @@ export default function HQStock() {
             style={{
               background: T.warningLight,
               border: "1px solid " + T.warningBd,
-              borderRadius: "6px",
+              borderRadius: T.radius.lg,
               padding: "14px 18px",
             }}
           >
@@ -2008,11 +2008,12 @@ export default function HQStock() {
         </div>
         <div
           style={{
-            background: "#fff",
+            background: T.surface,
             border: "1px solid " + T.border,
-            borderRadius: "6px",
+            borderRadius: T.radius.lg,
             overflow: "auto",
             boxShadow: T.shadow.sm,
+            padding: "0 16px",
           }}
         >
           <table
@@ -2266,7 +2267,7 @@ export default function HQStock() {
                                     fontSize: 11,
                                     fontWeight: 700,
                                     padding: "1px 6px",
-                                    borderRadius: 8,
+                                    borderRadius: T.radius.md,
                                     background:
                                       active.length > 0
                                         ? T.successLight
@@ -2279,7 +2280,7 @@ export default function HQStock() {
                                 </span>
                                 {scans > 0 && (
                                   <span
-                                    style={{ fontSize: 8, color: T.ink500 }}
+                                    style={{ fontSize: 11, color: T.ink500 }}
                                   >
                                     {scans} scans
                                   </span>
@@ -2444,11 +2445,12 @@ export default function HQStock() {
         </div>
         <div
           style={{
-            background: "#fff",
+            background: T.surface,
             border: "1px solid " + T.border,
-            borderRadius: "6px",
+            borderRadius: T.radius.lg,
             overflow: "auto",
             boxShadow: T.shadow.sm,
+            padding: "0 16px",
           }}
         >
           <table
@@ -3419,7 +3421,7 @@ export default function HQStock() {
                     fontWeight: 700,
                     letterSpacing: "0.06em",
                     padding: "2px 8px",
-                    borderRadius: 3,
+                    borderRadius: T.radius.sm,
                     cursor: "pointer",
                     background: T.warningLight,
                     color: T.warning,
@@ -3466,7 +3468,7 @@ export default function HQStock() {
                           fontSize: 11,
                           fontFamily: T.font,
                           border: "1px solid " + T.border,
-                          borderRadius: 4,
+                          borderRadius: T.radius.sm,
                         }}
                       />
                     </PieChart>
@@ -3620,7 +3622,7 @@ export default function HQStock() {
                           style={{
                             fontSize: 11,
                             padding: "2px 7px",
-                            borderRadius: 3,
+                            borderRadius: T.radius.sm,
                             background: T.bg,
                             color: T.ink500,
                             border: "1px solid " + T.border,
@@ -3886,7 +3888,7 @@ export default function HQStock() {
                         background: active ? T.accentMid : T.border,
                         color: active ? "#fff" : T.ink500,
                         padding: "1px 5px",
-                        borderRadius: 8,
+                        borderRadius: T.radius.md,
                       }}
                     >
                       {count}
@@ -3926,7 +3928,7 @@ export default function HQStock() {
                 style={{
                   display: "flex",
                   border: "1px solid " + T.border,
-                  borderRadius: 4,
+                  borderRadius: T.radius.sm,
                   overflow: "hidden",
                 }}
               >
@@ -4023,7 +4025,7 @@ export default function HQStock() {
                       onClick={() => setBrandFilter(brand)}
                       style={{
                         padding: "4px 11px",
-                        borderRadius: 16,
+                        borderRadius: T.radius.xl,
                         fontSize: 11,
                         fontWeight: active ? 700 : 500,
                         fontFamily: T.font,
@@ -4117,7 +4119,7 @@ export default function HQStock() {
                               }}
                               style={{
                                 padding: "6px 12px",
-                                borderRadius: 6,
+                                borderRadius: T.radius.md,
                                 cursor: "pointer",
                                 border:
                                   "1.5px solid " +
@@ -4550,7 +4552,7 @@ export default function HQStock() {
                           }}
                           style={{
                             padding: "8px 14px",
-                            borderRadius: 6,
+                            borderRadius: T.radius.md,
                             cursor: "pointer",
                             border:
                               "1.5px solid " +
@@ -4732,7 +4734,7 @@ export default function HQStock() {
                             style={{
                               display: "inline-block",
                               padding: "2px 7px",
-                              borderRadius: 3,
+                              borderRadius: T.radius.sm,
                               fontSize: 11,
                               fontWeight: 700,
                               width: "fit-content",
@@ -4779,7 +4781,7 @@ export default function HQStock() {
                                 fontSize: 11,
                                 fontWeight: 700,
                                 padding: "2px 6px",
-                                borderRadius: 3,
+                                borderRadius: T.radius.sm,
                                 background:
                                   margin >= 50
                                     ? T.successLight
@@ -4828,7 +4830,7 @@ export default function HQStock() {
                               border: "1px solid " + T.border,
                               color: T.ink500,
                               background: "transparent",
-                              borderRadius: 3,
+                              borderRadius: T.radius.sm,
                               cursor: "pointer",
                               textTransform: "uppercase",
                               letterSpacing: "0.04em",
@@ -4847,7 +4849,7 @@ export default function HQStock() {
                               border: "1px solid " + T.accentBd,
                               color: T.accentMid,
                               background: "transparent",
-                              borderRadius: 3,
+                              borderRadius: T.radius.sm,
                               cursor: "pointer",
                               textTransform: "uppercase",
                               letterSpacing: "0.04em",
@@ -4875,7 +4877,7 @@ export default function HQStock() {
                               color:
                                 adjustOpen === item.id ? T.danger : T.warning,
                               background: "transparent",
-                              borderRadius: 3,
+                              borderRadius: T.radius.sm,
                               cursor: "pointer",
                               textTransform: "uppercase",
                               letterSpacing: "0.04em",
@@ -5096,7 +5098,7 @@ export default function HQStock() {
                                     style={{
                                       display: "inline-block",
                                       padding: "2px 7px",
-                                      borderRadius: 3,
+                                      borderRadius: T.radius.sm,
                                       fontSize: 11,
                                       fontWeight: 700,
                                       background: "#EEF2FF",
@@ -5173,7 +5175,7 @@ export default function HQStock() {
                                       fontSize: 11,
                                       fontWeight: 700,
                                       padding: "2px 6px",
-                                      borderRadius: 3,
+                                      borderRadius: T.radius.sm,
                                       background:
                                         margin >= 50
                                           ? T.successLight
@@ -5223,7 +5225,7 @@ export default function HQStock() {
                                       border: "1px solid " + T.border,
                                       color: T.ink500,
                                       background: "transparent",
-                                      borderRadius: 3,
+                                      borderRadius: T.radius.sm,
                                       cursor: "pointer",
                                       textTransform: "uppercase",
                                       letterSpacing: "0.04em",
@@ -5241,7 +5243,7 @@ export default function HQStock() {
                                       border: "1px solid " + T.accentBd,
                                       color: T.accentMid,
                                       background: "transparent",
-                                      borderRadius: 3,
+                                      borderRadius: T.radius.sm,
                                       cursor: "pointer",
                                       textTransform: "uppercase",
                                       letterSpacing: "0.04em",
@@ -5263,7 +5265,7 @@ export default function HQStock() {
                                         (isAdj ? T.dangerBd : T.warningBd),
                                       color: isAdj ? T.danger : T.warning,
                                       background: "transparent",
-                                      borderRadius: 3,
+                                      borderRadius: T.radius.sm,
                                       cursor: "pointer",
                                       textTransform: "uppercase",
                                       letterSpacing: "0.04em",
@@ -5468,11 +5470,11 @@ export default function HQStock() {
               {t.soon && (
                 <span
                   style={{
-                    fontSize: 8,
+                    fontSize: 11,
                     fontWeight: 700,
                     letterSpacing: "0.08em",
                     padding: "1px 5px",
-                    borderRadius: 3,
+                    borderRadius: T.radius.sm,
                     background: T.infoLight,
                     color: T.info,
                     border: "1px solid " + T.infoBd,
@@ -5523,7 +5525,7 @@ export default function HQStock() {
               transform: "translateX(-50%)",
               background: T.warningLight,
               border: `1px solid ${T.warningBd}`,
-              borderRadius: 8,
+              borderRadius: T.radius.md,
               padding: "14px 20px",
               boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
               zIndex: 500,
@@ -5565,7 +5567,7 @@ export default function HQStock() {
                   background: T.warning,
                   color: "#fff",
                   border: "none",
-                  borderRadius: 3,
+                  borderRadius: T.radius.sm,
                   cursor: "pointer",
                   fontSize: 11,
                   fontWeight: 700,
@@ -5581,7 +5583,7 @@ export default function HQStock() {
                   background: "transparent",
                   color: T.warning,
                   border: `1px solid ${T.warningBd}`,
-                  borderRadius: 3,
+                  borderRadius: T.radius.sm,
                   cursor: "pointer",
                   fontSize: 11,
                   fontFamily: T.font,
@@ -5646,8 +5648,8 @@ export default function HQStock() {
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: "#fff",
-              borderRadius: 12,
+              background: T.surface,
+              borderRadius: T.radius.lg,
               padding: 28,
               width: 580,
               maxWidth: "95vw",
@@ -5713,11 +5715,11 @@ export default function HQStock() {
                   }}
                   style={{
                     padding: "14px 12px",
-                    borderRadius: 8,
+                    borderRadius: T.radius.md,
                     border: `1px solid ${T.border}`,
                     cursor: "pointer",
                     textAlign: "center",
-                    background: "#fff",
+                    background: T.surface,
                     transition: "all 0.15s",
                   }}
                   onMouseOver={(e) => {
