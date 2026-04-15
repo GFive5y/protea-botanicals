@@ -10,6 +10,7 @@
 // v2.0 — WP-Q Live Data Integration fixes
 
 import { useState, useEffect, useCallback } from "react";
+import { Printer, CheckCircle, AlertTriangle, Package } from "lucide-react";
 import {
   AreaChart,
   Area,
@@ -69,9 +70,9 @@ const SUBCATEGORY_TO_ACCOUNT = {
 };
 
 const STATUS_CONFIG = {
-  draft:    { label: "Draft", bg: "#FEF9C3", color: "#A16207", border: "#FDE047" },
-  reviewed: { label: "Reviewed", bg: "#DBEAFE", color: "#1D4ED8", border: "#93C5FD" },
-  signed:   { label: "Signed Off", bg: "#D1FAE5", color: "#065F46", border: "#6EE7B7" },
+  draft:    { label: "Draft",      bg: T.warningLight,  color: T.warningText,  border: T.warningBd },
+  reviewed: { label: "Reviewed",   bg: T.infoLight,     color: T.infoText,     border: T.infoBd },
+  signed:   { label: "Signed Off", bg: T.successLight,  color: T.successText,  border: T.successBd },
 };
 
 function StatusBadge({ status }) {
@@ -79,7 +80,7 @@ function StatusBadge({ status }) {
   return (
     <span style={{
       display:"inline-flex", alignItems:"center", gap:5,
-      padding:"3px 12px", borderRadius:20, fontSize:11, fontWeight:700,
+      padding:"3px 12px", borderRadius:T.radius.full, fontSize:11, fontWeight:700,
       background:cfg.bg, color:cfg.color, border:`1px solid ${cfg.border}`,
       letterSpacing:"0.05em", textTransform:"uppercase",
     }}>
@@ -620,13 +621,13 @@ function WaterfallChart({
         />
         <XAxis
           dataKey="label"
-          tick={{ fill: FIN.axis, fontSize: 11, fontFamily: CC.font }}
+          tick={{ fill: FIN.axis, fontSize: 11, fontFamily: T.font }}
           axisLine={false}
           tickLine={false}
           dy={6}
         />
         <YAxis
-          tick={{ fill: FIN.axis, fontSize: 11, fontFamily: CC.font }}
+          tick={{ fill: FIN.axis, fontSize: 11, fontFamily: T.font }}
           axisLine={false}
           tickLine={false}
           width={62}
@@ -705,7 +706,7 @@ function PLMarginGauge({ value, label, color }) {
         fill={color}
         fontSize="24"
         fontWeight="400"
-        fontFamily={CC.font}
+        fontFamily={T.font}
         style={{ fontVariantNumeric: "tabular-nums" }}
       >
         {value !== null && value !== undefined ? `${value.toFixed(1)}%` : "—"}
@@ -717,7 +718,7 @@ function PLMarginGauge({ value, label, color }) {
         fill={CC.ink400}
         fontSize="9"
         fontWeight="600"
-        fontFamily={CC.font}
+        fontFamily={T.font}
         letterSpacing="0.08em"
       >
         {(label || "").toUpperCase()}
@@ -739,12 +740,12 @@ function WRow({
 }) {
   const col =
     highlight === "green"
-      ? "#2E7D32"
+      ? T.successText
       : highlight === "red"
-        ? "#c62828"
+        ? T.dangerText
         : highlight === "orange"
-          ? "#E65100"
-          : "#333";
+          ? T.warningText
+          : T.ink900;
   return (
     <div
       style={{
@@ -752,9 +753,9 @@ function WRow({
         justifyContent: "space-between",
         alignItems: "center",
         padding: `${bold ? 14 : 10}px ${16 + indent * 20}px`,
-        borderTop: borderTop ? "2px solid #e0e0e0" : undefined,
-        borderBottom: bold ? "1px solid #e8e8e8" : undefined,
-        background: bold ? "#fafaf8" : "transparent",
+        borderTop: borderTop ? `2px solid ${T.border}` : undefined,
+        borderBottom: bold ? `1px solid ${T.border}` : undefined,
+        background: bold ? T.bg : "transparent",
       }}
     >
       <div>
@@ -762,13 +763,13 @@ function WRow({
           style={{
             fontSize: bold ? 15 : 13,
             fontWeight: bold ? 700 : 400,
-            color: dim ? "#bbb" : "#555",
+            color: dim ? T.ink300 : T.ink700,
           }}
         >
           {label}
         </div>
         {sub && (
-          <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>{sub}</div>
+          <div style={{ fontSize: 11, color: T.ink400, marginTop: 2 }}>{sub}</div>
         )}
       </div>
       <div style={{ textAlign: "right" }}>
@@ -776,7 +777,8 @@ function WRow({
           style={{
             fontSize: bold ? 18 : 14,
             fontWeight: bold ? 700 : 500,
-            color: dim ? "#bbb" : col,
+            color: dim ? T.ink300 : col,
+            fontVariantNumeric: "tabular-nums",
           }}
         >
           {negative && value > 0 ? `−${fmtZar(value, true)}` : fmtZar(value)}
@@ -786,24 +788,13 @@ function WRow({
   );
 }
 
-function SectionHeader({ label, icon }) {
+function SectionHeader({ label, icon: _icon }) {
   return (
-    <div
-      style={{
-        padding: "10px 16px",
-        background: "#f0ede8",
-        fontSize: 11,
-        fontWeight: 700,
-        color: "#888",
-        textTransform: "uppercase",
-        letterSpacing: "0.6px",
-        display: "flex",
-        gap: 8,
-        alignItems: "center",
-      }}
-    >
-      <span>{icon}</span>
-      {label}
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderBottom: `1px solid ${T.border}` }}>
+      <span style={{ display: "inline-block", width: 3, height: 14, borderRadius: 2, background: T.accent, flexShrink: 0 }} />
+      <span style={{ fontSize: 11, fontWeight: 700, color: T.ink400, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: T.font }}>
+        {label}
+      </span>
     </div>
   );
 }
@@ -816,21 +807,21 @@ function DataBadge({ label, ok, count }) {
         alignItems: "center",
         gap: 5,
         padding: "4px 10px",
-        background: ok ? "rgba(46,125,50,0.07)" : "rgba(198,40,40,0.07)",
-        border: `1px solid ${ok ? "#a5d6a7" : "#ef9a9a"}`,
-        borderRadius: 20,
+        background: ok ? T.successLight : T.dangerLight,
+        border: `1px solid ${ok ? T.successBd : T.dangerBd}`,
+        borderRadius: T.radius.full,
         fontSize: 11,
-        color: ok ? "#2E7D32" : "#c62828",
+        color: ok ? T.successText : T.dangerText,
         fontWeight: 500,
       }}
     >
-      <span>{ok ? "✓" : "⚠"}</span>
+      {ok ? <CheckCircle size={11} /> : <AlertTriangle size={11} />}
       {label}
       {count !== undefined && (
         <span
           style={{
-            background: ok ? "#c8e6c9" : "#ffcdd2",
-            borderRadius: 10,
+            background: ok ? T.successLight : T.dangerLight,
+            borderRadius: T.radius.full,
             padding: "0 6px",
             fontWeight: 700,
           }}
@@ -1469,16 +1460,16 @@ export default function HQProfitLoss() {
   const PL = PROFILE_LABELS[industryProfile] || PROFILE_LABELS.general_retail;
 
   const card = {
-    background: "#fff",
-    borderRadius: 12,
-    border: "1px solid #f0ede8",
+    background: T.surface,
+    borderRadius: T.radius.lg,
+    border: `1px solid ${T.border}`,
     overflow: "hidden",
     marginBottom: 20,
   };
   const inputStyle = {
     padding: "8px 12px",
-    border: "1px solid #ddd",
-    borderRadius: 8,
+    border: `1px solid ${T.border}`,
+    borderRadius: T.radius.md,
     fontFamily: T.font,
     fontSize: 14,
     boxSizing: "border-box",
@@ -1554,7 +1545,7 @@ export default function HQProfitLoss() {
               style={{
                 background: fxLoading ? "#f5f5f5" : "#e8f5e9",
                 border: "1px solid #c8e6c9",
-                borderRadius: 20,
+                borderRadius: T.radius.full,
                 padding: "6px 14px",
                 fontSize: 13,
                 color: "#2E7D32",
@@ -1563,7 +1554,7 @@ export default function HQProfitLoss() {
             >
               {fxLoading
                 ? "Loading FX…"
-                : `USD/ZAR R${usdZar.toFixed(4)} ${fxRate?.source === "live" ? "🟢" : "🟡"}`}
+                : `USD/ZAR R${usdZar.toFixed(4)} ${fxRate?.source === "live" ? "" : ""}`}
             </div>
             <InfoTooltip id="pl-fx-rate" />
           </div>
@@ -1611,8 +1602,8 @@ export default function HQProfitLoss() {
             border:"1px solid #E2E8F0", flexShrink:0,
           }}>
             {[
-              { id:false, label:"\uD83D\uDCCA Dashboard" },
-              { id:true,  label:"\uD83D\uDCCB IFRS Statement" },
+              { id:false, label:"Dashboard" },
+              { id:true,  label:"IFRS Statement" },
             ].map(opt => (
               <button key={String(opt.id)}
                 onClick={() => setIfrsView(opt.id)}
@@ -1633,7 +1624,7 @@ export default function HQProfitLoss() {
             disabled={loading}
             style={{
               padding: "8px 16px",
-              borderRadius: 8,
+              borderRadius: T.radius.md,
               border: "1px solid #e0e0e0",
               background: "#fafafa",
               color: "#555",
@@ -1659,7 +1650,7 @@ export default function HQProfitLoss() {
           padding: "12px 16px",
           background: hasDataErrors ? "#fff8f8" : "#f8fdf9",
           border: `1px solid ${hasDataErrors ? "#ffcdd2" : "#c8e6c9"}`,
-          borderRadius: 8,
+          borderRadius: T.radius.md,
         }}
       >
         <span
@@ -1818,7 +1809,7 @@ export default function HQProfitLoss() {
             {/* LEFT: P&L WATERFALL DETAIL */}
             <div>
               <div style={card}>
-                <SectionHeader icon="💰" label="Revenue" />
+                <SectionHeader icon="" label="Revenue" />
                 <WRow
                   label={PL.revenue}
                   sub={PL.revDesc}
@@ -1834,7 +1825,7 @@ export default function HQProfitLoss() {
                   highlight={profileRevenue > 0 ? "green" : undefined}
                 />
 
-                <SectionHeader icon="📦" label={PL.cogs} />
+                <SectionHeader icon="" label={PL.cogs} />
                 {cogsSource !== "actual" && (
                   <>
                     <WRow
@@ -1886,7 +1877,7 @@ export default function HQProfitLoss() {
                       padding: "8px 12px",
                       background: "#f8f9fa",
                       border: "1px solid #e8e8e8",
-                      borderRadius: 6,
+                      borderRadius: T.radius.md,
                       fontSize: 11,
                       color: "#999",
                       display: "flex",
@@ -1894,7 +1885,7 @@ export default function HQProfitLoss() {
                     }}
                   >
                     <span>
-                      📦 Inventory investment this period (balance sheet, not
+                      Inventory investment this period (balance sheet, not
                       P&L) — {completedPOs.length} PO
                       {completedPOs.length !== 1 ? "s" : ""} totalling{" "}
                       <strong style={{ color: "#666" }}>
@@ -1916,7 +1907,7 @@ export default function HQProfitLoss() {
                 {/* GAP-02 — Manual journal adjustments */}
                 {jAdj.count > 0 && (
                   <>
-                    <SectionHeader icon="📓" label="Journal Adjustments" />
+                    <SectionHeader icon="" label="Journal Adjustments" />
                     {jAdj.revAdj.map((e, i) => (
                       <WRow
                         key={i}
@@ -1955,7 +1946,7 @@ export default function HQProfitLoss() {
                     No manual journal adjustments for this period.
                   </div>
                 )}
-                <SectionHeader icon="📊" label={PL.gross} />
+                <SectionHeader icon="" label={PL.gross} />
                 <WRow
                   label={PL.gross}
                   sub={`Gross margin: ${fmt(grossMarginPct)}%`}
@@ -1977,7 +1968,7 @@ export default function HQProfitLoss() {
                     style={{
                       margin: "0 16px 12px",
                       padding: "12px 16px",
-                      borderRadius: 8,
+                      borderRadius: T.radius.md,
                       background:
                         (totalCogs / profileRevenue) * 100 < 30
                           ? "#F0FDF4"
@@ -2149,7 +2140,7 @@ export default function HQProfitLoss() {
                     onClick={() => setShowExpMgr(true)}
                     style={{
                       padding: "8px 14px",
-                      borderRadius: 8,
+                      borderRadius: T.radius.md,
                       border: "none",
                       background: "#2d4a2d",
                       color: "#fff",
@@ -2171,7 +2162,7 @@ export default function HQProfitLoss() {
                   highlight={totalOpexIncLoyalty > 0 ? "red" : undefined}
                 />
 
-                <SectionHeader icon="🏁" label="Net Profit / Loss" />
+                <SectionHeader icon="" label="Net Profit / Loss" />
                 <div
                   style={{
                     padding: "20px 16px",
@@ -2257,7 +2248,7 @@ export default function HQProfitLoss() {
                       <div
                         style={{
                           height: 8,
-                          borderRadius: 4,
+                          borderRadius: T.radius.sm,
                           background: "#e0e0e0",
                           overflow: "hidden",
                         }}
@@ -2267,7 +2258,7 @@ export default function HQProfitLoss() {
                             height: "100%",
                             width: `${Math.max(0, Math.min(100, netMarginPct))}%`,
                             background: pctColour(netMarginPct),
-                            borderRadius: 4,
+                            borderRadius: T.radius.sm,
                             transition: "width 0.5s",
                           }}
                         />
@@ -2280,7 +2271,7 @@ export default function HQProfitLoss() {
               {/* WP-FIN S1: CAPEX memo card */}
               {totalCapex > 0 && (
                 <div style={card}>
-                  <SectionHeader icon="🏗️" label="Capital Expenditure (Memo)" />
+                  <SectionHeader icon="" label="Capital Expenditure (Memo)" />
                   {expenses
                     .filter((e) => e.category === "capex")
                     .map((item) => (
@@ -2335,7 +2326,7 @@ export default function HQProfitLoss() {
                         key={m.id}
                         onClick={() => setMarginSortMode(m.id)}
                         style={{
-                          fontSize: 10, fontWeight: 600, padding: "4px 10px", borderRadius: 3,
+                          fontSize: 10, fontWeight: 600, padding: "4px 10px", borderRadius: T.radius.sm,
                           border: "1px solid #ddd", cursor: "pointer",
                           background: marginSortMode === m.id ? (T.accent) : "#fff",
                           color: marginSortMode === m.id ? "#fff" : "#666",
@@ -2362,7 +2353,7 @@ export default function HQProfitLoss() {
                         <span style={{ textAlign: "right", color: "#2E7D32", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtZar(p.gp)}</span>
                         <span style={{ textAlign: "right" }}>
                           <span style={{
-                            display: "inline-block", padding: "2px 6px", borderRadius: 3, fontSize: 10, fontWeight: 600,
+                            display: "inline-block", padding: "2px 6px", borderRadius: T.radius.sm, fontSize: 10, fontWeight: 600,
                             background: p.margin >= 70 ? "#E8F5E9" : p.margin >= 50 ? "#FFF8E1" : "#FFEBEE",
                             color: p.margin >= 70 ? "#2E7D32" : p.margin >= 50 ? "#F57F17" : "#c62828",
                           }}>
@@ -2469,7 +2460,7 @@ export default function HQProfitLoss() {
                               style={{
                                 fontSize: 11,
                                 color: CC.ink500,
-                                fontFamily: CC.font,
+                                fontFamily: T.font,
                               }}
                             >
                               {v}
@@ -2537,7 +2528,7 @@ export default function HQProfitLoss() {
                           />
                           <XAxis
                             dataKey="date"
-                            tick={{ fill: FIN.axis, fontSize: 10, fontFamily: CC.font }}
+                            tick={{ fill: FIN.axis, fontSize: 10, fontFamily: T.font }}
                             axisLine={false}
                             tickLine={false}
                             dy={6}
@@ -2545,7 +2536,7 @@ export default function HQProfitLoss() {
                             maxRotation={0}
                           />
                           <YAxis
-                            tick={{ fill: FIN.axis, fontSize: 10, fontFamily: CC.font }}
+                            tick={{ fill: FIN.axis, fontSize: 10, fontFamily: T.font }}
                             axisLine={false}
                             tickLine={false}
                             width={42}
@@ -2594,7 +2585,7 @@ export default function HQProfitLoss() {
 
               {/* FX Impact */}
               <div style={{ ...card, padding: 0 }}>
-                <SectionHeader icon="📡" label="Live FX Impact" />
+                <SectionHeader icon="" label="Live FX Impact" />
                 <div style={{ padding: "16px 20px" }}>
                   <p
                     style={{ margin: "0 0 14px", fontSize: 13, color: "#888" }}
@@ -2635,7 +2626,7 @@ export default function HQProfitLoss() {
                     <div
                       style={{
                         background: scenarioGross >= 0 ? "#f0f7f0" : "#fff8f8",
-                        borderRadius: 10,
+                        borderRadius: T.radius.md,
                         padding: "14px 16px",
                       }}
                     >
@@ -2740,7 +2731,7 @@ export default function HQProfitLoss() {
                         key={label}
                         style={{
                           background: "#fafaf8",
-                          borderRadius: 8,
+                          borderRadius: T.radius.md,
                           padding: "10px 12px",
                         }}
                       >
@@ -2764,7 +2755,7 @@ export default function HQProfitLoss() {
                       fontSize: 11,
                       color: "#999",
                       background: "#f9f9f9",
-                      borderRadius: 6,
+                      borderRadius: T.radius.md,
                       padding: "8px 10px",
                       lineHeight: 1.5,
                     }}
@@ -2781,7 +2772,7 @@ export default function HQProfitLoss() {
 
               {/* Best Margin SKU */}
               <div style={{ ...card, padding: 0 }}>
-                <SectionHeader icon="🏆" label="Best Margin SKU" />
+                <SectionHeader icon="" label="Best Margin SKU" />
                 <div style={{ padding: "16px 20px" }}>
                   {(() => {
                     const sku = bestSkuMargin || (productMargins.length > 0
@@ -2858,7 +2849,7 @@ export default function HQProfitLoss() {
                               textAlign: "center",
                               flex: 1,
                               background: "#f8f8f8",
-                              borderRadius: 8,
+                              borderRadius: T.radius.md,
                               padding: "12px 8px",
                             }}
                           >
@@ -2885,7 +2876,7 @@ export default function HQProfitLoss() {
                             fontSize: 12,
                             color: "#888",
                             background: "#fff8e1",
-                            borderRadius: 8,
+                            borderRadius: T.radius.md,
                             padding: "10px 14px",
                           }}
                         >
@@ -2908,7 +2899,7 @@ export default function HQProfitLoss() {
 
               {/* Channel Comparison */}
               <div style={{ ...card, padding: 0 }}>
-                <SectionHeader icon="📈" label="Channel Margin Comparison" />
+                <SectionHeader icon="" label="Channel Margin Comparison" />
                 <div style={{ padding: "16px 20px" }}>
                   {pricing.length === 0 && productMargins.length === 0 ? (
                     <p style={{ color: "#bbb", fontSize: 13 }}>
@@ -3031,7 +3022,7 @@ export default function HQProfitLoss() {
                           <div
                             style={{
                               height: 6,
-                              borderRadius: 3,
+                              borderRadius: T.radius.sm,
                               background: "#f0f0f0",
                               overflow: "hidden",
                             }}
@@ -3089,7 +3080,7 @@ export default function HQProfitLoss() {
             background: toast.type === "error" ? T.danger : T.accent,
             color: "#fff",
             padding: "12px 18px",
-            borderRadius: 8,
+            borderRadius: T.radius.md,
             fontSize: 13,
             fontWeight: 600,
             fontFamily: T.font,
