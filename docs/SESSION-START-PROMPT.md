@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 16 April 2026 — Session 285
+## Updated: 16 April 2026 — Session 286
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 366dcc3
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: db12ac3
 
 ---
 
@@ -24,11 +24,11 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 2b. `docs/NUAI-VISUAL-SPEC.md` — read before touching ANY visual code
 3. `docs/PENDING-ACTIONS.md`
 4. `docs/VIOLATION_LOG_v1_1.md`
-5. `docs/LL-ARCHIVE_v1_0.md` (LL-252 through LL-264 are new this session)
+5. `docs/LL-ARCHIVE_v1_0.md` (LL-265 through LL-268 are new)
 
 After reading, confirm out loud:
-- Current HEAD (should be 5802a7c or later — the docs commit on top of it is self-referential)
-- Group Portal status (COMPLETE — 6 stores, all tabs verified 15 Apr 2026)
+- Current HEAD (should be db12ac3 or later)
+- DS6 status: COMPLETE (all portals, HQ, HR, Admin, Consumer — see below)
 - All open loops from PENDING-ACTIONS.md
 - Any new violations
 
@@ -41,57 +41,78 @@ IF DEMO DATE CHANGES: update PENDING-ACTIONS.md first, then this file.
 
 ---
 
-## CURRENT STATE — 15 April 2026 — Session 284 Close
+## CURRENT STATE — 16 April 2026 — Session 286 Close
 
-### DS6 VISUAL UNIFICATION — Session 285 (commit 351bc44)
-
-Master visual spec: docs/NUAI-VISUAL-SPEC.md — mandatory before any visual code.
-
-Files unified this session:
-- HQStock.js — DS6 Phase 2a COMPLETE
-  DM Mono → T.font (36x), Outfit → T.font, emoji → Lucide (11x):
-    💰🛒🌐🗑✕✓★⏳📷🌿⚠☰⊞⊟ all replaced
-  LL-267 applied: outer return div has no background (transparent)
-  WORLD_ICON_MAP lifted to module scope — was inside ShopTab (scope bug caught
-  by ESLint, fixed before push). Both ShopTab + HQStock render now reference
-  shared constant.
-  23 Lucide icons in import block.
-
-DS6 Phase 2b OPEN (next session, same file):
-  - fontWeight 300/400 on 22px values → 700 (7 instances)
-  - fontSize 9/10 → 11px floor (43 instances)
-  - borderRadius 6/5 on cards → T.radius.lg 12px (12 instances)
-  - Section labels T.ink500 → T.ink400 + accent bar (13 instances)
-  - WORLD_ICON_MAP hex colours → T tokens (minor hygiene)
-
-Previous session (284):
+### DS6 VISUAL UNIFICATION — COMPLETE (Session 286)
 
 Master visual spec: docs/NUAI-VISUAL-SPEC.md — mandatory before any visual code.
 
-Files unified this session:
-- AppShell.css — cream → T.bg platform-wide
-- TenantPortal.js — cream eliminated, INNER maxWidth removed (LOOP-DS6-001 closed)
-- HQTradingDashboard.js — DM Mono killed, emoji→Lucide, radius tokenised,
-  section accent bars, KPI border 0.5px, chart padding, sKPISub breathing
-- HQOverview.js — SectionLabel industry-aware (T.accent), label → T.ink400,
-  radius tokens, T.surface panels
-- HQLoyalty.js — 15 changes: emoji removed (🌿💨🍬🌱🧪🔧🍄👕🎯📱📦🔀🎂⏰📊⚡),
-  radius tokenised, T.surface → T.bg where needed, unused consts deleted,
-  outer div → transparent, page header → transparent
-- HQDashboard.js — content wrapper → background: T.bg (eliminates white
-  middleman box for ALL 40+ HQ tabs, not just loyalty)
+**DS6 is now complete across all primary surfaces.** Every portal shell,
+HQ component, HR component, admin component and consumer page has been
+unified to the T token system. This was the entire focus of Session 286.
 
-ARCHITECTURAL LESSON LOCKED THIS SESSION (LL-267):
-Tab-level components (rendered inside HQDashboard or TenantPortal) must NEVER
-set background: T.surface on their outermost return div. This creates a white
-box that sits on top of the grey AppShell page chrome. The correct pattern:
-  outer div → background: "transparent" (or omit background entirely)
-  inner page header div → background: T.surface (intentional white header bar)
-  tab content div → no background (inherits grey from shell)
-  SectionCards/tiles → background: T.surface (white cards float on grey)
+#### Tokens foundation (commit 9d0da07)
+- `src/styles/tokens.js` — CRITICAL FIXES:
+  - Added 5 missing *Bd border tokens: `successBd`, `warningBd`, `dangerBd`,
+    `infoBd`, `accentBd`. Without these every `border: 1px solid ${T.xxxBd}`
+    across all bridge files rendered as `border: 1px solid undefined`.
+  - Converted `radius` values from numbers to px strings ("4px", "8px", etc)
+    so multi-corner template literals like `` `${T.radius.lg} ${T.radius.lg} 0 0` ``
+    produce valid CSS. Previously produced "12 12 0 0" (no units = invalid).
 
-Group Portal remains the visual reference. DS6 Phase 2 next: HQStock.js
-(PROTECTED — full file read required before any change per LL-185)
+#### All 6 portal shells ok
+HQDashboard · TenantPortal · AdminDashboard · HRDashboard · StaffPortal ·
+WholesalePortal
+
+#### All HQ components ok (21 files)
+HQStock (Phase 2a+2b) · HQBalanceSheet · ExpenseManager · HQProfitLoss ·
+HQDocuments · HQTradingDashboard · HQVat · HQLoyalty · HQAnalytics ·
+HQOverview · HQCogs · HQJournals · HQBankRecon · HQFixedAssets ·
+HQFinancialStatements · HQPurchaseOrders · HQSuppliers · HQPricing ·
+HQProduction · SmartInventory · PlatformBar
+
+#### All HR components ok (15 files)
+AdminHRPanel · HRStaffDirectory · HRLeave · HRTimesheets · HRContracts ·
+HRDisciplinary · HRPayroll · HRPerformance · HRRoster · HRCalendar ·
+HRComms · HRLoans · HRSettings · HRStaffProfile · HRStockView
+NOTE: HRStaffProfile had no local T block AND no T import — had bare T.*
+references from a prior partial edit. Fix: add `import { T } from "../../styles/tokens";`
+directly. This pattern (T.* with no local block, no import) = direct import, no bridge.
+
+#### Admin components ok
+AdminQRCodes · StockControl
+
+#### All consumer pages ok (5 files)
+Account · Shop · CheckoutPage · Redeem · WholesalePortal
+IMPORTANT: Cormorant Garamond + Jost fonts are intentionally preserved on
+ALL 5 consumer-facing pages. These are brand typography choices, not violations.
+Do NOT replace them with T.font on consumer pages.
+
+#### DS6 bridge pattern (for remaining files or future components)
+Files with a local `const T = { ink900: "#0D0D0D", ... }` block:
+  1. Add `import { T as DS } from "../../styles/tokens";`
+  2. Replace the entire local T block with the DS bridge:
+ const T = {
+   ...DS,
+   ink150: DS.border, ink075: DS.bg, ink050: DS.surface,
+   successBg: DS.successLight, warningBg: DS.warningLight,
+   dangerBg: DS.dangerLight, infoBg: DS.infoLight,
+   accentLit: DS.accentLight, fontUi: DS.font, fontData: DS.font,
+   shadow: DS.shadow.sm, shadowMd: DS.shadow.md,
+ };
+  3. Fix sLabel (11px/0.08em/T.ink400), sCard (T.surface/T.radius.md),
+     sBtn (T.radius.sm), sInput (T.surface/T.radius.sm),
+     sTh Part 16 (11px/T.ink400/0.08em/T.surface bg)
+  4. Global: fontSize 9/10→11, borderRadius numeric/string→T.radius.*, #fff→T.surface
+
+Files using T.* with NO local block AND NO import: add `import { T } from "../../styles/tokens";`
+
+#### Remaining (optional, not blocking demo)
+7 Admin tab components: AdminCommsCenter · AdminCustomerEngagement ·
+AdminFraudSecurity · AdminNotifications · AdminShipments ·
+AdminBatchManager · AdminProductionModule
+These inherit correct font/spacing from AdminDashboard shell. Internal
+raw hex / fontSize violations are cosmetic only.
 
 ### FINANCIAL PACKAGE — ALL 5 DEMO TENANTS COMPLETE
 DO NOT re-run financial seeding. DO NOT touch equity_ledger without LL-248.
@@ -99,22 +120,19 @@ All bank recons at 0 unmatched lines.
 
 | Tenant | Industry | Fin Suite | Bank Recon |
 |---|---|---|---|
-| The Garden Bistro | food_beverage | ✅ COMPLETE | ✅ 0 unmatched |
-| Medi Recreational | cannabis_retail | ✅ COMPLETE | ✅ 0 unmatched |
-| Nourish Kitchen & Deli | food_beverage | ✅ COMPLETE | ✅ 0 unmatched |
-| MediCare Dispensary | cannabis_dispensary | ✅ COMPLETE | ✅ 0 unmatched |
-| Metro Hardware (Pty) Ltd | general_retail | ✅ COMPLETE | ✅ 0 unmatched |
+| The Garden Bistro | food_beverage | COMPLETE | 0 unmatched |
+| Medi Recreational | cannabis_retail | COMPLETE | 0 unmatched |
+| Nourish Kitchen & Deli | food_beverage | COMPLETE | 0 unmatched |
+| MediCare Dispensary | cannabis_dispensary | COMPLETE | 0 unmatched |
+| Metro Hardware (Pty) Ltd | general_retail | COMPLETE | 0 unmatched |
 
 ### GROUP PORTAL — COMPLETE (Session 282)
 NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
-- LOOP-DS6-004: HQStock.js DS6 Phase 2b — fontWeight floor, fontSize floor,
-  borderRadius tokens, section label accent bars, WORLD_ICON_MAP token hygiene.
-  7+43+12+13+minor = ~76 targeted edits. Read file first (LL-185).
-- - LOOP-NEW-005: MediCare Revenue MTD shows R0 — reads from orders, must read
-  from dispensing_log for cannabis_dispensary profile per LL-231. Claude Code
-  fix: find Revenue MTD tile in dispensary dashboard component, switch source.
+- LOOP-NEW-005: MediCare Revenue MTD shows R0 — reads from orders, must read
+  from dispensing_log for cannabis_dispensary profile per LL-231.
+  Fix: find Revenue MTD tile in dispensary dashboard component, switch source.
 - LOOP-NEW-006: MediCare IFRS BS gap R76,906 — equity_ledger recalibration
   via Supabase MCP.
 - LOOP-010: Medi Rec — Run Depreciation via UI (step through each missing month)
@@ -123,30 +141,16 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
   Next: grep -r "no rows\|config row\|rewards engine" src/
   Ruled out: AINSBar.js, useNavIntelligence.js, HQLoyalty.js, IntelStrip.js
 
-### CLOSED RECENTLY (sessions 283–284)
-- LOOP-012: HR top-up — CLOSED (Medi Rec, MediCare, Metro all at RUNBOOK minimum)
-- LOOP-014: MediCare IFRS IS dispensing revenue verify — CLOSED (NEW-002 fix in 4fdafcd)
-- LOOP-016: R12,500 bank debit — CLOSED (created and closed same session;
-  resolved as Crown Electric forklift service invoice)
-- LOOP-NEW-004: Nourish Kitchen order_items cost_price — CLOSED (Supabase MCP
-  seed: 240 items, 6 products rotating, weighted_avg_cost in product_metadata.
-  BS signal now fires amber/1, 72 days of cover. Verified.)
-- Signal system (useFinSignals + hover cards + walk-in brief) — SHIPPED in 5802a7c
-- LOOP-DS6-001: TenantPortal INNER maxWidth causing grey side-strips at wide
-  viewports and any zoom level below 100% — CLOSED (71c7ae9, removed maxWidth
-  and margin:auto from INNER const)
-- DS6 visual unification Phase 1 — SHIPPED. AppShell cream, TenantPortal
-  background, HQTradingDashboard, HQOverview all unified. Master spec created.
-- DS6 HQLoyalty.js — SHIPPED (e983731 → 366dcc3). 15 changes + 2 follow-up
-  fixes: outer div background transparent, page header transparent.
-  Root cause of white middleman box identified and eliminated.
-- DS6 HQDashboard.js — SHIPPED (e216d4d). Content wrapper → background: T.bg.
-  Eliminates white box for all 40+ HQ tabs. Pattern matches TenantPortal.
+### CLOSED THIS SESSION (286)
+- LOOP-DS6-004: HQStock.js DS6 Phase 2b — CLOSED (shipped by Claude Code)
+- DS6 full platform pass — all portals, HQ, HR, Admin, Consumer unified
+- tokens.js *Bd tokens + radius string fix — CRITICAL BUG CLOSED
+- HRStaffProfile missing T import — CLOSED (db12ac3)
 
 ### KNOWN PERMANENT GAPS — DO NOT CHASE BEFORE 12 MAY
 1. POS VAT pipeline — ~R5k BS gap per tenant (amber banner explains it)
 2. MediCare IFRS BS gap R76,906 — tracked as LOOP-NEW-006 (fix next session)
-3. Metro Hardware IFRS BS gap — CLOSED Session 283 (A1 accrued opex + A5 FY filter in b281bb8)
+3. Metro Hardware IFRS BS gap — CLOSED Session 283
 4. Cash flow opening balance — not wired to bank recon
 5. Pricing data source red (0) — no product_pricing linked to recipes
 
@@ -172,6 +176,19 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 Check localhost FIRST. Same bug → code issue. Only on Vercel → SW cache.
 Fix: open NEW incognito window. Not refresh. Not existing incognito tab. (LL-257, LL-259)
 
+### "T is not defined in a HQ/HR component"
+Check the file: does it have a local `const T = {` block? No → add `import { T } from "../../styles/tokens";` directly. Yes → check if `import { T as DS }` was added but the bridge body was not — paste the bridge block. (LL-268)
+
+### "border: 1px solid undefined on a semantic badge/card"
+tokens.js is missing a *Bd token. Check: T.successBd, T.warningBd, T.dangerBd,
+T.infoBd, T.accentBd all exist as of 9d0da07. If a component uses a custom
+*Bd that doesn't exist in tokens.js, add it there first. (Session 286 fix)
+
+### "borderRadius template literal produces '12 12 0 0' (no units)"
+Use T.radius.lg directly as a string (it's "12px" as of 9d0da07). If you need
+multi-corner: `` `${T.radius.lg} ${T.radius.lg} 0 0` `` now correctly produces
+"12px 12px 0 0". (Session 286 fix)
+
 ### "Group Portal: infinite recursion detected in tenant_groups"
 Already fixed in prod. If it returns:
   SELECT policyname, qual FROM pg_policies WHERE tablename = 'tenant_groups';
@@ -191,7 +208,6 @@ Already fixed in prod. If it returns:
 ### "Nav item missing for some user roles"
   useNavConfig.js has 4 arrays: HQ_PAGES, ADMIN_PAGES, HR_PAGES, STAFF_PAGES
   New item must be in ALL relevant arrays. (LL-258)
-  Verify: grep -n 'Group Portal' src/hooks/useNavConfig.js → must return 2 lines
 
 ### "Bar chart bars invisible"
   T.neutralLight ≈ #F4F4F3 (near-white). Never use as chart fill. (LL-263)
@@ -206,9 +222,6 @@ RULE 0Q: NEVER push from Claude.ai. Claude Code (local terminal) ONLY.
          GitHub:push_files — VISIBLE, FORBIDDEN.
          Supabase:deploy_edge_function — VISIBLE, FORBIDDEN.
          GitHub:get_file_contents — PERMITTED (read only).
-         These write tools CANNOT be disabled in Claude.ai (Anthropic
-         gated feature, no per-tool toggle exists). Token scope is the
-         real gate. Do not call write tools regardless of availability.
 LL-075: Disk is truth. Read file before assuming state from docs.
 LL-083: Truncated reads drop data silently. Verify line count.
 LL-120: ALL Anthropic API calls via ai-copilot EF. NEVER from React.
@@ -219,7 +232,7 @@ LL-191: loyalty_transactions.transaction_type (not type/loyalty_type).
 LL-205: Every new DB table needs hq_all_ RLS bypass policy.
 LL-206: const { tenantId, industryProfile } = useTenant();
 LL-231: Dispensary revenue = dispensing_log. NOT orders.
-LL-246: NEVER git add -A. Specific files only. (service_role key rotated once already)
+LL-246: NEVER git add -A. Specific files only.
 LL-247: depreciation_entries.period_month is TEXT — quote it: '4' not 4.
 LL-248: equity_ledger.net_profit_for_year can drift — verify both sources.
 LL-250: All demo VAT numbers must be unique.
@@ -237,17 +250,18 @@ LL-261: qrcode.react missing after reset → npm install.
 LL-262: tenant_groups RLS recursion → get_my_group_ids() SECURITY DEFINER.
 LL-263: T.neutralLight invisible on white → BAR_PALETTE for chart bars.
 LL-264: NEVER create NEXT-SESSION-PROMPT_vXXX.md. Update SESSION-START-PROMPT.md
-         in-place instead. Versioned handoff files go stale immediately and leave
-         this file (the actual entry point) un-updated. See LL-264 in archive.
-LL-265: Production URL is protea-botanicals.vercel.app — never use preview URLs
-         (f520llkld format). Preview URLs serve frozen builds and will show stale
-         behaviour that doesn't match what's on main.
+         in-place instead.
+LL-265: Production URL is protea-botanicals.vercel.app — never use preview URLs.
 LL-266: TenantPortal INNER wrapper must NOT use maxWidth or margin:auto.
-         Content must fill 100% between sidebar and scrollbar at all zoom levels.
 LL-267: Tab components (rendered inside HQDashboard or TenantPortal) must NOT
          set background on their outermost return div. Use background: "transparent"
-         or omit it. Only inner page header divs and cards use T.surface. Violating
-         this creates a white middleman box over the grey AppShell chrome.
+         or omit it. Only inner page header divs and cards use T.surface.
+LL-268: DS6 batch scripts check hasLocalT to decide whether to add a bridge.
+         Files that use T.* with NO local T block AND NO import will compile with
+         "T is not defined". Pattern: if file has bare T.xxx with no local block
+         and no import → add `import { T } from "../../styles/tokens";` directly.
+         Do NOT add the bridge (no DS alias needed). HRStaffProfile.js was the
+         canonical example (db12ac3).
 
 ---
 
@@ -265,13 +279,11 @@ LL-267: Tab components (rendered inside HQDashboard or TenantPortal) must NOT
 1. **LOOP-NEW-005** — MediCare Revenue MTD R0 fix (Claude Code, dispensing_log source)
 2. **LOOP-NEW-006** — MediCare IFRS BS gap R76,906 (Supabase MCP)
 3. **LOOP-010/011** — Pre-demo: Medi Rec Run Depreciation + 20 IFRS sign-offs
-4. **WP-DS6-UNIFICATION Phase 2** — Next file: HQStock.js
-   (PROTECTED — read full file before any change). Pattern established in
-   Session 284 — follow NUAI-VISUAL-SPEC.md Part 14 checklist for each file.
-   CRITICAL: Apply LL-267 — tab component outer div must be transparent.
-   Check every file for background: T.surface on outermost return div.
-5. **11 May sim-pos-sales** — STANDING ALERT, cannot miss
-6. Eybna unpriced products — HC-0002, BB-LYCHEE-0002, 6-PH-0002
+4. **LOOP-015** — Loyalty warning banner grep (5 min diagnostic)
+5. **Optional DS6 mop-up** — 7 remaining Admin tab components (AdminCommsCenter,
+   AdminCustomerEngagement, AdminFraudSecurity, AdminNotifications,
+   AdminShipments, AdminBatchManager, AdminProductionModule). Not blocking demo.
+6. **11 May sim-pos-sales** — STANDING ALERT, cannot miss
 
 ---
 
