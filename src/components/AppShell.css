@@ -4,14 +4,14 @@
   display: flex;
   height: 100vh;
   overflow: hidden;
-  background: #ffffff;
+  background: #f8f9fa;
 }
 
 .app-shell-content {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  background: #ffffff;
+  background: #f8f9fa;
   position: relative;
   z-index: 1;
 }

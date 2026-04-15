@@ -88,7 +88,7 @@ import {
 } from "lucide-react";
 
 const T = {
-  bg: "#ffffff",
+  bg: "#f8f9fa",
   sidebar: "#ffffff",
   border: "#ECEAE6",
   accent: "#1A3D2B",
@@ -1463,13 +1463,13 @@ export default function TenantPortal() {
 
             {/* Content */}
             {fullBleed ? (
-              <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", background: "#ffffff" }}>
+              <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", background: T.bg }}>
                 <div style={{ ...INNER, flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", padding: "12px 24px 0", boxSizing: "border-box" }}>
                   {renderTab(activeTab, tenantId, industryProfile, setActiveTab, searchKey, searchFilter)}
                 </div>
               </div>
             ) : (
-              <div style={{ flex: 1, overflowY: "auto", background: "#ffffff" }}>
+              <div style={{ flex: 1, overflowY: "auto", background: T.bg }}>
                 <div style={{ ...INNER, padding: "24px 28px", boxSizing: "border-box" }}>
                   {activeTab === "overview" && <FinWalkInBrief signals={finSignals} />}
                   {renderTab(activeTab, tenantId, industryProfile, setActiveTab, searchKey, searchFilter)}
