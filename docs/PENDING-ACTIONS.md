@@ -109,7 +109,16 @@ Files ruled out: AINSBar.js, useNavIntelligence.js, HQLoyalty.js, IntelStrip.js.
 
 ---
 
-### LOOP-FIN-002 — PDF Audit Package EF (WP-FINANCIALS Phase 7.5 — never built)
+### LOOP-FIN-002 — PDF Audit Package EF — ✅ CLOSED Session 287 (95782e5)
+generate-financial-statements EF v1.0 deployed. 7-page A4 PDF via npm:pdf-lib.
+Download PDF button live in HQFinancialStatements.js header. Storage bucket
+`financial-statements` (private, 7-day signed URLs). Receives pre-computed
+statement data from React; queries tenant_config + journal_lines +
+chart_of_accounts for supplemental Notes (1-5) + Trial Balance pages.
+
+Original spec below for reference.
+
+### LOOP-FIN-002-ORIG — PDF Audit Package EF (WP-FINANCIALS Phase 7.5 — never built)
 Status: OPEN · Flagged as incomplete — specced in WP-FINANCIALS but no EF deployed
 Priority: HIGH for demo · Ref: docs/WP-FINANCIALS-v1_1.md Section 7.5
 

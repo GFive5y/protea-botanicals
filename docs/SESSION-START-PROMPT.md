@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 16 April 2026 — Session 286
+## Updated: 16 April 2026 — Session 287
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: db12ac3
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 95782e5
 
 ---
 
@@ -141,7 +141,14 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
   Next: grep -r "no rows\|config row\|rewards engine" src/
   Ruled out: AINSBar.js, useNavIntelligence.js, HQLoyalty.js, IntelStrip.js
 
-### CLOSED THIS SESSION (286)
+### CLOSED THIS SESSION (287)
+- LOOP-FIN-002: PDF Audit Package EF (95782e5) — CLOSED
+  generate-financial-statements EF deployed to uvicrqapgzcdvozxrreo.
+  7-page A4 PDF: Cover + TOC + 4 IFRS statements + Notes (5) + Trial Balance.
+  npm:pdf-lib StandardFonts, Storage bucket `financial-statements` (private,
+  7-day signed URL). Download PDF button live in HQFinancialStatements.js.
+
+### CLOSED SESSION 286
 - LOOP-DS6-004: HQStock.js DS6 Phase 2b — CLOSED (shipped by Claude Code)
 - DS6 full platform pass — all portals, HQ, HR, Admin, Consumer unified
 - tokens.js *Bd tokens + radius string fix — CRITICAL BUG CLOSED
