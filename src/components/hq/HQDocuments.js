@@ -11,6 +11,7 @@
 // v1.6 — Delivery Note → Auto-receive inventory
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Receipt, FileEdit, CreditCard, Package, FlaskConical, Tag, BarChart3, FileText, File, Upload, Lock, Microscope } from "lucide-react";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
 import WorkflowGuide from "../WorkflowGuide";
@@ -142,16 +143,20 @@ const DOC_TYPE_LABELS = {
   contract: "Contract",
   unknown: "Unknown",
 };
-const DOC_TYPE_ICONS = {
-  invoice: "🧾",
-  quote: "📝",
-  proof_of_payment: "💳",
-  delivery_note: "📦",
-  coa: "🔬",
-  price_list: "💰",
-  stock_sheet: "📊",
-  contract: "📃",
-  unknown: "📄",
+const DOC_TYPE_ICON_MAP = {
+  invoice:          (sz=14) => <Receipt size={sz} />,
+  quote:            (sz=14) => <FileEdit size={sz} />,
+  proof_of_payment: (sz=14) => <CreditCard size={sz} />,
+  delivery_note:    (sz=14) => <Package size={sz} />,
+  coa:              (sz=14) => <FlaskConical size={sz} />,
+  price_list:       (sz=14) => <Tag size={sz} />,
+  stock_sheet:      (sz=14) => <BarChart3 size={sz} />,
+  contract:         (sz=14) => <FileText size={sz} />,
+  unknown:          (sz=14) => <File size={sz} />,
+};
+const docTypeIcon = (type, size=14) => {
+  const fn = DOC_TYPE_ICON_MAP[type] || DOC_TYPE_ICON_MAP.unknown;
+  return fn(size);
 };
 const STATUS_COLORS = {
   pending_review: { bg: T.warningLight, color: T.warning, border: T.warning },
@@ -179,10 +184,10 @@ const confidencePct = (score) =>
 const inputStyle = {
   padding: "7px 10px",
   border: `1px solid ${T.border}`,
-  borderRadius: 4,
+  borderRadius: T.radius.sm,
   fontSize: 12,
   fontFamily: T.font,
-  background: "#fff",
+  background: T.surface,
   color: T.ink700,
   outline: "none",
   boxSizing: "border-box",
@@ -192,8 +197,8 @@ const makeBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
   backgroundColor: disabled ? "#ccc" : bg,
   color,
   border: bg === "transparent" ? `1px solid ${T.border}` : "none",
-  borderRadius: 4,
-  fontSize: 10,
+  borderRadius: T.radius.sm,
+  fontSize: 11,
   fontWeight: 700,
   letterSpacing: "0.07em",
   textTransform: "uppercase",
@@ -208,9 +213,9 @@ function StatusBadge({ status }) {
   return (
     <span
       style={{
-        fontSize: 9,
+        fontSize: 11,
         padding: "2px 8px",
-        borderRadius: 20,
+        borderRadius: T.radius.full,
         background: s.bg,
         color: s.color,
         border: `1px solid ${s.border}`,
@@ -233,7 +238,7 @@ function ConfidenceDot({ score }) {
         display: "inline-flex",
         alignItems: "center",
         gap: 4,
-        fontSize: 10,
+        fontSize: 11,
         color,
         fontFamily: T.font,
       }}
@@ -262,7 +267,7 @@ function ConfidenceBar({ score }) {
           flex: 1,
           height: 5,
           background: T.border,
-          borderRadius: 3,
+          borderRadius: T.radius.sm,
           overflow: "hidden",
         }}
       >
@@ -271,7 +276,7 @@ function ConfidenceBar({ score }) {
             width: `${pct}%`,
             height: "100%",
             background: color,
-            borderRadius: 3,
+            borderRadius: T.radius.sm,
             transition: "width 0.3s ease",
           }}
         />
@@ -314,11 +319,11 @@ function SupplierCreateForm({
   const lbl = (text) => (
     <label
       style={{
-        fontSize: 9,
+        fontSize: 11,
         fontWeight: 700,
         letterSpacing: "0.12em",
         textTransform: "uppercase",
-        color: T.ink500,
+        color: T.ink400,
         fontFamily: T.font,
         display: "block",
         marginBottom: 3,
@@ -352,7 +357,7 @@ function SupplierCreateForm({
     >
       <div
         style={{
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: 700,
           color: "#6c3483",
           fontFamily: T.font,
@@ -455,7 +460,7 @@ function SupplierCreateForm({
       {error && (
         <div
           style={{
-            fontSize: 10,
+            fontSize: 11,
             color: T.danger,
             fontFamily: T.font,
             marginTop: 6,
@@ -474,8 +479,8 @@ function SupplierCreateForm({
             background: "#6c3483",
             color: "#fff",
             border: "none",
-            borderRadius: 4,
-            fontSize: 10,
+            borderRadius: T.radius.sm,
+            fontSize: 11,
             fontWeight: 700,
             letterSpacing: "0.07em",
             cursor: saving ? "not-allowed" : "pointer",
@@ -494,8 +499,8 @@ function SupplierCreateForm({
             background: "transparent",
             color: T.ink500,
             border: `1px solid ${T.border}`,
-            borderRadius: 4,
-            fontSize: 10,
+            borderRadius: T.radius.sm,
+            fontSize: 11,
             cursor: "pointer",
             fontFamily: T.font,
           }}
@@ -533,7 +538,7 @@ function UploadZone({ onFileSelected, disabled }) {
       onClick={() => !disabled && fileRef.current?.click()}
       style={{
         border: `2px dashed ${dragOver ? T.accentMid : T.border}`,
-        borderRadius: 6,
+        borderRadius: T.radius.md,
         padding: "20px 16px",
         textAlign: "center",
         cursor: disabled ? "not-allowed" : "pointer",
@@ -542,7 +547,7 @@ function UploadZone({ onFileSelected, disabled }) {
         opacity: disabled ? 0.5 : 1,
       }}
     >
-      <div style={{ fontSize: 24, marginBottom: 6 }}>📤</div>
+      <div style={{ marginBottom: 6, color: T.ink400 }}><Upload size={24} /></div>
       <div
         style={{
           fontSize: 12,
@@ -555,7 +560,7 @@ function UploadZone({ onFileSelected, disabled }) {
       </div>
       <div
         style={{
-          fontSize: 10,
+          fontSize: 11,
           color: T.ink500,
           marginTop: 4,
           fontFamily: T.font,
@@ -575,14 +580,13 @@ function UploadZone({ onFileSelected, disabled }) {
 }
 
 function DocListItem({ doc, selected, onClick }) {
-  const icon = DOC_TYPE_ICONS[doc.document_type] || "📄";
   return (
     <div
       onClick={onClick}
       style={{
         padding: "10px 12px",
         cursor: "pointer",
-        borderRadius: 2,
+        borderRadius: T.radius.sm,
         background: selected ? T.accentLight : "transparent",
         borderLeft: selected
           ? `3px solid ${T.accentMid}`
@@ -604,7 +608,7 @@ function DocListItem({ doc, selected, onClick }) {
           marginBottom: 4,
         }}
       >
-        <span style={{ fontSize: 13 }}>{icon}</span>
+        <span style={{ display: "flex", alignItems: "center", color: T.ink400 }}>{docTypeIcon(doc.document_type, 16)}</span>
         <span
           style={{
             fontSize: 12,
@@ -624,7 +628,7 @@ function DocListItem({ doc, selected, onClick }) {
       </div>
       <div
         style={{
-          fontSize: 10,
+          fontSize: 11,
           color: T.ink500,
           fontFamily: T.font,
           marginBottom: 4,
@@ -643,7 +647,7 @@ function DocListItem({ doc, selected, onClick }) {
         }}
       >
         <StatusBadge status={doc.status} />
-        <span style={{ fontSize: 9, color: T.ink500, fontFamily: T.font }}>
+        <span style={{ fontSize: 11, color: T.ink500, fontFamily: T.font }}>
           {fmtDate(doc.uploaded_at)}
         </span>
       </div>
@@ -695,11 +699,11 @@ function ReviewPanel({
   const isReadOnly = doc.status !== "pending_review";
 
   const sectionHead = {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: 700,
     letterSpacing: "0.2em",
     textTransform: "uppercase",
-    color: T.ink500,
+    color: T.ink400,
     fontFamily: T.font,
     padding: "10px 14px 6px",
     borderBottom: `1px solid ${T.border}`,
@@ -716,9 +720,9 @@ function ReviewPanel({
   };
 
   const actionBadgeStyle = (action) => ({
-    fontSize: 9,
+    fontSize: 11,
     padding: "1px 6px",
-    borderRadius: 3,
+    borderRadius: T.radius.sm,
     background:
       action === "receive_delivery_item"
         ? T.accentLight
@@ -743,12 +747,12 @@ function ReviewPanel({
     letterSpacing: "0.05em",
   });
   const actionBadgeLabel = (action, table) => {
-    if (action === "receive_delivery_item") return "📦 " + table;
-    if (action === "update_batch_coa") return "🔬 " + table;
-    if (action === "update_po_status") return "🔄 " + table;
-    if (action === "create_supplier_product") return "➕ " + table;
-    if (action === "update_po_shipping") return "🚢 Shipping Cost";
-    if (action === "create_expense") return "💰 expenses";
+    if (action === "receive_delivery_item") return table;
+    if (action === "update_batch_coa") return table;
+    if (action === "update_po_status") return table;
+    if (action === "create_supplier_product") return "+ " + table;
+    if (action === "update_po_shipping") return "Shipping Cost";
+    if (action === "create_expense") return "expenses";
     return table;
   };
   const handleSupplierSave = async (supplierData) => {
@@ -766,7 +770,7 @@ function ReviewPanel({
         overflowY: "auto",
         display: "flex",
         flexDirection: "column",
-        background: "#fff",
+        background: T.surface,
       }}
     >
       {/* Header */}
@@ -785,9 +789,7 @@ function ReviewPanel({
             marginBottom: 8,
           }}
         >
-          <span style={{ fontSize: 18 }}>
-            {DOC_TYPE_ICONS[extraction.document_type] || "📄"}
-          </span>
+          <span style={{ display: "flex", alignItems: "center", color: T.ink400 }}>{docTypeIcon(extraction.document_type, 20)}</span>
           <div>
             <div
               style={{
@@ -799,7 +801,7 @@ function ReviewPanel({
             >
               {DOC_TYPE_LABELS[extraction.document_type] || "Document"}
             </div>
-            <div style={{ fontSize: 10, color: T.ink500, fontFamily: T.font }}>
+            <div style={{ fontSize: 11, color: T.ink500, fontFamily: T.font }}>
               {extraction.supplier?.name || "Unknown supplier"}
             </div>
           </div>
@@ -811,7 +813,7 @@ function ReviewPanel({
         {extraction.extraction_notes && (
           <div
             style={{
-              fontSize: 10,
+              fontSize: 11,
               color: T.ink500,
               fontFamily: T.font,
               marginTop: 6,
@@ -881,7 +883,7 @@ function ReviewPanel({
               {supplierCreated ? (
                 <span
                   style={{
-                    fontSize: 10,
+                    fontSize: 11,
                     color: T.accentMid,
                     fontWeight: 600,
                     fontFamily: T.font,
@@ -894,12 +896,12 @@ function ReviewPanel({
                   <button
                     onClick={() => setShowSupplierForm(true)}
                     style={{
-                      fontSize: 9,
+                      fontSize: 11,
                       padding: "3px 8px",
                       background: "#6c3483",
                       color: "#fff",
                       border: "none",
-                      borderRadius: 3,
+                      borderRadius: T.radius.sm,
                       cursor: "pointer",
                       fontFamily: T.font,
                       fontWeight: 700,
@@ -956,7 +958,7 @@ function ReviewPanel({
                       marginRight: 6,
                     }}
                   >
-                    {isShippingLine(item.description) ? "🚢 " : ""}
+                    {isShippingLine(item.description) ? "" : ""}
                     {item.description}
                   </span>
                   <ConfidenceDot score={item.confidence} />
@@ -979,9 +981,9 @@ function ReviewPanel({
                   {item.allocated_cost && (
                     <span
                       style={{
-                        fontSize: 9,
+                        fontSize: 11,
                         padding: "1px 6px",
-                        borderRadius: 3,
+                        borderRadius: T.radius.sm,
                         background: T.warningLight,
                         color: T.warning,
                         fontWeight: 700,
@@ -995,7 +997,7 @@ function ReviewPanel({
                   {item.matched_product_id ? (
                     <span style={{ color: T.accentMid }}>✓ matched</span>
                   ) : isShippingLine(item.description) ? (
-                    <span style={{ color: C.orange }}>🚢 shipping</span>
+                    <span style={{ color: C.orange }}>shipping</span>
                   ) : (
                     <span style={{ color: T.warning }}>⚠ unmatched</span>
                   )}
@@ -1018,9 +1020,9 @@ function ReviewPanel({
                         setCatOverrides((p) => ({ ...p, [i]: e.target.value }))
                       }
                       style={{
-                        fontSize: 10,
+                        fontSize: 11,
                         padding: "2px 6px",
-                        borderRadius: 3,
+                        borderRadius: T.radius.sm,
                         border: `1px solid ${T.border}`,
                         fontFamily: T.font,
                         background: catOverrides[i] ? T.accentLight : "#fff",
@@ -1058,9 +1060,9 @@ function ReviewPanel({
                           }))
                         }
                         style={{
-                          fontSize: 10,
+                          fontSize: 11,
                           padding: "2px 6px",
-                          borderRadius: 3,
+                          borderRadius: T.radius.sm,
                           border: `1px solid ${T.border}`,
                           fontFamily: T.font,
                           background: medOverrides[i] ? T.accentLight : "#fff",
@@ -1191,7 +1193,7 @@ function ReviewPanel({
             <div
               key={i}
               style={{
-                fontSize: 10,
+                fontSize: 11,
                 color: T.warning,
                 fontFamily: T.font,
                 marginBottom: 2,
@@ -1214,7 +1216,7 @@ function ReviewPanel({
         >
           <div
             style={{
-              fontSize: 9,
+              fontSize: 11,
               fontWeight: 700,
               letterSpacing: "0.15em",
               color: T.danger,
@@ -1229,7 +1231,7 @@ function ReviewPanel({
             <div
               key={i}
               style={{
-                fontSize: 10,
+                fontSize: 11,
                 color: T.danger,
                 fontFamily: T.font,
                 marginBottom: 2,
@@ -1255,7 +1257,7 @@ function ReviewPanel({
         >
           <div
             style={{
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: 700,
               color: T.accentMid,
               fontFamily: T.font,
@@ -1267,7 +1269,7 @@ function ReviewPanel({
           {doc.confirmed_at && (
             <div
               style={{
-                fontSize: 9,
+                fontSize: 11,
                 color: T.ink500,
                 marginTop: 2,
                 fontFamily: T.font,
@@ -1290,7 +1292,7 @@ function ReviewPanel({
         >
           <div
             style={{
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: 700,
               color: T.danger,
               fontFamily: T.font,
@@ -1301,7 +1303,7 @@ function ReviewPanel({
           {doc.rejection_reason && (
             <div
               style={{
-                fontSize: 10,
+                fontSize: 11,
                 color: T.danger,
                 marginTop: 2,
                 fontFamily: T.font,
@@ -1332,8 +1334,8 @@ function ReviewPanel({
               background: "transparent",
               color: T.ink500,
               border: `1px solid ${T.border}`,
-              borderRadius: 4,
-              fontSize: 10,
+              borderRadius: T.radius.sm,
+              fontSize: 11,
               fontWeight: 700,
               cursor: "pointer",
               fontFamily: T.font,
@@ -1356,7 +1358,7 @@ function ReviewPanel({
         >
           <div
             style={{
-              fontSize: 10,
+              fontSize: 11,
               color: T.danger,
               fontFamily: T.font,
               marginBottom: 6,
@@ -1373,7 +1375,7 @@ function ReviewPanel({
               boxSizing: "border-box",
               padding: 8,
               border: `1px solid ${T.danger}`,
-              borderRadius: 4,
+              borderRadius: T.radius.sm,
               fontSize: 11,
               fontFamily: T.font,
               minHeight: 60,
@@ -1394,8 +1396,8 @@ function ReviewPanel({
                 background: T.danger,
                 color: "#fff",
                 border: "none",
-                borderRadius: 4,
-                fontSize: 10,
+                borderRadius: T.radius.sm,
+                fontSize: 11,
                 fontWeight: 700,
                 cursor: "pointer",
                 fontFamily: T.font,
@@ -1410,8 +1412,8 @@ function ReviewPanel({
                 background: "transparent",
                 color: T.ink500,
                 border: `1px solid ${T.border}`,
-                borderRadius: 4,
-                fontSize: 10,
+                borderRadius: T.radius.sm,
+                fontSize: 11,
                 cursor: "pointer",
                 fontFamily: T.font,
               }}
@@ -1434,7 +1436,7 @@ function ReviewPanel({
           {confirmError && (
             <div
               style={{
-                fontSize: 10,
+                fontSize: 11,
                 color: T.danger,
                 marginBottom: 8,
                 fontFamily: T.font,
@@ -1472,8 +1474,8 @@ function ReviewPanel({
                   background: T.accent,
                   color: "#fff",
                   border: "none",
-                  borderRadius: 4,
-                  fontSize: 10,
+                  borderRadius: T.radius.sm,
+                  fontSize: 11,
                   fontWeight: 700,
                   letterSpacing: "0.07em",
                   cursor: checkedUpdates.size === 0 ? "not-allowed" : "pointer",
@@ -1494,8 +1496,8 @@ function ReviewPanel({
                   background: "transparent",
                   color: T.danger,
                   border: `1px solid ${T.danger}`,
-                  borderRadius: 4,
-                  fontSize: 10,
+                  borderRadius: T.radius.sm,
+                  fontSize: 11,
                   fontWeight: 700,
                   cursor: "pointer",
                   fontFamily: T.font,
@@ -1563,11 +1565,11 @@ function DocumentLogTable({ documents, onSelectDoc }) {
 
   const sTh = {
     padding: "8px 12px",
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: 700,
     letterSpacing: "0.12em",
     textTransform: "uppercase",
-    color: T.ink500,
+    color: T.ink400,
     borderBottom: `2px solid ${T.border}`,
     textAlign: "left",
     fontFamily: T.font,
@@ -1639,9 +1641,9 @@ function DocumentLogTable({ documents, onSelectDoc }) {
       </div>
       <div
         style={{
-          background: "#fff",
+          background: T.surface,
           border: `1px solid ${T.border}`,
-          borderRadius: 6,
+          borderRadius: T.radius.md,
           overflowX: "auto",
           boxShadow: T.shadow.sm,
         }}
@@ -1694,7 +1696,7 @@ function DocumentLogTable({ documents, onSelectDoc }) {
                 >
                   <td style={sTd}>{fmtDateTime(doc.uploaded_at)}</td>
                   <td style={sTd}>
-                    {DOC_TYPE_ICONS[doc.document_type]}{" "}
+                    <span style={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", marginRight: 4, color: T.ink400 }}>{docTypeIcon(doc.document_type, 13)}</span>
                     {DOC_TYPE_LABELS[doc.document_type]}
                   </td>
                   <td style={sTd}>
@@ -1736,7 +1738,7 @@ function DocumentLogTable({ documents, onSelectDoc }) {
                       style={{
                         ...makeBtn("transparent", T.accentMid),
                         padding: "3px 10px",
-                        fontSize: 9,
+                        fontSize: 11,
                       }}
                     >
                       Review →
@@ -2650,7 +2652,7 @@ export default function HQDocuments({ initialDocId = null }) {
           style={{
             display: "flex",
             border: `1px solid ${T.border}`,
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             overflow: "hidden",
           }}
         >
@@ -2664,7 +2666,7 @@ export default function HQDocuments({ initialDocId = null }) {
               style={{
                 padding: "8px 16px",
                 border: "none",
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: "0.07em",
                 textTransform: "uppercase",
@@ -2688,7 +2690,7 @@ export default function HQDocuments({ initialDocId = null }) {
             padding: "10px 16px",
             background: "#f5eef8",
             border: `1px solid #6c3483`,
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             marginBottom: 16,
             fontSize: 12,
             color: "#6c3483",
@@ -2698,7 +2700,7 @@ export default function HQDocuments({ initialDocId = null }) {
             gap: 8,
           }}
         >
-          🔬 <strong>Navigated from Batch Manager</strong> — showing source COA
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><Microscope size={14} /><strong>Navigated from Batch Manager</strong></span> — showing source COA
           document:&nbsp;
           <span style={{ fontWeight: 600 }}>{selectedDoc.file_name}</span>
         </div>
@@ -2711,7 +2713,7 @@ export default function HQDocuments({ initialDocId = null }) {
           gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))",
           gap: "1px",
           background: T.border,
-          borderRadius: 8,
+          borderRadius: T.radius.md,
           overflow: "hidden",
           border: `1px solid ${T.border}`,
           boxShadow: T.shadow.sm,
@@ -2744,7 +2746,7 @@ export default function HQDocuments({ initialDocId = null }) {
           <div
             key={s.label}
             style={{
-              background: "#fff",
+              background: T.surface,
               padding: "14px 16px",
               textAlign: "center",
             }}
@@ -2764,11 +2766,11 @@ export default function HQDocuments({ initialDocId = null }) {
             </div>
             <div
               style={{
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                color: T.ink500,
+                color: T.ink400,
                 marginTop: 6,
                 fontFamily: T.font,
               }}
@@ -2794,8 +2796,8 @@ export default function HQDocuments({ initialDocId = null }) {
           style={{
             display: "flex",
             border: `1px solid ${T.border}`,
-            borderRadius: 8,
-            background: "#fff",
+            borderRadius: T.radius.md,
+            background: T.surface,
             minHeight: 600,
             overflow: "hidden",
             boxShadow: T.shadow.sm,
@@ -2828,10 +2830,10 @@ export default function HQDocuments({ initialDocId = null }) {
                     width: "100%",
                     padding: "5px 8px",
                     border: `1px solid ${T.border}`,
-                    borderRadius: 4,
+                    borderRadius: T.radius.sm,
                     fontSize: 11,
                     fontFamily: T.font,
-                    background: "#fff",
+                    background: T.surface,
                     color: T.ink700,
                     cursor: "pointer",
                   }}
@@ -2858,7 +2860,7 @@ export default function HQDocuments({ initialDocId = null }) {
                       style={{
                         height: 4,
                         background: T.border,
-                        borderRadius: 2,
+                        borderRadius: T.radius.sm,
                         overflow: "hidden",
                         marginBottom: 6,
                       }}
@@ -2866,7 +2868,7 @@ export default function HQDocuments({ initialDocId = null }) {
                       <div
                         style={{
                           height: "100%",
-                          borderRadius: 2,
+                          borderRadius: T.radius.sm,
                           width: `${uploadProgress}%`,
                           background: T.accentMid,
                           transition: "width 0.4s ease",
@@ -2876,7 +2878,7 @@ export default function HQDocuments({ initialDocId = null }) {
                   )}
                   <div
                     style={{
-                      fontSize: 10,
+                      fontSize: 11,
                       fontFamily: T.font,
                       textAlign: "center",
                       color:
@@ -2958,9 +2960,7 @@ export default function HQDocuments({ initialDocId = null }) {
                     gap: 10,
                   }}
                 >
-                  <span style={{ fontSize: 16 }}>
-                    {DOC_TYPE_ICONS[selectedDoc.document_type]}
-                  </span>
+                  <span style={{ display: "flex", alignItems: "center", color: T.ink400 }}>{docTypeIcon(selectedDoc.document_type, 18)}</span>
                   <div style={{ flex: 1 }}>
                     <div
                       style={{
@@ -2974,7 +2974,7 @@ export default function HQDocuments({ initialDocId = null }) {
                     </div>
                     <div
                       style={{
-                        fontSize: 10,
+                        fontSize: 11,
                         color: T.ink500,
                         fontFamily: T.font,
                       }}
@@ -2991,14 +2991,14 @@ export default function HQDocuments({ initialDocId = null }) {
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{
-                        fontSize: 10,
+                        fontSize: 11,
                         color: T.info,
                         fontWeight: 600,
                         textDecoration: "none",
                         fontFamily: T.font,
                         padding: "4px 10px",
                         border: `1px solid ${T.infoBd}`,
-                        borderRadius: 4,
+                        borderRadius: T.radius.sm,
                       }}
                     >
                       ↗ Open
@@ -3065,7 +3065,7 @@ export default function HQDocuments({ initialDocId = null }) {
                         color: T.ink500,
                       }}
                     >
-                      <div style={{ fontSize: 36, marginBottom: 10 }}>🔒</div>
+                      <div style={{ marginBottom: 10, color: T.ink400 }}><Lock size={36} /></div>
                       <div style={{ fontSize: 13, fontFamily: T.font }}>
                         Preview unavailable
                       </div>
@@ -3095,7 +3095,7 @@ export default function HQDocuments({ initialDocId = null }) {
                   padding: 40,
                 }}
               >
-                <div style={{ fontSize: 48, marginBottom: 16 }}>📄</div>
+                <div style={{ marginBottom: 16, color: T.ink400 }}><File size={48} /></div>
                 <div
                   style={{
                     fontSize: 18,
