@@ -7,7 +7,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTenant } from "../services/tenantService";
-import { profileOverrides, getTokens } from "../styles/tokens";
+import { profileOverrides, getTokens, T as DS } from "../styles/tokens";
 import { TokenContext } from "../contexts/TokenContext";
 import { useBadges } from "../hooks/useBadges";
 // PlatformBar removed — WP-AINS Phase 5
@@ -88,18 +88,10 @@ import {
 } from "lucide-react";
 
 const T = {
-  bg: "#f8f9fa",
-  sidebar: "#ffffff",
-  border: "#ECEAE6",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  ink900: "#0D0D0D",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  ...DS,
+  sidebar:   DS.surface,
+  accentLit: DS.accentLight,
+  ink150:    DS.border,
 };
 
 // Shared inner constraint — matches FX bar exactly
@@ -953,7 +945,7 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, 
           </span>
           {badge?.count > 0 && (
             <span style={{
-              fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 8,
+              fontSize: 11, fontWeight: 700, padding: "1px 5px", borderRadius: 8,
               background: badge.variant === "danger" ? "#FEE2E2" : badge.variant === "warning" ? "#FFF3CD" : "#E0F0FF",
               color: badge.variant === "danger" ? "#991B1B" : badge.variant === "warning" ? "#92400E" : "#1E3A5F",
               flexShrink: 0, marginRight: 4, fontFamily: T.font,
@@ -1002,7 +994,7 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, 
                 </span>
                 {tabBadges[tab.id]?.count > 0 && (
                   <span style={{
-                    fontSize: 9, fontWeight: 700, flexShrink: 0,
+                    fontSize: 11, fontWeight: 700, flexShrink: 0,
                     padding: "1px 5px", borderRadius: 8, fontFamily: T.font,
                     background: tabBadges[tab.id].severity === "danger" ? "#FEE2E2" : "#FFF3CD",
                     color:      tabBadges[tab.id].severity === "danger" ? "#991B1B" : "#92400E",
@@ -1012,7 +1004,7 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, 
                 )}
                 {tabInsights?.[tab.id] && (
                   <span style={{
-                    fontSize: 9, color: "#888",
+                    fontSize: 11, color: "#888",
                     overflow: "hidden", textOverflow: "ellipsis",
                     whiteSpace: "nowrap", flexShrink: 1,
                     marginLeft: "auto", paddingLeft: 6,
@@ -1277,7 +1269,7 @@ export default function TenantPortal() {
                       {tenantName}
                     </div>
                     <div style={{
-                      display: "inline-block", fontSize: 9, fontWeight: 700,
+                      display: "inline-block", fontSize: 11, fontWeight: 700,
                       padding: "2px 8px", borderRadius: 20,
                       background: profileBadge.bg, color: profileBadge.color,
                       letterSpacing: "0.08em", textTransform: "uppercase",
@@ -1406,7 +1398,7 @@ export default function TenantPortal() {
             />
 
             {/* Breadcrumb */}
-            <div style={{ background: "#fff", flexShrink: 0 }}>
+            <div style={{ background: T.surface, flexShrink: 0 }}>
               <div style={{ ...INNER, padding: "0 24px", height: 48, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <button
@@ -1479,7 +1471,7 @@ export default function TenantPortal() {
             {/* Footer */}
             <div style={{
               height: 28, flexShrink: 0, borderTop: `1px solid ${T.border}`,
-              background: "#ffffff", display: "flex", alignItems: "center",
+              background: T.surface, display: "flex", alignItems: "center",
               padding: "0 20px", gap: 16,
             }}>
               <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.04em" }}>
@@ -1506,7 +1498,7 @@ export default function TenantPortal() {
                 <div style={{ padding: "14px 16px 12px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: pAccent, marginBottom: 5 }}>{tenantName}</div>
-                    <div style={{ display: "inline-block", fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: profileBadge.bg, color: profileBadge.color, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                    <div style={{ display: "inline-block", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: T.radius.full, background: profileBadge.bg, color: profileBadge.color, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                       {profileBadge.label}
                     </div>
                   </div>
