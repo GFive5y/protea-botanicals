@@ -117,7 +117,7 @@ function colHdr(page: APage, y: number, freg: AFont, fbold: AFont): number {
   dtr(page, "Prior Period (ZAR)", PW - MR, y, 7.5, fbold, C.ink500);
   y -= 5;
   hr(page, y, ML, PW - MR, C.midGreen, 1.5);
-  return y - 14;
+  return y - 11;
 }
 
 type S = { y: number };
@@ -125,7 +125,7 @@ type S = { y: number };
 function secBar(page: APage, s: S, label: string, fbold: AFont) {
   rect(page, ML, s.y - 2, CW, 13, C.sectionBg);
   dt(page, label, ML + 4, s.y, 7.5, fbold, C.ink500);
-  s.y -= 15;
+  s.y -= 12;
 }
 
 interface RowOpts {
@@ -150,7 +150,7 @@ function row(page: APage, s: S, label: string, value: number | null, opts: RowOp
     dtr(page, str, PW - MR - 80, s.y, sz, f, col);
     dtr(page, "—", PW - MR, s.y, 8.5, freg, C.ink300);
   }
-  s.y -= sub ? 28 : 18;
+  s.y -= sub ? 20 : 14;
 }
 
 function netRow(page: APage, s: S, label: string, value: number, pct: number, freg: AFont, fbold: AFont) {
@@ -161,7 +161,13 @@ function netRow(page: APage, s: S, label: string, value: number, pct: number, fr
   dt(page, `Net margin: ${safe(pct).toFixed(1)}%`, ML + 4, s.y - 13, 7.5, freg, C.ink500);
   dtr(page, fmtR(value), PW - MR - 80, s.y, 10.5, fbold, value >= 0 ? C.success : C.danger);
   dtr(page, "—", PW - MR, s.y, 8.5, freg, C.ink300);
-  s.y -= 32;
+  s.y -= 26;
+}
+
+function stmtClose(page: APage, freg: AFont) {
+  // Anchors the bottom of each statement page — makes blank space feel intentional
+  hr(page, 82, ML, PW - MR, C.midGreen, 0.8);
+  dt(page, "NuAi Financial Reporting Suite  |  IFRS for SMEs  |  All figures in South African Rand (ZAR)", ML, 70, 6.5, freg, C.ink300);
 }
 
 function noteBox(page: APage, s: S, text: string, freg: AFont) {
@@ -369,6 +375,7 @@ Deno.serve(async (req: Request) => {
     s2.y -= 6;
 
     noteBox(p2, s2, "Prepared in accordance with IFRS for SMEs. Functional currency: South African Rand (ZAR). Historical cost basis. COGS derived from weighted average cost (AVCO). Comparative figures will populate after prior year-end close.", freg);
+    stmtClose(p2, freg);
     footer(p2, 2, freg);
 
     // ── PAGE 3: BALANCE SHEET ──────────────────────────────────────────────────
@@ -424,6 +431,7 @@ Deno.serve(async (req: Request) => {
     s3.y -= 8;
 
     noteBox(p3, s3, "Inventories at AVCO (IAS 2). Fixed assets at cost less accumulated depreciation — straight-line method (IAS 16). Trade payables represent open purchase orders. Equity sourced from equity_ledger configuration.", freg);
+    stmtClose(p3, freg);
     footer(p3, 3, freg);
 
     // ── PAGE 4: CASH FLOW ──────────────────────────────────────────────────────
@@ -457,6 +465,7 @@ Deno.serve(async (req: Request) => {
     s4.y -= 32;
 
     noteBox(p4, s4, "Simplified indirect method: net profit adjusted for non-cash depreciation. Working capital movements require prior-period snapshots and are not included. Financing activities identified from bank statement keyword matching.", freg);
+    stmtClose(p4, freg);
     footer(p4, 4, freg);
 
     // ── PAGE 5: CHANGES IN EQUITY ──────────────────────────────────────────────
@@ -498,6 +507,7 @@ Deno.serve(async (req: Request) => {
 
     const s5: S = { y: y5 };
     noteBox(p5, s5, "Share capital and opening retained earnings sourced from financial setup (equity_ledger). Dividends declared: not recorded in current period. Future periods will show year-on-year retained earnings movement after year-end close.", freg);
+    stmtClose(p5, freg);
     footer(p5, 5, freg);
 
     // ── PAGE 6: NOTES ──────────────────────────────────────────────────────────
