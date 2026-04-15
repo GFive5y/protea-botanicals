@@ -59,8 +59,8 @@ const CHAMBER_COLORS = [
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const sCard = {
-  background: "#fff",
-  borderRadius: 8,
+  background: T.surface,
+  borderRadius: T.radius.md,
   border: `1px solid ${T.border}`,
   padding: 24,
   marginBottom: 20,
@@ -70,7 +70,7 @@ const sCard = {
 const mkBtn = (variant = "primary", extra = {}) => {
   const base = {
     padding: "9px 18px",
-    borderRadius: 4,
+    borderRadius: T.radius.sm,
     border: "none",
     cursor: "pointer",
     fontFamily: T.font,
@@ -101,21 +101,21 @@ const mkBtn = (variant = "primary", extra = {}) => {
 const sInput = {
   padding: "9px 12px",
   border: `1px solid ${T.border}`,
-  borderRadius: 4,
+  borderRadius: T.radius.sm,
   fontFamily: T.font,
   fontSize: 13,
   width: "100%",
   boxSizing: "border-box",
   color: T.ink900,
 };
-const sSelect = { ...sInput, background: "#fff" };
+const sSelect = { ...sInput, background: T.surface };
 
 const sLbl = (text) => (
   <label
     style={{
       fontSize: 11,
       fontWeight: 700,
-      color: T.ink500,
+      color: T.ink400,
       textTransform: "uppercase",
       letterSpacing: "0.08em",
       display: "block",
@@ -414,7 +414,7 @@ function LandedCostCalc({ usdZar, onApply }) {
         style={{
           background: "none",
           border: `1px solid ${T.infoBd}`,
-          borderRadius: 4,
+          borderRadius: T.radius.sm,
           color: T.info,
           fontSize: 12,
           padding: "4px 12px",
@@ -431,7 +431,7 @@ function LandedCostCalc({ usdZar, onApply }) {
             marginTop: 10,
             background: T.infoLight,
             border: `1px solid ${T.infoBd}`,
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             padding: "14px 16px",
           }}
         >
@@ -523,9 +523,9 @@ function LandedCostCalc({ usdZar, onApply }) {
                 alignItems: "center",
                 gap: 16,
                 flexWrap: "wrap",
-                background: "#fff",
+                background: T.surface,
                 border: `1px solid ${T.infoBd}`,
-                borderRadius: 4,
+                borderRadius: T.radius.sm,
                 padding: "10px 14px",
                 marginBottom: 10,
               }}
@@ -588,8 +588,9 @@ function LandedCostCalc({ usdZar, onApply }) {
                       style={{
                         fontFamily: T.font,
                         fontSize: 18,
-                        fontWeight: 400,
+                        fontWeight: 700,
                         color: T.info,
+                        fontVariantNumeric: "tabular-nums",
                       }}
                     >
                       R{perUnitZAR.toFixed(4)}
@@ -644,7 +645,7 @@ function CogsBar({ breakdown }) {
         style={{
           display: "flex",
           height: 8,
-          borderRadius: 4,
+          borderRadius: T.radius.sm,
           overflow: "hidden",
           gap: 1,
         }}
@@ -722,7 +723,7 @@ function ChambersEditor({
           flexWrap: "wrap",
           marginBottom: 14,
           background: T.bg,
-          borderRadius: 6,
+          borderRadius: T.radius.md,
           padding: "10px 14px",
           alignItems: "center",
         }}
@@ -750,7 +751,7 @@ function ChambersEditor({
                 gap: 5,
                 background: col.bg,
                 border: `1px solid ${col.border}`,
-                borderRadius: 4,
+                borderRadius: T.radius.sm,
                 padding: "3px 10px",
               }}
             >
@@ -833,7 +834,7 @@ function ChambersEditor({
             key={idx}
             style={{
               border: `1.5px solid ${col.border}`,
-              borderRadius: 8,
+              borderRadius: T.radius.md,
               marginBottom: 14,
               overflow: "hidden",
             }}
@@ -876,7 +877,7 @@ function ChambersEditor({
                   fontSize: 11,
                   color: col.accent,
                   background: "rgba(255,255,255,0.6)",
-                  borderRadius: 4,
+                  borderRadius: T.radius.sm,
                   padding: "2px 8px",
                   fontFamily: T.font,
                 }}
@@ -886,7 +887,7 @@ function ChambersEditor({
                   : "—"}
               </div>
             </div>
-            <div style={{ padding: "14px 16px", background: "#fff" }}>
+            <div style={{ padding: "14px 16px", background: T.surface }}>
               <div
                 style={{
                   display: "grid",
@@ -1057,7 +1058,7 @@ function ChambersEditor({
                     onClick={() => setChField(idx, "terpene_qty_ul", p.ul)}
                     style={{
                       padding: "2px 7px",
-                      borderRadius: 4,
+                      borderRadius: T.radius.sm,
                       border: `1px solid ${col.border}`,
                       background:
                         parseInt(ch.terpene_qty_ul) === p.ul
@@ -1394,7 +1395,7 @@ export default function HQCogs() {
             background: T.accent,
             color: "#fff",
             padding: "12px 18px",
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             fontSize: 13,
             fontWeight: 500,
             boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
@@ -1420,7 +1421,7 @@ export default function HQCogs() {
               margin: 0,
               fontSize: 22,
               fontFamily: T.font,
-              fontWeight: 300,
+              fontWeight: 600,
               color: T.ink900,
             }}
           >
@@ -1435,7 +1436,7 @@ export default function HQCogs() {
             style={{
               background: fxLoading ? T.bg : T.successLight,
               border: `1px solid ${T.successBd}`,
-              borderRadius: 4,
+              borderRadius: T.radius.sm,
               padding: "6px 12px",
               fontSize: 12,
               color: T.success,
@@ -1518,7 +1519,7 @@ export default function HQCogs() {
                     style={{
                       display: "inline-block",
                       padding: "3px 10px",
-                      borderRadius: 3,
+                      borderRadius: T.radius.sm,
                       fontSize: 10,
                       fontWeight: 700,
                       textTransform: "uppercase",
@@ -1544,7 +1545,7 @@ export default function HQCogs() {
                           alignItems: "center",
                           gap: 14,
                           padding: "12px 16px",
-                          borderRadius: 6,
+                          borderRadius: T.radius.md,
                           border: `1px solid ${T.border}`,
                           marginBottom: 8,
                           background: T.surface,
@@ -1620,8 +1621,9 @@ export default function HQCogs() {
                               style={{
                                 fontFamily: T.font,
                                 fontSize: 18,
-                                fontWeight: 400,
+                                fontWeight: 700,
                                 color: inp.cost_zar ? T.accent : T.ink300,
+                                fontVariantNumeric: "tabular-nums",
                                 cursor: "pointer",
                                 flex: 1,
                               }}
@@ -1656,7 +1658,7 @@ export default function HQCogs() {
           <div
             style={{
               background: T.bg,
-              borderRadius: 6,
+              borderRadius: T.radius.md,
               padding: "14px 18px",
               fontSize: 13,
               color: T.ink500,
@@ -1678,7 +1680,7 @@ export default function HQCogs() {
               style={{
                 background: T.warningLight,
                 border: `1px solid ${T.warningBd}`,
-                borderRadius: 6,
+                borderRadius: T.radius.md,
                 padding: "12px 16px",
                 marginBottom: 20,
                 fontSize: 13,
@@ -1955,7 +1957,7 @@ export default function HQCogs() {
                                 fontSize: 11,
                                 background: "#E3F2FD",
                                 color: "#1565C0",
-                                borderRadius: 3,
+                                borderRadius: T.radius.sm,
                                 padding: "1px 7px",
                                 fontWeight: 700,
                                 fontFamily: T.font,
@@ -1993,7 +1995,7 @@ export default function HQCogs() {
                                 ? T.warningLight
                                 : T.accentLight,
                               border: `1px solid ${bd?.hasMissingCosts ? T.warningBd : T.accentBd}`,
-                              borderRadius: 6,
+                              borderRadius: T.radius.md,
                               padding: "12px 16px",
                               marginBottom: 10,
                               display: "flex",
@@ -2018,8 +2020,9 @@ export default function HQCogs() {
                                 style={{
                                   fontFamily: T.font,
                                   fontSize: 26,
-                                  fontWeight: 400,
+                                  fontWeight: 700,
                                   color: T.accent,
+                                  fontVariantNumeric: "tabular-nums",
                                 }}
                               >
                                 {bd ? fmtZar(total) : "—"}
@@ -2045,7 +2048,7 @@ export default function HQCogs() {
                                 style={{
                                   background: T.warningLight,
                                   border: `1px solid ${T.warningBd}`,
-                                  borderRadius: 6,
+                                  borderRadius: T.radius.md,
                                   padding: "9px 12px",
                                   marginBottom: 10,
                                   fontSize: 12,
@@ -2062,7 +2065,7 @@ export default function HQCogs() {
                             style={{
                               background: T.surface,
                               border: `1px solid ${T.border}`,
-                              borderRadius: 6,
+                              borderRadius: T.radius.md,
                               padding: "10px 12px",
                               marginBottom: 14,
                             }}
@@ -2099,7 +2102,7 @@ export default function HQCogs() {
                                   width: 72,
                                   padding: "4px 8px",
                                   border: `1px solid ${T.border}`,
-                                  borderRadius: 4,
+                                  borderRadius: T.radius.sm,
                                   fontFamily: T.font,
                                   fontSize: 13,
                                   fontWeight: 700,
@@ -2113,7 +2116,7 @@ export default function HQCogs() {
                                   onClick={() => setCardQtyFor(recipe.id, n)}
                                   style={{
                                     padding: "3px 8px",
-                                    borderRadius: 4,
+                                    borderRadius: T.radius.sm,
                                     border: `1px solid ${T.border}`,
                                     background: qty === n ? T.accent : T.surface,
                                     color: qty === n ? "#fff" : T.ink500,
@@ -2295,7 +2298,7 @@ export default function HQCogs() {
                                           textTransform: "uppercase",
                                           background: "#E3F2FD",
                                           color: "#1565C0",
-                                          borderRadius: 3,
+                                          borderRadius: T.radius.sm,
                                           padding: "1px 6px",
                                         }}
                                       >
@@ -2517,8 +2520,8 @@ export default function HQCogs() {
         >
           <div
             style={{
-              background: "#fff",
-              borderRadius: 10,
+              background: T.surface,
+              borderRadius: T.radius.lg,
               padding: 32,
               width: 360,
               textAlign: "center",
@@ -2561,7 +2564,7 @@ export default function HQCogs() {
           <div
             style={{
               width: 700,
-              background: "#fff",
+              background: T.surface,
               overflowY: "auto",
               boxShadow: "-4px 0 32px rgba(0,0,0,0.15)",
               display: "flex",
@@ -2578,7 +2581,7 @@ export default function HQCogs() {
                 alignItems: "center",
                 position: "sticky",
                 top: 0,
-                background: "#fff",
+                background: T.surface,
                 zIndex: 1,
               }}
             >
@@ -2630,7 +2633,7 @@ export default function HQCogs() {
                   style={{
                     background: T.accentLight,
                     border: `1px solid ${T.accentBd}`,
-                    borderRadius: 6,
+                    borderRadius: T.radius.md,
                     padding: "14px 18px",
                     marginBottom: 24,
                   }}
@@ -2651,8 +2654,9 @@ export default function HQCogs() {
                     style={{
                       fontFamily: T.font,
                       fontSize: 28,
-                      fontWeight: 400,
+                      fontWeight: 700,
                       color: T.accent,
+                      fontVariantNumeric: "tabular-nums",
                     }}
                   >
                     {fmtZar(previewBreakdown.total)}{" "}
@@ -2738,7 +2742,7 @@ export default function HQCogs() {
               <div
                 style={{
                   background: "#F9FBE7",
-                  borderRadius: 6,
+                  borderRadius: T.radius.md,
                   padding: "14px 16px",
                   marginBottom: 14,
                   border: "1px solid #F0F4C3",
@@ -2808,7 +2812,7 @@ export default function HQCogs() {
               <div
                 style={{
                   background: "#E3F2FD",
-                  borderRadius: 6,
+                  borderRadius: T.radius.md,
                   padding: "14px 16px",
                   marginBottom: 14,
                 }}
@@ -2857,7 +2861,7 @@ export default function HQCogs() {
                           fontSize: 11,
                           color: "#1565C0",
                           background: "#EBF5FB",
-                          borderRadius: 4,
+                          borderRadius: T.radius.sm,
                           padding: "5px 10px",
                         }}
                       >
@@ -2884,7 +2888,7 @@ export default function HQCogs() {
                             fontSize: 11,
                             background: belowMoq ? "#FFF3E0" : "#E3F2FD",
                             border: `1px solid ${belowMoq ? "#FFB74D" : "#90CAF9"}`,
-                            borderRadius: 4,
+                            borderRadius: T.radius.sm,
                             padding: "5px 10px",
                           }}
                         >
@@ -2932,7 +2936,7 @@ export default function HQCogs() {
                           fontSize: 11,
                           color: T.danger,
                           background: T.dangerLight,
-                          borderRadius: 4,
+                          borderRadius: T.radius.sm,
                           padding: "4px 8px",
                         }}
                       >
@@ -3025,7 +3029,7 @@ export default function HQCogs() {
                   <div
                     style={{
                       background: "#F3E5F5",
-                      borderRadius: 6,
+                      borderRadius: T.radius.md,
                       padding: "14px 16px",
                       marginBottom: 14,
                     }}
@@ -3129,7 +3133,7 @@ export default function HQCogs() {
                           color: "#9C27B0",
                           background: "#EDE7F6",
                           padding: "4px 10px",
-                          borderRadius: 4,
+                          borderRadius: T.radius.sm,
                         }}
                       >
                         Typical range: 20µl (2%) → 100µl (10%) per 1ml
@@ -3184,7 +3188,7 @@ export default function HQCogs() {
                             onClick={() => setF("terpene_qty_ul", p.ul)}
                             style={{
                               padding: "3px 8px",
-                              borderRadius: 4,
+                              borderRadius: T.radius.sm,
                               border: "1px solid #CE93D8",
                               background:
                                 parseInt(form.terpene_qty_ul) === p.ul
@@ -3231,7 +3235,7 @@ export default function HQCogs() {
                   <div
                     style={{
                       background: "#FFF8E1",
-                      borderRadius: 6,
+                      borderRadius: T.radius.md,
                       padding: "14px 16px",
                       marginBottom: 14,
                     }}
@@ -3322,7 +3326,7 @@ export default function HQCogs() {
               <div
                 style={{
                   background: "#E8F5E9",
-                  borderRadius: 6,
+                  borderRadius: T.radius.md,
                   padding: "14px 16px",
                   marginBottom: 14,
                 }}
@@ -3459,7 +3463,7 @@ export default function HQCogs() {
               <div
                 style={{
                   background: "#FCE4EC",
-                  borderRadius: 6,
+                  borderRadius: T.radius.md,
                   padding: "14px 16px",
                   marginBottom: 14,
                 }}
@@ -3596,7 +3600,7 @@ export default function HQCogs() {
               <div
                 style={{
                   background: "#E8EAF6",
-                  borderRadius: 6,
+                  borderRadius: T.radius.md,
                   padding: "14px 16px",
                   marginBottom: 14,
                 }}
@@ -3681,7 +3685,7 @@ export default function HQCogs() {
                           alignItems: "center",
                           gap: 10,
                           padding: "9px 12px",
-                          borderRadius: 6,
+                          borderRadius: T.radius.md,
                           border: `1px solid ${checked ? "#3949AB" : "#C5CAE9"}`,
                           background: checked ? "#E8EAF6" : "#fff",
                           cursor: "pointer",
@@ -3738,7 +3742,7 @@ export default function HQCogs() {
                 <div
                   style={{
                     background: "#E0F7FA",
-                    borderRadius: 6,
+                    borderRadius: T.radius.md,
                     padding: "14px 16px",
                   }}
                 >
@@ -3788,7 +3792,7 @@ export default function HQCogs() {
                 <div
                   style={{
                     background: "#ECEFF1",
-                    borderRadius: 6,
+                    borderRadius: T.radius.md,
                     padding: "14px 16px",
                   }}
                 >
@@ -3855,7 +3859,7 @@ export default function HQCogs() {
                 justifyContent: "space-between",
                 position: "sticky",
                 bottom: 0,
-                background: "#fff",
+                background: T.surface,
               }}
             >
               <button
