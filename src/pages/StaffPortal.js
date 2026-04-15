@@ -32,26 +32,24 @@
 import React, { useState, useEffect, useCallback, useContext } from "react";
 import { supabase } from "../services/supabaseClient";
 import { RoleContext } from "../App";
+import { T } from "../styles/tokens";
 
 // ─── THEME ───────────────────────────────────────────────────────────────────
 
 const C = {
-  green: "#1b4332",
-  mid: "#2d6a4f",
+  green:  T.accent,
+  mid:    T.accentMid,
   accent: "#52b788",
-  gold: "#b5935a",
-  cream: "#faf9f6",
-  border: "#e0dbd2",
-  muted: "#888",
-  white: "#fff",
-  red: "#c0392b",
-  bg: "#f7f6f2",
+  gold:   "#b5935a",
+  cream:  T.surface,
+  border: T.border,
+  muted:  T.ink500,
+  white:  T.surface,
+  red:    T.danger,
+  bg:     T.bg,
 };
 
-const FONTS = {
-  heading: "'Cormorant Garamond', Georgia, serif",
-  body: "'Jost', 'Helvetica Neue', sans-serif",
-};
+const FONTS = { heading: T.font, body: T.font };
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
@@ -72,20 +70,20 @@ function zar(v) {
 // ─── STATUS BADGE ─────────────────────────────────────────────────────────────
 
 const STATUS_STYLES = {
-  pending: { bg: "#fff8e1", color: "#f57f17", border: "#ffe082" },
-  admin_approved: { bg: "#e8f5e9", color: "#2e7d32", border: "#a5d6a7" },
-  hr_approved: { bg: "#e8f5e9", color: "#2e7d32", border: "#a5d6a7" },
+  pending: { bg: "#fff8e1", color: T.warning, border: "#ffe082" },
+  admin_approved: { bg: "#e8f5e9", color: T.success, border: "#a5d6a7" },
+  hr_approved: { bg: "#e8f5e9", color: T.success, border: "#a5d6a7" },
   rejected: { bg: "#fce4ec", color: "#c62828", border: "#ef9a9a" },
-  draft: { bg: "#f5f5f5", color: "#666", border: "#ddd" },
-  staff_submitted: { bg: "#e3f2fd", color: "#1565c0", border: "#90caf9" },
-  admin_approved_ts: { bg: "#e8f5e9", color: "#2e7d32", border: "#a5d6a7" },
+  draft: { bg: "#f5f5f5", color: T.ink500, border: "#ddd" },
+  staff_submitted: { bg: "#e3f2fd", color: T.info, border: "#90caf9" },
+  admin_approved_ts: { bg: "#e8f5e9", color: T.success, border: "#a5d6a7" },
   locked: { bg: "#f5f5f5", color: "#555", border: "#ccc" },
 };
 
 function StatusBadge({ status }) {
   const s = STATUS_STYLES[status] || {
     bg: "#f5f5f5",
-    color: "#666",
+    color: T.ink500,
     border: "#ddd",
   };
   return (
@@ -94,7 +92,7 @@ function StatusBadge({ status }) {
         background: s.bg,
         color: s.color,
         border: `1px solid ${s.border}`,
-        borderRadius: 20,
+        borderRadius: T.radius.full,
         padding: "2px 10px",
         fontSize: 11,
         fontWeight: 700,
@@ -126,7 +124,7 @@ function Toast({ toast, onClose }) {
         zIndex: 9999,
         background: toast.type === "error" ? C.red : "#2e7d32",
         color: "#fff",
-        borderRadius: 8,
+        borderRadius: T.radius.md,
         padding: "12px 20px",
         display: "flex",
         alignItems: "center",
@@ -184,7 +182,7 @@ function SubTabs({ tabs, active, onChange }) {
             cursor: "pointer",
             fontSize: 11,
             fontWeight: 700,
-            letterSpacing: "0.12em",
+            letterSpacing: "0.08em",
             textTransform: "uppercase",
             fontFamily: FONTS.body,
             color: active === t.id ? C.green : C.muted,
@@ -213,7 +211,7 @@ function ProfileTab({ profile }) {
         style={{
           background: C.white,
           border: `1px solid ${C.border}`,
-          borderRadius: 4,
+          borderRadius: T.radius.sm,
           padding: "20px 22px",
         }}
       >
@@ -241,7 +239,7 @@ function ProfileTab({ profile }) {
         style={{
           background: C.white,
           border: `1px solid ${C.border}`,
-          borderRadius: 4,
+          borderRadius: T.radius.sm,
           padding: "20px 22px",
         }}
       >
@@ -269,7 +267,7 @@ function ProfileTab({ profile }) {
         style={{
           background: C.white,
           border: `1px solid ${C.border}`,
-          borderRadius: 4,
+          borderRadius: T.radius.sm,
           padding: "20px 22px",
         }}
       >
@@ -294,7 +292,7 @@ function ProfileTab({ profile }) {
         style={{
           background: C.white,
           border: `1px solid ${C.border}`,
-          borderRadius: 4,
+          borderRadius: T.radius.sm,
           padding: "20px 22px",
         }}
       >
@@ -312,7 +310,7 @@ function ProfileTab({ profile }) {
         style={{
           background: C.white,
           border: `1px solid ${C.border}`,
-          borderRadius: 4,
+          borderRadius: T.radius.sm,
           padding: "20px 22px",
           gridColumn: "1/-1",
         }}
@@ -367,9 +365,9 @@ function SectionTitle({ children }) {
   return (
     <div
       style={{
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: 700,
-        letterSpacing: "0.15em",
+        letterSpacing: "0.08em",
         textTransform: "uppercase",
         color: C.muted,
         marginBottom: 14,
@@ -403,7 +401,7 @@ function InfoRow({ label, value, children }) {
       >
         {label}
       </span>
-      {children || <span style={{ fontSize: 13, color: "#333" }}>{value}</span>}
+      {children || <span style={{ fontSize: 13, color: T.ink700 }}>{value}</span>}
     </div>
   );
 }
@@ -523,7 +521,7 @@ function LeaveTab({ profileId, tenantId }) {
             style={{
               fontSize: 11,
               fontWeight: 700,
-              letterSpacing: "0.15em",
+              letterSpacing: "0.08em",
               textTransform: "uppercase",
               color: C.muted,
               marginBottom: 12,
@@ -545,16 +543,16 @@ function LeaveTab({ profileId, tenantId }) {
                   background: C.white,
                   border: `1px solid ${C.border}`,
                   borderTop: `3px solid ${b.leave_types?.color || C.accent}`,
-                  borderRadius: 2,
+                  borderRadius: T.radius.sm,
                   padding: "12px 14px",
                 }}
               >
                 <div
                   style={{
-                    fontSize: 10,
+                    fontSize: 11,
                     fontWeight: 700,
                     textTransform: "uppercase",
-                    letterSpacing: "0.1em",
+                    letterSpacing: "0.08em",
                     color: C.muted,
                     marginBottom: 6,
                   }}
@@ -563,18 +561,18 @@ function LeaveTab({ profileId, tenantId }) {
                 </div>
                 <div
                   style={{
-                    fontFamily: FONTS.heading,
+                    fontFamily: T.font,
                     fontSize: 26,
                     color: C.green,
                   }}
                 >
                   {b.available ?? "—"}
                 </div>
-                <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
                   days available
                 </div>
                 {b.pending > 0 && (
-                  <div style={{ fontSize: 10, color: "#f57f17", marginTop: 2 }}>
+                  <div style={{ fontSize: 11, color: T.warning, marginTop: 2 }}>
                     {b.pending} pending
                   </div>
                 )}
@@ -597,7 +595,7 @@ function LeaveTab({ profileId, tenantId }) {
           style={{
             fontSize: 11,
             fontWeight: 700,
-            letterSpacing: "0.15em",
+            letterSpacing: "0.08em",
             textTransform: "uppercase",
             color: C.muted,
           }}
@@ -611,12 +609,12 @@ function LeaveTab({ profileId, tenantId }) {
             background: showForm ? C.bg : C.green,
             color: showForm ? C.muted : C.white,
             border: `1px solid ${showForm ? C.border : C.green}`,
-            borderRadius: 2,
+            borderRadius: T.radius.sm,
             cursor: "pointer",
             fontSize: 11,
             fontWeight: 700,
             fontFamily: FONTS.body,
-            letterSpacing: "0.1em",
+            letterSpacing: "0.08em",
           }}
         >
           {showForm ? "Cancel" : "+ Request Leave"}
@@ -629,7 +627,7 @@ function LeaveTab({ profileId, tenantId }) {
           style={{
             background: C.white,
             border: `1px solid ${C.border}`,
-            borderRadius: 4,
+            borderRadius: T.radius.sm,
             padding: "18px 20px",
             marginBottom: 20,
           }}
@@ -639,7 +637,7 @@ function LeaveTab({ profileId, tenantId }) {
               style={{
                 background: "#fce4ec",
                 border: "1px solid #ef9a9a",
-                borderRadius: 4,
+                borderRadius: T.radius.sm,
                 padding: "8px 12px",
                 color: C.red,
                 fontSize: 12,
@@ -657,7 +655,7 @@ function LeaveTab({ profileId, tenantId }) {
                 style={{
                   fontSize: 11,
                   fontWeight: 700,
-                  letterSpacing: "0.1em",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   color: C.muted,
                   display: "block",
@@ -673,7 +671,7 @@ function LeaveTab({ profileId, tenantId }) {
                 }
                 style={{
                   border: `1px solid ${C.border}`,
-                  borderRadius: 2,
+                  borderRadius: T.radius.sm,
                   padding: "8px 10px",
                   fontSize: 13,
                   fontFamily: FONTS.body,
@@ -694,7 +692,7 @@ function LeaveTab({ profileId, tenantId }) {
                 style={{
                   fontSize: 11,
                   fontWeight: 700,
-                  letterSpacing: "0.1em",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   color: C.muted,
                   display: "block",
@@ -711,7 +709,7 @@ function LeaveTab({ profileId, tenantId }) {
                 }
                 style={{
                   border: `1px solid ${C.border}`,
-                  borderRadius: 2,
+                  borderRadius: T.radius.sm,
                   padding: "8px 10px",
                   fontSize: 13,
                   fontFamily: FONTS.body,
@@ -725,7 +723,7 @@ function LeaveTab({ profileId, tenantId }) {
                 style={{
                   fontSize: 11,
                   fontWeight: 700,
-                  letterSpacing: "0.1em",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   color: C.muted,
                   display: "block",
@@ -742,7 +740,7 @@ function LeaveTab({ profileId, tenantId }) {
                 }
                 style={{
                   border: `1px solid ${C.border}`,
-                  borderRadius: 2,
+                  borderRadius: T.radius.sm,
                   padding: "8px 10px",
                   fontSize: 13,
                   fontFamily: FONTS.body,
@@ -756,7 +754,7 @@ function LeaveTab({ profileId, tenantId }) {
                 style={{
                   fontSize: 11,
                   fontWeight: 700,
-                  letterSpacing: "0.1em",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   color: C.muted,
                   display: "block",
@@ -773,7 +771,7 @@ function LeaveTab({ profileId, tenantId }) {
                 rows={2}
                 style={{
                   border: `1px solid ${C.border}`,
-                  borderRadius: 2,
+                  borderRadius: T.radius.sm,
                   padding: "8px 10px",
                   fontSize: 13,
                   fontFamily: FONTS.body,
@@ -800,7 +798,7 @@ function LeaveTab({ profileId, tenantId }) {
                 background: C.green,
                 color: C.white,
                 border: "none",
-                borderRadius: 2,
+                borderRadius: T.radius.sm,
                 cursor: saving ? "not-allowed" : "pointer",
                 fontSize: 12,
                 fontWeight: 700,
@@ -849,9 +847,9 @@ function LeaveTab({ profileId, tenantId }) {
                     style={{
                       padding: "9px 12px",
                       textAlign: "left",
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: 700,
-                      letterSpacing: "0.1em",
+                      letterSpacing: "0.08em",
                       textTransform: "uppercase",
                       color: C.muted,
                     }}
@@ -881,7 +879,7 @@ function LeaveTab({ profileId, tenantId }) {
                           : "#f5f5f5",
                         color: r.leave_types?.color || "#555",
                         border: `1px solid ${r.leave_types?.color ? r.leave_types.color + "44" : "#ddd"}`,
-                        borderRadius: 20,
+                        borderRadius: T.radius.full,
                         padding: "2px 9px",
                         fontSize: 11,
                         fontWeight: 700,
@@ -996,9 +994,9 @@ function TimesheetsTab({ profileId, tenantId }) {
                 style={{
                   padding: "9px 12px",
                   textAlign: "left",
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: 700,
-                  letterSpacing: "0.1em",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   color: C.muted,
                   whiteSpace: "nowrap",
@@ -1101,7 +1099,7 @@ function NoProfile() {
         <div style={{ fontSize: 48, marginBottom: 16 }}>🪪</div>
         <h2
           style={{
-            fontFamily: FONTS.heading,
+            fontFamily: T.font,
             fontSize: 24,
             color: C.green,
             marginBottom: 10,
@@ -1189,7 +1187,7 @@ export default function StaffPortal() {
         style={{
           background: C.green,
           padding: "20px 32px",
-          borderRadius: 2,
+          borderRadius: T.radius.sm,
           marginBottom: 0,
         }}
       >
@@ -1206,7 +1204,7 @@ export default function StaffPortal() {
         <h1
           style={{
             color: C.white,
-            fontFamily: FONTS.heading,
+            fontFamily: T.font,
             fontSize: 24,
             margin: "4px 0 0",
           }}
