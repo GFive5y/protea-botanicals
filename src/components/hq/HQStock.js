@@ -493,21 +493,21 @@ function ShopTab({ items, tenantId, onRefresh }) {
           <div
             key={label}
             style={{
-              background: "#fff",
+              background: T.surface,
               padding: "12px 16px",
               textAlign: "center",
             }}
           >
             <div
-              style={{ fontSize: 22, fontWeight: 300, color, lineHeight: 1 }}
+              style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}
             >
               {val}
             </div>
             <div
               style={{
-                fontSize: 9,
-                color: T.ink500,
-                letterSpacing: "0.1em",
+                fontSize: 11,
+                color: T.ink400,
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
                 marginTop: 4,
               }}
@@ -675,9 +675,9 @@ function ShopTab({ items, tenantId, onRefresh }) {
                     right: 6,
                     background: "rgba(0,0,0,0.55)",
                     color: "#fff",
-                    fontSize: 10,
+                    fontSize: 11,
                     padding: "4px 8px",
-                    borderRadius: 6,
+                    borderRadius: T.radius.md,
                     cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
@@ -757,7 +757,7 @@ function ShopTab({ items, tenantId, onRefresh }) {
                       fontSize: 10,
                       fontWeight: 600,
                       border: `1px solid ${item.is_active ? T.danger : T.success}`,
-                      borderRadius: 5,
+                      borderRadius: T.radius.md,
                       background: "transparent",
                       color: item.is_active ? T.danger : T.success,
                       cursor: "pointer",
@@ -774,7 +774,7 @@ function ShopTab({ items, tenantId, onRefresh }) {
                       fontSize: 10,
                       fontWeight: 600,
                       border: `1px solid ${item.is_featured ? "#b5935a" : T.border}`,
-                      borderRadius: 5,
+                      borderRadius: T.radius.md,
                       background: item.is_featured ? "#FFF8F0" : "transparent",
                       color: item.is_featured ? "#b5935a" : T.ink500,
                       cursor: "pointer",
@@ -790,7 +790,7 @@ function ShopTab({ items, tenantId, onRefresh }) {
                         padding: "5px 8px",
                         fontSize: 10,
                         border: `1px solid ${T.dangerBd}`,
-                        borderRadius: 5,
+                        borderRadius: T.radius.md,
                         background: T.dangerLight,
                         color: T.danger,
                         cursor: "pointer",
@@ -3160,9 +3160,9 @@ export default function HQStock() {
         {queueActions.length === 0 ? (
           <div
             style={{
-              background: "#fff",
+              background: T.surface,
               border: "1px solid " + T.border,
-              borderRadius: 6,
+              borderRadius: T.radius.lg,
               overflow: "hidden",
             }}
           >
@@ -3175,18 +3175,13 @@ export default function HQStock() {
                 alignItems: "center",
               }}
             >
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  color: T.ink500,
-                }}
-              >
-                Action Queue
-              </span>
-              <span style={{ fontSize: 10, color: T.ink300, fontFamily: T.font }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ display: "inline-block", width: 3, height: 14, borderRadius: 2, background: T.accent, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: T.ink400 }}>
+                  Action Queue
+                </span>
+              </div>
+              <span style={{ fontSize: 11, color: T.ink400, fontFamily: T.font }}>
                 {new Date().toLocaleTimeString("en-ZA", {
                   hour: "2-digit",
                   minute: "2-digit",
@@ -3257,20 +3252,20 @@ export default function HQStock() {
             <div
               key={tile.label}
               style={{
-                background: "#fff",
+                background: T.surface,
                 border: "1px solid " + T.border,
-                borderRadius: 6,
+                borderRadius: T.radius.lg,
                 padding: "14px 16px",
                 // No coloured top borders — forbidden by WP-VISUAL-SYSTEM v1.0
               }}
             >
               <div
                 style={{
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: 700,
-                  letterSpacing: "0.1em",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
-                  color: T.ink500,
+                  color: T.ink400,
                   marginBottom: 8,
                 }}
               >
@@ -3287,7 +3282,7 @@ export default function HQStock() {
                   <div
                     style={{
                       fontSize: 22,
-                      fontWeight: 400,
+                      fontWeight: 700,
                       fontFamily: T.font,
                       fontVariantNumeric: "tabular-nums",
                       color: tile.valueColor,
@@ -3329,9 +3324,9 @@ export default function HQStock() {
           {/* Left: BulletChart per category */}
           <div
             style={{
-              background: "#fff",
+              background: T.surface,
               border: "1px solid " + T.border,
-              borderRadius: 6,
+              borderRadius: T.radius.lg,
               overflow: "hidden",
             }}
           >
@@ -3341,17 +3336,12 @@ export default function HQStock() {
                 borderBottom: "1px solid " + T.border,
               }}
             >
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  color: T.ink500,
-                }}
-              >
-                Category Health
-              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ display: "inline-block", width: 3, height: 14, borderRadius: 2, background: T.accent, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: T.ink400 }}>
+                  Category Health
+                </span>
+              </div>
             </div>
             <div style={{ padding: "12px 20px", display: "grid", gap: 12 }}>
               {catGroups.length === 0 ? (
@@ -3391,9 +3381,9 @@ export default function HQStock() {
           {/* Right: Margin distribution donut */}
           <div
             style={{
-              background: "#fff",
+              background: T.surface,
               border: "1px solid " + T.border,
-              borderRadius: 6,
+              borderRadius: T.radius.lg,
               overflow: "hidden",
             }}
           >
@@ -3406,17 +3396,12 @@ export default function HQStock() {
                 alignItems: "center",
               }}
             >
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  color: T.ink500,
-                }}
-              >
-                Margin Distribution
-              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ display: "inline-block", width: 3, height: 14, borderRadius: 2, background: T.accent, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: T.ink400 }}>
+                  Margin Distribution
+                </span>
+              </div>
               {noPrice.length > 0 && (
                 <button
                   onClick={() => setSubTab("pricing")}
@@ -3542,9 +3527,9 @@ export default function HQStock() {
         {recentMov.length > 0 && (
           <div
             style={{
-              background: "#fff",
+              background: T.surface,
               border: "1px solid " + T.border,
-              borderRadius: 6,
+              borderRadius: T.radius.lg,
               overflow: "hidden",
             }}
           >
@@ -3557,17 +3542,12 @@ export default function HQStock() {
                 alignItems: "center",
               }}
             >
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  color: T.ink500,
-                }}
-              >
-                Recent Stock Movements
-              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ display: "inline-block", width: 3, height: 14, borderRadius: 2, background: T.accent, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: T.ink400 }}>
+                  Recent Stock Movements
+                </span>
+              </div>
               <button
                 onClick={() => setSubTab("movements")}
                 style={{
@@ -3787,7 +3767,7 @@ export default function HQStock() {
             style={{
               background: T.warningLight,
               border: "1px solid " + T.warningBd,
-              borderRadius: 6,
+              borderRadius: T.radius.md,
               padding: "10px 16px",
               marginBottom: 14,
               display: "flex",
@@ -3827,9 +3807,9 @@ export default function HQStock() {
           {/* Category sidebar */}
           <div
             style={{
-              background: "#fff",
+              background: T.surface,
               border: "1px solid " + T.border,
-              borderRadius: 6,
+              borderRadius: T.radius.md,
               padding: "8px 0",
               height: "fit-content",
             }}
@@ -3837,11 +3817,11 @@ export default function HQStock() {
             <div
               style={{
                 padding: "8px 12px 6px",
-                fontSize: 9,
+                fontSize: 11,
                 fontWeight: 700,
-                color: T.ink500,
+                color: T.ink400,
                 textTransform: "uppercase",
-                letterSpacing: "0.1em",
+                letterSpacing: "0.08em",
                 fontFamily: T.font,
               }}
             >
@@ -4069,11 +4049,11 @@ export default function HQStock() {
                     <div style={{ marginBottom: 10 }}>
                       <div
                         style={{
-                          fontSize: 9,
+                          fontSize: 11,
                           fontWeight: 700,
-                          color: T.ink500,
+                          color: T.ink400,
                           textTransform: "uppercase",
-                          letterSpacing: "0.1em",
+                          letterSpacing: "0.08em",
                           marginBottom: 6,
                           fontFamily: T.font,
                           display: "flex",
@@ -4610,7 +4590,7 @@ export default function HQStock() {
                       }}
                       style={{
                         padding: "8px 14px",
-                        borderRadius: 6,
+                        borderRadius: T.radius.md,
                         cursor: "pointer",
                         border: "1.5px dashed " + T.border,
                         background: T.surface,
@@ -4969,9 +4949,9 @@ export default function HQStock() {
             {viewMode === "list" && (
               <div
                 style={{
-                  background: "#fff",
+                  background: T.surface,
                   border: "1px solid " + T.border,
-                  borderRadius: 6,
+                  borderRadius: T.radius.md,
                   overflow: "auto",
                 }}
               >
