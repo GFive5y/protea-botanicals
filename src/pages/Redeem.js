@@ -28,7 +28,7 @@ const sharedStyles = `
     background: ${T.accent};
     color: white;
     border: none;
-    border-radius: 2px;
+    border-radius: 4px;
     font-size: 11px;
     letter-spacing: 0.2em;
     text-transform: uppercase;
@@ -36,7 +36,7 @@ const sharedStyles = `
     transition: background 0.2s;
   }
   .pb-btn:hover { background: ${T.accentMid}; }
-  .pb-btn:disabled { background: #ccc; cursor: not-allowed; }
+  .pb-btn:disabled { background: #dee2e6; cursor: not-allowed; }
   .reward-card { transition: transform 0.25s ease, box-shadow 0.25s ease; }
   .reward-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.08) !important; }
   @keyframes redeemFadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
@@ -157,7 +157,7 @@ export default function Redeem() {
             className="body-font"
             style={{
               color: T.ink600,
-              letterSpacing: "0.2em",
+              letterSpacing: "0.08em",
               fontSize: "12px",
               textTransform: "uppercase",
             }}
@@ -181,15 +181,15 @@ export default function Redeem() {
           background: `linear-gradient(135deg, ${T.accent} 0%, ${T.accentMid} 100%)`,
           padding: "clamp(40px, 6vw, 64px) 24px",
           textAlign: "center",
-          borderRadius: "2px",
+          borderRadius: T.radius.sm,
           animation: "redeemFadeUp 0.4s ease",
         }}
       >
         <span
           className="body-font"
           style={{
-            fontSize: "10px",
-            letterSpacing: "0.35em",
+            fontSize: "11px",
+            letterSpacing: "0.08em",
             textTransform: "uppercase",
             color: T.accentLight,
           }}
@@ -244,9 +244,9 @@ export default function Redeem() {
         {success && (
           <div
             style={{
-              background: "rgba(82,183,136,0.08)",
-              border: "1px solid rgba(82,183,136,0.25)",
-              borderRadius: "2px",
+              background: T.accentLight,
+              border: `1px solid ${T.accentBd}`,
+              borderRadius: T.radius.sm,
               padding: "14px 24px",
               marginBottom: "20px",
               animation: "redeemFadeUp 0.3s ease",
@@ -263,16 +263,16 @@ export default function Redeem() {
         {error && (
           <div
             style={{
-              background: "rgba(181,147,90,0.08)",
-              border: "1px solid rgba(181,147,90,0.25)",
-              borderRadius: "2px",
+              background: T.warningLight,
+              border: `1px solid ${T.warningBd}`,
+              borderRadius: T.radius.sm,
               padding: "14px 24px",
               marginBottom: "20px",
             }}
           >
             <p
               className="body-font"
-              style={{ color: "#b5935a", fontSize: "14px", margin: 0 }}
+              style={{ color: T.brandGold, fontSize: "14px", margin: 0 }}
             >
               {error}
             </p>
@@ -282,11 +282,11 @@ export default function Redeem() {
         {/* ─── SECTION LABEL ─── */}
         <div
           style={{
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: 600,
-            letterSpacing: "0.35em",
+            letterSpacing: "0.08em",
             textTransform: "uppercase",
-            color: "#52b788",
+            color: T.accent,
             marginBottom: 16,
           }}
         >
@@ -309,9 +309,9 @@ export default function Redeem() {
                 key={reward.id}
                 className={canAfford ? "reward-card" : ""}
                 style={{
-                  background: "white",
-                  border: `1px solid ${canAfford ? "#e8e0d4" : "#f0ebe2"}`,
-                  borderRadius: "2px",
+                  background: T.surface,
+                  border: `1px solid ${canAfford ? T.border : T.border}`,
+                  borderRadius: T.radius.sm,
                   boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
                   overflow: "hidden",
                   opacity: canAfford ? 1 : 0.6,
@@ -333,14 +333,14 @@ export default function Redeem() {
                     {canAfford ? (
                       <span
                         style={{
-                          fontSize: 9,
+                          fontSize: 11,
                           fontWeight: 600,
-                          letterSpacing: "0.2em",
+                          letterSpacing: "0.08em",
                           textTransform: "uppercase",
-                          color: "#52b788",
-                          background: "rgba(82,183,136,0.08)",
+                          color: T.accent,
+                          background: T.accentLight,
                           padding: "3px 10px",
-                          borderRadius: 2,
+                          borderRadius: T.radius.sm,
                         }}
                       >
                         Available
@@ -348,14 +348,14 @@ export default function Redeem() {
                     ) : (
                       <span
                         style={{
-                          fontSize: 9,
+                          fontSize: 11,
                           fontWeight: 600,
-                          letterSpacing: "0.2em",
+                          letterSpacing: "0.08em",
                           textTransform: "uppercase",
-                          color: "#888",
-                          background: "rgba(136,136,136,0.08)",
+                          color: T.ink600,
+                          background: T.bg,
                           padding: "3px 10px",
-                          borderRadius: 2,
+                          borderRadius: T.radius.sm,
                         }}
                       >
                         {reward.cost - points} pts needed
@@ -390,7 +390,7 @@ export default function Redeem() {
                 <div
                   style={{
                     padding: "16px 24px",
-                    borderTop: "1px solid #f4f0e8",
+                    borderTop: `1px solid ${T.bg}`,
                     marginTop: "auto",
                     display: "flex",
                     justifyContent: "space-between",
@@ -401,13 +401,13 @@ export default function Redeem() {
                     className="shop-font"
                     style={{
                       fontSize: "22px",
-                      color: "#b5935a",
+                      color: T.brandGold,
                       fontWeight: 600,
                     }}
                   >
                     {reward.cost}{" "}
                     <span
-                      style={{ fontSize: 12, fontWeight: 400, color: "#888" }}
+                      style={{ fontSize: 12, fontWeight: 400, color: T.ink600 }}
                     >
                       pts
                     </span>
@@ -436,8 +436,8 @@ export default function Redeem() {
         {/* ─── LOYALTY CTA ─── */}
         <div
           style={{
-            background: "#f4f0e8",
-            borderRadius: 2,
+            background: T.bg,
+            borderRadius: T.radius.sm,
             padding: "clamp(20px, 3vw, 32px)",
             textAlign: "center",
             marginBottom: 40,
@@ -448,7 +448,7 @@ export default function Redeem() {
             style={{
               fontSize: 20,
               fontWeight: 400,
-              color: "#1a1a1a",
+              color: T.ink900,
               margin: "0 0 12px",
             }}
           >
@@ -458,17 +458,17 @@ export default function Redeem() {
             className="pb-btn"
             style={{
               background: "transparent",
-              color: "#1b4332",
-              border: "1px solid #1b4332",
+              color: T.accentText,
+              border: `1px solid ${T.accentText}`,
             }}
             onClick={() => navigate("/loyalty")}
             onMouseEnter={(e) => {
-              e.target.style.background = "#1b4332";
-              e.target.style.color = "#fff";
+              e.target.style.background = T.accentText;
+              e.target.style.color = T.surface;
             }}
             onMouseLeave={(e) => {
               e.target.style.background = "transparent";
-              e.target.style.color = "#1b4332";
+              e.target.style.color = T.accentText;
             }}
           >
             View Loyalty Dashboard
@@ -495,7 +495,7 @@ export default function Redeem() {
         {/* ─── DARK FOOTER ─── */}
         <div
           style={{
-            background: "#060e09",
+            background: T.ink900,
             marginLeft: "calc(-50vw + 50%)",
             marginRight: "calc(-50vw + 50%)",
             width: "100vw",
@@ -509,9 +509,9 @@ export default function Redeem() {
               fontFamily: "'Cormorant Garamond', Georgia, serif",
               fontSize: 18,
               fontWeight: 300,
-              color: "#fff",
+              color: T.surface,
               margin: "0 0 16px",
-              letterSpacing: "0.1em",
+              letterSpacing: "0.08em",
             }}
           >
             Protea Botanicals
@@ -538,7 +538,7 @@ export default function Redeem() {
                   color: "rgba(255,255,255,0.5)",
                   textDecoration: "none",
                   fontSize: 11,
-                  letterSpacing: "0.2em",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   fontFamily: "'Jost', sans-serif",
                 }}
@@ -550,9 +550,9 @@ export default function Redeem() {
           <p
             style={{
               color: "rgba(255,255,255,0.25)",
-              fontSize: 10,
+              fontSize: 11,
               marginTop: 20,
-              letterSpacing: "0.1em",
+              letterSpacing: "0.08em",
             }}
           >
             © 2026 Protea Botanicals. All rights reserved.
