@@ -1922,7 +1922,7 @@ export default function HQOverview({ onNavigate }) {
                               flex: 1,
                               height: 7,
                               background: T.bg,
-                              borderRadius: 3,
+                              borderRadius: T.radius.sm,
                               overflow: "hidden",
                             }}
                           >
@@ -1936,7 +1936,7 @@ export default function HQOverview({ onNavigate }) {
                                     : pct > 50
                                       ? "#D97706"
                                       : "#DC2626",
-                                borderRadius: 3,
+                                borderRadius: T.radius.sm,
                                 transition: "width 0.5s",
                               }}
                             />
@@ -2365,11 +2365,11 @@ export default function HQOverview({ onNavigate }) {
             {/* FX Rate card */}
             <div
               style={{
-                background: "white",
+                background: T.surface,
                 border: `1px solid ${T.border}`,
-                borderRadius: 6,
-                padding: "18px 20px",
-                boxShadow: T.shadow.sm,
+                borderRadius: T.radius.lg,
+                padding: "20px 24px",
+                boxShadow: T.shadow.md,
               }}
             >
               <div
@@ -2399,7 +2399,7 @@ export default function HQOverview({ onNavigate }) {
                       color: T.ink500,
                       background: T.bg,
                       padding: "1px 6px",
-                      borderRadius: 3,
+                      borderRadius: T.radius.sm,
                     }}
                   >
                     {fxCountdown}s
@@ -2527,11 +2527,11 @@ export default function HQOverview({ onNavigate }) {
         {/* Recent Scans */}
         <div
           style={{
-            background: "white",
+            background: T.surface,
             border: `1px solid ${T.border}`,
-            borderRadius: 6,
+            borderRadius: T.radius.lg,
             overflow: "hidden",
-            boxShadow: T.shadow.sm,
+            boxShadow: T.shadow.md,
           }}
         >
           <div
@@ -2651,11 +2651,11 @@ export default function HQOverview({ onNavigate }) {
       {/* ── QUICK ACTIONS ── */}
       <div
         style={{
-          background: "white",
+          background: T.surface,
           border: `1px solid ${T.border}`,
-          borderRadius: 6,
+          borderRadius: T.radius.lg,
           padding: "20px 24px",
-          boxShadow: T.shadow.sm,
+          boxShadow: T.shadow.md,
         }}
       >
         <div
@@ -2702,7 +2702,7 @@ export default function HQOverview({ onNavigate }) {
                 alignItems: "center",
                 background: T.bg,
                 border: `1px solid ${T.border}`,
-                borderRadius: 3,
+                borderRadius: T.radius.sm,
                 padding: "8px 14px",
                 fontFamily: T.font,
                 fontSize: 11,
@@ -2763,7 +2763,7 @@ export default function HQOverview({ onNavigate }) {
                     gap: 6,
                     background: alert ? T.dangerLight : T.bg,
                     border: `1px solid ${alert ? T.dangerBd : T.border}`,
-                    borderRadius: 3,
+                    borderRadius: T.radius.sm,
                     padding: "8px 14px",
                     fontFamily: T.font,
                     fontSize: 11,
@@ -2804,7 +2804,7 @@ export default function HQOverview({ onNavigate }) {
           style={{
             background: "transparent",
             border: `1px solid ${T.border}`,
-            borderRadius: 3,
+            borderRadius: T.radius.sm,
             padding: "7px 14px",
             cursor: "pointer",
             fontFamily: T.font,
@@ -2833,7 +2833,7 @@ function SectionLabel({ label }) {
         fontWeight: 700,
         letterSpacing: "0.08em",
         textTransform: "uppercase",
-        color: "#374151",
+        color: T.ink400,
         marginBottom: 14,
         display: "flex",
         alignItems: "center",
@@ -2845,7 +2845,7 @@ function SectionLabel({ label }) {
         width: 3,
         height: 14,
         borderRadius: 2,
-        background: "#1A3D2B",
+        background: T.accent,
         flexShrink: 0,
       }} />
       {label}
@@ -2978,7 +2978,7 @@ function MetricTile({
       style={{
         background: "#FFFFFF",
         border: "0.5px solid #E5E7EB",
-        borderRadius: 10,
+        borderRadius: T.radius.lg,
         padding: "18px 20px 16px",
         cursor: clickable ? "pointer" : "default",
         boxShadow: hovered && clickable
@@ -3119,8 +3119,8 @@ function btn(variant, size) {
     display: "inline-flex",
     alignItems: "center",
     gap: 6,
-    borderRadius: 3,
-    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+    borderRadius: T.radius.sm,
+    fontFamily: T.font,
     fontWeight: 600,
     letterSpacing: "0.06em",
     textTransform: "uppercase",
