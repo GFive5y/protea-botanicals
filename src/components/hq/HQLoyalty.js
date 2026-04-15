@@ -631,7 +631,7 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
             <span
               key={tag}
               style={{
-                background: "white",
+                background: T.surface,
                 color: T.accentMid,
                 border: `1px solid ${T.accentBd}`,
                 borderRadius: T.radius.sm,
@@ -899,12 +899,12 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                     padding: "10px 14px",
                     textAlign: "left",
                     fontWeight: 700,
-                    color: T.ink500,
+                    color: T.ink400,
                     textTransform: "uppercase",
-                    fontSize: 10,
-                    letterSpacing: "0.06em",
+                    fontSize: 11,
+                    letterSpacing: "0.08em",
                     borderBottom: `2px solid ${T.border}`,
-                    background: T.bg,
+                    background: T.surface,
                   }}
                 >
                   Setting
@@ -944,7 +944,7 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
               {COMPARISON_ROWS.map((row, i) => (
                 <tr
                   key={row.key}
-                  style={{ background: i % 2 === 0 ? T.bg : "#fff" }}
+                  style={{ background: i % 2 === 0 ? T.bg : T.surface }}
                 >
                   <td
                     style={{
@@ -2993,7 +2993,7 @@ function TabAIEngine({ draft, setDraft, aiLog, loadingAiLog, tenantName, onRunNo
           <button
             onClick={onRunNow}
             disabled={runningAi}
-            style={{padding:"8px 18px",background:runningAi?"#9CA3AF":T.accentMid,color:"#fff",border:"none",borderRadius:6,fontFamily:T.font,fontSize:12,fontWeight:700,cursor:runningAi?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:6}}
+            style={{padding:"8px 18px",background:runningAi?T.ink300:T.accentMid,color:"#fff",border:"none",borderRadius:T.radius.md,fontFamily:T.font,fontSize:12,fontWeight:700,cursor:runningAi?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:6}}
           >
             {runningAi?(
               <><span style={{width:12,height:12,border:"2px solid rgba(255,255,255,0.3)",borderTopColor:"#fff",borderRadius:"50%",display:"inline-block",animation:"spin 0.8s linear infinite"}}/>Running{"\u2026"}</>
@@ -3017,7 +3017,7 @@ function TabAIEngine({ draft, setDraft, aiLog, loadingAiLog, tenantName, onRunNo
                 style={{
                   width: 36,
                   height: 20,
-                  borderRadius: 10,
+                  borderRadius: T.radius.full,
                   background: cfg[auto.key] ? T.accentMid : T.ink300,
                   cursor: "pointer",
                   position: "relative",
