@@ -23,6 +23,7 @@ import {
 } from "recharts";
 import { supabase } from "../services/supabaseClient";
 import { useTenant } from "../services/tenantService";
+import { T as DS } from "../styles/tokens";
 import HRStaffDirectory from "../components/hq/HRStaffDirectory";
 import HRLeave from "../components/hq/HRLeave";
 import HRTimesheets from "../components/hq/HRTimesheets";
@@ -43,41 +44,26 @@ import {
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+  ...DS,
+  ink150:    DS.border,
+  ink075:    DS.bg,
+  ink050:    DS.surface,
+  successBg: DS.successLight,
+  warningBg: DS.warningLight,
+  dangerBg:  DS.dangerLight,
+  infoBg:    DS.infoLight,
+  accentLit: DS.accentLight,
+  shadow:    DS.shadow.sm,
 };
 const C = {
-  green: T.accent,
-  mid: T.accentMid,
+  green:  T.accent,
+  mid:    T.accentMid,
   accent: "#52b788",
-  cream: T.ink050,
-  border: T.ink150,
-  muted: T.ink500,
-  white: "#fff",
-  red: T.danger,
+  cream:  T.surface,
+  border: T.border,
+  muted:  T.ink500,
+  white:  T.surface,
+  red:    T.danger,
 };
 const FONTS = { heading: T.font, body: T.font };
 
@@ -129,8 +115,8 @@ function TabBtn({ active, label, badge, onClick }) {
             display: "inline-block",
             background: C.red,
             color: C.white,
-            borderRadius: 10,
-            fontSize: 9,
+            borderRadius: T.radius.md,
+            fontSize: 11,
             fontWeight: 700,
             padding: "1px 5px",
             marginLeft: 6,
@@ -379,7 +365,7 @@ function HROverview({ tenantId, onNavigate }) {
               background: C.white,
               border: "1px solid " + T.ink150,
               borderLeft: `4px solid ${tile.color === "#aaa" ? T.ink150 : tile.color}`,
-              borderRadius: 10,
+              borderRadius: T.radius.md,
               padding: "18px 20px 16px",
               cursor: "pointer",
               boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
@@ -404,11 +390,11 @@ function HROverview({ tenantId, onNavigate }) {
             >
               <span
                 style={{
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: 700,
                   letterSpacing: "0.08em",
                   textTransform: "uppercase",
-                  color: "#6B7280",
+                  color: T.ink400,
                   fontFamily: T.font,
                 }}
               >
@@ -434,7 +420,7 @@ function HROverview({ tenantId, onNavigate }) {
             >
               {tile.value}
             </div>
-            <div style={{ fontSize: 10, color: "#9CA3AF", fontFamily: T.font }}>
+            <div style={{ fontSize: 11, color: T.ink400, fontFamily: T.font }}>
               {tile.sub}
             </div>
           </div>
@@ -523,14 +509,14 @@ function HROverview({ tenantId, onNavigate }) {
                   />
                   <XAxis
                     dataKey="name"
-                    tick={{ fill: T.ink400, fontSize: 9, fontFamily: T.font }}
+                    tick={{ fill: T.ink400, fontSize: 11, fontFamily: T.font }}
                     axisLine={false}
                     tickLine={false}
                     dy={4}
                     maxRotation={30}
                   />
                   <YAxis
-                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    tick={{ fill: T.ink400, fontSize: 11, fontFamily: T.font }}
                     axisLine={false}
                     tickLine={false}
                     width={24}
@@ -592,7 +578,7 @@ function HROverview({ tenantId, onNavigate }) {
                   >
                     <span
                       style={{
-                        fontSize: 10,
+                        fontSize: 11,
                         color: T.ink700,
                         fontFamily: T.font,
                         width: 80,
@@ -609,7 +595,7 @@ function HROverview({ tenantId, onNavigate }) {
                         flex: 1,
                         height: 16,
                         background: T.ink075,
-                        borderRadius: 3,
+                        borderRadius: T.radius.sm,
                         overflow: "hidden",
                       }}
                     >
@@ -618,7 +604,7 @@ function HROverview({ tenantId, onNavigate }) {
                           height: "100%",
                           width: (d.count / deptMax) * 100 + "%",
                           background: T.accentMid,
-                          borderRadius: 3,
+                          borderRadius: T.radius.sm,
                           transition: "width 0.5s",
                           display: "flex",
                           alignItems: "center",
@@ -628,7 +614,7 @@ function HROverview({ tenantId, onNavigate }) {
                         {d.count / deptMax > 0.2 && (
                           <span
                             style={{
-                              fontSize: 9,
+                              fontSize: 11,
                               color: "#fff",
                               fontWeight: 700,
                               fontFamily: T.font,
@@ -708,7 +694,7 @@ function HROverview({ tenantId, onNavigate }) {
               background: highlight ? T.danger : T.accent,
               color: "#fff",
               border: "none",
-              borderRadius: "4px",
+              borderRadius: T.radius.sm,
               display: "flex",
               alignItems: "center",
               gap: 6,
@@ -811,7 +797,7 @@ export default function HRDashboard() {
           gap: 0,
           overflowX: "auto",
           marginBottom: "24px",
-          borderRadius: "2px",
+          borderRadius: T.radius.sm,
           marginTop: "12px",
         }}
       >
