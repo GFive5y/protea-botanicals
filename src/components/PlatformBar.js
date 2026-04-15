@@ -17,33 +17,20 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { AlertTriangle, Mail, Shield, Wrench } from "lucide-react";
+import { T as DS } from "../styles/tokens";
 import { supabase } from "../services/supabaseClient";
 import { useTenant } from "../services/tenantService";
 
 const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  ...DS,
+  ink150:    DS.border,
+  ink075:    DS.bg,
+  ink050:    DS.surface,
+  successBg: DS.successLight,
+  warningBg: DS.warningLight,
+  dangerBg:  DS.dangerLight,
+  infoBg:    DS.infoLight,
 };
 
 const SEV = {
@@ -108,71 +95,10 @@ function fmtTime(iso) {
   });
 }
 
-const IconAlert = ({ stroke }) => (
-  <svg
-    viewBox="0 0 20 20"
-    width={20}
-    height={20}
-    fill="none"
-    stroke={stroke}
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M8.7 3.2a1.55 1.55 0 0 1 2.6 0l6.4 11A1.55 1.55 0 0 1 16.4 16.5H3.6a1.55 1.55 0 0 1-1.3-2.3l6.4-11z" />
-    <line x1="10" y1="8" x2="10" y2="11.5" />
-    <circle cx="10" cy="13.75" r="0.65" fill={stroke} stroke="none" />
-  </svg>
-);
-
-const IconComms = ({ stroke }) => (
-  <svg
-    viewBox="0 0 20 20"
-    width={20}
-    height={20}
-    fill="none"
-    stroke={stroke}
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <rect x="2" y="4" width="16" height="12" rx="2" />
-    <polyline points="2,6 10,12 18,6" />
-  </svg>
-);
-
-const IconFraud = ({ stroke }) => (
-  <svg
-    viewBox="0 0 20 20"
-    width={20}
-    height={20}
-    fill="none"
-    stroke={stroke}
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M10 2 L3 5.5 V10 C3 13.87 6.1 17.1 10 18.2 C13.9 17.1 17 13.87 17 10 V5.5 L10 2z" />
-    <line x1="10" y1="8" x2="10" y2="11.5" />
-    <circle cx="10" cy="13.75" r="0.65" fill={stroke} stroke="none" />
-  </svg>
-);
-
-const IconActions = ({ stroke }) => (
-  <svg
-    viewBox="0 0 20 20"
-    width={20}
-    height={20}
-    fill="none"
-    stroke={stroke}
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M15.3 3.2 a3.2 3.2 0 0 0-4.5 4.5 L4 15.5 a.7.7 0 0 0 1 1 l6.8-6.8 A3.2 3.2 0 0 0 15.3 3.2z" />
-    <line x1="13.2" y1="6" x2="15.2" y2="4" />
-  </svg>
-);
+const IconAlert = ({ stroke }) => <AlertTriangle size={18} color={stroke} strokeWidth={1.5} />;
+const IconComms = ({ stroke }) => <Mail size={18} color={stroke} strokeWidth={1.5} />;
+const IconFraud = ({ stroke }) => <Shield size={18} color={stroke} strokeWidth={1.5} />;
+const IconActions = ({ stroke }) => <Wrench size={18} color={stroke} strokeWidth={1.5} />;
 
 function PIBIcon({ Icon, severity, active, panelOpen, onClick }) {
   const s = active && severity ? SEV[severity] : null;
@@ -190,7 +116,7 @@ function PIBIcon({ Icon, severity, active, panelOpen, onClick }) {
         cursor: active ? "pointer" : "default",
         opacity: active ? 1 : 0.38,
         background: panelOpen ? s?.bg || "transparent" : "transparent",
-        borderRadius: 4,
+        borderRadius: T.radius.sm,
         transition: "opacity 0.3s ease, background 0.15s",
         flexShrink: 0,
       }}
@@ -215,10 +141,10 @@ function PanelShell({ severity, title, count, onAckAll, onClose, children }) {
         top: 44,
         left: 0,
         right: 0,
-        background: "#fff",
+        background: T.surface,
         border: `1px solid ${T.ink150}`,
         borderTop: `2px solid ${s.color}`,
-        borderRadius: "0 0 8px 8px",
+        borderRadius: `0 0 ${T.radius.md} ${T.radius.md}`,
         zIndex: 100,
         boxShadow: "0 12px 32px rgba(0,0,0,0.10)",
         maxHeight: 380,
@@ -250,7 +176,7 @@ function PanelShell({ severity, title, count, onAckAll, onClose, children }) {
           />
           <span
             style={{
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: 700,
               letterSpacing: "0.12em",
               textTransform: "uppercase",
@@ -267,13 +193,13 @@ function PanelShell({ severity, title, count, onAckAll, onClose, children }) {
             <button
               onClick={onAckAll}
               style={{
-                fontSize: 9,
+                fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
                 padding: "3px 10px",
                 border: `1px solid ${s.bd}`,
-                borderRadius: 3,
+                borderRadius: T.radius.sm,
                 background: "transparent",
                 color: s.color,
                 cursor: "pointer",
@@ -296,7 +222,7 @@ function PanelShell({ severity, title, count, onAckAll, onClose, children }) {
               color: T.ink400,
               fontSize: 13,
               cursor: "pointer",
-              borderRadius: 4,
+              borderRadius: T.radius.sm,
             }}
           >
             ✕
@@ -377,12 +303,12 @@ function AlertsPanel({ alerts, onAckOne, onAckAll, onClose }) {
                 {alert.alert_type && (
                   <span
                     style={{
-                      fontSize: 8,
+                      fontSize: 11,
                       fontWeight: 700,
                       letterSpacing: "0.07em",
                       textTransform: "uppercase",
                       padding: "1px 5px",
-                      borderRadius: 2,
+                      borderRadius: T.radius.sm,
                       background: s.bg,
                       border: `1px solid ${s.bd}`,
                       color: s.color,
@@ -394,13 +320,13 @@ function AlertsPanel({ alerts, onAckOne, onAckAll, onClose }) {
                 )}
                 {alert.source_table && (
                   <span
-                    style={{ fontSize: 9, color: T.ink400, fontFamily: T.font }}
+                    style={{ fontSize: 11, color: T.ink400, fontFamily: T.font }}
                   >
                     {alert.source_table}
                   </span>
                 )}
                 <span
-                  style={{ fontSize: 9, color: T.ink400, fontFamily: T.font }}
+                  style={{ fontSize: 11, color: T.ink400, fontFamily: T.font }}
                 >
                   {fmtTime(alert.created_at)}
                 </span>
@@ -410,13 +336,13 @@ function AlertsPanel({ alerts, onAckOne, onAckAll, onClose }) {
               className="pib-ack-btn"
               onClick={() => onAckOne(alert.id)}
               style={{
-                fontSize: 9,
+                fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
                 padding: "3px 9px",
                 border: `1px solid ${T.successBd}`,
-                borderRadius: 3,
+                borderRadius: T.radius.sm,
                 background: T.successBg,
                 color: T.success,
                 cursor: "pointer",
@@ -452,12 +378,12 @@ function CommsPanel({ unread, openTickets, role, onNavigate, onClose }) {
               padding: "10px 12px",
               background: unread > 0 ? T.warningBg : T.ink075,
               border: `1px solid ${unread > 0 ? T.warningBd : T.ink150}`,
-              borderRadius: 6,
+              borderRadius: T.radius.md,
             }}
           >
             <div
               style={{
-                fontSize: 9,
+                fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
@@ -471,7 +397,7 @@ function CommsPanel({ unread, openTickets, role, onNavigate, onClose }) {
             <div
               style={{
                 fontSize: 22,
-                fontWeight: 400,
+                fontWeight: 700,
                 color: unread > 0 ? T.warning : T.ink400,
                 letterSpacing: "-0.02em",
                 fontVariantNumeric: "tabular-nums",
@@ -487,12 +413,12 @@ function CommsPanel({ unread, openTickets, role, onNavigate, onClose }) {
               padding: "10px 12px",
               background: openTickets > 0 ? T.infoBg : T.ink075,
               border: `1px solid ${openTickets > 0 ? T.infoBd : T.ink150}`,
-              borderRadius: 6,
+              borderRadius: T.radius.md,
             }}
           >
             <div
               style={{
-                fontSize: 9,
+                fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
@@ -506,7 +432,7 @@ function CommsPanel({ unread, openTickets, role, onNavigate, onClose }) {
             <div
               style={{
                 fontSize: 22,
-                fontWeight: 400,
+                fontWeight: 700,
                 color: openTickets > 0 ? T.info : T.ink400,
                 letterSpacing: "-0.02em",
                 fontVariantNumeric: "tabular-nums",
@@ -539,13 +465,13 @@ function CommsPanel({ unread, openTickets, role, onNavigate, onClose }) {
             onNavigate(role === "hq" ? "/hq?tab=comms" : "?tab=comms");
           }}
           style={{
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: 700,
             letterSpacing: "0.08em",
             textTransform: "uppercase",
             padding: "5px 14px",
             border: `1px solid ${T.ink150}`,
-            borderRadius: 4,
+            borderRadius: T.radius.sm,
             background: T.ink075,
             color: T.ink700,
             cursor: "pointer",
@@ -573,7 +499,7 @@ function FraudPanel({ flagged, role, onNavigate, onClose }) {
             padding: "8px 12px",
             background: T.dangerBg,
             border: `1px solid ${T.dangerBd}`,
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             marginBottom: 12,
             fontSize: 11,
             color: T.danger,
@@ -610,7 +536,7 @@ function FraudPanel({ flagged, role, onNavigate, onClose }) {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: 700,
                 color: T.danger,
                 fontFamily: T.font,
@@ -634,7 +560,7 @@ function FraudPanel({ flagged, role, onNavigate, onClose }) {
                 {u.full_name || u.email || "Unknown user"}
               </div>
               <div
-                style={{ fontSize: 10, color: T.ink400, fontFamily: T.font }}
+                style={{ fontSize: 11, color: T.ink400, fontFamily: T.font }}
               >
                 Score: {u.anomaly_score}
               </div>
@@ -644,7 +570,7 @@ function FraudPanel({ flagged, role, onNavigate, onClose }) {
         {flagged.length > 8 && (
           <div
             style={{
-              fontSize: 10,
+              fontSize: 11,
               color: T.ink400,
               fontFamily: T.font,
               padding: "8px 0",
@@ -660,13 +586,13 @@ function FraudPanel({ flagged, role, onNavigate, onClose }) {
           }}
           style={{
             marginTop: 12,
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: 700,
             letterSpacing: "0.08em",
             textTransform: "uppercase",
             padding: "5px 14px",
             border: `1px solid ${T.dangerBd}`,
-            borderRadius: 4,
+            borderRadius: T.radius.sm,
             background: T.dangerBg,
             color: T.danger,
             cursor: "pointer",
@@ -714,7 +640,7 @@ function ActionsPanel({
           >
             <div
               style={{
-                fontSize: 9,
+                fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: "0.09em",
                 textTransform: "uppercase",
@@ -763,7 +689,7 @@ function ActionsPanel({
                 {item.sku && (
                   <span
                     style={{
-                      fontSize: 10,
+                      fontSize: 11,
                       color: T.ink400,
                       fontFamily: T.font,
                     }}
@@ -776,7 +702,7 @@ function ActionsPanel({
             {zeroPrice.length > 6 && (
               <div
                 style={{
-                  fontSize: 10,
+                  fontSize: 11,
                   color: T.ink400,
                   fontFamily: T.font,
                   paddingTop: 4,
@@ -793,7 +719,7 @@ function ActionsPanel({
           <div style={{ marginBottom: expiringItems.length > 0 ? 16 : 0 }}>
             <div
               style={{
-                fontSize: 9,
+                fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: "0.09em",
                 textTransform: "uppercase",
@@ -840,7 +766,7 @@ function ActionsPanel({
             {outOfStock.length > 6 && (
               <div
                 style={{
-                  fontSize: 10,
+                  fontSize: 11,
                   color: T.ink400,
                   fontFamily: T.font,
                   paddingTop: 4,
@@ -857,7 +783,7 @@ function ActionsPanel({
           <div>
             <div
               style={{
-                fontSize: 9,
+                fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: "0.09em",
                 textTransform: "uppercase",
@@ -898,7 +824,7 @@ function ActionsPanel({
                   {item.name}
                 </span>
                 <span
-                  style={{ fontSize: 10, color: T.ink400, fontFamily: T.font }}
+                  style={{ fontSize: 11, color: T.ink400, fontFamily: T.font }}
                 >
                   ·{" "}
                   {new Date(item.expiry_date).toLocaleDateString("en-ZA", {
@@ -922,13 +848,13 @@ function ActionsPanel({
                 onNavigate(role === "hq" ? "/hq?tab=pricing" : "?tab=stock");
               }}
               style={{
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
                 padding: "5px 14px",
                 border: `1px solid ${T.dangerBd}`,
-                borderRadius: 4,
+                borderRadius: T.radius.sm,
                 background: T.dangerBg,
                 color: T.danger,
                 cursor: "pointer",
@@ -945,13 +871,13 @@ function ActionsPanel({
                 onNavigate("?tab=stock");
               }}
               style={{
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
                 padding: "5px 14px",
                 border: `1px solid ${T.warningBd}`,
-                borderRadius: 4,
+                borderRadius: T.radius.sm,
                 background: T.warningBg,
                 color: T.warning,
                 cursor: "pointer",
@@ -968,13 +894,13 @@ function ActionsPanel({
                 onNavigate(role === "hq" ? "/hq?tab=hq-stock" : "?tab=items");
               }}
               style={{
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
                 padding: "5px 14px",
                 border: `1px solid ${T.warningBd}`,
-                borderRadius: 4,
+                borderRadius: T.radius.sm,
                 background: T.warningBg,
                 color: T.warning,
                 cursor: "pointer",
@@ -1232,7 +1158,7 @@ export default function PlatformBar({ role = "admin", tenantId }) {
         <div
           style={{
             height: allClear ? 4 : 40,
-            background: allClear ? T.successBd : "#ffffff",
+            background: allClear ? T.successBd : T.surface,
             borderBottom: allClear ? "none" : `1px solid ${T.ink150}`,
             overflow: "visible",
             transition: "height 200ms ease, background 200ms ease",
