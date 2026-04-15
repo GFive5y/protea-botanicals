@@ -10,7 +10,7 @@
 // Status workflow: any authenticated user with access can advance (tenant self-managed)
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Printer, Mail, Lock } from "lucide-react";
+import { Printer, Mail, Lock, Download } from "lucide-react";
 import { createPortal } from "react-dom";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
@@ -229,6 +229,7 @@ export default function HQFinancialStatements() {
   const [cfData, setCfData] = useState(null);
   const [equityData, setEquityData] = useState(null);
   const [printing, setPrinting] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const showToast = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 4000); };
   const bounds = useMemo(
@@ -402,6 +403,39 @@ export default function HQFinancialStatements() {
     });
   }, [loading, incomeData, bsData, cfData, equityData]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const handleDownloadPDF = useCallback(async () => {
+    if (loading || !incomeData || !bsData || !cfData || !equityData) {
+      showToast("Statements still loading \u2014 wait a moment", "error");
+      return;
+    }
+    setDownloading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-financial-statements", {
+        body: {
+          tenant_id: tenantId,
+          financial_year: financialYear,
+          period_label: periodLabel,
+          tenant_name: tenantName,
+          status: currentStatus,
+          signed_by: statusRow?.signed_by ?? null,
+          signed_at: statusRow?.signed_at ?? null,
+          income: incomeData,
+          balance_sheet: bsData,
+          cash_flow: cfData,
+          equity: equityData,
+        },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error ?? "PDF generation failed");
+      window.open(data.url, "_blank");
+      showToast("PDF ready \u2014 opening in new tab");
+    } catch (err) {
+      showToast(err.message ?? "PDF generation failed", "error");
+    } finally {
+      setDownloading(false);
+    }
+  }, [loading, incomeData, bsData, cfData, equityData, tenantId, financialYear, periodLabel, tenantName, currentStatus, statusRow]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (setupComplete === false) return <HQFinancialSetup onComplete={() => setSetupComplete(true)} />;
   if (setupComplete === null) return <div style={{ padding: 60, textAlign: "center", color: C.ink500, fontFamily: C.font }}>Loading{"\u2026"}</div>;
 
@@ -437,6 +471,11 @@ export default function HQFinancialStatements() {
           {!loading && incomeData && (
             <button onClick={handlePrint} disabled={printing} style={{ padding: "7px 16px", borderRadius: 8, border: `1.5px solid ${C.accentMid}`, background: printing ? C.bg : C.accentLight, color: printing ? C.ink500 : C.accent, cursor: printing ? "wait" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: C.font, display: "flex", alignItems: "center", gap: 6 }}>
               {printing ? "Preparing\u2026" : <><Printer size={14} style={{ marginRight: 6, verticalAlign: "middle" }} />Print / Save PDF</>}
+            </button>
+          )}
+          {!loading && incomeData && (
+            <button onClick={handleDownloadPDF} disabled={downloading} style={{ padding: "7px 16px", borderRadius: 8, border: `1.5px solid ${C.accent}`, background: downloading ? C.bg : C.accent, color: downloading ? C.ink500 : "#fff", cursor: downloading ? "wait" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: C.font, display: "flex", alignItems: "center", gap: 6 }}>
+              {downloading ? "Generating PDF\u2026" : <><Download size={14} style={{ marginRight: 6, verticalAlign: "middle" }} />Download PDF</>}
             </button>
           )}
           {!loading && incomeData && (
