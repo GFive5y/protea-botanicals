@@ -36,33 +36,10 @@ import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import InfoTooltip from "../InfoTooltip";
 import { ChartCard, ChartTooltip } from "../viz";
+import { Zap } from "lucide-react";
 import { T } from "../../styles/tokens";
 
 // Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
-const C = {
-  bg: T.surface,
-  card: "#ffffff",
-  border: T.border,
-  borderDark: "#C8C0B0",
-  green: T.accent,
-  greenMid: T.accentMid,
-  greenLight: "#52b788",
-  greenPale: T.accentLight,
-  blue: T.info,
-  bluePale: T.infoLight,
-  amber: T.warning,
-  amberPale: T.warningLight,
-  red: T.danger,
-  redPale: T.dangerLight,
-  text: T.ink900,
-  textMid: T.ink700,
-  textLight: T.ink500,
-  white: "#ffffff",
-  gold: "#b5935a",
-  goldPale: "#FFF8E7",
-};
-const FONT_DISPLAY = T.font;
-const FONT_BODY = T.font;
 
 // ─── DEFAULT CONFIG (includes all WP-O v2.0 fields) ─────────────────────────
 const DEFAULT_CONFIG = {
@@ -298,9 +275,9 @@ function SectionCard({ title, subtitle, children, accent }) {
   return (
     <div
       style={{
-        background: "#fff",
+        background: T.surface,
         border: `1px solid ${T.border}`,
-        borderRadius: 8,
+        borderRadius: T.radius.md,
         marginBottom: 20,
         overflow: "hidden",
         boxShadow: T.shadow.sm,
@@ -406,12 +383,12 @@ function NumInput({
           width,
           padding: "7px 10px",
           border: `1.5px solid ${T.border}`,
-          borderRadius: 4,
+          borderRadius: T.radius.sm,
           fontFamily: T.font,
           fontSize: 14,
           fontWeight: 600,
           color: T.accent,
-          background: "#fff",
+          background: T.surface,
           outline: "none",
           textAlign: "center",
         }}
@@ -433,7 +410,7 @@ function InfoBox({ children, colour, bgColour }) {
       style={{
         background: bg,
         border: `1px solid ${co}30`,
-        borderRadius: 6,
+        borderRadius: T.radius.md,
         padding: "12px 16px",
         fontFamily: T.font,
         fontSize: 12.5,
@@ -453,7 +430,7 @@ function PreviewBox({ children, title }) {
       style={{
         background: T.accentLight,
         border: `1px solid ${T.accentBd}`,
-        borderRadius: 6,
+        borderRadius: T.radius.md,
         padding: "14px 16px",
         marginTop: 14,
       }}
@@ -517,7 +494,7 @@ function Toast({ msg, type, onDone }) {
         background: type === "error" ? T.danger : T.accent,
         color: "#fff",
         padding: "14px 22px",
-        borderRadius: 8,
+        borderRadius: T.radius.md,
         fontFamily: T.font,
         fontSize: 14,
         fontWeight: 500,
@@ -606,7 +583,7 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
         style={{
           background: T.accentLight,
           border: `1px solid ${T.accentBd}`,
-          borderRadius: 8,
+          borderRadius: T.radius.md,
           padding: "18px 22px",
           marginBottom: 24,
         }}
@@ -657,7 +634,7 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                 background: "white",
                 color: T.accentMid,
                 border: `1px solid ${T.accentBd}`,
-                borderRadius: 3,
+                borderRadius: T.radius.sm,
                 padding: "2px 10px",
                 fontSize: 11,
                 fontWeight: 600,
@@ -683,9 +660,9 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
             <div
               key={schema.id}
               style={{
-                background: "#fff",
+                background: T.surface,
                 border: `1.5px solid ${active ? schema.costColor : T.border}`,
-                borderRadius: 10,
+                borderRadius: T.radius.lg,
                 overflow: "hidden",
                 boxShadow: active
                   ? `0 4px 16px ${schema.costColor}18`
@@ -728,7 +705,7 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                     style={{
                       background: "rgba(255,255,255,0.2)",
                       color: "#fff",
-                      borderRadius: 3,
+                      borderRadius: T.radius.sm,
                       padding: "2px 10px",
                       fontSize: 10,
                       fontWeight: 700,
@@ -746,7 +723,7 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                     background: schema.costBg,
                     color: schema.costColor,
                     border: `1px solid ${schema.costColor}30`,
-                    borderRadius: 3,
+                    borderRadius: T.radius.sm,
                     padding: "3px 10px",
                     fontSize: 11,
                     fontWeight: 700,
@@ -770,7 +747,7 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                 <div
                   style={{
                     background: T.bg,
-                    borderRadius: 6,
+                    borderRadius: T.radius.md,
                     padding: "10px 14px",
                     marginBottom: 16,
                   }}
@@ -821,7 +798,7 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                         marginBottom: 10,
                         background: T.warningLight,
                         padding: "8px 12px",
-                        borderRadius: 4,
+                        borderRadius: T.radius.sm,
                         border: `1px solid ${T.warningBd}`,
                       }}
                     >
@@ -841,7 +818,7 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                           background: schema.costColor,
                           color: "#fff",
                           border: "none",
-                          borderRadius: 5,
+                          borderRadius: T.radius.md,
                           fontFamily: T.font,
                           fontSize: 12,
                           fontWeight: 700,
@@ -857,7 +834,7 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                           padding: "9px",
                           background: "none",
                           border: `1px solid ${T.border}`,
-                          borderRadius: 5,
+                          borderRadius: T.radius.md,
                           fontFamily: T.font,
                           fontSize: 12,
                           color: T.ink500,
@@ -882,7 +859,7 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                         : schema.costColor,
                       color: active ? schema.costColor : "#fff",
                       border: `1.5px solid ${schema.costColor}`,
-                      borderRadius: 6,
+                      borderRadius: T.radius.md,
                       fontFamily: T.font,
                       fontSize: 12,
                       fontWeight: 700,
@@ -1259,7 +1236,6 @@ function TabCategories({ draft, setDraft }) {
     {
       key: "mult_cat_cannabis_flower",
       label: "Cannabis Flower",
-      icon: "🌿",
       desc: "Flower, pre-rolls, hash, kief",
       margin: "60–70%",
       rationale: "Highest repeat purchase — reward loyalty hard",
@@ -1267,7 +1243,6 @@ function TabCategories({ draft, setDraft }) {
     {
       key: "mult_cat_cannabis_vape",
       label: "Cannabis Vape",
-      icon: "💨",
       desc: "Cartridges, disposables, pods",
       margin: "55–65%",
       rationale: "Good margin — drive channel preference",
@@ -1275,7 +1250,6 @@ function TabCategories({ draft, setDraft }) {
     {
       key: "mult_cat_cannabis_edible",
       label: "Cannabis Edibles",
-      icon: "🍬",
       desc: "Gummies, chocolate, beverages",
       margin: "50–65%",
       rationale: "Variable margin — balanced earn",
@@ -1283,7 +1257,6 @@ function TabCategories({ draft, setDraft }) {
     {
       key: "mult_cat_seeds_clones",
       label: "Seeds & Clones",
-      icon: "🌱",
       desc: "Feminised seeds, live clones, plugs, trays",
       margin: "65–80%",
       rationale: "Highest value — builds lifelong grower loyalty",
@@ -1291,7 +1264,6 @@ function TabCategories({ draft, setDraft }) {
     {
       key: "mult_cat_grow_supplies",
       label: "Grow Supplies",
-      icon: "🧪",
       desc: "Nutrients, substrate, fertilizer, rooting gel",
       margin: "30–45%",
       rationale: "Lower margin — neutral earn, cross-sell play",
@@ -1299,7 +1271,6 @@ function TabCategories({ draft, setDraft }) {
     {
       key: "mult_cat_accessories",
       label: "Accessories",
-      icon: "🔧",
       desc: "Papers, cones, Boveda, grinders, trays",
       margin: "35–55%",
       rationale: "Competitive pricing — lower earn to protect margin",
@@ -1307,7 +1278,6 @@ function TabCategories({ draft, setDraft }) {
     {
       key: "mult_cat_health_wellness",
       label: "Health & Wellness",
-      icon: "🍄",
       desc: "Lion's Mane, Ashwagandha, CBD pet, mushrooms",
       margin: "45–60%",
       rationale: "Growth category — reward to build habit",
@@ -1315,7 +1285,6 @@ function TabCategories({ draft, setDraft }) {
     {
       key: "mult_cat_lifestyle_merch",
       label: "Lifestyle & Merch",
-      icon: "👕",
       desc: "Branded clothing, caps, accessories",
       margin: "60–75%",
       rationale: "Brand advocacy — high margin, reward ambassadors",
@@ -1359,7 +1328,7 @@ function TabCategories({ draft, setDraft }) {
         return (
           <SectionCard
             key={cat.key}
-            title={`${cat.icon}  ${cat.label}`}
+            title={cat.label}
             subtitle={cat.desc}
             accent={guardTriggered ? T.warning : T.accent}
           >
@@ -1395,7 +1364,7 @@ function TabCategories({ draft, setDraft }) {
                     style={{
                       background: T.bg,
                       border: `1px solid ${T.border}`,
-                      borderRadius: 3,
+                      borderRadius: T.radius.sm,
                       padding: "2px 8px",
                       fontSize: 11,
                       color: T.ink500,
@@ -1408,7 +1377,7 @@ function TabCategories({ draft, setDraft }) {
                       style={{
                         background: T.warningLight,
                         border: `1px solid ${T.warningBd}`,
-                        borderRadius: 3,
+                        borderRadius: T.radius.sm,
                         padding: "2px 8px",
                         fontSize: 11,
                         fontWeight: 700,
@@ -1425,7 +1394,7 @@ function TabCategories({ draft, setDraft }) {
                 style={{
                   background: T.accentLight,
                   border: `1px solid ${T.accentBd}`,
-                  borderRadius: 6,
+                  borderRadius: T.radius.md,
                   padding: "12px 16px",
                   minWidth: 220,
                 }}
@@ -1489,14 +1458,13 @@ function TabCategories({ draft, setDraft }) {
               style={{
                 background: T.bg,
                 border: `1px solid ${T.border}`,
-                borderRadius: 5,
+                borderRadius: T.radius.md,
                 padding: "8px 10px",
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
               }}
             >
-              <span style={{ fontSize: 14 }}>{cat.icon}</span>
               <div>
                 <div
                   style={{
@@ -1600,7 +1568,7 @@ function TabTiers({ draft, setDraft, atRiskCustomers }) {
               style={{
                 background: tier.colour.bg,
                 border: `1.5px solid ${tier.colour.border}`,
-                borderRadius: 8,
+                borderRadius: T.radius.md,
                 padding: "16px 18px",
               }}
             >
@@ -1772,7 +1740,7 @@ function TabTiers({ draft, setDraft, atRiskCustomers }) {
                     background: T.warningLight,
                     color: T.warning,
                     border: `1px solid ${T.warningBd}`,
-                    borderRadius: 3,
+                    borderRadius: T.radius.sm,
                     padding: "2px 8px",
                     fontSize: 11,
                     fontWeight: 700,
@@ -1866,7 +1834,7 @@ function TabEconomics({ draft, setDraft, liveStats }) {
           style={{
             background: healthBg,
             border: `1px solid ${healthColour}30`,
-            borderRadius: 8,
+            borderRadius: T.radius.md,
             padding: "16px 20px",
             display: "flex",
             alignItems: "center",
@@ -1915,7 +1883,7 @@ function TabEconomics({ draft, setDraft, liveStats }) {
               style={{
                 height: 8,
                 background: `${healthColour}20`,
-                borderRadius: 4,
+                borderRadius: T.radius.sm,
                 overflow: "hidden",
               }}
             >
@@ -1924,7 +1892,7 @@ function TabEconomics({ draft, setDraft, liveStats }) {
                   height: "100%",
                   width: `${(healthScore / 10) * 100}%`,
                   background: healthColour,
-                  borderRadius: 4,
+                  borderRadius: T.radius.sm,
                   transition: "width 0.6s",
                 }}
               />
@@ -2286,9 +2254,9 @@ function TabEconomics({ draft, setDraft, liveStats }) {
                 <div
                   key={i}
                   style={{
-                    background: "#fff",
+                    background: T.surface,
                     border: `1px solid ${T.border}`,
-                    borderRadius: 8,
+                    borderRadius: T.radius.md,
                     padding: "12px 14px",
                     textAlign: "center",
                   }}
@@ -2417,7 +2385,7 @@ function TabReferrals({ draft, setDraft, referralLeaderboard, tenantName }) {
                 justifyContent: "space-between",
                 padding: "10px 14px",
                 background: i === 0 ? T.infoLight : T.bg,
-                borderRadius: 6,
+                borderRadius: T.radius.md,
                 marginBottom: 6,
                 border: `1px solid ${i === 0 ? T.infoBd : T.border}`,
               }}
@@ -2474,7 +2442,7 @@ function TabReferrals({ draft, setDraft, referralLeaderboard, tenantName }) {
                         gap: 3,
                         background: "#25D366",
                         color: "#fff",
-                        borderRadius: 3,
+                        borderRadius: T.radius.sm,
                         padding: "1px 7px",
                         fontSize: 10,
                         fontWeight: 700,
@@ -2534,7 +2502,7 @@ function TabReferrals({ draft, setDraft, referralLeaderboard, tenantName }) {
           style={{
             background: "#DCF8C6",
             border: "1px solid #A8D99C",
-            borderRadius: 8,
+            borderRadius: T.radius.md,
             padding: "14px 16px",
             maxWidth: 360,
           }}
@@ -2660,9 +2628,9 @@ function TabQRSecurity({ draft, setDraft, qrStats }) {
                 <div
                   key={i}
                   style={{
-                    background: "#fff",
+                    background: T.surface,
                     border: `1px solid ${T.border}`,
-                    borderRadius: 8,
+                    borderRadius: T.radius.md,
                     padding: "10px 14px",
                     textAlign: "center",
                   }}
@@ -2835,9 +2803,9 @@ function TabSimulator({ draft }) {
               style={{
                 flex: 1,
                 minWidth: 260,
-                background: "#fff",
+                background: T.surface,
                 border: `1.5px solid ${s.color}40`,
-                borderRadius: 8,
+                borderRadius: T.radius.md,
                 overflow: "hidden",
               }}
             >
@@ -2909,7 +2877,7 @@ function TabSimulator({ draft }) {
                     style={{
                       marginTop: 10,
                       padding: "10px 12px",
-                      borderRadius: 6,
+                      borderRadius: T.radius.md,
                       background: gain > 0 ? T.successLight : T.dangerLight,
                     }}
                   >
@@ -3029,7 +2997,7 @@ function TabAIEngine({ draft, setDraft, aiLog, loadingAiLog, tenantName, onRunNo
           >
             {runningAi?(
               <><span style={{width:12,height:12,border:"2px solid rgba(255,255,255,0.3)",borderTopColor:"#fff",borderRadius:"50%",display:"inline-block",animation:"spin 0.8s linear infinite"}}/>Running{"\u2026"}</>
-            ):"\u26A1 Run Now"}
+            ):<><Zap size={13} strokeWidth={1.5} style={{ marginRight: 4 }} />Run Now</>}
           </button>
         </div>
         {AUTOMATIONS.map((auto) => (
@@ -3065,7 +3033,7 @@ function TabAIEngine({ draft, setDraft, aiLog, loadingAiLog, tenantName, onRunNo
                     width: 16,
                     height: 16,
                     borderRadius: "50%",
-                    background: "#fff",
+                    background: T.surface,
                     transition: "left 0.2s",
                     boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
                   }}
@@ -3096,7 +3064,7 @@ function TabAIEngine({ draft, setDraft, aiLog, loadingAiLog, tenantName, onRunNo
                     background: cfg[auto.key] ? T.successLight : T.bg,
                     color: cfg[auto.key] ? T.success : T.ink500,
                     border: `1px solid ${cfg[auto.key] ? T.successBd : T.border}`,
-                    borderRadius: 3,
+                    borderRadius: T.radius.sm,
                     padding: "1px 7px",
                     fontSize: 10,
                     fontWeight: 700,
@@ -3194,7 +3162,7 @@ function TabAIEngine({ draft, setDraft, aiLog, loadingAiLog, tenantName, onRunNo
                 style={{
                   background: colours.bg,
                   border: `1px solid ${colours.border}`,
-                  borderRadius: 6,
+                  borderRadius: T.radius.md,
                   padding: "12px 14px",
                   marginBottom: 10,
                 }}
@@ -3211,7 +3179,7 @@ function TabAIEngine({ draft, setDraft, aiLog, loadingAiLog, tenantName, onRunNo
                     style={{
                       background: colours.c,
                       color: "#fff",
-                      borderRadius: 3,
+                      borderRadius: T.radius.sm,
                       padding: "2px 8px",
                       fontSize: 10,
                       fontWeight: 700,
@@ -3244,7 +3212,7 @@ function TabAIEngine({ draft, setDraft, aiLog, loadingAiLog, tenantName, onRunNo
                             ? T.ink500
                             : T.warning,
                       border: `1px solid ${entry.outcome === "actioned" ? T.successBd : entry.outcome === "dismissed" ? T.border : T.warningBd}`,
-                      borderRadius: 3,
+                      borderRadius: T.radius.sm,
                       padding: "1px 7px",
                       fontSize: 10,
                       fontWeight: 700,
@@ -3278,9 +3246,6 @@ function TabAIEngine({ draft, setDraft, aiLog, loadingAiLog, tenantName, onRunNo
               padding: "30px 0",
             }}
           >
-            <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.4 }}>
-              ⚡
-            </div>
             No AI actions yet. The loyalty-ai edge function runs nightly and
             will populate this feed once the programme has enough data.
             <div
@@ -3306,37 +3271,30 @@ function TabAIEngine({ draft, setDraft, aiLog, loadingAiLog, tenantName, onRunNo
       >
         {[
           {
-            icon: "🎯",
             title: "Churn Scoring",
             desc: "Calculates churn_risk_score (0–1) for every active customer based on recency, tier, and spend trend. Updates user_profiles.",
           },
           {
-            icon: "📱",
             title: "Churn Rescue WhatsApp",
             desc: `Sends personalised WhatsApp re-engagement to Gold+ customers silent for ${cfg.ai_churn_rescue_threshold_days || 21}+ days. Logs to loyalty_ai_log.`,
           },
           {
-            icon: "📦",
             title: "Stock-Linked Boost Suggestions",
             desc: `Identifies inventory_items with >${cfg.ai_stock_boost_days_on_hand || 90} days stock on hand. Suggests pts multiplier boost to drive clearance.`,
           },
           {
-            icon: "🔀",
             title: "Cross-Sell Intelligence",
             desc: "Identifies single-category buyers. Creates nudge records in loyalty_ai_log for targeted WhatsApp campaigns.",
           },
           {
-            icon: "🎂",
             title: "Birthday Bonuses",
             desc: "Daily check: awards pts_birthday_bonus to customers whose birthday month matches today. Dedup-safe — one award per year.",
           },
           {
-            icon: "⏰",
             title: "Point Expiry",
             desc: "Marks expired points (is_expired = true). Updates user_profiles.loyalty_points to deduct expired balance. Logs recaptured liability.",
           },
           {
-            icon: "📊",
             title: "Weekly Programme Brief",
             desc: "Monday: compiles Health Score, wins, warnings, and opportunities. Surfaces in this tab's AI Actions Feed.",
           },
@@ -3350,7 +3308,6 @@ function TabAIEngine({ draft, setDraft, aiLog, loadingAiLog, tenantName, onRunNo
               borderBottom: i < 6 ? `1px solid ${T.border}` : "none",
             }}
           >
-            <span style={{ fontSize: 20, flexShrink: 0 }}>{item.icon}</span>
             <div>
               <div
                 style={{
@@ -3525,11 +3482,11 @@ function TabCampaigns({ showToast, tenantId }) {
     width: "100%",
     padding: "9px 12px",
     border: `1.5px solid ${T.border}`,
-    borderRadius: 5,
+    borderRadius: T.radius.md,
     fontFamily: T.font,
     fontSize: 14,
     color: T.ink900,
-    background: "#fff",
+    background: T.surface,
     outline: "none",
     boxSizing: "border-box",
   };
@@ -3548,7 +3505,7 @@ function TabCampaigns({ showToast, tenantId }) {
               padding: "9px 20px",
               background: T.accent,
               border: "none",
-              borderRadius: 6,
+              borderRadius: T.radius.md,
               fontFamily: T.font,
               fontSize: 13,
               fontWeight: 600,
@@ -3564,7 +3521,7 @@ function TabCampaigns({ showToast, tenantId }) {
             style={{
               background: T.warningLight,
               border: `1.5px solid ${T.warningBd}`,
-              borderRadius: 8,
+              borderRadius: T.radius.md,
               padding: "20px 24px",
               marginBottom: 24,
             }}
@@ -3691,7 +3648,7 @@ function TabCampaigns({ showToast, tenantId }) {
                   padding: "9px 22px",
                   background: T.accent,
                   border: "none",
-                  borderRadius: 5,
+                  borderRadius: T.radius.md,
                   fontFamily: T.font,
                   fontSize: 13,
                   fontWeight: 600,
@@ -3712,7 +3669,7 @@ function TabCampaigns({ showToast, tenantId }) {
                   padding: "9px 18px",
                   background: "none",
                   border: `1px solid ${T.border}`,
-                  borderRadius: 5,
+                  borderRadius: T.radius.md,
                   fontFamily: T.font,
                   fontSize: 13,
                   color: T.ink500,
@@ -3777,7 +3734,7 @@ function TabCampaigns({ showToast, tenantId }) {
                     gap: 12,
                     padding: "14px 18px",
                     marginBottom: 10,
-                    borderRadius: 8,
+                    borderRadius: T.radius.md,
                     background: active ? T.successLight : T.bg,
                     border: `1.5px solid ${active ? T.successBd : T.border}`,
                   }}
@@ -3832,7 +3789,7 @@ function TabCampaigns({ showToast, tenantId }) {
                         padding: "6px 12px",
                         background: c.is_active ? T.warningLight : T.successLight,
                         border: `1px solid ${c.is_active ? T.warningBd : T.successBd}`,
-                        borderRadius: 4,
+                        borderRadius: T.radius.sm,
                         fontFamily: T.font,
                         fontSize: 11,
                         fontWeight: 600,
@@ -3848,7 +3805,7 @@ function TabCampaigns({ showToast, tenantId }) {
                         padding: "6px 12px",
                         background: T.infoLight,
                         border: `1px solid ${T.infoBd}`,
-                        borderRadius: 4,
+                        borderRadius: T.radius.sm,
                         fontFamily: T.font,
                         fontSize: 11,
                         fontWeight: 600,
@@ -3864,7 +3821,7 @@ function TabCampaigns({ showToast, tenantId }) {
                         padding: "6px 12px",
                         background: T.dangerLight,
                         border: `1px solid ${T.dangerBd}`,
-                        borderRadius: 4,
+                        borderRadius: T.radius.sm,
                         fontFamily: T.font,
                         fontSize: 11,
                         fontWeight: 600,
@@ -4223,7 +4180,7 @@ export default function HQLoyalty() {
         style={{
           padding: "24px 28px 0",
           borderBottom: `1px solid ${T.border}`,
-          background: "#fff",
+          background: T.surface,
         }}
       >
         <div
@@ -4262,7 +4219,7 @@ export default function HQLoyalty() {
                     background: activeBadge.bg,
                     color: activeBadge.color,
                     border: `1px solid ${activeBadge.color}40`,
-                    borderRadius: 3,
+                    borderRadius: T.radius.sm,
                     padding: "2px 10px",
                     fontFamily: T.font,
                     fontSize: 11,
@@ -4280,7 +4237,7 @@ export default function HQLoyalty() {
                     background: T.warningLight,
                     color: T.warning,
                     border: `1px solid ${T.warningBd}`,
-                    borderRadius: 3,
+                    borderRadius: T.radius.sm,
                     padding: "2px 10px",
                     fontFamily: T.font,
                     fontSize: 11,
@@ -4296,7 +4253,7 @@ export default function HQLoyalty() {
                     background: T.bg,
                     color: T.ink500,
                     border: `1px solid ${T.border}`,
-                    borderRadius: 3,
+                    borderRadius: T.radius.sm,
                     padding: "2px 10px",
                     fontFamily: T.font,
                     fontSize: 11,
@@ -4327,7 +4284,7 @@ export default function HQLoyalty() {
                 background: isDirty ? T.accent : T.border,
                 color: isDirty ? "#fff" : T.ink500,
                 border: "none",
-                borderRadius: 6,
+                borderRadius: T.radius.md,
                 fontFamily: T.font,
                 fontSize: 13,
                 fontWeight: 600,
@@ -4439,7 +4396,7 @@ export default function HQLoyalty() {
             bottom: 0,
             left: 0,
             right: 0,
-            background: "#fff",
+            background: T.surface,
             borderTop: `1px solid ${T.border}`,
             padding: "14px 28px",
             display: "flex",
@@ -4466,7 +4423,7 @@ export default function HQLoyalty() {
                 padding: "8px 16px",
                 background: "none",
                 border: `1px solid ${T.border}`,
-                borderRadius: 5,
+                borderRadius: T.radius.md,
                 fontFamily: T.font,
                 fontSize: 13,
                 color: T.ink500,
@@ -4482,7 +4439,7 @@ export default function HQLoyalty() {
                 padding: "8px 20px",
                 background: T.accent,
                 border: "none",
-                borderRadius: 5,
+                borderRadius: T.radius.md,
                 fontFamily: T.font,
                 fontSize: 13,
                 fontWeight: 600,
