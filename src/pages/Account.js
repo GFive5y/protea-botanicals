@@ -17,6 +17,7 @@ import { supabase } from "../services/supabaseClient";
 import CustomerSupportWidget from "../components/CustomerSupportWidget";
 import { RoleContext } from "../App";
 import ClientHeader from "../components/ClientHeader";
+import { T } from "../styles/tokens";
 import CustomerInbox, {
   getInboxUnreadCount,
 } from "../components/CustomerInbox";
@@ -26,23 +27,23 @@ const SUPABASE_FUNCTIONS_URL =
   "https://uvicrqapgzcdvozxrreo.supabase.co/functions/v1";
 
 const C = {
-  green: "#1b4332",
-  mid: "#2d6a4f",
-  accent: "#52b788",
-  gold: "#b5935a",
-  cream: "#faf9f6",
-  border: "#e8e0d4",
-  muted: "#888",
-  text: "#1a1a1a",
-  white: "#fff",
-  red: "#c0392b",
-  lightRed: "#fdf0ef",
-  blue: "#2c4a6e",
-  lightBlue: "#eaf0f8",
-  platinum: "#7b68ee",
-  lightGreen: "#eafaf1",
-  lightGold: "#fef9e7",
-  bg: "#f4f0e8",
+  green:      T.accentText,
+  mid:        T.accent,
+  accent:     "#52b788",
+  gold:       T.brandGold,
+  cream:      T.surface,
+  border:     T.border,
+  muted:      T.ink600,
+  text:       T.ink900,
+  white:      T.surface,
+  red:        T.danger,
+  lightRed:   T.dangerLight,
+  blue:       "#2c4a6e",
+  lightBlue:  T.infoLight,
+  platinum:   "#7b68ee",
+  lightGreen: T.successLight,
+  lightGold:  T.warningLight,
+  bg:         T.bg,
 };
 const F = {
   heading: "'Cormorant Garamond',Georgia,serif",
@@ -227,7 +228,7 @@ const inp = {
   width: "100%",
   padding: "11px 14px",
   border: `1px solid ${C.border}`,
-  borderRadius: 3,
+  borderRadius: T.radius.sm,
   fontSize: 14,
   fontFamily: F.body,
   background: C.white,
@@ -240,10 +241,10 @@ const btn = (bg = C.mid, color = C.white, disabled = false) => ({
   background: disabled ? "#ccc" : bg,
   color,
   border: "none",
-  borderRadius: 3,
+  borderRadius: T.radius.sm,
   fontSize: 11,
   fontWeight: 700,
-  letterSpacing: "0.18em",
+  letterSpacing: "0.08em",
   textTransform: "uppercase",
   fontFamily: F.body,
   cursor: disabled ? "not-allowed" : "pointer",
@@ -286,7 +287,7 @@ function AdminConfigModal({ config, onSave, onClose }) {
           left: "50%",
           transform: "translate(-50%,-50%)",
           background: C.white,
-          borderRadius: 4,
+          borderRadius: T.radius.sm,
           width: 600,
           maxWidth: "95vw",
           maxHeight: "85vh",
@@ -338,7 +339,7 @@ function AdminConfigModal({ config, onSave, onClose }) {
               key={key}
               style={{
                 background: C.cream,
-                borderRadius: 3,
+                borderRadius: T.radius.sm,
                 padding: "12px 16px",
                 display: "grid",
                 gridTemplateColumns: "2fr 1fr 80px",
@@ -606,7 +607,7 @@ function OTPPanel({ currentPhone, userId, onVerified, config }) {
               key={item.title}
               style={{
                 background: C.lightGreen,
-                borderRadius: 3,
+                borderRadius: T.radius.sm,
                 padding: "14px 10px",
                 border: `1px solid ${C.accent}30`,
               }}
@@ -716,12 +717,12 @@ function OTPPanel({ currentPhone, userId, onVerified, config }) {
                 style={{
                   display: "block",
                   marginTop: 8,
-                  color: "#e67e22",
+                  color: T.warning,
                   fontSize: 12,
                   fontWeight: 600,
-                  background: "#fff3e0",
+                  background: T.warningLight,
                   padding: "6px 10px",
-                  borderRadius: 3,
+                  borderRadius: T.radius.sm,
                 }}
               >
                 🔧 Dev mode: enter <code>000000</code> to bypass verification
@@ -983,7 +984,7 @@ function RewardField({ fieldKey, config, profile, onSave }) {
         background: earned ? C.lightGreen : C.white,
         border: `1px solid ${earned ? C.accent + "50" : C.border}`,
         borderLeft: `4px solid ${earned ? C.accent : C.border}`,
-        borderRadius: 3,
+        borderRadius: T.radius.sm,
         padding: "16px 20px",
         transition: "all 0.3s ease",
       }}
@@ -1020,7 +1021,7 @@ function RewardField({ fieldKey, config, profile, onSave }) {
                 background: earned ? C.lightGreen : C.lightGold,
                 border: `1px solid ${earned ? C.accent + "40" : C.gold + "40"}`,
                 padding: "2px 8px",
-                borderRadius: 10,
+                borderRadius: T.radius.full,
               }}
             >
               {earned ? `✓ +${cfg.points} pts earned` : `+${cfg.points} pts`}
@@ -1061,7 +1062,7 @@ function RewardField({ fieldKey, config, profile, onSave }) {
                 onClick={handleEdit}
                 style={{
                   ...btn("#f0ebe3", C.muted),
-                  fontSize: 9,
+                  fontSize: 11,
                   padding: "5px 12px",
                 }}
               >
@@ -1149,7 +1150,7 @@ function SupportCommsPanel({ userId, profile, onUnreadChange, inboxUnread }) {
               padding: "10px 20px",
               fontSize: 11,
               fontWeight: 700,
-              letterSpacing: "0.12em",
+              letterSpacing: "0.08em",
               textTransform: "uppercase",
               fontFamily: F.body,
               cursor: "pointer",
@@ -1172,10 +1173,10 @@ function SupportCommsPanel({ userId, profile, onUnreadChange, inboxUnread }) {
                 style={{
                   background: C.red,
                   color: C.white,
-                  fontSize: 9,
+                  fontSize: 11,
                   fontWeight: 700,
                   padding: "1px 6px",
-                  borderRadius: 10,
+                  borderRadius: T.radius.full,
                   fontFamily: F.body,
                 }}
               >
@@ -1558,7 +1559,7 @@ function AccountView({
             background: toastMsg.color,
             color: C.white,
             padding: "12px 24px",
-            borderRadius: 20,
+            borderRadius: T.radius.full,
             fontSize: 13,
             fontWeight: 600,
             zIndex: 4000,
@@ -1576,7 +1577,7 @@ function AccountView({
         <div
           style={{
             background: C.green,
-            borderRadius: 4,
+            borderRadius: T.radius.sm,
             padding: "24px 28px",
             marginBottom: 24,
             position: "relative",
@@ -1599,7 +1600,7 @@ function AccountView({
             style={{
               fontSize: 10,
               fontWeight: 700,
-              letterSpacing: "0.35em",
+              letterSpacing: "0.08em",
               textTransform: "uppercase",
               color: C.accent,
               marginBottom: 4,
@@ -1659,7 +1660,7 @@ function AccountView({
                   gap: 6,
                   background: `${tier.color}20`,
                   border: `1px solid ${tier.color}50`,
-                  borderRadius: 20,
+                  borderRadius: T.radius.full,
                   padding: "5px 14px",
                   fontSize: 11,
                   fontWeight: 700,
@@ -1671,10 +1672,10 @@ function AccountView({
                 {tier.mult > 1 && (
                   <span
                     style={{
-                      fontSize: 9,
+                      fontSize: 11,
                       background: `${tier.color}30`,
                       padding: "1px 6px",
-                      borderRadius: 8,
+                      borderRadius: T.radius.md,
                       marginLeft: 4,
                     }}
                   >
@@ -1721,13 +1722,13 @@ function AccountView({
                 marginTop: 14,
                 height: 3,
                 background: "rgba(255,255,255,0.15)",
-                borderRadius: 3,
+                borderRadius: T.radius.sm,
               }}
             >
               <div
                 style={{
                   height: "100%",
-                  borderRadius: 3,
+                  borderRadius: T.radius.sm,
                   background: tier.color,
                   width: `${Math.min(100, ((profile.loyalty_points || 0) / tier.nextAt) * 100)}%`,
                   transition: "width 0.5s ease",
@@ -1756,7 +1757,7 @@ function AccountView({
                 padding: "12px 18px",
                 fontSize: 10,
                 fontWeight: 700,
-                letterSpacing: "0.14em",
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
                 fontFamily: F.body,
                 cursor: "pointer",
@@ -1793,7 +1794,7 @@ function AccountView({
                 style={{
                   background: "#edf7f2",
                   border: `1px solid ${C.accent}30`,
-                  borderRadius: 3,
+                  borderRadius: T.radius.sm,
                   padding: "12px 16px",
                   marginBottom: 22,
                   fontSize: 13,
@@ -1810,7 +1811,7 @@ function AccountView({
                   style={{
                     background: C.lightGreen,
                     border: `1px solid ${C.accent}`,
-                    borderRadius: 3,
+                    borderRadius: T.radius.sm,
                     padding: "10px 14px",
                     marginBottom: 16,
                     fontSize: 13,
@@ -1826,7 +1827,7 @@ function AccountView({
                   style={{
                     background: C.lightRed,
                     border: `1px solid ${C.red}`,
-                    borderRadius: 3,
+                    borderRadius: T.radius.sm,
                     padding: "10px 14px",
                     marginBottom: 16,
                     fontSize: 13,
@@ -1841,7 +1842,7 @@ function AccountView({
                 style={{
                   fontSize: 11,
                   fontWeight: 700,
-                  letterSpacing: "0.15em",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   color: C.muted,
                   marginBottom: 14,
@@ -1912,7 +1913,7 @@ function AccountView({
                 style={{
                   fontSize: 11,
                   fontWeight: 700,
-                  letterSpacing: "0.15em",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   color: C.muted,
                   marginBottom: 14,
@@ -2136,7 +2137,7 @@ function AccountView({
                   style={{
                     fontSize: 10,
                     fontWeight: 600,
-                    letterSpacing: "0.15em",
+                    letterSpacing: "0.08em",
                     textTransform: "uppercase",
                     color: C.muted,
                     marginBottom: 10,
@@ -2149,7 +2150,7 @@ function AccountView({
                     style={{
                       background: C.lightBlue,
                       border: `1px solid ${C.blue}30`,
-                      borderRadius: 3,
+                      borderRadius: T.radius.sm,
                       padding: "14px 18px",
                       fontSize: 13,
                       color: C.blue,
@@ -2165,7 +2166,7 @@ function AccountView({
                     style={{
                       background: C.cream,
                       border: `1px solid ${C.border}`,
-                      borderRadius: 3,
+                      borderRadius: T.radius.sm,
                       padding: "14px 18px",
                     }}
                   >
@@ -2205,7 +2206,7 @@ function AccountView({
                     marginTop: 24,
                     padding: "14px 18px",
                     background: "linear-gradient(135deg, #1b4332, #2d6a4f)",
-                    borderRadius: 3,
+                    borderRadius: T.radius.sm,
                     cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
@@ -2258,7 +2259,7 @@ function AccountView({
                     style={{
                       background: C.lightGold,
                       border: `1px solid ${C.gold}30`,
-                      borderRadius: 3,
+                      borderRadius: T.radius.sm,
                       padding: "16px 20px",
                       marginBottom: 20,
                     }}
@@ -2278,7 +2279,7 @@ function AccountView({
                           style={{
                             fontSize: 11,
                             fontWeight: 700,
-                            letterSpacing: "0.15em",
+                            letterSpacing: "0.08em",
                             textTransform: "uppercase",
                             color: C.gold,
                           }}
@@ -2330,13 +2331,13 @@ function AccountView({
                       style={{
                         height: 8,
                         background: "rgba(0,0,0,0.08)",
-                        borderRadius: 4,
+                        borderRadius: T.radius.sm,
                       }}
                     >
                       <div
                         style={{
                           height: "100%",
-                          borderRadius: 4,
+                          borderRadius: T.radius.sm,
                           background: `linear-gradient(to right, ${C.gold}, ${C.accent})`,
                           width: `${pctComplete}%`,
                           transition: "width 0.5s ease",
@@ -2367,7 +2368,7 @@ function AccountView({
                     style={{
                       background: C.lightBlue,
                       border: `1px solid ${C.blue}20`,
-                      borderRadius: 3,
+                      borderRadius: T.radius.sm,
                       padding: "10px 14px",
                       marginBottom: 20,
                       fontSize: 12,
@@ -2397,7 +2398,7 @@ function AccountView({
                         background: C.lightGold,
                         border: `1px solid ${C.gold}30`,
                         borderLeft: `4px solid ${C.gold}`,
-                        borderRadius: 3,
+                        borderRadius: T.radius.sm,
                         padding: "18px 20px",
                       }}
                     >
@@ -2405,7 +2406,7 @@ function AccountView({
                         style={{
                           fontSize: 11,
                           fontWeight: 700,
-                          letterSpacing: "0.15em",
+                          letterSpacing: "0.08em",
                           textTransform: "uppercase",
                           color: C.gold,
                           marginBottom: 4,
@@ -2466,7 +2467,7 @@ function AccountView({
                           style={{
                             background: "#f4f0e8",
                             border: "2px dashed #e8e0d4",
-                            borderRadius: 4,
+                            borderRadius: T.radius.sm,
                             padding: "10px 20px",
                             fontFamily: "monospace",
                             fontSize: 20,
@@ -2494,10 +2495,10 @@ function AccountView({
                             background: "#25D366",
                             color: C.white,
                             border: "none",
-                            borderRadius: 3,
+                            borderRadius: T.radius.sm,
                             fontSize: 10,
                             fontWeight: 700,
-                            letterSpacing: "0.15em",
+                            letterSpacing: "0.08em",
                             textTransform: "uppercase",
                             fontFamily: F.body,
                             cursor: "pointer",
@@ -2553,16 +2554,16 @@ function AccountView({
                     style={{
                       background: C.cream,
                       borderTop: `3px solid ${s.color}`,
-                      borderRadius: 3,
+                      borderRadius: T.radius.sm,
                       padding: "12px 14px",
                       textAlign: "center",
                     }}
                   >
                     <div
                       style={{
-                        fontSize: 9,
+                        fontSize: 11,
                         color: C.muted,
-                        letterSpacing: "0.15em",
+                        letterSpacing: "0.08em",
                         textTransform: "uppercase",
                         marginBottom: 4,
                       }}
@@ -2597,7 +2598,7 @@ function AccountView({
                     textAlign: "center",
                     padding: "40px",
                     border: `1px dashed ${C.border}`,
-                    borderRadius: 3,
+                    borderRadius: T.radius.sm,
                     color: C.muted,
                   }}
                 >
@@ -2623,7 +2624,7 @@ function AccountView({
                       style={{
                         background: C.lightGreen,
                         border: `1px solid ${C.accent}30`,
-                        borderRadius: 3,
+                        borderRadius: T.radius.sm,
                         padding: "10px 14px",
                         marginBottom: 14,
                         fontSize: 13,
@@ -2700,7 +2701,7 @@ function AccountView({
                               style={{
                                 fontSize: 10,
                                 padding: "2px 7px",
-                                borderRadius: 10,
+                                borderRadius: T.radius.full,
                                 background:
                                   sc.scan_outcome === "points_awarded"
                                     ? C.lightGreen
@@ -2719,7 +2720,7 @@ function AccountView({
                                 style={{
                                   fontSize: 10,
                                   padding: "2px 7px",
-                                  borderRadius: 10,
+                                  borderRadius: T.radius.full,
                                   background: C.lightGold,
                                   color: C.gold,
                                   fontWeight: 700,
@@ -2733,7 +2734,7 @@ function AccountView({
                                 style={{
                                   fontSize: 10,
                                   padding: "2px 7px",
-                                  borderRadius: 10,
+                                  borderRadius: T.radius.full,
                                   background: C.lightBlue,
                                   color: C.blue,
                                 }}
@@ -2777,10 +2778,10 @@ function AccountView({
               padding: "12px",
               background: C.white,
               border: `1px solid ${C.border}`,
-              borderRadius: 3,
+              borderRadius: T.radius.sm,
               fontSize: 11,
               fontWeight: 600,
-              letterSpacing: "0.12em",
+              letterSpacing: "0.08em",
               textTransform: "uppercase",
               color: C.green,
               cursor: "pointer",
@@ -2795,10 +2796,10 @@ function AccountView({
               padding: "12px",
               background: C.white,
               border: `1px solid ${C.border}`,
-              borderRadius: 3,
+              borderRadius: T.radius.sm,
               fontSize: 11,
               fontWeight: 600,
-              letterSpacing: "0.12em",
+              letterSpacing: "0.08em",
               textTransform: "uppercase",
               color: C.green,
               cursor: "pointer",
@@ -3059,7 +3060,7 @@ export default function Account() {
         <div
           style={{
             minHeight: "100vh",
-            background: "#faf9f6",
+            background: T.surface,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
@@ -3078,12 +3079,12 @@ export default function Account() {
               animation: "spin .8s linear infinite",
             }}
           />
-          <p style={{ color: "#888", marginTop: 16, fontSize: 13 }}>
+          <p style={{ color: C.muted, marginTop: 16, fontSize: 13 }}>
             Checking session…
           </p>
           {showForceLogout && (
             <div style={{ marginTop: 20, textAlign: "center" }}>
-              <p style={{ color: "#888", fontSize: 12, marginBottom: 12 }}>
+              <p style={{ color: C.muted, fontSize: 12, marginBottom: 12 }}>
                 Taking too long?
               </p>
               <button
@@ -3092,7 +3093,7 @@ export default function Account() {
                   background: "#c0392b",
                   color: "#fff",
                   border: "none",
-                  borderRadius: 2,
+                  borderRadius: T.radius.sm,
                   padding: "10px 24px",
                   fontSize: 11,
                   fontWeight: 600,
@@ -3130,7 +3131,7 @@ export default function Account() {
       <div
         style={{
           minHeight: "100vh",
-          background: "#faf9f6",
+          background: T.surface,
           fontFamily: F.body,
           padding: "40px 20px",
           maxWidth: 480,
@@ -3141,13 +3142,13 @@ export default function Account() {
         {returnUrl && (
           <div
             style={{
-              background: "#e8f5e9",
+              background: T.successLight,
               border: "1px solid #52b788",
-              borderRadius: 8,
+              borderRadius: T.radius.md,
               padding: "14px 20px",
               marginBottom: 24,
               fontSize: 14,
-              color: "#1b4332",
+              color: C.green,
             }}
           >
             🔑 Sign in to claim your points — you'll be taken straight back.
@@ -3158,9 +3159,9 @@ export default function Account() {
             style={{
               fontSize: 11,
               fontWeight: 600,
-              letterSpacing: ".35em",
+              letterSpacing: "0.08em",
               textTransform: "uppercase",
-              color: "#52b788",
+              color: C.accent,
               marginBottom: 8,
             }}
           >
@@ -3171,7 +3172,7 @@ export default function Account() {
               fontFamily: F.heading,
               fontSize: 32,
               fontWeight: 600,
-              color: "#1a1a1a",
+              color: C.text,
               margin: 0,
             }}
           >
@@ -3181,13 +3182,13 @@ export default function Account() {
         {error && (
           <div
             style={{
-              background: "#fce4ec",
+              background: T.dangerLight,
               border: "1px solid #e0dbd2",
-              borderRadius: 8,
+              borderRadius: T.radius.md,
               padding: "12px 16px",
               marginBottom: 16,
               fontSize: 14,
-              color: "#c0392b",
+              color: C.red,
             }}
           >
             {error}
@@ -3196,13 +3197,13 @@ export default function Account() {
         {message && (
           <div
             style={{
-              background: "#e8f5e9",
+              background: T.successLight,
               border: "1px solid #52b788",
-              borderRadius: 8,
+              borderRadius: T.radius.md,
               padding: "12px 16px",
               marginBottom: 16,
               fontSize: 14,
-              color: "#1b4332",
+              color: C.green,
             }}
           >
             {message}
@@ -3214,9 +3215,9 @@ export default function Account() {
               style={{
                 fontSize: 12,
                 fontWeight: 600,
-                letterSpacing: ".1em",
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                color: "#888",
+                color: C.muted,
                 display: "block",
                 marginBottom: 6,
               }}
@@ -3233,10 +3234,10 @@ export default function Account() {
                 width: "100%",
                 padding: "12px 16px",
                 border: "1px solid #e0dbd2",
-                borderRadius: 4,
+                borderRadius: T.radius.sm,
                 fontSize: 15,
                 fontFamily: F.body,
-                background: "#fff",
+                background: T.surface,
                 boxSizing: "border-box",
               }}
             />
@@ -3246,9 +3247,9 @@ export default function Account() {
               style={{
                 fontSize: 12,
                 fontWeight: 600,
-                letterSpacing: ".1em",
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                color: "#888",
+                color: C.muted,
                 display: "block",
                 marginBottom: 6,
               }}
@@ -3265,10 +3266,10 @@ export default function Account() {
                 width: "100%",
                 padding: "12px 16px",
                 border: "1px solid #e0dbd2",
-                borderRadius: 4,
+                borderRadius: T.radius.sm,
                 fontSize: 15,
                 fontFamily: F.body,
-                background: "#fff",
+                background: T.surface,
                 boxSizing: "border-box",
               }}
             />
@@ -3281,11 +3282,11 @@ export default function Account() {
               background: loading ? "#888" : "#1b4332",
               color: "#fff",
               border: "none",
-              borderRadius: 2,
+              borderRadius: T.radius.sm,
               padding: 14,
               fontSize: 12,
               fontWeight: 600,
-              letterSpacing: ".2em",
+              letterSpacing: "0.08em",
               textTransform: "uppercase",
               cursor: loading ? "wait" : "pointer",
               fontFamily: F.body,
@@ -3301,13 +3302,13 @@ export default function Account() {
             style={{
               width: "100%",
               background: "transparent",
-              color: "#1b4332",
+              color: C.green,
               border: "1.5px solid #1b4332",
-              borderRadius: 2,
+              borderRadius: T.radius.sm,
               padding: 14,
               fontSize: 12,
               fontWeight: 600,
-              letterSpacing: ".2em",
+              letterSpacing: "0.08em",
               textTransform: "uppercase",
               cursor: loading ? "wait" : "pointer",
               fontFamily: F.body,
@@ -3321,18 +3322,18 @@ export default function Account() {
             style={{
               marginTop: 40,
               border: "2px solid #e67e22",
-              borderRadius: 8,
+              borderRadius: T.radius.md,
               padding: 20,
-              background: "#fff3e0",
+              background: T.warningLight,
             }}
           >
             <div
               style={{
                 fontSize: 11,
                 fontWeight: 700,
-                letterSpacing: ".2em",
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                color: "#e67e22",
+                color: T.warning,
                 marginBottom: 16,
                 textAlign: "center",
               }}
@@ -3348,10 +3349,10 @@ export default function Account() {
                 }
                 style={{
                   padding: "10px 16px",
-                  background: "#1b4332",
+                  background: C.green,
                   color: "#fff",
                   border: "none",
-                  borderRadius: 4,
+                  borderRadius: T.radius.sm,
                   fontSize: 13,
                   fontWeight: 600,
                   cursor: "pointer",
@@ -3371,10 +3372,10 @@ export default function Account() {
                 }
                 style={{
                   padding: "10px 16px",
-                  background: "#1A3D2B",
+                  background: C.green,
                   color: "#fff",
                   border: "none",
-                  borderRadius: 4,
+                  borderRadius: T.radius.sm,
                   fontSize: 13,
                   fontWeight: 600,
                   cursor: "pointer",
@@ -3392,7 +3393,7 @@ export default function Account() {
                   background: "#2c4a6e",
                   color: "#fff",
                   border: "none",
-                  borderRadius: 4,
+                  borderRadius: T.radius.sm,
                   fontSize: 13,
                   fontWeight: 600,
                   cursor: "pointer",
@@ -3412,7 +3413,7 @@ export default function Account() {
                   background: "#5c3d1e",
                   color: "#fff",
                   border: "none",
-                  borderRadius: 4,
+                  borderRadius: T.radius.sm,
                   fontSize: 13,
                   fontWeight: 600,
                   cursor: "pointer",
@@ -3431,7 +3432,7 @@ export default function Account() {
             style={{
               background: "none",
               border: "none",
-              color: "#888",
+              color: C.muted,
               fontSize: 13,
               cursor: "pointer",
               textDecoration: "underline",
