@@ -700,7 +700,7 @@ function ShopTab({ items, tenantId, onRefresh }) {
                 {item.brand && (
                   <div
                     style={{
-                      fontSize: 9,
+                      fontSize: 11,
                       fontWeight: 700,
                       color: T.accentMid,
                       letterSpacing: "0.1em",
@@ -737,7 +737,7 @@ function ShopTab({ items, tenantId, onRefresh }) {
                   </span>
                   <span
                     style={{
-                      fontSize: 10,
+                      fontSize: 11,
                       color: statusColor,
                       fontWeight: 600,
                     }}
@@ -754,7 +754,7 @@ function ShopTab({ items, tenantId, onRefresh }) {
                     style={{
                       flex: 1,
                       padding: "5px 8px",
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: 600,
                       border: `1px solid ${item.is_active ? T.danger : T.success}`,
                       borderRadius: T.radius.md,
@@ -771,7 +771,7 @@ function ShopTab({ items, tenantId, onRefresh }) {
                     style={{
                       flex: 1,
                       padding: "5px 8px",
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: 600,
                       border: `1px solid ${item.is_featured ? "#b5935a" : T.border}`,
                       borderRadius: T.radius.md,
@@ -788,7 +788,7 @@ function ShopTab({ items, tenantId, onRefresh }) {
                       title="Remove photo"
                       style={{
                         padding: "5px 8px",
-                        fontSize: 10,
+                        fontSize: 11,
                         border: `1px solid ${T.dangerBd}`,
                         borderRadius: T.radius.md,
                         background: T.dangerLight,
@@ -2238,7 +2238,7 @@ export default function HQStock() {
                               return (
                                 <span
                                   style={{
-                                    fontSize: 9,
+                                    fontSize: 11,
                                     color: T.ink300,
                                     fontStyle: "italic",
                                   }}
@@ -2257,7 +2257,7 @@ export default function HQStock() {
                               >
                                 <span
                                   style={{
-                                    fontSize: 9,
+                                    fontSize: 11,
                                     fontWeight: 700,
                                     padding: "1px 6px",
                                     borderRadius: 8,
@@ -3294,7 +3294,7 @@ export default function HQStock() {
                   {tile.sub && (
                     <div
                       style={{
-                        fontSize: 10,
+                        fontSize: 11,
                         color: T.ink300,
                         marginTop: 4,
                         fontFamily: T.font,
@@ -3406,7 +3406,7 @@ export default function HQStock() {
                 <button
                   onClick={() => setSubTab("pricing")}
                   style={{
-                    fontSize: 9,
+                    fontSize: 11,
                     fontWeight: 700,
                     letterSpacing: "0.06em",
                     padding: "2px 8px",
@@ -3551,7 +3551,7 @@ export default function HQStock() {
               <button
                 onClick={() => setSubTab("movements")}
                 style={{
-                  fontSize: 10,
+                  fontSize: 11,
                   color: T.accentMid,
                   background: "none",
                   border: "none",
@@ -3609,7 +3609,7 @@ export default function HQStock() {
                       <td style={sTd}>
                         <span
                           style={{
-                            fontSize: 9,
+                            fontSize: 11,
                             padding: "2px 7px",
                             borderRadius: 3,
                             background: T.bg,
@@ -3871,7 +3871,7 @@ export default function HQStock() {
                   {count > 0 && (
                     <span
                       style={{
-                        fontSize: 9,
+                        fontSize: 11,
                         fontWeight: 700,
                         fontFamily: T.font,
                         background: active ? T.accentMid : T.border,
@@ -4065,7 +4065,7 @@ export default function HQStock() {
                         {note && (
                           <span
                             style={{
-                              fontSize: 9,
+                              fontSize: 11,
                               fontWeight: 400,
                               color: T.ink300,
                               textTransform: "none",
@@ -4078,7 +4078,7 @@ export default function HQStock() {
                         {!hasAny && (
                           <span
                             style={{
-                              fontSize: 9,
+                              fontSize: 11,
                               fontWeight: 400,
                               color: T.ink300,
                               textTransform: "none",
@@ -4147,7 +4147,7 @@ export default function HQStock() {
                               </span>
                               <span
                                 style={{
-                                  fontSize: 10,
+                                  fontSize: 11,
                                   color: isActive
                                     ? "rgba(255,255,255,0.75)"
                                     : inStock
@@ -4567,7 +4567,7 @@ export default function HQStock() {
                           </span>
                           <span
                             style={{
-                              fontSize: 10,
+                              fontSize: 11,
                               color: isActive
                                 ? "rgba(255,255,255,0.65)"
                                 : T.ink500,
@@ -4611,7 +4611,7 @@ export default function HQStock() {
                       >
                         + Add New
                       </span>
-                      <span style={{ fontSize: 10, color: T.ink300 }}>
+                      <span style={{ fontSize: 11, color: T.ink300 }}>
                         Create item
                       </span>
                     </button>
@@ -4700,7 +4700,7 @@ export default function HQStock() {
                         </div>
                         <span
                           style={{
-                            fontSize: 10,
+                            fontSize: 11,
                             color: T.ink300,
                             fontFamily: T.font,
                           }}
@@ -4710,7 +4710,7 @@ export default function HQStock() {
                         {item.brand && (
                           <span
                             style={{
-                              fontSize: 10,
+                              fontSize: 11,
                               color: T.ink500,
                               fontFamily: T.font,
                             }}
@@ -4724,7 +4724,7 @@ export default function HQStock() {
                               display: "inline-block",
                               padding: "2px 7px",
                               borderRadius: 3,
-                              fontSize: 10,
+                              fontSize: 11,
                               fontWeight: 700,
                               width: "fit-content",
                               background: "#EEF2FF",
@@ -4767,7 +4767,7 @@ export default function HQStock() {
                           {margin !== null && (
                             <span
                               style={{
-                                fontSize: 10,
+                                fontSize: 11,
                                 fontWeight: 700,
                                 padding: "2px 6px",
                                 borderRadius: 3,
@@ -4813,7 +4813,7 @@ export default function HQStock() {
                             style={{
                               flex: 1,
                               padding: "5px 0",
-                              fontSize: 10,
+                              fontSize: 11,
                               fontWeight: 600,
                               fontFamily: T.font,
                               border: "1px solid " + T.border,
@@ -4832,7 +4832,7 @@ export default function HQStock() {
                             style={{
                               flex: 1,
                               padding: "5px 0",
-                              fontSize: 10,
+                              fontSize: 11,
                               fontWeight: 600,
                               fontFamily: T.font,
                               border: "1px solid " + T.accentBd,
@@ -4855,7 +4855,7 @@ export default function HQStock() {
                             style={{
                               flex: 1,
                               padding: "5px 0",
-                              fontSize: 10,
+                              fontSize: 11,
                               fontWeight: 600,
                               fontFamily: T.font,
                               border:
@@ -5049,7 +5049,7 @@ export default function HQStock() {
                                 </div>
                                 <div
                                   style={{
-                                    fontSize: 10,
+                                    fontSize: 11,
                                     color: T.ink300,
                                     fontFamily: T.font,
                                     marginTop: 2,
@@ -5060,7 +5060,7 @@ export default function HQStock() {
                                 {item.brand && (
                                   <div
                                     style={{
-                                      fontSize: 10,
+                                      fontSize: 11,
                                       color: T.ink500,
                                       marginTop: 1,
                                     }}
@@ -5087,7 +5087,7 @@ export default function HQStock() {
                                       display: "inline-block",
                                       padding: "2px 7px",
                                       borderRadius: 3,
-                                      fontSize: 10,
+                                      fontSize: 11,
                                       fontWeight: 700,
                                       background: "#EEF2FF",
                                       color: "#3730A3",
@@ -5124,7 +5124,7 @@ export default function HQStock() {
                                   <span
                                     style={{
                                       display: "block",
-                                      fontSize: 9,
+                                      fontSize: 11,
                                       color: T.warning,
                                       fontWeight: 600,
                                     }}
@@ -5160,7 +5160,7 @@ export default function HQStock() {
                                 {margin !== null ? (
                                   <span
                                     style={{
-                                      fontSize: 10,
+                                      fontSize: 11,
                                       fontWeight: 700,
                                       padding: "2px 6px",
                                       borderRadius: 3,
@@ -5207,7 +5207,7 @@ export default function HQStock() {
                                     onClick={() => loadMovForItem(item)}
                                     style={{
                                       padding: "3px 8px",
-                                      fontSize: 10,
+                                      fontSize: 11,
                                       fontFamily: T.font,
                                       fontWeight: 600,
                                       border: "1px solid " + T.border,
@@ -5225,7 +5225,7 @@ export default function HQStock() {
                                     onClick={() => setModalItem(item)}
                                     style={{
                                       padding: "3px 8px",
-                                      fontSize: 10,
+                                      fontSize: 11,
                                       fontFamily: T.font,
                                       fontWeight: 600,
                                       border: "1px solid " + T.accentBd,
@@ -5245,7 +5245,7 @@ export default function HQStock() {
                                     }
                                     style={{
                                       padding: "3px 8px",
-                                      fontSize: 10,
+                                      fontSize: 11,
                                       fontFamily: T.font,
                                       fontWeight: 600,
                                       border:
@@ -5733,7 +5733,7 @@ export default function HQStock() {
                     {world.label}
                   </div>
                   <div
-                    style={{ fontSize: 10, color: T.ink500, lineHeight: 1.4 }}
+                    style={{ fontSize: 11, color: T.ink500, lineHeight: 1.4 }}
                   >
                     {world.desc || world.enums?.[0]?.replace(/_/g, " ") || ""}
                   </div>
