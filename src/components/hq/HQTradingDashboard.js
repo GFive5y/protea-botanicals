@@ -46,11 +46,12 @@ import { CheckCircle, AlertTriangle, AlertOctagon } from "lucide-react";
 // ── Style helpers ─────────────────────────────────────────────────────────────
 const sKPICard = {
   background: T.surface,
-  border: `1px solid ${T.border}`,
+  border: "0.5px solid #E5E7EB",
   borderRadius: T.radius.lg,
   padding: "18px 20px",
   flex: 1,
   minWidth: 130,
+  boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
 };
 const sKPIValue = {
   fontSize: "22px",
@@ -102,7 +103,7 @@ const sSection = {
   background: T.surface,
   border: `1px solid ${T.border}`,
   borderRadius: T.radius.lg,
-  padding: T.inset.card,
+  padding: "20px 24px",
   marginBottom: T.gap.lg,
 };
 // sSectionHead removed — replaced by SectionHead component with accent bar
