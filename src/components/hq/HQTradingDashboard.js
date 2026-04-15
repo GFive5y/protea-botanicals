@@ -39,7 +39,7 @@ import { useTenant } from "../../services/tenantService";
 import { usePageContext } from "../../hooks/usePageContext";
 import { SparkLine, DeltaBadge } from "../viz";
 import { T } from "../../styles/tokens";
-const MONO = "'DM Mono','Courier New',monospace";
+import { CheckCircle, AlertTriangle, AlertOctagon } from "lucide-react";
 
 // Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
@@ -47,15 +47,15 @@ const MONO = "'DM Mono','Courier New',monospace";
 const sKPICard = {
   background: T.surface,
   border: `1px solid ${T.border}`,
-  borderRadius: "4px",
-  padding: "14px 16px",
+  borderRadius: T.radius.lg,
+  padding: "18px 20px",
   flex: 1,
   minWidth: 130,
 };
 const sKPIValue = {
   fontSize: "22px",
-  fontFamily: MONO,
-  fontWeight: 400,
+  fontFamily: T.font,
+  fontWeight: 600,
   fontVariantNumeric: "tabular-nums",
   color: T.ink900,
   marginBottom: "4px",
@@ -98,18 +98,18 @@ const sTd = {
   color: T.ink900,
 };
 const sSection = {
-  background: "#fff",
+  background: T.surface,
   border: `1px solid ${T.border}`,
-  borderRadius: "4px",
-  padding: "16px",
-  marginBottom: "16px",
+  borderRadius: T.radius.lg,
+  padding: T.inset.card,
+  marginBottom: T.gap.lg,
 };
 const sSectionHead = {
   fontSize: "11px",
   fontWeight: 700,
   letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: T.ink500,
+  color: T.ink400,
   marginBottom: "12px",
   fontFamily: T.font,
 };
@@ -384,10 +384,10 @@ const CAT_LABELS = {
   other: "Other",
 };
 const PAY_LABELS = {
-  cash: "💵 Cash",
-  card: "💳 Card",
-  online: "📱 Online",
-  payfast: "🔗 PayFast",
+  cash: "Cash",
+  card: "Card",
+  online: "Online",
+  payfast: "PayFast",
 };
 const CAT_COLOURS = [
   T.accentMid,
@@ -402,27 +402,30 @@ const CAT_COLOURS = [
 // ── EOD status helpers ─────────────────────────────────────────────────────────
 const EOD_STATUS = {
   balanced: {
-    icon: "✅",
+    icon: "check",
     label: "Balanced",
     colour: T.success,
     bg: T.successLight,
     bd: T.successBd,
   },
   flagged: {
-    icon: "⚠️",
+    icon: "warn",
     label: "Flagged",
     colour: T.warning,
     bg: T.warningLight,
     bd: T.warningBd,
   },
   escalated: {
-    icon: "🚨",
+    icon: "danger",
     label: "Escalated",
     colour: T.danger,
     bg: T.dangerLight,
     bd: T.dangerBd,
   },
 };
+
+// Lucide map for EOD_STATUS.icon string keys
+const EOD_ICON_MAP = { check: CheckCircle, warn: AlertTriangle, danger: AlertOctagon };
 
 // ── Auto-refresh interval (seconds) ───────────────────────────────────────────
 const REFRESH_INTERVAL_S = 300; // 5 minutes
@@ -766,7 +769,7 @@ export default function HQTradingDashboard() {
           style={{
             background: T.warningLight,
             border: `1px solid ${T.warningBd}`,
-            borderRadius: "4px",
+            borderRadius: T.radius.md,
             padding: "10px 14px",
             marginBottom: "16px",
             fontSize: "12px",
@@ -777,7 +780,7 @@ export default function HQTradingDashboard() {
             gap: 8,
           }}
         >
-          <span style={{ fontWeight: 700 }}>🧪 SANDBOX MODE</span>— Showing
+          <span style={{ fontWeight: 700 }}>SANDBOX MODE</span>— Showing
           seeded development data, not real sales. Run{" "}
           <code
             style={{
@@ -869,7 +872,7 @@ export default function HQTradingDashboard() {
               padding: "6px 14px",
               background: "transparent",
               border: `1px solid ${T.accentBd}`,
-              borderRadius: "3px",
+              borderRadius: T.radius.sm,
               color: T.accentMid,
               fontSize: "11px",
               fontWeight: 600,
@@ -934,7 +937,7 @@ export default function HQTradingDashboard() {
           marginBottom: 16,
           padding: "10px 14px",
           background: T.bg,
-          borderRadius: "4px",
+          borderRadius: T.radius.md,
           border: `1px solid ${T.border}`,
           flexWrap: "wrap",
           alignItems: "center",
@@ -968,7 +971,7 @@ export default function HQTradingDashboard() {
           padding: "10px 16px",
           background: T.accentLight,
           border: `1px solid ${T.accentBd}`,
-          borderRadius: "4px",
+          borderRadius: T.radius.md,
           alignItems: "center",
           flexWrap: "wrap",
         }}
@@ -983,7 +986,7 @@ export default function HQTradingDashboard() {
             fontFamily: T.font,
           }}
         >
-          💎 Loyalty Today
+          Loyalty Today
         </span>
         <LoyaltyKPI
           label="Points earned"
@@ -1054,7 +1057,7 @@ export default function HQTradingDashboard() {
               tickLine={false}
             />
             <YAxis
-              tick={{ fontSize: 10, fontFamily: MONO, fill: T.ink500 }}
+              tick={{ fontSize: 10, fontFamily: T.font, fill: T.ink500 }}
               tickFormatter={(v) =>
                 v === 0 ? "" : `R${v >= 1000 ? Math.round(v / 1000) + "k" : v}`
               }
@@ -1121,7 +1124,7 @@ export default function HQTradingDashboard() {
                   padding: "3px 10px",
                   background: "transparent",
                   border: `1px solid ${T.accentBd}`,
-                  borderRadius: "3px",
+                  borderRadius: T.radius.sm,
                   color: T.accentMid,
                   fontSize: "10px",
                   fontWeight: 600,
@@ -1132,7 +1135,7 @@ export default function HQTradingDashboard() {
                   marginLeft: 4,
                 }}
               >
-                📅 History
+                History
               </button>
             </div>
           </div>
@@ -1176,7 +1179,7 @@ export default function HQTradingDashboard() {
                       style={{
                         ...sTd,
                         textAlign: "right",
-                        fontFamily: MONO,
+                        fontFamily: T.font,
                         fontWeight: 600,
                       }}
                     >
@@ -1186,7 +1189,7 @@ export default function HQTradingDashboard() {
                       style={{
                         ...sTd,
                         textAlign: "right",
-                        fontFamily: MONO,
+                        fontFamily: T.font,
                         color: T.ink500,
                       }}
                     >
@@ -1223,7 +1226,7 @@ export default function HQTradingDashboard() {
                       <span style={{ color: T.ink700 }}>
                         {PAY_LABELS[method] || method}
                       </span>
-                      <span style={{ fontFamily: MONO, color: T.ink900 }}>
+                      <span style={{ fontFamily: T.font, color: T.ink900 }}>
                         {zar(revenue)}{" "}
                         <span style={{ color: T.ink500, fontWeight: 400 }}>
                           ({pct(revenue, todayRevenue)})
@@ -1315,7 +1318,7 @@ export default function HQTradingDashboard() {
                   </div>
                   <span
                     style={{
-                      fontFamily: MONO,
+                      fontFamily: T.font,
                       fontSize: 11,
                       color: T.ink900,
                       width: 70,
@@ -1370,8 +1373,10 @@ export default function HQTradingDashboard() {
 function EODStatusWidget({ data, onNavigateCashUp, onNavigatePOS }) {
   const { cashup, sessionOpen } = data;
 
-  // Determine display state
-  let icon, message, colour, bg, bd, actionLabel, onAction;
+  // Determine display state. icon is a string key for EOD_ICON_MAP when a
+  // cash-up status exists; otherwise StatusIcon stays null and we render a
+  // coloured status dot.
+  let icon = null, message, colour, bg, bd, actionLabel, onAction;
 
   if (cashup) {
     const s = EOD_STATUS[cashup.status] || EOD_STATUS.balanced;
@@ -1384,7 +1389,6 @@ function EODStatusWidget({ data, onNavigateCashUp, onNavigatePOS }) {
     actionLabel = "View cash-up";
     onAction = onNavigateCashUp;
   } else if (sessionOpen) {
-    icon = "🟢";
     colour = T.success;
     bg = T.successLight;
     bd = T.successBd;
@@ -1392,7 +1396,6 @@ function EODStatusWidget({ data, onNavigateCashUp, onNavigatePOS }) {
     actionLabel = "Close day →";
     onAction = onNavigateCashUp;
   } else {
-    icon = "⚪";
     colour = T.ink500;
     bg = T.bg;
     bd = T.border;
@@ -1400,6 +1403,7 @@ function EODStatusWidget({ data, onNavigateCashUp, onNavigatePOS }) {
     actionLabel = "Open till →";
     onAction = onNavigatePOS;
   }
+  const StatusIcon = icon ? EOD_ICON_MAP[icon] : null;
 
   return (
     <div
@@ -1411,11 +1415,22 @@ function EODStatusWidget({ data, onNavigateCashUp, onNavigatePOS }) {
         padding: "10px 14px",
         background: bg,
         border: `1px solid ${bd}`,
-        borderRadius: "4px",
+        borderRadius: T.radius.md,
         flexWrap: "wrap",
       }}
     >
-      <span style={{ fontSize: 15 }}>{icon}</span>
+      {StatusIcon ? (
+        <StatusIcon size={16} strokeWidth={1.5} color={colour} />
+      ) : (
+        <span style={{
+          display: "inline-block",
+          width: 8, height: 8,
+          borderRadius: "50%",
+          background: colour,
+          flexShrink: 0,
+          marginTop: 2,
+        }} />
+      )}
       <div style={{ flex: 1 }}>
         <span
           style={{
@@ -1447,7 +1462,7 @@ function EODStatusWidget({ data, onNavigateCashUp, onNavigatePOS }) {
             padding: "4px 12px",
             background: "transparent",
             border: `1px solid ${colour}`,
-            borderRadius: "3px",
+            borderRadius: T.radius.sm,
             color: colour,
             fontSize: "10px",
             fontWeight: 700,
@@ -1524,7 +1539,7 @@ function CompStat({ label, delta, amount, up, pctOf, bestVal, isBest }) {
       ) : (
         <>
           <span
-            style={{ fontFamily: MONO, color: T.ink900, fontWeight: 600 }}
+            style={{ fontFamily: T.font, color: T.ink900, fontWeight: 600 }}
           >
             {Math.round(pctOf)}%
           </span>
@@ -1567,7 +1582,7 @@ function LoyaltyKPI({ label, value }) {
       <span
         style={{
           fontSize: 15,
-          fontFamily: MONO,
+          fontFamily: T.font,
           fontWeight: 600,
           color: T.accent,
         }}
@@ -1612,7 +1627,7 @@ function ModeToggle({ active, onClick, label }) {
         padding: "2px 8px",
         background: active ? T.accentMid : "transparent",
         border: `1px solid ${active ? T.accentMid : T.border}`,
-        borderRadius: "3px",
+        borderRadius: T.radius.sm,
         color: active ? "#fff" : T.ink500,
         fontSize: "10px",
         fontWeight: 600,
@@ -1850,7 +1865,7 @@ function HistoryPanel({ tenantId, onClose }) {
               key={mode}
               onClick={() => setViewMode(mode)}
               style={{
-                padding: "4px 14px", borderRadius: "3px", cursor: "pointer",
+                padding: "4px 14px", borderRadius: T.radius.sm, cursor: "pointer",
                 fontFamily: T.font, fontSize: "10px", fontWeight: 700,
                 textTransform: "uppercase", letterSpacing: "0.08em",
                 border: `1px solid ${viewMode === mode ? T.accentMid : T.border}`,
@@ -1871,7 +1886,7 @@ function HistoryPanel({ tenantId, onClose }) {
                 key={p.label}
                 onClick={() => setPreset(i)}
                 style={{
-                  padding: "6px 14px", borderRadius: "3px", cursor: "pointer",
+                  padding: "6px 14px", borderRadius: T.radius.sm, cursor: "pointer",
                   fontFamily: T.font, fontSize: "12px",
                   fontWeight: preset === i ? 600 : 400,
                   border: `1px solid ${preset === i ? T.accentMid : T.border}`,
@@ -1892,7 +1907,7 @@ function HistoryPanel({ tenantId, onClose }) {
               onClick={prevMonth}
               disabled={isAtMin}
               style={{
-                background: "none", border: `1px solid ${T.border}`, borderRadius: "3px",
+                background: "none", border: `1px solid ${T.border}`, borderRadius: T.radius.sm,
                 padding: "4px 10px", cursor: isAtMin ? "not-allowed" : "pointer",
                 color: isAtMin ? T.ink300 : T.ink700, fontSize: 14, lineHeight: 1,
               }}
@@ -1906,7 +1921,7 @@ function HistoryPanel({ tenantId, onClose }) {
               onClick={nextMonth}
               disabled={isAtMax}
               style={{
-                background: "none", border: `1px solid ${T.border}`, borderRadius: "3px",
+                background: "none", border: `1px solid ${T.border}`, borderRadius: T.radius.sm,
                 padding: "4px 10px", cursor: isAtMax ? "not-allowed" : "pointer",
                 color: isAtMax ? T.ink300 : T.ink700, fontSize: 14, lineHeight: 1,
               }}
@@ -2007,7 +2022,7 @@ function HistoryPanel({ tenantId, onClose }) {
                           style={{
                             ...sTd,
                             textAlign: "right",
-                            fontFamily: MONO,
+                            fontFamily: T.font,
                           }}
                         >
                           {s.qty}
@@ -2016,7 +2031,7 @@ function HistoryPanel({ tenantId, onClose }) {
                           style={{
                             ...sTd,
                             textAlign: "right",
-                            fontFamily: MONO,
+                            fontFamily: T.font,
                             fontWeight: 600,
                           }}
                         >
@@ -2084,7 +2099,7 @@ function HistoryPanel({ tenantId, onClose }) {
                         </div>
                         <span
                           style={{
-                            fontFamily: MONO,
+                            fontFamily: T.font,
                             fontSize: 11,
                             color: T.ink900,
                             width: 70,
@@ -2134,7 +2149,7 @@ function HistKPI({ label, value }) {
       style={{
         background: T.surface,
         border: `1px solid ${T.border}`,
-        borderRadius: "4px",
+        borderRadius: T.radius.md,
         padding: "10px 14px",
         minWidth: 120,
       }}
@@ -2143,7 +2158,7 @@ function HistKPI({ label, value }) {
       <div
         style={{
           fontSize: "18px",
-          fontFamily: MONO,
+          fontFamily: T.font,
           fontWeight: 400,
           color: T.ink900,
         }}
