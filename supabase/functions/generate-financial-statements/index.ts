@@ -136,7 +136,7 @@ interface RowOpts {
 function row(page: APage, s: S, label: string, value: number | null, opts: RowOpts = {}, freg: AFont, fbold: AFont) {
   const { bold = false, shade = false, negative = false, sub, indent = 0, green = false } = opts;
   const rh = sub ? 26 : 18;
-  if (shade) rect(page, ML, s.y - 4, CW, rh, C.bg);
+  if (shade) rect(page, ML, s.y - 2, CW, rh - 2, C.bg);
   const f = bold ? fbold : freg;
   const sz = bold ? 10 : 9;
   dt(page, label, ML + 4 + indent * 12, s.y, sz, f, C.ink700);
@@ -150,7 +150,7 @@ function row(page: APage, s: S, label: string, value: number | null, opts: RowOp
     dtr(page, str, PW - MR - 80, s.y, sz, f, col);
     dtr(page, "—", PW - MR, s.y, 8.5, freg, C.ink300);
   }
-  s.y -= sub ? 20 : 14;
+  s.y -= sub ? 22 : 16;
 }
 
 function netRow(page: APage, s: S, label: string, value: number, pct: number, freg: AFont, fbold: AFont) {
@@ -409,6 +409,7 @@ Deno.serve(async (req: Request) => {
     } else {
       row(p3, s3, "Property, plant and equipment", 0, { indent: 1 }, freg, fbold);
     }
+    s3.y -= 5;
     row(p3, s3, "TOTAL ASSETS", totalAssets, { bold: true, shade: true, green: true }, freg, fbold);
     s3.y -= 6;
     hr(p3, s3.y, ML, PW - MR, C.midGreen, 1.5);
@@ -565,6 +566,7 @@ Deno.serve(async (req: Request) => {
       if (line) { dt(p6, line, ML + 4, y6, 8.5, freg, C.ink700); y6 -= 13; }
       y6 -= 14;
     }
+    stmtClose(p6, freg);
     footer(p6, 6, freg);
 
     // ── PAGE 7: TRIAL BALANCE ──────────────────────────────────────────────────
@@ -618,6 +620,7 @@ Deno.serve(async (req: Request) => {
       rect(p7, ML, y7 - 4, CW, 16, tbOk ? C.hlGreen : C.hlRed);
       dt(p7, tbOk ? "Trial balance is balanced  [Dr = Cr]" : `Out of balance by ${fmtR(Math.abs(tbDr - tbCr))}  [REVIEW REQUIRED]`, ML + 4, y7, 9, fbold, tbOk ? C.success : C.danger);
     }
+    stmtClose(p7, freg);
     footer(p7, 7, freg);
 
     // ── Upload to Storage + return signed URL ──────────────────────────────────
