@@ -256,7 +256,7 @@ export default function HQDashboard() {
           )}
         </div>
 
-        <div>
+        <div style={{ background: T.bg }}>
           <LiveFXBar />
           <PlatformBar role="hq" tenantId={tenant?.id} onNavigate={() => {}} />
           <AINSBar
