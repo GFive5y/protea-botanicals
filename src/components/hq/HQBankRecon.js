@@ -4,6 +4,7 @@
 // Schema verified · LL-205 applied · LL-206 pattern · additive only
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { Landmark, AlertTriangle, TrendingUp } from 'lucide-react';
 import { supabase } from '../../services/supabaseClient';
 import { useTenant } from '../../services/tenantService';
 import { T } from "../../styles/tokens";
@@ -280,7 +281,7 @@ export default function HQBankRecon() {
           const isUnmatched = line.matched_type === 'unmatched';
 
           return (
-            <div key={line.id} style={{ ...S.lineRow, background: isUnmatched ? '#fffbeb' : '#fff', borderLeft: isUnmatched ? '3px solid #f59e0b' : '3px solid transparent' }}>
+            <div key={line.id} style={{ ...S.lineRow, background: isUnmatched ? T.warningLight : T.surface, borderLeft: isUnmatched ? `3px solid ${T.warning}` : '3px solid transparent' }}>
               <span style={{ ...S.td, flex: 1.2, color: '#374151', fontWeight: 500 }}>{fmtDate(line.statement_date)}</span>
               <span style={{ ...S.td, flex: 1.5, fontFamily: 'monospace', fontSize: 11, color: '#6b7280' }}>{line.reference || '\u2014'}</span>
               <span style={{ ...S.td, flex: 3.5, color: '#111827', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -376,50 +377,50 @@ const TK = {
 };
 
 const S = {
-  root: { padding: '24px 28px', maxWidth: 1440, margin: '0 auto', fontFamily: 'Inter, -apple-system, sans-serif', color: TK.ink900 },
+  root: { padding: '24px 28px', maxWidth: 1440, margin: '0 auto', fontFamily: T.font, color: TK.ink900 },
   center: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 80, color: TK.ink500 },
   spinner: { width: 20, height: 20, border: `2px solid ${TK.ink300}`, borderTopColor: TK.blue, borderRadius: '50%', animation: 'spin 0.75s linear infinite' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
   title: { margin: 0, fontSize: 22, fontWeight: 700, color: TK.ink900 },
   subtitle: { margin: '4px 0 0', fontSize: 12, color: TK.ink500 },
-  btnRefresh: { background: '#fff', color: TK.ink700, border: `1px solid ${TK.ink300}`, borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  accountCard: { background: '#fff', border: `1px solid ${TK.ink200}`, borderRadius: 14, padding: '20px 24px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' },
+  btnRefresh: { background: T.surface, color: TK.ink700, border: `1px solid ${TK.ink300}`, borderRadius: T.radius.md, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  accountCard: { background: T.surface, border: `1px solid ${TK.ink200}`, borderRadius: T.radius.lg, padding: '20px 24px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', boxShadow: T.shadow.md },
   accountLeft: { display: 'flex', flexDirection: 'column', gap: 6 },
-  bankBadge: { display: 'inline-block', background: TK.blueLt, color: TK.blue, fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', padding: '3px 10px', borderRadius: 20 },
+  bankBadge: { display: 'inline-block', background: TK.blueLt, color: TK.blue, fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', padding: '3px 10px', borderRadius: T.radius.full },
   accountName: { fontSize: 18, fontWeight: 700, color: TK.ink900 },
   accountMeta: { fontSize: 13, color: TK.ink500, fontFamily: 'monospace' },
   accountRight: { textAlign: 'right' },
-  balanceLabel: { fontSize: 10, fontWeight: 700, color: TK.ink500, letterSpacing: '0.07em', marginBottom: 6 },
+  balanceLabel: { fontSize: 11, fontWeight: 700, color: T.ink400, letterSpacing: '0.07em', marginBottom: 6 },
   balanceValue: { fontSize: 32, fontWeight: 800, color: TK.blue, fontVariantNumeric: 'tabular-nums', marginBottom: 8 },
-  reconBadge: { fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8, display: 'inline-block' },
+  reconBadge: { fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: T.radius.md, display: 'inline-block' },
   statsRow: { display: 'flex', gap: 12, marginBottom: 20 },
-  statCard: { background: '#fff', border: `1px solid ${TK.ink200}`, borderRadius: 12, padding: '14px 18px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' },
-  statLabel: { fontSize: 10, fontWeight: 700, color: TK.ink500, letterSpacing: '0.07em', marginBottom: 6 },
+  statCard: { background: T.surface, border: `1px solid ${TK.ink200}`, borderRadius: T.radius.lg, padding: '14px 18px', boxShadow: T.shadow.sm },
+  statLabel: { fontSize: 11, fontWeight: 700, color: T.ink400, letterSpacing: '0.07em', marginBottom: 6 },
   statVal: { fontWeight: 700, fontVariantNumeric: 'tabular-nums' },
   filterBar: { display: 'flex', gap: 20, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' },
   filterGroup: { display: 'flex', alignItems: 'center', gap: 6 },
-  filterLabel: { fontSize: 10, fontWeight: 700, color: TK.ink500, letterSpacing: '0.07em', marginRight: 2 },
-  chip: { padding: '5px 13px', borderRadius: 20, border: `1px solid ${TK.ink300}`, background: '#fff', fontSize: 11, fontWeight: 600, color: TK.ink700, cursor: 'pointer' },
+  filterLabel: { fontSize: 11, fontWeight: 700, color: T.ink400, letterSpacing: '0.07em', marginRight: 2 },
+  chip: { padding: '5px 13px', borderRadius: T.radius.full, border: `1px solid ${TK.ink300}`, background: T.surface, fontSize: 11, fontWeight: 600, color: TK.ink700, cursor: 'pointer' },
   chipActive: { background: TK.ink900, color: '#fff', borderColor: TK.ink900 },
-  tableWrap: { background: '#fff', border: `1px solid ${TK.ink200}`, borderRadius: 12, overflow: 'hidden', marginBottom: 16 },
+  tableWrap: { background: T.surface, border: `1px solid ${TK.ink200}`, borderRadius: T.radius.lg, overflow: 'hidden', marginBottom: 16 },
   thead: { display: 'flex', gap: 8, padding: '10px 16px', background: TK.ink100, borderBottom: `1px solid ${TK.ink200}` },
-  th: { fontSize: 10, fontWeight: 700, color: TK.ink500, letterSpacing: '0.07em' },
+  th: { fontSize: 11, fontWeight: 700, color: T.ink400, letterSpacing: '0.07em' },
   lineRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '11px 16px', borderBottom: `1px solid ${TK.ink100}`, transition: 'background 0.1s' },
   td: { fontSize: 13, display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden' },
-  badge: { fontSize: 9, fontWeight: 800, letterSpacing: '0.05em', padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' },
-  batchPill: { fontSize: 9, fontWeight: 700, background: TK.ink100, color: TK.ink500, padding: '1px 6px', borderRadius: 10, marginLeft: 8, whiteSpace: 'nowrap', flexShrink: 0 },
+  badge: { fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', padding: '2px 8px', borderRadius: T.radius.full, whiteSpace: 'nowrap' },
+  batchPill: { fontSize: 11, fontWeight: 700, background: TK.ink100, color: TK.ink500, padding: '1px 6px', borderRadius: T.radius.full, marginLeft: 8, whiteSpace: 'nowrap', flexShrink: 0 },
   matchEdit: { display: 'flex', gap: 4, alignItems: 'center' },
-  matchSelect: { fontSize: 11, padding: '3px 6px', borderRadius: 6, border: `1px solid ${TK.ink300}`, background: '#fff', maxWidth: 120 },
-  btnSave: { background: TK.greenLt, color: TK.green, border: 'none', borderRadius: 5, padding: '3px 8px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
-  btnCancel: { background: TK.ink100, color: TK.ink500, border: 'none', borderRadius: 5, padding: '3px 8px', fontSize: 12, cursor: 'pointer' },
-  btnMatch: { background: TK.amberLt, color: TK.amber, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' },
-  btnReCat: { background: TK.ink100, color: TK.ink700, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer' },
-  unmatchedSummary: { background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 12, padding: '16px 20px', marginBottom: 16 },
+  matchSelect: { fontSize: 11, padding: '3px 6px', borderRadius: T.radius.sm, border: `1px solid ${TK.ink300}`, background: T.surface, maxWidth: 120 },
+  btnSave: { background: TK.greenLt, color: TK.green, border: 'none', borderRadius: T.radius.sm, padding: '3px 8px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
+  btnCancel: { background: TK.ink100, color: TK.ink500, border: 'none', borderRadius: T.radius.sm, padding: '3px 8px', fontSize: 12, cursor: 'pointer' },
+  btnMatch: { background: TK.amberLt, color: TK.amber, border: 'none', borderRadius: T.radius.sm, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' },
+  btnReCat: { background: TK.ink100, color: TK.ink700, border: 'none', borderRadius: T.radius.sm, padding: '4px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer' },
+  unmatchedSummary: { background: T.warningLight, border: `1px solid ${T.warningBd}`, borderRadius: T.radius.lg, padding: '16px 20px', marginBottom: 16 },
   unmatchedTitle: { fontWeight: 700, fontSize: 14, color: TK.amber, marginBottom: 12 },
   unmatchedList: { display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 },
-  unmatchedItem: { display: 'flex', gap: 16, alignItems: 'center', fontSize: 13, background: '#fff', padding: '8px 12px', borderRadius: 8, border: '1px solid #fde68a' },
+  unmatchedItem: { display: 'flex', gap: 16, alignItems: 'center', fontSize: 13, background: T.surface, padding: '8px 12px', borderRadius: T.radius.md, border: `1px solid ${T.warningBd}` },
   unmatchedNote: { fontSize: 12, color: TK.amber },
-  btnMatchSm: { marginLeft: 'auto', background: TK.amber, color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' },
-  bsNote: { background: TK.blueLt, border: '1px solid #93c5fd', borderRadius: 10, padding: '12px 16px', display: 'flex', gap: 12, alignItems: 'center', fontSize: 13 },
+  btnMatchSm: { marginLeft: 'auto', background: TK.amber, color: '#fff', border: 'none', borderRadius: T.radius.sm, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' },
+  bsNote: { background: TK.blueLt, border: `1px solid ${T.infoBd}`, borderRadius: T.radius.md, padding: '12px 16px', display: 'flex', gap: 12, alignItems: 'center', fontSize: 13 },
   empty: { textAlign: 'center', padding: '40px 20px', color: TK.ink500 },
 };
