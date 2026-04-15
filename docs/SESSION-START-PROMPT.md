@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 15 April 2026 — Session 283
+## Updated: 15 April 2026 — Session 284
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 5802a7c
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 71c7ae9
 
 ---
 
@@ -41,16 +41,24 @@ IF DEMO DATE CHANGES: update PENDING-ACTIONS.md first, then this file.
 
 ---
 
-## CURRENT STATE — 15 April 2026 — Session 283 Close
+## CURRENT STATE — 15 April 2026 — Session 284 Close
 
-### SIGNAL SYSTEM LIVE — Session 283 (commit 5802a7c)
-useFinSignals + FinAlertHoverCard + FinWalkInBrief deployed.
-Three fin tabs active: balance-sheet, vat, pl.
-All 8 acceptance tests passing including Nourish Kitchen (LOOP-NEW-004 fixed
-via Supabase MCP — order_items seeded with weighted_avg_cost in product_metadata).
-Walk-in brief renders above Operations Health on dashboard. Hover card fires
-on fin nav items with active alerts. Unified 5-min data source. AINS dispatch
-stubbed as TODO (navigate actions only in v1).
+### DS6 VISUAL UNIFICATION — Session 284 (commit 71c7ae9)
+
+Master visual spec created and committed: docs/NUAI-VISUAL-SPEC.md (15 parts,
+1,410 lines). This is now mandatory reading before touching any visual code.
+Added to LOAD CONTEXT as step 2b.
+
+Files unified this session:
+- AppShell.css — cream #faf9f6 → #f8f9fa (T.bg) platform-wide
+- TenantPortal.js — 4 cream backgrounds eliminated, INNER maxWidth removed
+  (content now pins edge to edge at all zoom levels — LOOP-DS6-001 closed)
+- HQTradingDashboard.js — DM Mono killed, emoji replaced with Lucide, radius
+  tokenised, section accent bars added, KPI tile border 0.5px, chart padding
+- HQOverview.js — SectionLabel industry-aware (T.accent not hardcoded green),
+  label colour → T.ink400, borderRadius tokens, T.surface on all panels
+
+Group Portal remains the visual reference implementation.
 
 ### FINANCIAL PACKAGE — ALL 5 DEMO TENANTS COMPLETE
 DO NOT re-run financial seeding. DO NOT touch equity_ledger without LL-248.
@@ -66,43 +74,20 @@ All bank recons at 0 unmatched lines.
 
 ### GROUP PORTAL — COMPLETE (Session 282)
 NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
-Combined Revenue MTD: R705,557 · Margin: 64.8% · Stock: R3.85M AVCO.
-
-Button wired into ALL nav contexts (LL-258 — all 4 arrays):
-  - TenantPortal.js — unconditional render, no hasGroup gate (CC-07, 93cdf5f)
-  - useNavConfig HQ_PAGES — Platform section (Session 262)
-  - useNavConfig ADMIN_PAGES — Platform section (CC-08)
-RLS infinite recursion fixed: get_my_group_ids() SECURITY DEFINER in prod (CC-09)
-Bar chart: BAR_PALETTE 6-color palette, T.neutralLight removed (CC-10, LL-263)
-
-### ALL CODE FIXES LANDED — SESSIONS 261–282
-CC-01: Fixed asset monthsBehind() counter (HQFixedAssets.js)
-CC-02: CF depreciation add-back verified (no change needed)
-CC-03: IFRS Note 4 dispensary revenue branch (HQFinancialNotes.js)
-CC-04: IFRS BS VAT sign logic (HQFinancialStatements.js)
-CC-05: TenantPortal nav Reports split + hr-dashboard tab removed
-CC-06: Group Portal — 5 demo tenants + nav wired (9ef682a, 93cdf5f)
-CC-07: TenantPortal Group Portal button unconditional render
-CC-08: ADMIN_PAGES Group Portal entry (useNavConfig.js)
-CC-09: RLS fix — get_my_group_ids() SECURITY DEFINER (Supabase MCP)
-CC-10: StoreComparison BAR_PALETTE visible bar colors
 
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
+- LOOP-NEW-005: MediCare Revenue MTD shows R0 — reads from orders, must read
+  from dispensing_log for cannabis_dispensary profile per LL-231. Claude Code
+  fix: find Revenue MTD tile in dispensary dashboard component, switch source.
+- LOOP-NEW-006: MediCare IFRS BS gap R76,906 — equity_ledger recalibration
+  via Supabase MCP.
 - LOOP-010: Medi Rec — Run Depreciation via UI (step through each missing month)
 - LOOP-011: All 5 tenants — IFRS Mark Reviewed + Auditor Sign-Off (20 statements)
 - LOOP-015: Loyalty warning banner — source unidentified
   Next: grep -r "no rows\|config row\|rewards engine" src/
   Ruled out: AINSBar.js, useNavIntelligence.js, HQLoyalty.js, IntelStrip.js
-- LOOP-NEW-005: MediCare Revenue MTD header shows R0 — reads from orders, must
-  read from dispensing_log for cannabis_dispensary profile per LL-231. Claude
-  Code fix: find Revenue MTD tile in dispensary dashboard component, switch
-  data source. Same pattern as the IFRS IS fix in CC-03 / 0f6cfa0.
-- LOOP-NEW-006: MediCare IFRS BS gap R76,906 — same root cause as Metro's
-  R362k gap before Session 283 fixes. Fix via Supabase MCP using the same
-  pattern: run the A5 OpEx date-filter equivalent, then recalibrate
-  equity_ledger. Schedule next session.
 
-### CLOSED THIS SESSION (283)
+### CLOSED RECENTLY (sessions 283–284)
 - LOOP-012: HR top-up — CLOSED (Medi Rec, MediCare, Metro all at RUNBOOK minimum)
 - LOOP-014: MediCare IFRS IS dispensing revenue verify — CLOSED (NEW-002 fix in 4fdafcd)
 - LOOP-016: R12,500 bank debit — CLOSED (created and closed same session;
@@ -111,6 +96,11 @@ CC-10: StoreComparison BAR_PALETTE visible bar colors
   seed: 240 items, 6 products rotating, weighted_avg_cost in product_metadata.
   BS signal now fires amber/1, 72 days of cover. Verified.)
 - Signal system (useFinSignals + hover cards + walk-in brief) — SHIPPED in 5802a7c
+- LOOP-DS6-001: TenantPortal INNER maxWidth causing grey side-strips at wide
+  viewports and any zoom level below 100% — CLOSED (71c7ae9, removed maxWidth
+  and margin:auto from INNER const)
+- DS6 visual unification Phase 1 — SHIPPED. AppShell cream, TenantPortal
+  background, HQTradingDashboard, HQOverview all unified. Master spec created.
 
 ### KNOWN PERMANENT GAPS — DO NOT CHASE BEFORE 12 MAY
 1. POS VAT pipeline — ~R5k BS gap per tenant (amber banner explains it)
@@ -204,6 +194,8 @@ LL-264: NEVER create NEXT-SESSION-PROMPT_vXXX.md. Update SESSION-START-PROMPT.md
 LL-265: Production URL is protea-botanicals.vercel.app — never use preview URLs
          (f520llkld format). Preview URLs serve frozen builds and will show stale
          behaviour that doesn't match what's on main.
+LL-266: TenantPortal INNER wrapper must NOT use maxWidth or margin:auto.
+         Content must fill 100% between sidebar and scrollbar at all zoom levels.
 
 ---
 
@@ -218,15 +210,14 @@ LL-265: Production URL is protea-botanicals.vercel.app — never use preview URL
 ---
 
 ## NEXT PRIORITIES (choose with owner at session start)
-1. **WP-DS6-UNIFICATION** — Root cause diagnosed Session 284. Read ROOT CAUSE
-   section in WP-DS6-UNIFICATION-BRIEF.md FIRST. Execute Steps 1–3 before any
-   colour work. AppShell.css + TenantPageFrame fix 80% of the gap in <50 lines.
-2. LOOP-NEW-005 — MediCare Revenue MTD dispensary source fix (Claude Code)
-3. LOOP-NEW-006 — MediCare IFRS BS gap R76,906 recalibration (Supabase MCP)
-4. LOOP-010/011 — Pre-demo financial hygiene (UI Run Depreciation + IFRS sign-off)
-5. LOOP-015 — Loyalty warning banner grep
-6. 11 May sim-pos-sales — STANDING ALERT, cannot miss
-7. Eybna unpriced products — HC-0002, BB-LYCHEE-0002, 6-PH-0002
+1. **LOOP-NEW-005** — MediCare Revenue MTD R0 fix (Claude Code, dispensing_log source)
+2. **LOOP-NEW-006** — MediCare IFRS BS gap R76,906 (Supabase MCP)
+3. **LOOP-010/011** — Pre-demo: Medi Rec Run Depreciation + 20 IFRS sign-offs
+4. **WP-DS6-UNIFICATION Phase 2** — Next files: HQLoyalty.js, then HQStock.js
+   (PROTECTED — read full file before any change). Pattern established in
+   Session 284 — follow NUAI-VISUAL-SPEC.md Part 14 checklist for each file.
+5. **11 May sim-pos-sales** — STANDING ALERT, cannot miss
+6. Eybna unpriced products — HC-0002, BB-LYCHEE-0002, 6-PH-0002
 
 ---
 
