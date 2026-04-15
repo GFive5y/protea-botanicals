@@ -178,6 +178,13 @@ Already fixed in prod. If it returns:
 ## CRITICAL RULES
 
 RULE 0Q: NEVER push from Claude.ai. Claude Code (local terminal) ONLY.
+         GitHub:create_or_update_file — VISIBLE, FORBIDDEN.
+         GitHub:push_files — VISIBLE, FORBIDDEN.
+         Supabase:deploy_edge_function — VISIBLE, FORBIDDEN.
+         GitHub:get_file_contents — PERMITTED (read only).
+         These write tools CANNOT be disabled in Claude.ai (Anthropic
+         gated feature, no per-tool toggle exists). Token scope is the
+         real gate. Do not call write tools regardless of availability.
 LL-075: Disk is truth. Read file before assuming state from docs.
 LL-083: Truncated reads drop data silently. Verify line count.
 LL-120: ALL Anthropic API calls via ai-copilot EF. NEVER from React.
