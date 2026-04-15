@@ -11,6 +11,7 @@
 //   - No in-memory estimates — every line traces to a DB row
 
 import { useState, useEffect, useCallback } from "react";
+import { Package, CreditCard, Scale, Settings, Construction, Landmark, CheckCircle, AlertTriangle } from "lucide-react";
 import {
   PieChart, Pie, Cell,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -25,8 +26,8 @@ import { T } from "../../styles/tokens";
 // Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
 const sCard = {
-  background: "#fff",
-  borderRadius: 8,
+  background: T.surface,
+  borderRadius: T.radius.md,
   border: `1px solid ${T.border}`,
   padding: 24,
   marginBottom: 20,
@@ -36,7 +37,7 @@ const sCard = {
 const mkBtn = (variant = "primary", extra = {}) => {
   const base = {
     padding: "9px 18px",
-    borderRadius: 4,
+    borderRadius: T.radius.sm,
     border: "none",
     cursor: "pointer",
     fontFamily: T.font,
@@ -189,25 +190,35 @@ function BSRow({
   );
 }
 
-function SectionLabel({ label, icon }) {
+function SectionLabel({ label, icon: _icon }) {
   return (
     <div
       style={{
-        padding: "8px 16px",
-        background: "#f0ede8",
-        fontSize: 10,
-        fontWeight: 700,
-        color: T.ink500,
-        textTransform: "uppercase",
-        letterSpacing: "0.08em",
-        fontFamily: T.font,
         display: "flex",
         alignItems: "center",
         gap: 8,
+        padding: "10px 16px",
+        borderBottom: `1px solid ${T.border}`,
       }}
     >
-      {icon && <span>{icon}</span>}
-      {label}
+      <span style={{
+        display: "inline-block",
+        width: 3,
+        height: 14,
+        borderRadius: 2,
+        background: T.accent,
+        flexShrink: 0,
+      }} />
+      <span style={{
+        fontSize: 11,
+        fontWeight: 700,
+        color: T.ink400,
+        textTransform: "uppercase",
+        letterSpacing: "0.08em",
+        fontFamily: T.font,
+      }}>
+        {label}
+      </span>
     </div>
   );
 }
@@ -217,9 +228,9 @@ function KPI({ label, value, sub, color }) {
   return (
     <div
       style={{
-        background: "#fff",
+        background: T.surface,
         border: `1px solid ${T.border}`,
-        borderRadius: 8,
+        borderRadius: T.radius.lg,
         padding: "18px 20px",
         boxShadow: T.shadow.sm,
         flex: 1,
@@ -228,9 +239,9 @@ function KPI({ label, value, sub, color }) {
     >
       <div
         style={{
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: 700,
-          color: T.ink500,
+          color: T.ink400,
           textTransform: "uppercase",
           letterSpacing: "0.08em",
           marginBottom: 8,
@@ -243,9 +254,10 @@ function KPI({ label, value, sub, color }) {
         style={{
           fontFamily: T.font,
           fontSize: 26,
-          fontWeight: 400,
+          fontWeight: 700,
           color: color || T.accent,
           lineHeight: 1,
+          fontVariantNumeric: "tabular-nums",
         }}
       >
         {value}
@@ -254,7 +266,7 @@ function KPI({ label, value, sub, color }) {
         <div
           style={{
             fontSize: 11,
-            color: T.ink500,
+            color: T.ink400,
             marginTop: 6,
             fontFamily: T.font,
           }}
@@ -684,7 +696,7 @@ export default function HQBalanceSheet() {
             background: T.accent,
             color: "#fff",
             padding: "12px 18px",
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             fontSize: 13,
             fontWeight: 500,
             boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
@@ -710,7 +722,7 @@ export default function HQBalanceSheet() {
               margin: 0,
               fontSize: 22,
               fontFamily: T.font,
-              fontWeight: 300,
+              fontWeight: 600,
               color: T.ink900,
             }}
           >
@@ -756,7 +768,7 @@ export default function HQBalanceSheet() {
               fontWeight: activeTab === t.id ? 700 : 400,
               letterSpacing: "0.06em",
               textTransform: "uppercase",
-              color: activeTab === t.id ? T.accent : T.ink500,
+              color: activeTab === t.id ? T.accent : T.ink400,
               borderBottom:
                 activeTab === t.id
                   ? `2px solid ${T.accent}`
@@ -794,7 +806,7 @@ export default function HQBalanceSheet() {
                   style={{
                     background: T.accentLight,
                     border: `1px solid ${T.accentBd}`,
-                    borderRadius: 4,
+                    borderRadius: T.radius.sm,
                     padding: "8px 14px",
                     fontSize: 12,
                     color: T.accent,
@@ -808,7 +820,7 @@ export default function HQBalanceSheet() {
                   style={{
                     background: balanced ? T.successLight : T.dangerLight,
                     border: `1px solid ${balanced ? T.successBd : T.dangerBd}`,
-                    borderRadius: 4,
+                    borderRadius: T.radius.sm,
                     padding: "8px 14px",
                     fontSize: 12,
                     color: balanced ? T.success : T.danger,
@@ -817,8 +829,8 @@ export default function HQBalanceSheet() {
                   }}
                 >
                   {balanced
-                    ? "✓ Statement balances"
-                    : "⚠ Statement does not balance — check data"}
+                    ? <><CheckCircle size={12} style={{ marginRight: 4, verticalAlign: "middle" }} />Statement balances</>
+                    : <><AlertTriangle size={12} style={{ marginRight: 4, verticalAlign: "middle" }} />Statement does not balance — check data</>}
                 </div>
               </div>
 
@@ -930,7 +942,7 @@ export default function HQBalanceSheet() {
               >
                 {/* LEFT: Assets */}
                 <div style={{ ...sCard, padding: 0, overflow: "hidden" }}>
-                  <SectionLabel label="Assets" icon="📦" />
+                  <SectionLabel label="Assets" icon={null} />
 
                   <SectionLabel label="Current Assets" />
                   <BSRow
@@ -970,7 +982,7 @@ export default function HQBalanceSheet() {
                       <div style={{
                         display:"grid", gridTemplateColumns:"1fr 90px 90px 90px",
                         padding:"6px 16px 6px 40px",
-                        fontSize:10, fontWeight:700, color:T.ink500,
+                        fontSize:10, fontWeight:700, color:T.ink400,
                         letterSpacing:"0.07em", textTransform:"uppercase",
                         borderBottom:`1px solid ${T.border}`, fontFamily:T.font,
                       }}>
@@ -1048,7 +1060,7 @@ export default function HQBalanceSheet() {
                 >
                   {/* Liabilities */}
                   <div style={{ ...sCard, padding: 0, overflow: "hidden" }}>
-                    <SectionLabel label="Liabilities" icon="💳" />
+                    <SectionLabel label="Liabilities" icon={null} />
 
                     <SectionLabel label="Current Liabilities" />
                     <BSRow
@@ -1085,7 +1097,7 @@ export default function HQBalanceSheet() {
 
                   {/* WP-FINANCIALS Phase 3: Equity from equity_ledger */}
                   <div style={{ ...sCard, padding: 0, overflow: "hidden" }}>
-                    <SectionLabel label="Equity" icon="⚖️" />
+                    <SectionLabel label="Equity" icon={null} />
                     {equityAvailable ? (
                       <>
                         <BSRow label="Share Capital" value={shareCapital} indent={1}
@@ -1118,7 +1130,7 @@ export default function HQBalanceSheet() {
                   >
                     <SectionLabel
                       label="Accounting Equation Check"
-                      icon={balanced2 ? "\u2713" : "\u26A0"}
+                      icon={null}
                     />
                     <BSRow label="Total Assets" value={canonicalTotalAssets} bold />
                     <BSRow label="Total Liabilities" value={totalLiabilities2} bold />
@@ -1140,7 +1152,7 @@ export default function HQBalanceSheet() {
                         : `\u26A0 Difference: ${fmtZar(Math.abs(canonicalTotalAssets - totalLiabilities2 - netEquity2))}`}
                     </div>
                     {!balanced2 && (
-                      <div style={{ fontSize: 11, color: "#92400E", marginTop: 8, padding: "8px 12px", background: "#FFFBEB", borderRadius: 6, border: "1px solid #F59E0B" }}>
+                      <div style={{ fontSize: 11, color: "#92400E", marginTop: 8, padding: "8px 12px", background: "#FFFBEB", borderRadius: T.radius.md, border: "1px solid #F59E0B" }}>
                         {"\u26A0"} Residual balance sheet gap: POS output VAT not flowing to vat_transactions (pipeline bug {"\u2014"} known). VAT liability understated by approximately R34,331 (YTD output R56,544 less recorded R22,213). Balance will close when POS VAT pipeline is repaired in a future session.
                       </div>
                     )}
@@ -1153,7 +1165,7 @@ export default function HQBalanceSheet() {
                 style={{
                   marginTop: 8,
                   background: T.bg,
-                  borderRadius: 6,
+                  borderRadius: T.radius.md,
                   padding: "14px 18px",
                   fontSize: 12,
                   color: T.ink500,
@@ -1196,7 +1208,7 @@ export default function HQBalanceSheet() {
               style={{
                 fontSize: 11,
                 fontWeight: 700,
-                color: T.ink500,
+                color: T.ink400,
                 textTransform: "uppercase",
                 letterSpacing: "0.08em",
                 fontFamily: T.font,
@@ -1229,7 +1241,7 @@ export default function HQBalanceSheet() {
                   style={{
                     padding: "7px 10px",
                     border: `1px solid ${T.border}`,
-                    borderRadius: 4,
+                    borderRadius: T.radius.sm,
                     fontFamily: T.font,
                     fontSize: 13,
                     color: T.ink900,
@@ -1243,7 +1255,7 @@ export default function HQBalanceSheet() {
                   style={{
                     padding: "7px 10px",
                     border: `1px solid ${T.border}`,
-                    borderRadius: 4,
+                    borderRadius: T.radius.sm,
                     fontFamily: T.font,
                     fontSize: 13,
                     color: T.ink900,
@@ -1335,7 +1347,7 @@ export default function HQBalanceSheet() {
               >
                 {/* Operating activities */}
                 <div style={{ ...sCard, padding: 0, overflow: "hidden" }}>
-                  <SectionLabel label="Operating Activities" icon="⚙️" />
+                  <SectionLabel label="Operating Activities" icon={null} />
                   <BSRow
                     label="Cash received from customers"
                     value={cfData.cashFromCustomers}
@@ -1369,7 +1381,7 @@ export default function HQBalanceSheet() {
                   style={{ display: "flex", flexDirection: "column", gap: 20 }}
                 >
                   <div style={{ ...sCard, padding: 0, overflow: "hidden" }}>
-                    <SectionLabel label="Investing Activities" icon="🏗️" />
+                    <SectionLabel label="Investing Activities" icon={null} />
                     {cfData.capexItems.length === 0 ? (
                       <div
                         style={{
@@ -1407,7 +1419,7 @@ export default function HQBalanceSheet() {
 
                   {/* Net cash summary */}
                   <div style={{ ...sCard, padding: 0, overflow: "hidden" }}>
-                    <SectionLabel label="Net Cash Summary" icon="💰" />
+                    <SectionLabel label="Net Cash Summary" icon={null} />
                     <BSRow
                       label="Operating activities"
                       value={cfData.netOperating}
@@ -1438,8 +1450,8 @@ export default function HQBalanceSheet() {
                       }}
                     >
                       {cfData.netCash >= 0
-                        ? `✓ Net cash positive — ${fmtZar(cfData.netCash)} generated`
-                        : `⚠ Net cash negative — ${fmtZar(Math.abs(cfData.netCash))} consumed`}
+                        ? <><CheckCircle size={12} style={{ marginRight: 4, verticalAlign: "middle" }} />Net cash positive — {fmtZar(cfData.netCash)} generated</>
+                        : <><AlertTriangle size={12} style={{ marginRight: 4, verticalAlign: "middle" }} />Net cash negative — {fmtZar(Math.abs(cfData.netCash))} consumed</>}
                     </div>
                   </div>
                 </div>
@@ -1450,7 +1462,7 @@ export default function HQBalanceSheet() {
                 style={{
                   marginTop: 8,
                   background: T.bg,
-                  borderRadius: 6,
+                  borderRadius: T.radius.md,
                   padding: "14px 18px",
                   fontSize: 12,
                   color: T.ink500,
