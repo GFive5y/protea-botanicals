@@ -34,37 +34,22 @@ import { ChartCard, ChartTooltip, InlineProgressBar } from "./viz";
 import StockItemModal from "./StockItemModal";
 import StockAIAnalysis from "./hq/StockAIAnalysis";
 import StockReceiveModal from "./hq/StockReceiveModal";
+import { T as DS } from "../styles/tokens";
 
 // ── Design tokens ────────────────────────────────────────────────────────────
 const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
-  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  ink400: "#474747",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+  ...DS,
+  ink150:    DS.border,
+  ink075:    DS.bg,
+  ink050:    DS.surface,
+  successBg: DS.successLight,
+  warningBg: DS.warningLight,
+  dangerBg:  DS.dangerLight,
+  infoBg:    DS.infoLight,
+  accentLit: DS.accentLight,
+  fontUi:    DS.font,
+  fontData:  DS.font,
+  shadow:    DS.shadow.sm,
 };
 
 // Legacy aliases (keeps internal logic unchanged)
@@ -75,7 +60,7 @@ const C = {
   gold: "#b5935a",
   cream: T.ink050,
   warm: T.ink075,
-  white: "#fff",
+  white: T.surface,
   border: T.ink150,
   muted: T.ink500,
   text: T.ink900,
@@ -93,8 +78,8 @@ const F = {
 
 // ── Shared style objects ─────────────────────────────────────────────────────
 const sLabel = {
-  fontSize: "10px",
-  letterSpacing: "0.1em",
+  fontSize: "11px",
+  letterSpacing: "0.08em",
   textTransform: "uppercase",
   color: T.ink400,
   marginBottom: "6px",
@@ -102,9 +87,9 @@ const sLabel = {
   fontWeight: 700,
 };
 const sCard = {
-  background: "#fff",
+  background: T.surface,
   border: `1px solid ${T.ink150}`,
-  borderRadius: "6px",
+  borderRadius: T.radius.md,
   padding: "20px",
   boxShadow: T.shadow,
 };
@@ -113,7 +98,7 @@ const sBtn = (v = "primary") => ({
   background: v === "primary" ? T.accent : "transparent",
   color: v === "primary" ? "#fff" : T.accentMid,
   border: v === "primary" ? "none" : `1px solid ${T.accentBd}`,
-  borderRadius: "4px",
+  borderRadius: T.radius.sm,
   fontSize: "11px",
   letterSpacing: "0.06em",
   textTransform: "uppercase",
@@ -125,10 +110,10 @@ const sBtn = (v = "primary") => ({
 const sInput = {
   padding: "8px 12px",
   border: `1px solid ${T.ink150}`,
-  borderRadius: "4px",
+  borderRadius: T.radius.sm,
   fontSize: "13px",
   fontFamily: T.fontUi,
-  background: "#fff",
+  background: T.surface,
   outline: "none",
   width: "100%",
   boxSizing: "border-box",
@@ -143,8 +128,8 @@ const sTable = {
 const sTh = {
   textAlign: "left",
   padding: "10px 12px",
-  fontSize: "10px",
-  letterSpacing: "0.1em",
+  fontSize: "11px",
+  letterSpacing: "0.08em",
   textTransform: "uppercase",
   color: T.ink400,
   borderBottom: `2px solid ${T.ink150}`,
@@ -232,9 +217,9 @@ function DocumentSourceBadge({ movement }) {
     <span
       title={`Doc ingestion ${new Date(movement.created_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })}`}
       style={{
-        fontSize: "9px",
+        fontSize: "11px",
         padding: "1px 6px",
-        borderRadius: 3,
+        borderRadius: T.radius.sm,
         background: T.infoBg,
         color: T.info,
         border: `1px solid ${T.infoBd}`,
@@ -255,9 +240,9 @@ function LiveShopBadge() {
     <span
       title="Live in customer shop"
       style={{
-        fontSize: "9px",
+        fontSize: "11px",
         padding: "2px 7px",
-        borderRadius: "3px",
+        borderRadius: T.radius.sm,
         background: T.successBg,
         color: T.success,
         border: `1px solid ${T.successBd}`,
@@ -488,7 +473,7 @@ export default function StockControl() {
             padding: "7px 18px",
             background: T.accentMid,
             border: "none",
-            borderRadius: "4px",
+            borderRadius: T.radius.sm,
             cursor: "pointer",
             fontSize: "11px",
             fontFamily: T.fontUi,
@@ -618,17 +603,17 @@ function StatCard({ label, value, sub, semantic }) {
   return (
     <div
       style={{
-        background: "#fff",
+        background: T.surface,
         border: `1px solid ${T.ink150}`,
-        borderRadius: "6px",
+        borderRadius: T.radius.md,
         padding: "16px 18px",
         boxShadow: T.shadow,
       }}
     >
       <div
         style={{
-          fontSize: "10px",
-          letterSpacing: "0.1em",
+          fontSize: "11px",
+          letterSpacing: "0.08em",
           textTransform: "uppercase",
           color: T.ink400,
           marginBottom: "6px",
@@ -719,7 +704,7 @@ function OverviewView({ items, movements, orders }) {
           gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))",
           gap: "1px",
           background: T.ink150,
-          borderRadius: "6px",
+          borderRadius: T.radius.md,
           overflow: "hidden",
           border: `1px solid ${T.ink150}`,
         }}
@@ -766,11 +751,11 @@ function OverviewView({ items, movements, orders }) {
           };
           const color = s.semantic ? colors[s.semantic] : T.ink900;
           return (
-            <div key={i} style={{ background: "#fff", padding: "16px 18px" }}>
+            <div key={i} style={{ background: T.surface, padding: "16px 18px" }}>
               <div
                 style={{
-                  fontSize: "10px",
-                  letterSpacing: "0.1em",
+                  fontSize: "11px",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   color: T.ink400,
                   marginBottom: "6px",
@@ -842,7 +827,7 @@ function OverviewView({ items, movements, orders }) {
                       dataKey="name"
                       tick={{
                         fill: T.ink400,
-                        fontSize: 10,
+                        fontSize: 11,
                         fontFamily: T.font,
                       }}
                       axisLine={false}
@@ -852,7 +837,7 @@ function OverviewView({ items, movements, orders }) {
                     <YAxis
                       tick={{
                         fill: T.ink400,
-                        fontSize: 10,
+                        fontSize: 11,
                         fontFamily: T.font,
                       }}
                       axisLine={false}
@@ -968,15 +953,15 @@ function OverviewView({ items, movements, orders }) {
             style={{
               background: T.warningBg,
               border: `1px solid ${T.warningBd}`,
-              borderRadius: "6px",
+              borderRadius: T.radius.md,
               padding: "14px 18px",
             }}
           >
             <div
               style={{
-                fontSize: "10px",
+                fontSize: "11px",
                 fontWeight: 700,
-                letterSpacing: "0.1em",
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
                 color: T.warning,
                 marginBottom: "10px",
@@ -1081,13 +1066,13 @@ function OverviewView({ items, movements, orders }) {
                 padding: "12px 14px",
                 background: T.ink075,
                 border: `1px solid ${T.ink150}`,
-                borderRadius: "6px",
+                borderRadius: T.radius.md,
               }}
             >
               <div
                 style={{
-                  fontSize: "10px",
-                  letterSpacing: "0.1em",
+                  fontSize: "11px",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   color: CATEGORY_COLORS[cat] || T.ink500,
                   marginBottom: "4px",
@@ -1288,9 +1273,9 @@ function OverviewView({ items, movements, orders }) {
                   <td style={sTd}>
                     <span
                       style={{
-                        fontSize: "10px",
+                        fontSize: "11px",
                         padding: "2px 8px",
-                        borderRadius: "3px",
+                        borderRadius: T.radius.sm,
                         background: m.quantity >= 0 ? T.successBg : T.dangerBg,
                         color: m.quantity >= 0 ? T.success : T.danger,
                         fontWeight: 600,
@@ -1548,12 +1533,12 @@ function ItemsView({
                       <td style={sTd}>
                         <span
                           style={{
-                            fontSize: "9px",
+                            fontSize: "11px",
                             padding: "2px 8px",
-                            borderRadius: "3px",
+                            borderRadius: T.radius.sm,
                             background: T.ink075,
                             color: CATEGORY_COLORS[item.category] || T.ink500,
-                            letterSpacing: "0.1em",
+                            letterSpacing: "0.08em",
                             textTransform: "uppercase",
                             fontWeight: 700,
                           }}
@@ -1592,9 +1577,9 @@ function ItemsView({
                           <span
                             style={{
                               marginLeft: "6px",
-                              fontSize: "9px",
+                              fontSize: "11px",
                               padding: "1px 5px",
-                              borderRadius: "3px",
+                              borderRadius: T.radius.sm,
                               background: T.warningBg,
                               color: T.warning,
                               fontWeight: 700,
@@ -1723,7 +1708,7 @@ function ItemsView({
                             style={{
                               ...sBtn("outline"),
                               padding: "4px 10px",
-                              fontSize: "9px",
+                              fontSize: "11px",
                               color:
                                 expandedItemId === item.id
                                   ? T.accent
@@ -1746,7 +1731,7 @@ function ItemsView({
                             style={{
                               ...sBtn("outline"),
                               padding: "4px 10px",
-                              fontSize: "9px",
+                              fontSize: "11px",
                               color: T.info,
                               borderColor: T.infoBd,
                             }}
@@ -1762,7 +1747,7 @@ function ItemsView({
                             style={{
                               ...sBtn("outline"),
                               padding: "4px 10px",
-                              fontSize: "9px",
+                              fontSize: "11px",
                             }}
                           >
                             Edit
@@ -1772,7 +1757,7 @@ function ItemsView({
                             style={{
                               ...sBtn("outline"),
                               padding: "4px 10px",
-                              fontSize: "9px",
+                              fontSize: "11px",
                               color: T.danger,
                               borderColor: T.dangerBd,
                             }}
@@ -1919,17 +1904,17 @@ function StockItemExpandedCard({
         {/* Core metrics */}
         <div
           style={{
-            background: "#fff",
+            background: T.surface,
             border: `1px solid ${T.ink150}`,
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             padding: "14px 16px",
           }}
         >
           <div
             style={{
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: 700,
-              letterSpacing: "0.1em",
+              letterSpacing: "0.08em",
               textTransform: "uppercase",
               color: T.ink400,
               marginBottom: 10,
@@ -1987,17 +1972,17 @@ function StockItemExpandedCard({
         {/* Pricing + profile-specific */}
         <div
           style={{
-            background: "#fff",
+            background: T.surface,
             border: `1px solid ${T.ink150}`,
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             padding: "14px 16px",
           }}
         >
           <div
             style={{
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: 700,
-              letterSpacing: "0.1em",
+              letterSpacing: "0.08em",
               textTransform: "uppercase",
               color: T.ink400,
               marginBottom: 10,
@@ -2096,7 +2081,7 @@ function StockItemExpandedCard({
             <div style={{ marginTop: 8 }}>
               <div
                 style={{
-                  fontSize: 10,
+                  fontSize: 11,
                   color: T.warning,
                   fontWeight: 700,
                   marginBottom: 4,
@@ -2111,9 +2096,9 @@ function StockItemExpandedCard({
                   <span
                     key={a}
                     style={{
-                      fontSize: 9,
+                      fontSize: 11,
                       padding: "2px 6px",
-                      borderRadius: 3,
+                      borderRadius: T.radius.sm,
                       background: T.warningBg,
                       color: T.warning,
                       border: `1px solid ${T.warningBd}`,
@@ -2133,17 +2118,17 @@ function StockItemExpandedCard({
         {/* Recent movements */}
         <div
           style={{
-            background: "#fff",
+            background: T.surface,
             border: `1px solid ${T.ink150}`,
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             padding: "14px 16px",
           }}
         >
           <div
             style={{
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: 700,
-              letterSpacing: "0.1em",
+              letterSpacing: "0.08em",
               textTransform: "uppercase",
               color: T.ink400,
               marginBottom: 10,
@@ -2218,7 +2203,7 @@ function StockItemExpandedCard({
               padding: "8px 12px",
               background: T.infoBg,
               border: `1px solid ${T.infoBd}`,
-              borderRadius: 6,
+              borderRadius: T.radius.md,
               fontSize: 11,
               color: T.info,
             }}
@@ -2233,7 +2218,7 @@ function StockItemExpandedCard({
               padding: "8px 12px",
               background: "#E8F5E9",
               border: "1px solid #A5D6A7",
-              borderRadius: 6,
+              borderRadius: T.radius.md,
               fontSize: 11,
               color: "#2E7D32",
             }}
@@ -2246,12 +2231,12 @@ function StockItemExpandedCard({
             onClick={onHistory}
             style={{
               padding: "7px 14px",
-              borderRadius: 4,
+              borderRadius: T.radius.sm,
               border: `1px solid ${T.infoBd}`,
               background: T.infoBg,
               color: T.info,
               cursor: "pointer",
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: 700,
               fontFamily: T.fontUi,
               letterSpacing: "0.06em",
@@ -2264,12 +2249,12 @@ function StockItemExpandedCard({
             onClick={onEdit}
             style={{
               padding: "7px 14px",
-              borderRadius: 4,
+              borderRadius: T.radius.sm,
               border: `1px solid ${T.accentBd}`,
               background: T.accentLit,
               color: T.accentMid,
               cursor: "pointer",
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: 700,
               fontFamily: T.fontUi,
               letterSpacing: "0.06em",
@@ -2282,12 +2267,12 @@ function StockItemExpandedCard({
             onClick={onAI}
             style={{
               padding: "7px 14px",
-              borderRadius: 4,
+              borderRadius: T.radius.sm,
               border: "none",
               background: T.accent,
               color: "#fff",
               cursor: "pointer",
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: 700,
               fontFamily: T.fontUi,
               letterSpacing: "0.06em",
@@ -2339,7 +2324,7 @@ function ItemHistoryModal({ item, movements, onClose }) {
         style={{
           width: "min(640px,100vw)",
           height: "100vh",
-          background: "#fff",
+          background: T.surface,
           boxShadow: "-4px 0 24px rgba(0,0,0,0.12)",
           display: "flex",
           flexDirection: "column",
@@ -2364,9 +2349,9 @@ function ItemHistoryModal({ item, movements, onClose }) {
             <div>
               <div
                 style={{
-                  fontSize: "10px",
+                  fontSize: "11px",
                   fontWeight: 700,
-                  letterSpacing: "0.1em",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   color: T.ink400,
                   marginBottom: "4px",
@@ -2442,17 +2427,17 @@ function ItemHistoryModal({ item, movements, onClose }) {
               <div
                 key={s.label}
                 style={{
-                  background: "#fff",
+                  background: T.surface,
                   border: `1px solid ${T.ink150}`,
-                  borderRadius: "4px",
+                  borderRadius: T.radius.sm,
                   padding: "10px 14px",
                   minWidth: "90px",
                 }}
               >
                 <div
                   style={{
-                    fontSize: "9px",
-                    letterSpacing: "0.1em",
+                    fontSize: "11px",
+                    letterSpacing: "0.08em",
                     textTransform: "uppercase",
                     color: T.ink400,
                     fontFamily: T.fontUi,
@@ -2539,7 +2524,7 @@ function ItemHistoryModal({ item, movements, onClose }) {
                       <div style={{ color: T.ink900, fontWeight: 500 }}>
                         {new Date(m.created_at).toLocaleDateString("en-ZA")}
                       </div>
-                      <div style={{ fontSize: "10px", color: T.ink500 }}>
+                      <div style={{ fontSize: "11px", color: T.ink500 }}>
                         {new Date(m.created_at).toLocaleTimeString("en-ZA", {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -2549,9 +2534,9 @@ function ItemHistoryModal({ item, movements, onClose }) {
                     <td style={{ ...sTd, padding: "10px 8px" }}>
                       <span
                         style={{
-                          fontSize: "9px",
+                          fontSize: "11px",
                           padding: "2px 8px",
-                          borderRadius: "3px",
+                          borderRadius: T.radius.sm,
                           background:
                             m.quantity >= 0 ? T.successBg : T.dangerBg,
                           color: m.quantity >= 0 ? T.success : T.danger,
@@ -2592,7 +2577,7 @@ function ItemHistoryModal({ item, movements, onClose }) {
                       {m.runningBalance.toFixed(2)}
                       <span
                         style={{
-                          fontSize: "9px",
+                          fontSize: "11px",
                           color: T.ink400,
                           marginLeft: "3px",
                           fontFamily: T.fontUi,
@@ -2737,7 +2722,7 @@ function ItemForm({
     >
       {t}
       {note && (
-        <span style={{ marginLeft: 6, fontSize: "9px", color: T.accentMid }}>
+        <span style={{ marginLeft: 6, fontSize: "11px", color: T.accentMid }}>
           {note}
         </span>
       )}
@@ -2917,16 +2902,16 @@ function ItemForm({
           style={{
             background: willBeLive ? T.successBg : T.warningBg,
             border: `1px solid ${willBeLive ? T.successBd : T.warningBd}`,
-            borderRadius: "6px",
+            borderRadius: T.radius.md,
             padding: "14px 16px",
             marginBottom: "16px",
           }}
         >
           <div
             style={{
-              fontSize: "10px",
+              fontSize: "11px",
               fontWeight: 700,
-              letterSpacing: "0.1em",
+              letterSpacing: "0.08em",
               textTransform: "uppercase",
               color: willBeLive ? T.success : T.warning,
               marginBottom: "6px",
@@ -3203,9 +3188,9 @@ function MovementsView({ movements, items, onRefresh }) {
                     >
                       <span
                         style={{
-                          fontSize: "10px",
+                          fontSize: "11px",
                           padding: "2px 8px",
-                          borderRadius: "3px",
+                          borderRadius: T.radius.sm,
                           background:
                             m.quantity >= 0 ? T.successBg : T.dangerBg,
                           color: m.quantity >= 0 ? T.success : T.danger,
@@ -3545,7 +3530,7 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
           ))}
           <button
             onClick={addLine}
-            style={{ ...sBtn("outline"), fontSize: "9px", marginTop: "4px" }}
+            style={{ ...sBtn("outline"), fontSize: "11px", marginTop: "4px" }}
           >
             + Add Line
           </button>
@@ -3654,10 +3639,10 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
                   >
                     <span
                       style={{
-                        fontSize: "10px",
+                        fontSize: "11px",
                         padding: "3px 10px",
-                        borderRadius: "3px",
-                        letterSpacing: "0.1em",
+                        borderRadius: T.radius.sm,
+                        letterSpacing: "0.08em",
                         textTransform: "uppercase",
                         background: `${sc}18`,
                         color: sc,
@@ -3674,7 +3659,7 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
                         if (e.target.value)
                           handleStatusChange(po, e.target.value);
                       }}
-                      style={{ ...sSelect, width: "130px", fontSize: "10px" }}
+                      style={{ ...sSelect, width: "130px", fontSize: "11px" }}
                     >
                       <option value="">Set status...</option>
                       {ALL_PO_STATUSES.filter((s) => s.id !== status).map(
@@ -3741,7 +3726,7 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
                 )}
                 <div
                   style={{
-                    fontSize: "10px",
+                    fontSize: "11px",
                     color: T.accentMid,
                     marginTop: "8px",
                     letterSpacing: "0.04em",
@@ -3845,7 +3830,7 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
           fontSize: "11px",
           color: T.ink500,
           textTransform: "uppercase",
-          letterSpacing: "0.1em",
+          letterSpacing: "0.08em",
           fontFamily: T.fontUi,
           flexShrink: 0,
           paddingRight: 16,
@@ -3886,7 +3871,7 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
         style={{
           width: "min(680px,100vw)",
           height: "100vh",
-          background: "#fff",
+          background: T.surface,
           boxShadow: "-4px 0 32px rgba(0,0,0,0.15)",
           display: "flex",
           flexDirection: "column",
@@ -3911,9 +3896,9 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
             <div>
               <div
                 style={{
-                  fontSize: "10px",
+                  fontSize: "11px",
                   fontWeight: 700,
-                  letterSpacing: "0.1em",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   color: T.ink400,
                   marginBottom: "4px",
@@ -3945,8 +3930,8 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
                 style={{
                   fontSize: "11px",
                   padding: "4px 12px",
-                  borderRadius: "3px",
-                  letterSpacing: "0.1em",
+                  borderRadius: T.radius.sm,
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   background: `${sc}18`,
                   color: sc,
@@ -3973,9 +3958,9 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
           <div style={{ marginTop: "16px" }}>
             <div
               style={{
-                fontSize: "10px",
+                fontSize: "11px",
                 fontWeight: 700,
-                letterSpacing: "0.1em",
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
                 color: T.ink400,
                 marginBottom: "8px",
@@ -3987,7 +3972,7 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
                   style={{
                     marginLeft: 8,
                     color: T.danger,
-                    fontSize: "10px",
+                    fontSize: "11px",
                     fontWeight: 400,
                   }}
                 >
@@ -4003,11 +3988,11 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
                   disabled={s.id === status}
                   style={{
                     padding: "5px 12px",
-                    borderRadius: "3px",
+                    borderRadius: T.radius.sm,
                     border: `1px solid ${s.id === status ? s.color : T.ink150}`,
                     background: s.id === status ? `${s.color}18` : "#fff",
                     color: s.id === status ? s.color : T.ink500,
-                    fontSize: "9px",
+                    fontSize: "11px",
                     letterSpacing: "0.12em",
                     textTransform: "uppercase",
                     fontWeight: s.id === status ? 700 : 400,
@@ -4171,7 +4156,7 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
                       }}
                     >
                       USD/ZAR Override{" "}
-                      <span style={{ fontSize: "9px", color: T.warning }}>
+                      <span style={{ fontSize: "11px", color: T.warning }}>
                         affects landed cost
                       </span>
                     </label>
@@ -4231,7 +4216,7 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
               )}
               <button
                 onClick={() => setEditing(true)}
-                style={{ ...sBtn("outline"), fontSize: "9px" }}
+                style={{ ...sBtn("outline"), fontSize: "11px" }}
               >
                 Edit Notes / Dates / Invoice Ref / FX Rate
               </button>
@@ -4282,7 +4267,7 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
                             {line.supplier_products?.sku && (
                               <div
                                 style={{
-                                  fontSize: "10px",
+                                  fontSize: "11px",
                                   color: T.ink500,
                                   fontFamily: T.fontData,
                                 }}
@@ -4340,11 +4325,11 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
                             {line.item_id ? (
                               <span
                                 style={{
-                                  fontSize: "10px",
+                                  fontSize: "11px",
                                   padding: "2px 6px",
                                   background: T.successBg,
                                   color: T.success,
-                                  borderRadius: "3px",
+                                  borderRadius: T.radius.sm,
                                   fontWeight: 600,
                                 }}
                               >
@@ -4353,11 +4338,11 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
                             ) : (
                               <span
                                 style={{
-                                  fontSize: "10px",
+                                  fontSize: "11px",
                                   padding: "2px 6px",
                                   background: T.warningBg,
                                   color: T.warning,
-                                  borderRadius: "3px",
+                                  borderRadius: T.radius.sm,
                                   fontWeight: 600,
                                 }}
                               >
@@ -4404,7 +4389,7 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
               marginTop: "20px",
               background: T.infoBg,
               border: `1px solid ${T.infoBd}`,
-              borderRadius: "6px",
+              borderRadius: T.radius.md,
               padding: "14px 16px",
               fontSize: "12px",
               color: T.info,
@@ -4650,7 +4635,7 @@ function SuppliersView({ suppliers, onRefresh }) {
                   style={{
                     ...sBtn("outline"),
                     padding: "4px 10px",
-                    fontSize: "9px",
+                    fontSize: "11px",
                   }}
                 >
                   Edit
