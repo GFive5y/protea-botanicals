@@ -10,6 +10,7 @@
 // Status workflow: any authenticated user with access can advance (tenant self-managed)
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { Printer, Mail, Lock } from "lucide-react";
 import { createPortal } from "react-dom";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
@@ -34,34 +35,34 @@ function customBounds(from, to) {
 }
 
 const STATUS_CFG = {
-  draft: { label: "Draft", bg: "#FEF9C3", color: "#A16207", border: "#FDE047", icon: "\u25CB" },
-  reviewed: { label: "Reviewed", bg: "#DBEAFE", color: "#1D4ED8", border: "#93C5FD", icon: "\u25CE" },
-  signed: { label: "Auditor Signed Off", bg: "#D1FAE5", color: "#065F46", border: "#6EE7B7", icon: "\u2713" },
-  locked: { label: "Locked", bg: "#E5E7EB", color: "#374151", border: "#9CA3AF", icon: "\uD83D\uDD12" },
+  draft:    { label: "Draft",              bg: T.warningLight, color: T.warning, border: T.warningBd, icon: "\u25CB" },
+  reviewed: { label: "Reviewed",           bg: T.infoLight,    color: T.info,    border: T.infoBd,    icon: "\u25CE" },
+  signed:   { label: "Auditor Signed Off", bg: T.successLight, color: T.success, border: T.successBd, icon: "\u2713" },
+  locked:   { label: "Locked",             bg: T.bg,           color: T.ink700,  border: T.border,    icon: <Lock size={10} style={{ display: "inline", verticalAlign: "middle" }} /> },
 };
 
 function StatusBadge({ status }) {
   const cfg = STATUS_CFG[status] || STATUS_CFG.draft;
-  return <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 14px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`, letterSpacing: "0.05em", textTransform: "uppercase", fontFamily: C.font }}>{cfg.icon} {cfg.label}</span>;
+  return <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 14px", borderRadius: T.radius.full, fontSize: 11, fontWeight: 700, background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`, letterSpacing: "0.05em", textTransform: "uppercase", fontFamily: C.font }}>{cfg.icon} {cfg.label}</span>;
 }
 
 function SRow({ label, current, prior = null, indent = 0, bold = false, total = false, negative = false, sub = null, shade = false }) {
   const fmt = (v) => { if (v === null || v === undefined) return "\u2014"; if (negative && v > 0) return `(${fmtZar(Math.abs(v))})`; return fmtZar(v); };
   const col = total ? (current >= 0 ? C.accent : C.danger) : C.ink700;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px", padding: `${bold || total ? 11 : 8}px ${16 + indent * 20}px`, borderBottom: total ? `2px solid ${C.border}` : `1px solid #F8FAFC`, background: shade || total ? C.bg : "transparent", alignItems: "center" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px", padding: `${bold || total ? 11 : 8}px ${16 + indent * 20}px`, borderBottom: total ? `2px solid ${C.border}` : `1px solid ${T.bg}`, background: shade || total ? C.bg : "transparent", alignItems: "center" }}>
       <div><div style={{ fontSize: bold || total ? 14 : 13, fontWeight: bold || total ? 700 : 400, color: C.ink700, fontFamily: C.font }}>{label}</div>{sub && <div style={{ fontSize: 11, color: C.ink500, marginTop: 2, fontFamily: C.font }}>{sub}</div>}</div>
       <div style={{ textAlign: "right", fontSize: bold || total ? 15 : 13, fontWeight: bold || total ? 700 : 400, color: col, fontFamily: C.font, fontVariantNumeric: "tabular-nums" }}>{fmt(current)}</div>
       <div style={{ textAlign: "right", fontSize: 13, color: C.ink300, fontFamily: C.font, fontVariantNumeric: "tabular-nums", fontStyle: "italic" }}>{prior !== null ? fmt(prior) : "\u2014 prior period"}</div>
     </div>
   );
 }
-function SSection({ label }) { return <div style={{ padding: "8px 16px", background: "#F0EDE8", fontSize: 10, fontWeight: 700, color: C.ink500, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: C.font }}>{label}</div>; }
-function SHeader() { return <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px", padding: "10px 16px", borderBottom: `2px solid ${C.accent}`, fontSize: 10, fontWeight: 700, color: C.ink500, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: C.font }}><span>Note</span><span style={{ textAlign: "right" }}>Current Period (ZAR)</span><span style={{ textAlign: "right" }}>Prior Period (ZAR)</span></div>; }
+function SSection({ label }) { return <div style={{ padding: "8px 16px", background: "#F0EDE8", fontSize: 11, fontWeight: 700, color: C.ink500, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: C.font }}>{label}</div>; }
+function SHeader() { return <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px", padding: "10px 16px", borderBottom: `2px solid ${C.accent}`, fontSize: 11, fontWeight: 700, color: T.ink400, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: C.font }}><span>Note</span><span style={{ textAlign: "right" }}>Current Period (ZAR)</span><span style={{ textAlign: "right" }}>Prior Period (ZAR)</span></div>; }
 
 function Letterhead({ tenantName, statementTitle, statementSubtitle, periodLabel, status, financialYear }) {
   return (
-    <div style={{ background: "linear-gradient(135deg,#1A3D2B 0%,#2D6A4F 100%)", padding: "28px 32px 24px", color: "#fff", borderRadius: "12px 12px 0 0" }}>
+    <div style={{ background: "linear-gradient(135deg,#1A3D2B 0%,#2D6A4F 100%)", padding: "28px 32px 24px", color: "#fff", borderRadius: `${T.radius.lg} ${T.radius.lg} 0 0` }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", opacity: 0.65, marginBottom: 6 }}>{statementTitle}</div>
@@ -76,14 +77,14 @@ function Letterhead({ tenantName, statementTitle, statementSubtitle, periodLabel
 }
 
 function StatementNote({ text }) {
-  return <div style={{ margin: "0 16px 20px", padding: "10px 14px", background: C.bg, borderRadius: 6, fontSize: 11, color: C.ink500, lineHeight: 1.6, fontFamily: C.font, borderLeft: `3px solid ${C.accentBd}` }}>{text}</div>;
+  return <div style={{ margin: "0 16px 20px", padding: "10px 14px", background: C.bg, borderRadius: T.radius.sm, fontSize: 11, color: C.ink500, lineHeight: 1.6, fontFamily: C.font, borderLeft: `3px solid ${C.accentBd}` }}>{text}</div>;
 }
 
 // ── Statement 1: Income Statement ─────────────────────────────────────────────
 function IncomeStatement({ data, tenantName, periodLabel, financialYear, status }) {
   const { revenue, cogs, grossProfit, grossMarginPct, opexLines, totalOpex, depreciationTotal, netProfit, netMarginPct } = data;
   return (
-    <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C.border}`, overflow: "hidden", marginBottom: 24 }}>
+    <div style={{ background: T.surface, borderRadius: T.radius.lg, border: `1px solid ${C.border}`, overflow: "hidden", marginBottom: 24 }}>
       <Letterhead tenantName={tenantName} statementTitle="Statement 1 of 4" statementSubtitle="Statement of Comprehensive Income" periodLabel={periodLabel} status={status} financialYear={financialYear} />
       <div style={{ padding: "0 0 8px" }}>
         <SHeader />
@@ -97,7 +98,7 @@ function IncomeStatement({ data, tenantName, periodLabel, financialYear, status 
         {opexLines.map((line, i) => <SRow key={i} label={line.label} current={line.amount} indent={1} negative />)}
         {depreciationTotal > 0 && <SRow label="Depreciation of property, plant and equipment" current={depreciationTotal} indent={1} negative />}
         <SRow label="Total Operating Expenses" current={totalOpex + depreciationTotal} bold shade negative />
-        <div style={{ background: "#F0FDF4", borderTop: "2px solid #6EE7B7", borderBottom: "2px solid #6EE7B7" }}>
+        <div style={{ background: T.successLight, borderTop: `2px solid ${T.successBd}`, borderBottom: `2px solid ${T.successBd}` }}>
           <SRow label={netProfit >= 0 ? "Profit for the Period" : "Loss for the Period"} current={netProfit} bold sub={`Net margin: ${(netMarginPct || 0).toFixed(1)}%`} />
         </div>
       </div>
@@ -113,7 +114,7 @@ function BalanceSheetStatement({ data, tenantName, asAtLabel, financialYear, sta
   const totalAssets = totalCurrentAssets + fixedAssetsNBV;
   const totalLiabilities = payables + vatLiability + opexAccruals;
   return (
-    <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C.border}`, overflow: "hidden", marginBottom: 24 }}>
+    <div style={{ background: T.surface, borderRadius: T.radius.lg, border: `1px solid ${C.border}`, overflow: "hidden", marginBottom: 24 }}>
       <Letterhead tenantName={tenantName} statementTitle="Statement 2 of 4" statementSubtitle="Statement of Financial Position" periodLabel={`As at ${asAtLabel}`} status={status} financialYear={financialYear} />
       <div style={{ padding: "8px 16px", background: balanced ? C.successLight : C.dangerLight, fontSize: 12, fontWeight: 600, color: balanced ? C.success : C.danger, fontFamily: C.font, borderBottom: `1px solid ${balanced ? C.successBd : C.dangerBd}` }}>
         {balanced ? "\u2713 Assets = Liabilities + Equity" : `\u26A0 Statement does not balance \u2014 difference: ${fmtZar(Math.abs(totalAssets - totalLiabilities - totalEquity))}`}
@@ -155,7 +156,7 @@ function BalanceSheetStatement({ data, tenantName, asAtLabel, financialYear, sta
 function CashFlowStatement({ data, tenantName, periodLabel, financialYear, status }) {
   const { netProfit, depreciationTotal, netOperating, capexPaid, netInvesting, netCash, financingInflow, financingOutflow, netFinancing } = data;
   return (
-    <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C.border}`, overflow: "hidden", marginBottom: 24 }}>
+    <div style={{ background: T.surface, borderRadius: T.radius.lg, border: `1px solid ${C.border}`, overflow: "hidden", marginBottom: 24 }}>
       <Letterhead tenantName={tenantName} statementTitle="Statement 3 of 4" statementSubtitle="Statement of Cash Flows" periodLabel={periodLabel} status={status} financialYear={financialYear} />
       <div style={{ padding: "0 0 8px" }}>
         <SHeader />
@@ -171,7 +172,7 @@ function CashFlowStatement({ data, tenantName, periodLabel, financialYear, statu
         <SRow label="Capital contributions / owner injections" current={financingInflow || 0} indent={1} />
         <SRow label="Loan repayments / owner drawings" current={-(financingOutflow || 0)} indent={1} negative />
         <SRow label="Net cash from financing activities" current={netFinancing || 0} bold shade />
-        <div style={{ background: netCash >= 0 ? "#F0FDF4" : "#FEF2F2", borderTop: `2px solid ${netCash >= 0 ? "#6EE7B7" : "#FECACA"}`, borderBottom: `2px solid ${netCash >= 0 ? "#6EE7B7" : "#FECACA"}` }}>
+        <div style={{ background: netCash >= 0 ? T.successLight : T.dangerLight, borderTop: `2px solid ${netCash >= 0 ? T.successBd : T.dangerBd}`, borderBottom: `2px solid ${netCash >= 0 ? T.successBd : T.dangerBd}` }}>
           <SRow label="Net increase / (decrease) in cash and cash equivalents" current={netCash} bold />
         </div>
       </div>
@@ -191,7 +192,7 @@ function ChangesInEquityStatement({ data, tenantName, periodLabel, financialYear
   const rowStyle = (shade) => ({ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", padding: "10px 16px", borderBottom: "1px solid #F8FAFC", background: shade ? C.bg : "transparent", alignItems: "center" });
   const hdStyle = { display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", padding: "10px 16px", borderBottom: `2px solid ${C.accent}`, fontSize: 10, fontWeight: 700, color: C.ink500, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: C.font, background: C.bg };
   return (
-    <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C.border}`, overflow: "hidden", marginBottom: 24 }}>
+    <div style={{ background: T.surface, borderRadius: T.radius.lg, border: `1px solid ${C.border}`, overflow: "hidden", marginBottom: 24 }}>
       <Letterhead tenantName={tenantName} statementTitle="Statement 4 of 4" statementSubtitle="Statement of Changes in Equity" periodLabel={periodLabel} status={status} financialYear={financialYear} />
       <div>
         <div style={hdStyle}><span>Movement</span><span style={{ textAlign: "right", padding: "0 8px" }}>Share Capital</span><span style={{ textAlign: "right", padding: "0 8px" }}>Retained Earnings</span><span style={{ textAlign: "right", padding: "0 8px" }}>Total</span></div>
@@ -431,11 +432,11 @@ export default function HQFinancialStatements() {
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           {FY_OPTIONS.map(opt => (
-            <button key={opt.id} onClick={() => setSelectedFY(opt.id)} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid", borderColor: selectedFY === opt.id ? C.accent : C.border, background: selectedFY === opt.id ? C.accentLight : "#fff", color: selectedFY === opt.id ? C.accent : C.ink500, fontWeight: selectedFY === opt.id ? 700 : 400, cursor: "pointer", fontSize: 12, fontFamily: C.font }}>{opt.label}</button>
+            <button key={opt.id} onClick={() => setSelectedFY(opt.id)} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid", borderColor: selectedFY === opt.id ? C.accent : C.border, background: selectedFY === opt.id ? C.accentLight : T.surface, color: selectedFY === opt.id ? C.accent : C.ink500, fontWeight: selectedFY === opt.id ? 700 : 400, cursor: "pointer", fontSize: 12, fontFamily: C.font }}>{opt.label}</button>
           ))}
           {!loading && incomeData && (
             <button onClick={handlePrint} disabled={printing} style={{ padding: "7px 16px", borderRadius: 8, border: `1.5px solid ${C.accentMid}`, background: printing ? C.bg : C.accentLight, color: printing ? C.ink500 : C.accent, cursor: printing ? "wait" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: C.font, display: "flex", alignItems: "center", gap: 6 }}>
-              {printing ? "Preparing\u2026" : "\uD83D\uDDA8\uFE0F Print / Save PDF"}
+              {printing ? "Preparing\u2026" : <><Printer size={14} style={{ marginRight: 6, verticalAlign: "middle" }} />Print / Save PDF</>}
             </button>
           )}
           {!loading && incomeData && (
@@ -464,9 +465,9 @@ export default function HQFinancialStatements() {
                 else if (!res.ok) window.alert(`Email failed: ${res.error}`);
                 else window.alert(`Statement email sent to ${to}`);
               }}
-              style={{ padding: "7px 16px", borderRadius: 8, border: `1.5px solid ${C.accentMid}`, background: "#fff", color: C.accent, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: C.font, display: "flex", alignItems: "center", gap: 6 }}
+              style={{ padding: "7px 16px", borderRadius: 8, border: `1.5px solid ${C.accentMid}`, background: T.surface, color: C.accent, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: C.font, display: "flex", alignItems: "center", gap: 6 }}
             >
-              {"\uD83D\uDCE7"} Email Statement
+              <Mail size={14} style={{ marginRight: 6, verticalAlign: "middle" }} />Email Statement
             </button>
           )}
         </div>
@@ -480,7 +481,7 @@ export default function HQFinancialStatements() {
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#fff", border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 20, gap: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: T.surface, border: `1px solid ${C.border}`, borderRadius: T.radius.md, marginBottom: 20, gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <StatusBadge status={currentStatus} />
           {statusRow?.signed_by && <span style={{ fontSize: 12, color: C.ink500, fontFamily: C.font }}>Signed by: <strong>{statusRow.signed_by}</strong>{statusRow.signed_at ? ` on ${new Date(statusRow.signed_at).toLocaleDateString("en-ZA")}` : ""}</span>}
@@ -490,7 +491,7 @@ export default function HQFinancialStatements() {
           <div style={{ display: "flex", gap: 8 }}>
             {currentStatus === "draft" && <button onClick={handleMarkReviewed} disabled={statusSaving} style={{ padding: "7px 16px", borderRadius: 7, border: `1px solid ${C.infoBd}`, background: C.infoLight, color: C.info, cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: C.font }}>{"\u25CE"} Mark Reviewed</button>}
             {currentStatus === "reviewed" && <button onClick={() => setShowSignModal(true)} disabled={statusSaving} style={{ padding: "7px 16px", borderRadius: 7, border: `1px solid ${C.successBd}`, background: C.successLight, color: C.success, cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: C.font }}>{"\u2713"} Auditor Sign Off{"\u2026"}</button>}
-            {currentStatus === "signed" && <button onClick={handleLock} disabled={statusSaving} style={{ padding: "7px 16px", borderRadius: 7, border: "1px solid #9CA3AF", background: "#F3F4F6", color: "#374151", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: C.font }}>{"\uD83D\uDD12"} Lock Period</button>}
+            {currentStatus === "signed" && <button onClick={handleLock} disabled={statusSaving} style={{ padding: "7px 16px", borderRadius: 7, border: `1px solid ${T.border}`, background: T.bg, color: T.ink700, cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: C.font }}><Lock size={12} style={{ marginRight: 4, verticalAlign: "middle" }} />Lock Period</button>}
           </div>
         )}
       </div>
@@ -512,23 +513,23 @@ export default function HQFinancialStatements() {
 
       {showSignModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 9000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 380, fontFamily: C.font, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: T.surface, borderRadius: T.radius.lg, padding: 28, width: 380, fontFamily: C.font, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: C.ink900 }}>Auditor Sign-Off</h3>
             <p style={{ margin: "0 0 18px", fontSize: 13, color: C.ink500, lineHeight: 1.5 }}>Enter the auditor or reviewer name. This will be recorded on the statement and cannot be changed after locking.</p>
             <input autoFocus value={auditorName} onChange={e => setAuditorName(e.target.value)} placeholder="e.g. J. Smith CA(SA) / Smith & Associates" style={{ width: "100%", padding: "10px 12px", border: `1px solid ${C.border}`, borderRadius: 7, fontSize: 13, fontFamily: C.font, boxSizing: "border-box", marginBottom: 16 }} />
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button onClick={() => { setShowSignModal(false); setAuditorName(""); }} style={{ padding: "8px 18px", borderRadius: 7, border: `1px solid ${C.border}`, background: "#fff", color: C.ink500, cursor: "pointer", fontSize: 13, fontFamily: C.font }}>Cancel</button>
+              <button onClick={() => { setShowSignModal(false); setAuditorName(""); }} style={{ padding: "8px 18px", borderRadius: 7, border: `1px solid ${C.border}`, background: T.surface, color: C.ink500, cursor: "pointer", fontSize: 13, fontFamily: C.font }}>Cancel</button>
               <button onClick={handleSignOff} disabled={!auditorName.trim()} style={{ padding: "8px 18px", borderRadius: 7, border: "none", background: C.accent, color: "#fff", cursor: auditorName.trim() ? "pointer" : "not-allowed", fontSize: 13, fontWeight: 700, fontFamily: C.font, opacity: auditorName.trim() ? 1 : 0.5 }}>Confirm Sign-Off</button>
             </div>
           </div>
         </div>
       )}
 
-      {toast && <div style={{ position: "fixed", top: 24, right: 24, zIndex: 9999, background: toast.type === "error" ? "#991B1B" : C.accent, color: "#fff", padding: "12px 18px", borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: C.font, boxShadow: "0 4px 20px rgba(0,0,0,0.18)" }}>{toast.msg}</div>}
+      {toast && <div style={{ position: "fixed", top: 24, right: 24, zIndex: 9999, background: toast.type === "error" ? T.danger : C.accent, color: "#fff", padding: "12px 18px", borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: C.font, boxShadow: "0 4px 20px rgba(0,0,0,0.18)" }}>{toast.msg}</div>}
 
       {/* Print portal — renders all 4 statements outside #root for clean printing */}
       {printing && createPortal(
-        <div className="nuai-print-portal" style={{ position: "fixed", inset: 0, background: "#fff", zIndex: 99999, overflowY: "auto", padding: "24px", fontFamily: C.font }}>
+        <div className="nuai-print-portal" style={{ position: "fixed", inset: 0, background: T.surface, zIndex: 99999, overflowY: "auto", padding: "24px", fontFamily: C.font }}>
           <div style={{ textAlign: "center", marginBottom: 32, paddingBottom: 24, borderBottom: `2px solid ${C.border}` }}>
             <div style={{ fontSize: 11, color: C.ink500, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>NuAi Financial Reporting</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: C.ink900 }}>{tenantName}</div>
