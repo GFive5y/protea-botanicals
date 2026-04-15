@@ -39,14 +39,14 @@ import { useTenant } from "../../services/tenantService";
 import { usePageContext } from "../../hooks/usePageContext";
 import { SparkLine, DeltaBadge } from "../viz";
 import { T } from "../../styles/tokens";
-import { CheckCircle, AlertTriangle, AlertOctagon } from "lucide-react";
+import { CheckCircle, AlertTriangle, AlertOctagon, X } from "lucide-react";
 
 // Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
 // ── Style helpers ─────────────────────────────────────────────────────────────
 const sKPICard = {
   background: T.surface,
-  border: "0.5px solid #E5E7EB",
+  border: `1px solid ${T.border}`,
   borderRadius: T.radius.lg,
   padding: "18px 20px",
   flex: 1,
@@ -63,12 +63,12 @@ const sKPIValue = {
   lineHeight: 1.2,
 };
 const sKPILabel = {
-  fontSize: "10px",
+  fontSize: "11px",
   fontFamily: T.font,
   fontWeight: 700,
-  letterSpacing: "0.1em",
+  letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: T.ink500,
+  color: T.ink400,
   marginBottom: "6px",
 };
 const sKPISub = {
@@ -80,11 +80,11 @@ const sKPISub = {
 };
 const sTh = {
   textAlign: "left",
-  padding: "8px 12px",
-  fontSize: "10px",
-  letterSpacing: "0.1em",
+  padding: "11px 12px",
+  fontSize: "11px",
+  letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: T.ink500,
+  color: T.ink400,
   borderBottom: `2px solid ${T.border}`,
   fontWeight: 700,
   fontFamily: T.font,
@@ -1048,7 +1048,7 @@ export default function HQTradingDashboard() {
                 fontSize: 12,
                 background: T.surface,
                 border: `1px solid ${T.border}`,
-                borderRadius: 4,
+                borderRadius: T.radius.sm,
                 boxShadow: "none",
               }}
               formatter={(v, name) => [
@@ -1131,7 +1131,7 @@ export default function HQTradingDashboard() {
                 {topSellers.slice(0, 5).map((s, i) => (
                   <tr
                     key={s.name}
-                    style={{ background: i % 2 === 0 ? "#fff" : T.surface }}
+                    style={{ background: i % 2 === 0 ? T.bg : T.surface }}
                   >
                     <td style={{ ...sTd, color: T.ink300, fontSize: 11 }}>
                       {i + 1}
@@ -1409,7 +1409,7 @@ function EODStatusWidget({ data, onNavigateCashUp, onNavigatePOS }) {
             fontSize: 11,
             fontWeight: 700,
             color: colour,
-            fontFamily: "'Inter',sans-serif",
+            fontFamily: T.font,
             textTransform: "uppercase",
             letterSpacing: "0.06em",
           }}
@@ -1420,7 +1420,7 @@ function EODStatusWidget({ data, onNavigateCashUp, onNavigatePOS }) {
           style={{
             fontSize: 12,
             color: colour,
-            fontFamily: "'Inter',sans-serif",
+            fontFamily: T.font,
             marginLeft: 10,
           }}
         >
@@ -1439,7 +1439,7 @@ function EODStatusWidget({ data, onNavigateCashUp, onNavigatePOS }) {
             fontSize: "10px",
             fontWeight: 700,
             cursor: "pointer",
-            fontFamily: "'Inter',sans-serif",
+            fontFamily: T.font,
             textTransform: "uppercase",
             letterSpacing: "0.06em",
             whiteSpace: "nowrap",
@@ -1644,7 +1644,7 @@ function ThirtyDayChart({ data }) {
           <Tooltip
             contentStyle={{
               fontFamily: T.font, fontSize: 11, background: T.surface,
-              border: `1px solid ${T.border}`, borderRadius: 4, boxShadow: "none",
+              border: `1px solid ${T.border}`, borderRadius: T.radius.sm, boxShadow: "none",
             }}
             formatter={(v) => [zar(v), "Revenue"]}
             labelFormatter={(_, payload) =>
@@ -1832,7 +1832,7 @@ function HistoryPanel({ tenantId, onClose }) {
       <div
         style={{
           width: "min(720px, 95vw)",
-          background: "#fff",
+          background: T.surface,
           overflowY: "auto",
           padding: "24px",
           boxShadow: "-4px 0 24px rgba(0,0,0,0.12)",
@@ -1864,13 +1864,13 @@ function HistoryPanel({ tenantId, onClose }) {
             style={{
               background: "none",
               border: "none",
-              fontSize: 18,
               cursor: "pointer",
-              color: T.ink500,
-              lineHeight: 1,
+              color: T.ink400,
+              display: "flex",
+              alignItems: "center",
             }}
           >
-            ✕
+            <X size={18} />
           </button>
         </div>
 
@@ -2023,7 +2023,7 @@ function HistoryPanel({ tenantId, onClose }) {
                     {histTopSellers.map((s, i) => (
                       <tr
                         key={s.name}
-                        style={{ background: i % 2 === 0 ? "#fff" : T.surface }}
+                        style={{ background: i % 2 === 0 ? T.bg : T.surface }}
                       >
                         <td style={{ ...sTd, color: T.ink300, fontSize: 11 }}>
                           {i + 1}
@@ -2171,8 +2171,9 @@ function HistKPI({ label, value }) {
         style={{
           fontSize: "18px",
           fontFamily: T.font,
-          fontWeight: 400,
+          fontWeight: 700,
           color: T.ink900,
+          fontVariantNumeric: "tabular-nums",
         }}
       >
         {value}
