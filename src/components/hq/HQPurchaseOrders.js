@@ -33,63 +33,28 @@ import WorkflowGuide from "../WorkflowGuide";
 import { ChartCard, ChartTooltip } from "../viz";
 import { usePageContext } from "../../hooks/usePageContext";
 import InfoTooltip from "../InfoTooltip";
+import { T as DS } from "../../styles/tokens";
 
-// ── Design tokens ────────────────────────────────────────────────────────────
+// ── Design tokens — bridge to shared DS token system ─────────────────────
+// Local aliases preserve existing T.xxx references throughout this file
 const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
-  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
-  label: {
-    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-    fontSize: 11,
-    fontWeight: 600,
-    letterSpacing: "0.07em",
-    textTransform: "uppercase",
-  },
-  kpi: {
-    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-    fontSize: 24,
-    fontWeight: 400,
-    letterSpacing: "-0.02em",
-    fontVariantNumeric: "tabular-nums",
-  },
-  body: {
-    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-    fontSize: 13,
-    fontWeight: 400,
-  },
-  data: {
-    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-    fontSize: 12,
-    fontWeight: 400,
-    fontVariantNumeric: "tabular-nums",
-  },
+  ...DS,                          // inherit all shared tokens
+  ink150:   DS.border,            // local alias for 1px borders
+  ink075:   DS.bg,                // local alias for subtle backgrounds
+  ink050:   DS.surface,           // local alias for near-white surfaces
+  successBg: DS.successLight,
+  warningBg: DS.warningLight,
+  dangerBg:  DS.dangerLight,
+  infoBg:    DS.infoLight,
+  accentLit: DS.accentLight,
+  fontUi:    DS.font,
+  fontData:  DS.font,
+  shadow:    DS.shadow.sm,
+  shadowMd:  DS.shadow.md,
+  label: { fontFamily: DS.font, fontSize: 11, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase" },
+  kpi:   { fontFamily: DS.font, fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" },
+  body:  { fontFamily: DS.font, fontSize: 13, fontWeight: 400 },
+  data:  { fontFamily: DS.font, fontSize: 12, fontWeight: 400, fontVariantNumeric: "tabular-nums" },
 };
 
 // ── FX Rate Hook ─────────────────────────────────────────────────────────────
@@ -228,9 +193,9 @@ const isOverdue = (po) => {
 
 // ── Shared style objects ─────────────────────────────────────────────────────
 const sCard = {
-  background: "#fff",
+  background: T.surface,
   border: `1px solid ${T.ink150}`,
-  borderRadius: 8,
+  borderRadius: T.radius.md,
   padding: "20px",
   boxShadow: T.shadow,
 };
@@ -238,7 +203,7 @@ const sCard = {
 const mkBtn = (variant = "primary") => {
   const base = {
     padding: "9px 18px",
-    borderRadius: 4,
+    borderRadius: T.radius.sm,
     border: "none",
     cursor: "pointer",
     fontFamily: T.fontUi,
@@ -276,7 +241,7 @@ const mkBtn = (variant = "primary") => {
 const sInput = {
   padding: "9px 12px",
   border: `1px solid ${T.ink150}`,
-  borderRadius: 4,
+  borderRadius: T.radius.sm,
   fontFamily: T.fontUi,
   fontSize: 13,
   width: "100%",
@@ -284,9 +249,9 @@ const sInput = {
   color: T.ink900,
 };
 const sTh = {
-  padding: "10px 14px",
+  padding: "11px 14px",
   textAlign: "left",
-  fontSize: 10,
+  fontSize: 11,
   fontWeight: 700,
   color: T.ink400,
   textTransform: "uppercase",
@@ -309,7 +274,7 @@ function StatusBadge({ status }) {
       style={{
         display: "inline-block",
         padding: "3px 10px",
-        borderRadius: 3,
+        borderRadius: T.radius.sm,
         fontSize: 11,
         fontWeight: 700,
         color: meta.color,
@@ -851,7 +816,7 @@ export default function HQPurchaseOrders({
             background: T.accent,
             color: "#fff",
             padding: "12px 18px",
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             fontSize: 13,
             fontWeight: 500,
             boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
@@ -900,7 +865,7 @@ export default function HQPurchaseOrders({
             style={{
               background: fxLoading ? T.ink075 : T.successBg,
               border: `1px solid ${T.successBd}`,
-              borderRadius: 4,
+              borderRadius: T.radius.sm,
               padding: "6px 12px",
               fontSize: 12,
               color: T.success,
@@ -933,7 +898,7 @@ export default function HQPurchaseOrders({
           gridTemplateColumns: "repeat(4,1fr)",
           gap: "1px",
           background: T.ink150,
-          borderRadius: 6,
+          borderRadius: T.radius.md,
           overflow: "hidden",
           border: `1px solid ${T.ink150}`,
           boxShadow: T.shadow,
@@ -971,7 +936,7 @@ export default function HQPurchaseOrders({
           return (
             <div
               key={k.label}
-              style={{ background: "#fff", padding: "16px 18px" }}
+              style={{ background: T.surface, padding: "16px 18px" }}
             >
               <div
                 style={{
@@ -1168,7 +1133,7 @@ export default function HQPurchaseOrders({
           style={{
             background: T.warningBg,
             border: `1px solid ${T.warningBd}`,
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             padding: "12px 16px",
             marginBottom: 16,
             fontSize: 13,
@@ -1205,7 +1170,7 @@ export default function HQPurchaseOrders({
               onClick={() => setFilter(f.id)}
               style={{
                 padding: "5px 14px",
-                borderRadius: 20,
+                borderRadius: T.radius.full,
                 border: "none",
                 cursor: "pointer",
                 fontSize: 12,
@@ -1473,7 +1438,7 @@ export default function HQPurchaseOrders({
           <div
             style={{
               width: 720,
-              background: "#fff",
+              background: T.surface,
               overflowY: "auto",
               boxShadow: "-4px 0 32px rgba(0,0,0,0.15)",
               display: "flex",
@@ -1490,7 +1455,7 @@ export default function HQPurchaseOrders({
                 alignItems: "center",
                 position: "sticky",
                 top: 0,
-                background: "#fff",
+                background: T.surface,
                 zIndex: 1,
               }}
             >
@@ -1581,14 +1546,14 @@ export default function HQPurchaseOrders({
                       ...{
                         padding: "9px 12px",
                         border: `1px solid ${T.ink150}`,
-                        borderRadius: 4,
+                        borderRadius: T.radius.sm,
                         fontFamily: T.fontUi,
                         fontSize: 13,
                         width: "100%",
                         boxSizing: "border-box",
                         color: T.ink900,
                       },
-                      background: "#fff",
+                      background: T.surface,
                     }}
                   >
                     <option value="">— Select supplier —</option>
@@ -1631,7 +1596,7 @@ export default function HQPurchaseOrders({
                       style={{
                         padding: "9px 12px",
                         border: `1px solid ${T.ink150}`,
-                        borderRadius: 4,
+                        borderRadius: T.radius.sm,
                         fontFamily: T.fontUi,
                         fontSize: 13,
                         width: "100%",
@@ -1663,7 +1628,7 @@ export default function HQPurchaseOrders({
                       style={{
                         padding: "9px 12px",
                         border: `1px solid ${T.ink150}`,
-                        borderRadius: 4,
+                        borderRadius: T.radius.sm,
                         fontFamily: T.fontUi,
                         fontSize: 13,
                         width: "100%",
@@ -1715,7 +1680,7 @@ export default function HQPurchaseOrders({
                   <div
                     style={{
                       border: `1px solid ${T.successBd}`,
-                      borderRadius: 6,
+                      borderRadius: T.radius.md,
                       marginBottom: 14,
                       overflow: "hidden",
                     }}
@@ -1795,7 +1760,7 @@ export default function HQPurchaseOrders({
                                   width: 60,
                                   padding: "3px 6px",
                                   border: `1px solid ${T.ink150}`,
-                                  borderRadius: 3,
+                                  borderRadius: T.radius.sm,
                                   fontFamily: T.fontData,
                                   fontSize: 12,
                                 }}
@@ -1824,7 +1789,7 @@ export default function HQPurchaseOrders({
                                   width: 80,
                                   padding: "3px 6px",
                                   border: `1px solid ${T.ink150}`,
-                                  borderRadius: 3,
+                                  borderRadius: T.radius.sm,
                                   fontFamily: T.fontData,
                                   fontSize: 12,
                                 }}
@@ -1883,7 +1848,7 @@ export default function HQPurchaseOrders({
                       maxHeight: 300,
                       overflowY: "auto",
                       border: `1px solid ${T.ink150}`,
-                      borderRadius: 6,
+                      borderRadius: T.radius.md,
                     }}
                   >
                     {inventoryItems
@@ -2092,7 +2057,7 @@ export default function HQPurchaseOrders({
                           onClick={() => setSelSupplier(s)}
                           style={{
                             padding: "16px 18px",
-                            borderRadius: 6,
+                            borderRadius: T.radius.md,
                             marginBottom: 10,
                             cursor: "pointer",
                             border: `2px solid ${selSupplier?.id === s.id ? T.accent : T.ink150}`,
@@ -2166,7 +2131,7 @@ export default function HQPurchaseOrders({
                             onClick={() => setCatFilter(c)}
                             style={{
                               padding: "4px 12px",
-                              borderRadius: 16,
+                              borderRadius: T.radius.full,
                               border: "none",
                               cursor: "pointer",
                               fontSize: 11,
@@ -2223,7 +2188,7 @@ export default function HQPurchaseOrders({
                                 onClick={() => addItem(p)}
                                 style={{
                                   padding: "12px 14px",
-                                  borderRadius: 6,
+                                  borderRadius: T.radius.md,
                                   marginBottom: 6,
                                   cursor: "pointer",
                                   border: `1px solid ${inOrder ? T.successBd : T.ink150}`,
@@ -2256,7 +2221,7 @@ export default function HQPurchaseOrders({
                                       marginLeft: 8,
                                       fontSize: 10,
                                       padding: "2px 7px",
-                                      borderRadius: 3,
+                                      borderRadius: T.radius.sm,
                                       background: T.ink075,
                                       color: T.ink500,
                                       textTransform: "uppercase",
@@ -2445,7 +2410,7 @@ export default function HQPurchaseOrders({
                             onClick={() => setShipMode(m.id)}
                             style={{
                               padding: "12px 16px",
-                              borderRadius: 6,
+                              borderRadius: T.radius.md,
                               marginBottom: 6,
                               cursor: "pointer",
                               border: `2px solid ${shipMode === m.id ? T.accent : T.ink150}`,
@@ -2677,7 +2642,7 @@ export default function HQPurchaseOrders({
                     justifyContent: "space-between",
                     position: "sticky",
                     bottom: 0,
-                    background: "#fff",
+                    background: T.surface,
                   }}
                 >
                   <button
@@ -2765,8 +2730,8 @@ export default function HQPurchaseOrders({
         >
           <div
             style={{
-              background: "#fff",
-              borderRadius: 10,
+              background: T.surface,
+              borderRadius: T.radius.md,
               width: "100%",
               maxWidth: 680,
               maxHeight: "85vh",
@@ -2875,7 +2840,7 @@ export default function HQPurchaseOrders({
                               flex: 1,
                               textAlign: "center",
                               padding: "7px 3px",
-                              borderRadius: 4,
+                              borderRadius: T.radius.sm,
                               fontSize: 10,
                               background: done ? meta.bg : T.ink075,
                               color: done ? meta.color : T.ink300,
@@ -2946,7 +2911,7 @@ export default function HQPurchaseOrders({
                         key={label}
                         style={{
                           background: T.ink075,
-                          borderRadius: 6,
+                          borderRadius: T.radius.md,
                           padding: "10px 14px",
                         }}
                       >
@@ -2988,7 +2953,7 @@ export default function HQPurchaseOrders({
                     style={{
                       background: T.accentLit,
                       border: `1px solid ${T.accentBd}`,
-                      borderRadius: 6,
+                      borderRadius: T.radius.md,
                       padding: "14px 18px",
                       marginBottom: 20,
                       display: "flex",
@@ -3057,7 +3022,7 @@ export default function HQPurchaseOrders({
                         color: T.ink700,
                         background: T.ink075,
                         padding: "10px 14px",
-                        borderRadius: 6,
+                        borderRadius: T.radius.md,
                       }}
                     >
                       <strong>Notes:</strong> {po.notes}
