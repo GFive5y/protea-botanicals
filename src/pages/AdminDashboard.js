@@ -6,6 +6,7 @@
 // ★ v5.0: WP-NAV Sub-B — URL sync, green banner + tab bar removed
 
 import React, { useState, useEffect, useCallback } from "react";
+import { T as DS } from "../styles/tokens";
 import { useLocation } from "react-router-dom";
 import InfoTooltip from "../components/InfoTooltip";
 import {
@@ -43,33 +44,18 @@ import AdminHRPanel from "../components/AdminHRPanel";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
-  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+  ...DS,
+  ink150:    DS.border,
+  ink075:    DS.bg,
+  ink050:    DS.surface,
+  successBg: DS.successLight,
+  warningBg: DS.warningLight,
+  dangerBg:  DS.dangerLight,
+  infoBg:    DS.infoLight,
+  accentLit: DS.accentLight,
+  fontUi:    DS.font,
+  fontData:  DS.font,
+  shadow:    DS.shadow.sm,
 };
 
 // 4-variant button factory
@@ -78,7 +64,7 @@ const mkBtn = (variant = "primary", size = "md") => {
     display: "inline-flex",
     alignItems: "center",
     gap: 6,
-    borderRadius: 4,
+    borderRadius: T.radius.sm,
     fontFamily: T.fontUi,
     fontWeight: 600,
     letterSpacing: "0.06em",
@@ -127,7 +113,7 @@ function StatCard({ label, value, sub, semantic, onClick }) {
     <div
       onClick={onClick}
       style={{
-        background: "#fff",
+        background: T.surface,
         padding: "16px 18px",
         cursor: onClick ? "pointer" : "default",
         transition: "box-shadow 0.15s",
@@ -142,7 +128,7 @@ function StatCard({ label, value, sub, semantic, onClick }) {
     >
       <div
         style={{
-          fontSize: "10px",
+          fontSize: "11px",
           fontWeight: 700,
           letterSpacing: "0.1em",
           textTransform: "uppercase",
@@ -192,7 +178,7 @@ function MetricGrid({ children }) {
         gap: "1px",
         background: T.ink150,
         border: `1px solid ${T.ink150}`,
-        borderRadius: 6,
+        borderRadius: T.radius.md,
         overflow: "hidden",
         marginBottom: 24,
         boxShadow: T.shadow,
@@ -207,7 +193,7 @@ function SectionLabel({ text }) {
   return (
     <div
       style={{
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: 700,
         letterSpacing: "0.12em",
         textTransform: "uppercase",
@@ -266,7 +252,7 @@ function ScanHeatmap({ heatmapData }) {
               style={{
                 height: 14,
                 width: 12,
-                fontSize: 9,
+                fontSize: 11,
                 color: T.ink400,
                 fontFamily: T.fontUi,
                 display: "flex",
@@ -284,7 +270,7 @@ function ScanHeatmap({ heatmapData }) {
           >
             <div
               style={{
-                fontSize: 8,
+                fontSize: 11,
                 color: T.ink400,
                 fontFamily: T.fontUi,
                 height: 14,
@@ -319,7 +305,7 @@ function ScanHeatmap({ heatmapData }) {
       <div
         style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 8 }}
       >
-        <span style={{ fontSize: 9, color: T.ink400, fontFamily: T.fontUi }}>
+        <span style={{ fontSize: 11, color: T.ink400, fontFamily: T.fontUi }}>
           Less
         </span>
         {[
@@ -341,7 +327,7 @@ function ScanHeatmap({ heatmapData }) {
             }}
           />
         ))}
-        <span style={{ fontSize: 9, color: T.ink400, fontFamily: T.fontUi }}>
+        <span style={{ fontSize: 11, color: T.ink400, fontFamily: T.fontUi }}>
           More
         </span>
       </div>
@@ -751,7 +737,7 @@ export default function AdminDashboard() {
               background: T.dangerBg,
               border: `1px solid ${T.dangerBd}`,
               padding: "12px 16px",
-              borderRadius: 6,
+              borderRadius: T.radius.md,
               marginBottom: 20,
               marginTop: 12,
               color: T.danger,
@@ -852,7 +838,7 @@ export default function AdminDashboard() {
                         dataKey="hour"
                         tick={{
                           fill: T.ink400,
-                          fontSize: 10,
+                          fontSize: 11,
                           fontFamily: T.fontUi,
                         }}
                         axisLine={false}
@@ -863,7 +849,7 @@ export default function AdminDashboard() {
                       <YAxis
                         tick={{
                           fill: T.ink400,
-                          fontSize: 10,
+                          fontSize: 11,
                           fontFamily: T.fontUi,
                         }}
                         axisLine={false}
@@ -898,7 +884,7 @@ export default function AdminDashboard() {
             <div style={{ marginBottom: 24 }}>
               <div
                 style={{
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: 700,
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
@@ -1150,7 +1136,7 @@ export default function AdminDashboard() {
                         dataKey="label"
                         tick={{
                           fill: T.ink400,
-                          fontSize: 10,
+                          fontSize: 11,
                           fontFamily: T.fontUi,
                         }}
                         axisLine={false}
@@ -1160,7 +1146,7 @@ export default function AdminDashboard() {
                       <YAxis
                         tick={{
                           fill: T.ink400,
-                          fontSize: 10,
+                          fontSize: 11,
                           fontFamily: T.fontUi,
                         }}
                         axisLine={false}
@@ -1202,7 +1188,7 @@ export default function AdminDashboard() {
                           type="number"
                           tick={{
                             fill: T.ink400,
-                            fontSize: 10,
+                            fontSize: 11,
                             fontFamily: T.fontUi,
                           }}
                           axisLine={false}
@@ -1214,7 +1200,7 @@ export default function AdminDashboard() {
                           dataKey="metric"
                           tick={{
                             fill: T.ink400,
-                            fontSize: 10,
+                            fontSize: 11,
                             fontFamily: T.fontUi,
                           }}
                           axisLine={false}
@@ -1301,7 +1287,7 @@ export default function AdminDashboard() {
                       gridTemplateColumns: "repeat(auto-fit,minmax(110px,1fr))",
                       gap: "1px",
                       background: T.ink150,
-                      borderRadius: 8,
+                      borderRadius: T.radius.md,
                       overflow: "hidden",
                       border: `1px solid ${T.ink150}`,
                       boxShadow: "0 1px 3px rgba(0,0,0,0.07)",
@@ -1338,14 +1324,14 @@ export default function AdminDashboard() {
                       <div
                         key={s.label}
                         style={{
-                          background: "#fff",
+                          background: T.surface,
                           padding: "14px 16px",
                           textAlign: "center",
                         }}
                       >
                         <div
                           style={{
-                            fontSize: 10,
+                            fontSize: 11,
                             fontWeight: 700,
                             letterSpacing: "0.08em",
                             textTransform: "uppercase",
@@ -1472,7 +1458,7 @@ export default function AdminDashboard() {
                             dataKey="name"
                             tick={{
                               fill: T.ink400,
-                              fontSize: 10,
+                              fontSize: 11,
                               fontFamily: T.fontUi,
                             }}
                             axisLine={false}
@@ -1482,7 +1468,7 @@ export default function AdminDashboard() {
                           <YAxis
                             tick={{
                               fill: T.ink400,
-                              fontSize: 10,
+                              fontSize: 11,
                               fontFamily: T.fontUi,
                             }}
                             axisLine={false}
@@ -1527,7 +1513,7 @@ export default function AdminDashboard() {
                             type="number"
                             tick={{
                               fill: T.ink400,
-                              fontSize: 9,
+                              fontSize: 11,
                               fontFamily: T.fontUi,
                             }}
                             axisLine={false}
@@ -1539,7 +1525,7 @@ export default function AdminDashboard() {
                             dataKey="name"
                             tick={{
                               fill: T.ink400,
-                              fontSize: 9,
+                              fontSize: 11,
                               fontFamily: T.fontUi,
                             }}
                             axisLine={false}
@@ -1571,7 +1557,7 @@ export default function AdminDashboard() {
                 style={{
                   width: "100%",
                   borderCollapse: "collapse",
-                  background: "#fff",
+                  background: T.surface,
                   border: `1px solid ${T.ink150}`,
                   fontSize: "13px",
                   fontFamily: T.fontUi,
@@ -1586,7 +1572,7 @@ export default function AdminDashboard() {
                           style={{
                             padding: "10px 12px",
                             textAlign: "left",
-                            fontSize: "10px",
+                            fontSize: "11px",
                             letterSpacing: "0.1em",
                             textTransform: "uppercase",
                             fontWeight: 700,
@@ -1647,8 +1633,8 @@ export default function AdminDashboard() {
                                     ? T.info
                                     : T.ink500,
                               padding: "2px 8px",
-                              borderRadius: 3,
-                              fontSize: "10px",
+                              borderRadius: T.radius.sm,
+                              fontSize: "11px",
                               fontWeight: 700,
                               letterSpacing: "0.1em",
                               textTransform: "uppercase",
