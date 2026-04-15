@@ -501,56 +501,110 @@ States:
 - Semantic warning: value colour T.warningText
 - Semantic danger: value colour T.dangerText
 
-### 8.2 Store/Content Card
+### 8.2 Card / Box System
 
-The primary content container. Used for store comparison cards, detail panels.
+**The Group Portal store card is the canonical reference for ALL cards and boxes
+in NuAi.** Source: src/components/group/NetworkDashboard.js — StoreCard function.
 
+#### The "Lines Stop Short" Principle
+
+The visual effect where row dividers stop short of the card wall is NOT a special
+technique. It is a direct consequence of one rule:
+
+> The card has padding: T.inset.card (16px) on all sides.
+> Row borderBottom lines run full content width.
+> Content width is already 16px inside the card wall.
+> The line never touches the wall.
+
+This is what makes NuAi cards look sophisticated rather than like an Excel grid.
+Every card, every panel, every box in the system must follow this principle.
+
+#### Card Container (canonical)
 ```js
-background: T.surface          // #ffffff
-border: `1px solid ${T.border}` // 1px solid #dee2e6
-borderRadius: T.radius.lg       // 12px
-padding: T.inset.card           // 16px
+// From NetworkDashboard.js StoreCard — DO NOT DEVIATE
+background: T.surface               // #ffffff
+border: `1px solid ${T.border}`   // 1px #dee2e6
+borderRadius: T.radius.lg           // 12px
+padding: T.inset.card               // 16px ALL SIDES — non-negotiable
 display: "flex"
 flexDirection: "column"
-gap: T.gap.md                   // 12px between internal sections
+gap: T.gap.md                       // 12px between internal sections
 ```
 
-Card header (name + badge):
+#### Card Header (name + badge)
 ```js
-// Name
-fontSize: T.text.base           // 14px
-fontWeight: T.weight.medium     // 500
+// Store/content name
+fontSize: T.text.base               // 14px
+fontWeight: T.weight.medium         // 500
 color: T.ink900
-marginBottom: T.gap.xs          // 4px
+marginBottom: T.gap.xs              // 4px
 
 // Industry badge
 display: "inline-block"
-background: badge.bg            // from INDUSTRY_BADGE map
+background: badge.bg                // from INDUSTRY_BADGE map
 color: badge.fg
-fontSize: T.text.xs             // 11px
-fontWeight: T.weight.semibold   // 600
+fontSize: T.text.xs                 // 11px
+fontWeight: T.weight.semibold       // 600
 padding: `${T.pad.xs}px ${T.pad.sm}px`  // 4px 8px
-borderRadius: T.radius.sm       // 4px
+borderRadius: T.radius.sm           // 4px
 letterSpacing: "0.04em"
 ```
 
-Card metric rows:
+#### Card Metric Rows (the key pattern)
 ```js
+// Each row div (NOT a table row — a flex div):
 display: "flex"
 justifyContent: "space-between"
 alignItems: "baseline"
-paddingBottom: T.gap.sm         // 8px
-borderBottom: `1px solid ${T.border}`  // last row: borderBottom "none"
-fontSize: T.text.sm             // 12px
+paddingBottom: T.gap.sm             // 8px — breathing room below text
+borderBottom: `1px solid ${T.border}`  // the divider line
+// LAST ROW ONLY: borderBottom: "none"
+fontSize: T.text.sm                 // 12px
 
-// Label column
-color: T.ink600                 // #6c757d
+// Label (left):
+color: T.ink600                     // muted — recedes
+fontWeight: T.weight.normal         // 400
 
-// Value column
-color: semantic or T.ink900
-fontWeight: T.weight.semibold   // 600
-fontVariantNumeric: "tabular-nums"
+// Value (right):
+color: T.ink900 or semantic colour
+fontWeight: T.weight.semibold       // 600
+fontVariantNumeric: "tabular-nums"  // MANDATORY on all numbers
 ```
+
+#### Card Section Sub-heading (e.g. "TOP PRODUCTS")
+```js
+fontSize: T.text.xs                 // 11px
+fontWeight: T.weight.semibold       // 600
+color: T.ink400                     // whisper — recedes
+textTransform: "uppercase"
+letterSpacing: "0.08em"
+// Sits above a borderTop to visually separate the sub-section:
+borderTop: `1px solid ${T.border}`
+paddingTop: T.gap.sm                // 8px
+```
+
+#### Box Size Variants
+```js
+// Standard card (store comparison, content panels)
+borderRadius: T.radius.lg           // 12px
+padding: T.inset.card               // 16px
+
+// Compact panel (sidebar cards, nested boxes)
+borderRadius: T.radius.md           // 8px
+padding: `${T.pad.md}px ${T.pad.lg}px`  // 12px 16px
+
+// KPI tile (metric-only, small)
+borderRadius: T.radius.lg           // 12px — same radius, smaller padding
+padding: "18px 20px 16px"
+border: "0.5px solid #E5E7EB"      // slightly lighter than T.border
+```
+
+#### NEVER on any card/box
+- `background: "#fff"` — always use T.surface
+- `borderRadius: 6` or any raw number — always T.radius.lg / T.radius.md
+- padding less than 12px on any visible card
+- coloured top border (use alert bar inside instead)
+- box-shadow stronger than T.shadow.md at rest
 
 ### 8.3 Section Label / Divider Heading
 
@@ -651,55 +705,38 @@ neutral: { bg: T.neutralLight, color: T.neutralText }
 
 ### 8.6 Data Tables
 
-Table container:
-```js
-width: "100%"
-borderCollapse: "collapse"
-fontFamily: T.font
-```
+> **Full table system spec is in Part 16.** This section is a summary.
+> Part 16 is the authoritative source — read it before building or editing any table.
 
-Header cell:
-```js
-textAlign: "left"
-padding: "8px 12px"  // or T.inset.tight
-fontSize: T.text.xs              // 11px
-letterSpacing: "0.06-0.1em"
-textTransform: "uppercase"
-color: T.ink400                  // #adb5bd — whisper
-borderBottom: `2px solid ${T.border}`
-fontWeight: T.weight.bold        // 700
-background: T.surface
-whiteSpace: "nowrap"
-```
+The table system is the card/box system (8.2) applied to structured data.
+The same "lines stop short" principle applies — the card wrapper provides the
+16px inset, the table rows provide the dividers.
 
-Data cell:
+Quick reference:
 ```js
-padding: "9px 12px"
-borderBottom: `1px solid ${T.border}`
-fontSize: 13                     // slightly below T.text.base
-fontFamily: T.font
+// Card wrapper around every primary table:
+background: T.surface, border: `1px solid ${T.border}`
+borderRadius: T.radius.lg, padding: "0 16px", overflow: "auto"
+
+// Header cell (sTh):
+padding: "11px 12px", fontSize: 11, fontWeight: 700
+letterSpacing: "0.08em", textTransform: "uppercase"
+color: T.ink400, borderBottom: `2px solid ${T.border}`
+background: T.surface, whiteSpace: "nowrap"
+
+// Data cell (sTd):
+padding: "11px 12px", fontSize: 13, fontFamily: T.font
+borderBottom: `1px solid ${T.border}`, color: T.ink900
 verticalAlign: "middle"
-color: T.ink900
+
+// Numeric cell — add: fontVariantNumeric: "tabular-nums"
+// Financial figures — add: textAlign: "right"
+// Row zebra: even T.surface / odd T.surfaceAlt
+// Row hover: T.surfaceHover
 ```
 
-Numeric data cell (any number in a table):
-```js
-// Same as data cell PLUS:
-fontVariantNumeric: "tabular-nums"
-// and for financial figures, textAlign: "right"
-```
-
-Row zebra striping:
-```js
-// Even rows: background T.surface (#ffffff)
-// Odd rows:  background T.surfaceAlt (#f1f3f5)
-// Or: no zebra, rely on hover
-```
-
-Row hover:
-```js
-background: T.surfaceHover      // #e9ecef on hover
-```
+See Part 16 for: two-tier system, type badges, compact tables,
+compliance table, and prohibited patterns.
 
 ### 8.7 Tabs / Sub-Navigation
 
@@ -1400,6 +1437,25 @@ CHARTS
 - [ ] Axes: no axisLine, no tickLine, fill #94A3B8, fontSize 10, fontFamily T.font
 - [ ] isAnimationActive={false} on sparklines and area charts
 
+CARDS / BOXES (Part 8.2)
+- [ ] Card background: T.surface — never "#fff" string
+- [ ] Card border: 1px solid T.border
+- [ ] Card radius: T.radius.lg (12px) for primary cards — never hardcoded 6/8
+- [ ] Card padding: T.inset.card (16px) all sides for content cards
+- [ ] Row dividers: 1px solid T.border, paddingBottom T.gap.sm (8px)
+- [ ] Last row in card: borderBottom "none"
+- [ ] Row values: fontWeight semibold, fontVariantNumeric tabular-nums
+
+TABLES (Part 16)
+- [ ] Card wrapper has padding: "0 16px" — if missing, lines bleed to edge
+- [ ] Card wrapper uses T.radius.lg — never hardcoded 6
+- [ ] sTh color is T.ink400 — never T.ink500 or T.ink600
+- [ ] sTh fontSize is 11 — never 9 or 10
+- [ ] sTd fontFamily is T.font — never MONO or Courier
+- [ ] Type/status columns use badge chips — never plain lowercase text
+- [ ] SKU/reference text uses T.font at 11px color T.ink400
+- [ ] Numbers have fontVariantNumeric: tabular-nums
+
 INTERACTION
 - [ ] Clickable cards have hover shadow + translateY(-1px)
 - [ ] All transitions use 0.15s-0.18s (not 0.3s, not instant)
@@ -1423,9 +1479,235 @@ INTERACTION
 | CLOSED | HQLoyalty.js | outer div background: T.surface | → transparent |
 | CLOSED | HQDashboard.js | content div no background | → background: T.bg |
 | CLOSED | HQLoyalty.js | page header background: T.surface | → transparent |
+| CLOSED | HQStock.js S285 | DM Mono 36x + Outfit | → T.font |
+| CLOSED | HQStock.js S285 | 11 emoji panel icons | → Lucide |
+| CLOSED | HQStock.js S285 | borderRadius 6/5 on cards | → T.radius.lg/md |
+| CLOSED | HQStock.js S285 | background "#fff" on cards | → T.surface |
+| CLOSED | HQStock.js S285 | T.ink500 on section labels | → T.ink400 + accent bar |
+| CLOSED | HQStock.js S285 | fontSize 9/10 on 43 instances | → 11px floor |
+| CLOSED | StockIntelPanel.js S285 | MONO, 7 emoji, plain SectionLabel | → T.font + Lucide + accent bar |
+| CLOSED | StockChannelPanel.js S285 | MONO 6x, emoji, T.ink500 header | → T.font + Lucide + accent bar |
+| CLOSED | StockPricingPanel.js S285 | MONO via Ty.data, 14 emoji | → T.font + Lucide |
+| CLOSED | StockPricingPanel.js S285 | missing padding "0 16px" on table | → added |
+| CLOSED | StockChannelPanel.js S285 | missing padding "0 16px" on table | → added |
+| OPEN | HQStock.js FoodMovements | TYPE column plain lowercase text | → badge chips (Part 16.4) |
+| OPEN | StockReceiveHistoryPanel.js | full table system unification | → Part 16 pass pending |
+| OPEN | HQTradingDashboard.js | const MONO + emoji + hardcoded radius | → T.font + Lucide + tokens |
 
 ---
 
-*NUAI-VISUAL-SPEC.md · v1.0 · Session 284 · 15 April 2026*
+## PART 16 — TABLE SYSTEM
+
+**Source of truth:** This spec is derived directly from the Group Portal
+(src/components/group/NetworkDashboard.js — StoreCard). Every table in NuAi
+must produce the same visual feeling as a Group Portal store card.
+
+### 16.1 The Core Principle
+
+The Group Portal store card and a data table are the SAME design pattern:
+a white box with internal content rows separated by thin lines that stop
+short of the box wall. The mechanism is identical:
+
+> **Card has `padding: 16px` (all sides) → row dividers stop 16px from wall.**
+> For tables: card has `padding: "0 16px"` (horizontal) → td borderBottom
+> stops 16px from the card edge. Same visual. Same principle.
+
+This is the difference between a spreadsheet and a premium data interface.
+
+---
+
+### 16.2 Two Table Tiers
+
+#### Tier 1 — Primary Table
+Used for full-tab data views: Items, Movements, Pricing, Receipts, Movements.
+Lives inside its own card wrapper on a T.bg grey page.
+
+```js
+// ── Card wrapper ──────────────────────────────────────────────────────────
+{
+  background: T.surface,            // #ffffff
+  border: `1px solid ${T.border}`, // #dee2e6
+  borderRadius: T.radius.lg,        // 12px — same as store card
+  overflow: "auto",
+  padding: "0 16px",               // THE KEY LINE — horizontal inset only
+                                    // table header provides top/bottom spacing
+}
+
+// ── Table element ─────────────────────────────────────────────────────────
+{
+  width: "100%",
+  borderCollapse: "collapse",
+  fontFamily: T.font,
+}
+
+// ── Header cell (sTh) ─────────────────────────────────────────────────────
+const sTh = {
+  textAlign: "left",
+  padding: "11px 12px",            // 11px gives breathing room
+  fontSize: 11,                     // T.text.xs
+  fontWeight: 700,                  // T.weight.bold
+  letterSpacing: "0.08em",         // NOT 0.1em — matches section labels
+  textTransform: "uppercase",
+  color: T.ink400,                  // WHISPER — not T.ink500, not T.ink600
+  borderBottom: `2px solid ${T.border}`,
+  background: T.surface,
+  whiteSpace: "nowrap",
+  fontFamily: T.font,
+};
+
+// ── Data cell (sTd) ───────────────────────────────────────────────────────
+const sTd = {
+  padding: "11px 12px",
+  borderBottom: `1px solid ${T.border}`,
+  fontSize: 13,
+  fontFamily: T.font,
+  verticalAlign: "middle",
+  color: T.ink900,
+};
+```
+
+#### Tier 2 — Compact Table
+Used for tables embedded inside a panel card (e.g. Channel Stock Hold table,
+Recent Movements in Overview). No separate card wrapper — inherits the panel's
+own 16px padding. Same sTh/sTd spec, slightly reduced padding.
+
+```js
+// No card wrapper — sits inside an existing card with padding: "0 16px"
+// or inside a panel with T.inset.card padding
+
+// Compact sTh:
+padding: "8px 12px"   // reduced from 11px
+// Everything else identical to Tier 1 sTh
+
+// Compact sTd:
+padding: "8px 12px"   // reduced from 11px
+fontSize: 12           // slightly smaller
+// Everything else identical to Tier 1 sTd
+```
+
+---
+
+### 16.3 Row Patterns
+
+#### Zebra striping
+```js
+// Even rows (0, 2, 4…):
+background: T.surface       // #ffffff
+// Odd rows (1, 3, 5…):
+background: T.surfaceAlt    // #f1f3f5 — subtle, not stark
+// Row hover:
+background: T.surfaceHover  // #e9ecef
+```
+
+#### Semantic row state (e.g. out-of-stock, critical)
+```js
+// Warning row:
+background: T.warningLight
+borderLeft: `3px solid ${T.warning}`
+// Danger row:
+background: T.dangerLight
+borderLeft: `3px solid ${T.danger}`
+// Normal rows: borderLeft: "3px solid transparent" (preserves layout)
+```
+
+#### Numeric cells
+```js
+// Add to sTd spread for any number:
+fontVariantNumeric: "tabular-nums"   // MANDATORY
+// For financial amounts (R values):
+textAlign: "right"
+```
+
+---
+
+### 16.4 Type/Status Badges Inside Table Cells
+
+The movement type badge (PURCHASE IN / SALE OUT / ADJUSTMENT) is the canonical
+example. It should look like a pill label, not plain text.
+
+```js
+{
+  display: "inline-block",
+  fontSize: 11,                     // T.text.xs
+  fontWeight: 600,                  // T.weight.semibold
+  padding: "2px 8px",
+  borderRadius: T.radius.sm,        // 4px
+  border: `1px solid ${T.border}`,
+  background: T.bg,                 // very light grey — sits on white row
+  color: T.ink600,
+  letterSpacing: "0.05em",
+  textTransform: "uppercase",
+  whiteSpace: "nowrap",
+}
+
+// Semantic variants (for status columns):
+// SUCCESS:  background T.successLight, color T.successText, border T.successBd
+// WARNING:  background T.warningLight, color T.warningText, border T.warningBd
+// DANGER:   background T.dangerLight,  color T.dangerText,  border T.dangerBd
+// INFO:     background T.infoLight,    color T.infoText,    border T.infoBd
+```
+
+---
+
+### 16.5 SKU / Reference Chips
+
+Technical identifiers (SKUs, RCV refs, PO numbers) inside table cells.
+These are NOT in monospace. They use T.font like everything else.
+
+```js
+{
+  fontSize: 11,          // T.text.xs — smaller than data cell
+  color: T.ink400,       // whisper — supporting info, not primary
+  fontFamily: T.font,    // NEVER fontMono — this is not code
+  marginTop: 2,          // sits below item name
+}
+```
+
+---
+
+### 16.6 Empty State Inside Table
+```js
+// Single-cell spanning all columns:
+<td colSpan={N} style={{
+  ...sTd,
+  textAlign: "center",
+  color: T.ink400,
+  padding: "40px 32px",
+  fontStyle: "normal",    // no italics
+}}>
+  {message}
+</td>
+```
+
+---
+
+### 16.7 Compliance Table (updated each session)
+
+| Component | padding "0 16px" | T.radius.lg | sTh T.ink400 | Type badges |
+|---|---|---|---|---|
+| HQStock Recent Movements | yes | yes | yes | yes |
+| HQStock FoodMovements | yes | yes | yes | no (plain text) |
+| HQStock FoodItems | yes | yes | yes | N/A |
+| HQStock CannabisItemsView | yes | yes | yes | N/A |
+| StockPricingPanel | yes S285 | yes S285 | yes S285 | N/A |
+| StockChannelPanel | yes S285 | yes existing | yes S285 | N/A |
+| StockReceiveHistoryPanel | pending | pending | pending | pending |
+
+---
+
+### 16.8 NEVER on any table
+
+- `background: "#fff"` on card wrapper — always T.surface
+- `borderRadius: 6` or any raw number — always T.radius.lg
+- Missing `padding: "0 16px"` on card wrapper — lines will bleed to card edge
+- `color: T.ink500` on sTh — always T.ink400 (whisper)
+- `fontSize: 9` or `fontSize: 10` anywhere in the table — 11px minimum
+- `fontFamily: MONO` on any table cell — T.font everywhere
+- Plain lowercase text for type/status values — always a badge chip
+- `borderCollapse: "separate"` — always collapse
+
+---
+
+*NUAI-VISUAL-SPEC.md · v1.1 · Session 285 · 16 April 2026*
 *Updated each session in-place when new violations are found or specs added.*
 *This document does not expire. It grows.*
