@@ -112,8 +112,10 @@ export const T = {
   ink900: "#212529",   // primary text
   ink700: "#495057",   // secondary text
   ink600: "#6c757d",   // muted text / labels
-  ink400: "#adb5bd",   // disabled / placeholder
-  ink200: "#dee2e6",   // very subtle text
+  ink500: "#868e96",   // medium-muted — supporting info, timestamps, sub-labels
+  ink400: "#adb5bd",   // whisper — uppercase section labels, placeholders
+  ink300: "#ced4da",   // very subtle — dimmed secondary, decorative
+  ink200: "#dee2e6",   // near-invisible — watermarks, disabled
 
   // ─── BRAND / ACCENT ──────────────────────────────────────────
   // Cannabis retail default — overridden per profile in getTokens()

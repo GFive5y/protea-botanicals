@@ -64,11 +64,11 @@ const sMetricBase = {
 };
 const sTh = {
   textAlign: "left",
-  padding: "10px 12px",
-  fontSize: "10px",
-  letterSpacing: "0.1em",
+  padding: "11px 12px",
+  fontSize: "11px",
+  letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: T.ink500,
+  color: T.ink400,
   borderBottom: `2px solid ${T.border}`,
   fontWeight: 700,
   fontFamily: T.font,
@@ -1164,11 +1164,17 @@ export default function HQStock() {
                     >
                       <span
                         style={{
-                          fontSize: "11px",
+                          display: "inline-block",
+                          fontSize: 11,
                           fontWeight: 600,
-                          color: T.ink700,
+                          padding: "2px 8px",
+                          borderRadius: T.radius.sm,
+                          border: `1px solid ${T.border}`,
+                          background: T.bg,
+                          color: T.ink600,
+                          letterSpacing: "0.05em",
                           textTransform: "uppercase",
-                          letterSpacing: "0.06em",
+                          whiteSpace: "nowrap",
                         }}
                       >
                         {(m.movement_type || "").replace(/_/g, " ")}
@@ -2511,14 +2517,17 @@ export default function HQStock() {
                       <td style={sTd}>
                         <span
                           style={{
-                            fontSize: "9px",
-                            padding: "2px 7px",
-                            borderRadius: "3px",
+                            display: "inline-block",
+                            fontSize: 11,
+                            fontWeight: 600,
+                            padding: "2px 8px",
+                            borderRadius: T.radius.sm,
+                            border: `1px solid ${T.border}`,
                             background: T.bg,
-                            color: T.ink500,
+                            color: T.ink600,
+                            letterSpacing: "0.05em",
                             textTransform: "uppercase",
-                            letterSpacing: "0.08em",
-                            fontWeight: 700,
+                            whiteSpace: "nowrap",
                           }}
                         >
                           {(m.movement_type || "").replace(/_/g, " ")}
