@@ -276,6 +276,12 @@ LL-268: DS6 batch scripts check hasLocalT to decide whether to add a bridge.
 ---
 
 ## NEXT PRIORITIES (choose with owner at session start)
+FIN SUITE NOTE FOR NEXT AGENT: The financial data collection layer is complete
+but the CA-facing OUTPUT layer is missing. Read LOOP-FIN-002 through LOOP-FIN-005
+in PENDING-ACTIONS.md before any fin work. The most impactful item is
+LOOP-FIN-002 (PDF Audit Package EF) — spec in WP-FINANCIALS-v1_1.md Section 7.5.
+Also read FIN-AUDIT_v1_0.md for the full technical gap map (10 confirmed gaps).
+
 1. **LOOP-NEW-005** — MediCare Revenue MTD R0 fix (Claude Code, dispensing_log source)
 2. **LOOP-NEW-006** — MediCare IFRS BS gap R76,906 (Supabase MCP)
 3. **LOOP-010/011** — Pre-demo: Medi Rec Run Depreciation + 20 IFRS sign-offs

@@ -109,6 +109,95 @@ Files ruled out: AINSBar.js, useNavIntelligence.js, HQLoyalty.js, IntelStrip.js.
 
 ---
 
+### LOOP-FIN-002 — PDF Audit Package EF (WP-FINANCIALS Phase 7.5 — never built)
+Status: OPEN · Flagged as incomplete — specced in WP-FINANCIALS but no EF deployed
+Priority: HIGH for demo · Ref: docs/WP-FINANCIALS-v1_1.md Section 7.5
+
+What a CA actually needs vs what we have:
+
+BUILT:
+  - 4 IFRS statement views (browser print-to-PDF via Lucide Printer icon)
+  - 15 financial disclosure notes (auto-generated from live data)
+  - Year-end close wizard
+  - Trial balance CSV export button
+  - Journal system
+
+NOT BUILT — WP-FINANCIALS Phase 7.5 spec exists, EF not deployed:
+  generate-financial-statements Edge Function
+  Input:  { tenant_id, period_start, period_end, include_notes: true }
+  Output: PDF download URL (Supabase Storage, 7-day signed URL)
+  Contents:
+    Page 1:   Cover — entity name, period, "Prepared by NuAi Financial Suite"
+    Page 2:   Directors' Responsibility Statement (template)
+    Page 3:   Income Statement (IFRS)
+    Page 4:   Balance Sheet
+    Page 5:   Statement of Cash Flows
+    Page 6:   Statement of Changes in Equity
+    Pages 7+: Notes 1–15 (fully populated from live data)
+    Appendix A: Fixed Asset Register (cost / accumulated dep / NBV)
+    Appendix B: Expense Schedule (all 47 expenses, categorised)
+    Appendix C: VAT Summary (output/input by period)
+    Appendix D: Trial Balance (all accounts, Dr/Cr)
+  Tech: Deno Edge Function + jsPDF or PDFKit
+  Storage: Supabase Storage bucket "financial-statements"
+
+WHY THIS MATTERS FOR THE 12 MAY DEMO:
+  A CA cannot take a browser print-to-PDF to a client meeting.
+  A properly formatted, branded PDF is the difference between
+  "interesting demo" and "I want this for all my clients".
+  The fee-saving argument (R17k-40k/audit → 8-16hrs vs 40-80hrs)
+  only lands if the CA can see the output document.
+
+Build estimate: 1-2 sessions. Spec is in docs/WP-FINANCIALS-v1_1.md.
+Next agent: read WP-FINANCIALS-v1_1.md Section 7.5 before touching anything.
+Close when: EF deployed, PDF accessible from IFRS Statements screen via Download button.
+
+### LOOP-FIN-003 — Revenue VAT Exclusion (GAP-01 from FIN-AUDIT_v1_0.md)
+Status: OPEN · Code fix · Ref: docs/FIN-AUDIT_v1_0.md Section 3
+Priority: HIGH — every CA will spot this immediately
+
+Issue: Revenue shown as VAT-inclusive (R473,480 actual → should be ~R411,722 ex-VAT)
+Impact: Revenue overstated by 15% (~R61,758). Every downstream metric wrong.
+Fix: In HQProfitLoss.js and HQFinancialStatements.js, divide order revenue by 1.15
+     where tenant is VAT-registered (check tenant_config.vat_registered first).
+     Non-VAT-registered tenants show raw totals.
+Effort: ~30 min. Verified by: P&L revenue drops ~15%, gross margin % increases.
+
+### LOOP-FIN-004 — Trial Balance Excel Export (CA working papers format)
+Status: OPEN · Nice-to-have for demo
+Priority: MEDIUM — CAs import TB into Sage/MYOB for working papers
+
+Issue: Trial Balance export exists as CSV only. CAs need Excel (.xlsx) with:
+  - Account code | Account name | Account type | Debit | Credit | Net
+  - Sorted by account code
+  - Formatted for direct import into Sage One / MYOB / Xero
+Current: CSV export button exists on IFRS Statements screen
+Fix: Add .xlsx export using existing chart_of_accounts data + journal_lines
+     Ref: WP-FINANCIALS-v1_1.md Section 7 Excel Export spec
+Effort: ~2 hours (use SheetJS in HQFinancialStatements.js)
+
+### LOOP-FIN-005 — Provisional Tax + Compliance Calendar display
+Status: OPEN · Post-demo backlog unless session time permits
+Priority: LOW for 12 May · HIGH for first paying CA client
+
+What a CA needs that we don't show:
+  a) Provisional tax calculation:
+     - IRP6 due dates: 31 Aug 2026 (1st payment) + 28 Feb 2027 (2nd)
+     - Estimate: net_profit × 28% (corporate tax rate) / 2 per payment
+     - Display on P&L as "Estimated Tax Provision" line
+  b) Compliance calendar:
+     - VAT due dates per period (bi-monthly = every 2 months + 25 days)
+     - Year-end deadline (based on financial_year_end in tenant_config)
+     - PAYE submissions (if staff payroll active — 7th of following month)
+  c) SARS IT14 code mapping:
+     - Every chart_of_accounts row needs a SARS IT14 code
+     - Required for income tax return submission
+     - Currently: 40 COA rows, 0 have IT14 codes
+Ref: Session (3877e713) — "What nobody has built" panel.
+Build estimate: 1 session for provisional tax + basic calendar.
+
+---
+
 ## WATCH ITEMS
 
 ### WATCH-001 — SAHPRA export CSV format
