@@ -4163,7 +4163,7 @@ export default function HQLoyalty() {
     <div
       style={{
         fontFamily: T.font,
-        background: T.surface,
+        background: "transparent",
         minHeight: "100%",
         scrollbarGutter: "stable",
       }}
