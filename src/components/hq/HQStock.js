@@ -16,17 +16,23 @@ import StockChannelPanel from "./StockChannelPanel";
 import StockReceiveHistoryPanel from "./StockReceiveHistoryPanel";
 import HQPurchaseOrders from "./HQPurchaseOrders";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import {
+  Package, Tag, ShoppingCart, Globe, AlignJustify, LayoutGrid, Table2,
+  Star, Loader2, Camera, Trash2, X, AlertTriangle, Check,
+  Leaf, Gem, FlaskConical, Wrench, Heart, Wind, Sprout, Lightbulb,
+  ScrollText, Shirt, Cookie,
+} from "lucide-react";
 import { SparkLine, BulletChart } from "../viz";
 import StockIntelPanel from "./StockIntelPanel";
 import ActionCentre from "../shared/ActionCentre";
 import {
   PRODUCT_WORLDS,
   itemMatchesWorld,
+  worldForItem,
   CATEGORY_LABELS,
   CATEGORY_ICONS,
 } from "./ProductWorlds";
 import { T } from "../../styles/tokens";
-const MONO = "'DM Mono','Courier New',monospace";
 // Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
 const sInput = {
@@ -53,7 +59,7 @@ const sMetricBase = {
   borderRadius: "3px",
   padding: "3px 8px",
   fontSize: "11px",
-  fontFamily: "'DM Mono','Courier New',monospace",
+  fontFamily: T.font,
   whiteSpace: "nowrap",
 };
 const sTh = {
@@ -332,6 +338,25 @@ const isLowFn = (item) =>
   item.reorder_level != null &&
   (item.quantity_on_hand || 0) <= item.reorder_level;
 
+// Module-scoped Lucide world icon map — referenced by both ShopTab and HQStock
+const WORLD_ICON_MAP = {
+  all: <Package size={18} color={T.ink400} />,
+  flower: <Leaf size={18} color="#2d6a4f" />,
+  hash: <Gem size={18} color="#6c757d" />,
+  concentrate: <Gem size={18} color="#2980b9" />,
+  vape: <Wind size={18} color="#6c757d" />,
+  preroll: <ScrollText size={18} color="#e67e22" />,
+  edible: <Cookie size={18} color="#e67e22" />,
+  seeds: <Sprout size={18} color="#2d6a4f" />,
+  substrate: <Sprout size={18} color="#40916c" />,
+  nutrients: <FlaskConical size={18} color="#2980b9" />,
+  equipment: <Lightbulb size={18} color="#e67e22" />,
+  wellness: <Heart size={18} color="#2d6a4f" />,
+  papers: <ScrollText size={18} color="#6c757d" />,
+  accessories: <Wrench size={18} color="#6c757d" />,
+  merch: <Shirt size={18} color="#6c757d" />,
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // SHOP TAB — visual product grid, image upload, visibility + featured controls
 // Owner manages exactly what the website shows from this panel
@@ -592,14 +617,13 @@ function ShopTab({ items, tenantId, onRefresh }) {
                     }}
                   />
                 ) : (
-                  <span
-                    style={{
-                      fontSize: 40,
-                      filter: isHidden ? "grayscale(1)" : "none",
-                    }}
-                  >
-                    {CAT_ICON_MAP[item.category] || "🌿"}
-                  </span>
+                  <div style={{
+                    width:40,height:40,
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    filter: isHidden ? "grayscale(1)" : "none",
+                  }}>
+                    {WORLD_ICON_MAP[worldForItem(item)?.id] || <Package size={22} color={T.ink400} />}
+                  </div>
                 )}
 
                 {/* Status badge */}
@@ -639,7 +663,7 @@ function ShopTab({ items, tenantId, onRefresh }) {
                       borderRadius: 10,
                     }}
                   >
-                    ★ FEATURED
+                    <Star size={9} fill="currentColor" strokeWidth={0} style={{marginRight:2,verticalAlign:"middle"}} />FEATURED
                   </div>
                 )}
 
@@ -666,7 +690,7 @@ function ShopTab({ items, tenantId, onRefresh }) {
                     style={{ display: "none" }}
                     onChange={(e) => handleImageUpload(item, e.target.files[0])}
                   />
-                  {uploading[item.id] ? "⏳" : "📷"}{" "}
+                  {uploading[item.id] ? <Loader2 size={12} style={{animation:"spin 1s linear infinite",verticalAlign:"middle"}} /> : <Camera size={12} style={{verticalAlign:"middle"}} />}{" "}
                   {item.image_url ? "Replace" : "Add photo"}
                 </label>
               </div>
@@ -756,7 +780,7 @@ function ShopTab({ items, tenantId, onRefresh }) {
                       cursor: "pointer",
                     }}
                   >
-                    {item.is_featured ? "★ Featured" : "Feature"}
+                    {item.is_featured ? <><Star size={9} fill="currentColor" strokeWidth={0} style={{marginRight:2,verticalAlign:"middle"}} /> Featured</> : "Feature"}
                   </button>
                   {item.image_url && (
                     <button
@@ -772,7 +796,7 @@ function ShopTab({ items, tenantId, onRefresh }) {
                         cursor: "pointer",
                       }}
                     >
-                      🗑
+                      <Trash2 size={13} />
                     </button>
                   )}
                 </div>
@@ -1086,7 +1110,7 @@ export default function HQStock() {
               }}
               onClick={() => setMovItem(null)}
             >
-              ✕
+              <X size={13} />
             </button>
           </div>
           <div
@@ -1152,7 +1176,7 @@ export default function HQStock() {
                       <span
                         style={{
                           fontSize: "12px",
-                          fontFamily: MONO,
+                          fontFamily: T.font,
                           color: pos ? T.success : T.danger,
                           fontWeight: 600,
                         }}
@@ -1419,7 +1443,7 @@ export default function HQStock() {
                   fontSize: "22px",
                   fontWeight: 400,
                   color: T.ink900,
-                  fontFamily: MONO,
+                  fontFamily: T.font,
                   lineHeight: 1,
                   marginBottom: "4px",
                   letterSpacing: "-0.02em",
@@ -1533,7 +1557,7 @@ export default function HQStock() {
                         style={{
                           padding: "7px 10px",
                           borderBottom: "1px solid " + T.warningBd,
-                          fontFamily: MONO,
+                          fontFamily: T.font,
                         }}
                       >
                         {fmtQty(item.quantity_on_hand, item.unit)}
@@ -1542,7 +1566,7 @@ export default function HQStock() {
                         style={{
                           padding: "7px 10px",
                           borderBottom: "1px solid " + T.warningBd,
-                          fontFamily: MONO,
+                          fontFamily: T.font,
                           color: ex?.color,
                         }}
                       >
@@ -1740,7 +1764,7 @@ export default function HQStock() {
                   <span
                     style={{
                       fontSize: "12px",
-                      fontFamily: MONO,
+                      fontFamily: T.font,
                       color: T.danger,
                       fontWeight: 700,
                     }}
@@ -1830,7 +1854,7 @@ export default function HQStock() {
                       style={{
                         fontSize: "12px",
                         color: T.ink500,
-                        fontFamily: MONO,
+                        fontFamily: T.font,
                       }}
                     >
                       Recorded: {fmt(item.cost_price)}
@@ -1840,7 +1864,7 @@ export default function HQStock() {
                         fontSize: "13px",
                         fontWeight: 700,
                         color: T.warning,
-                        fontFamily: MONO,
+                        fontFamily: T.font,
                       }}
                     >
                       AVCO: {fmt(item.weighted_avg_cost)}
@@ -1850,7 +1874,7 @@ export default function HQStock() {
                         fontSize: "11px",
                         fontWeight: 700,
                         color: drift > 0 ? T.danger : T.success,
-                        fontFamily: MONO,
+                        fontFamily: T.font,
                       }}
                     >
                       {drift > 0 ? "↑" : "↓"} {Math.abs(drift).toFixed(1)}%
@@ -2002,7 +2026,7 @@ export default function HQStock() {
                 <th style={{ ...sTh, textAlign: "right" }}>Available</th>
                 <th style={{ ...sTh, textAlign: "right" }}>AVCO / unit</th>
                 <th style={sTh}>Expiry</th>
-                <th style={{ ...sTh, textAlign: "center" }}>⚠</th>
+                <th style={{ ...sTh, textAlign: "center" }}><AlertTriangle size={11} /></th>
                 <th style={{ ...sTh, textAlign: "center" }}>QR</th>
                 <th style={sTh}>Lot / Batch</th>
                 <th style={sTh}>Reorder</th>
@@ -2063,7 +2087,7 @@ export default function HQStock() {
                             style={{
                               fontSize: "10px",
                               color: T.ink300,
-                              fontFamily: MONO,
+                              fontFamily: T.font,
                               marginTop: "2px",
                             }}
                           >
@@ -2120,7 +2144,7 @@ export default function HQStock() {
                           style={{
                             ...sTd,
                             textAlign: "right",
-                            fontFamily: MONO,
+                            fontFamily: T.font,
                             fontWeight: 600,
                             color: low ? T.danger : T.ink700,
                           }}
@@ -2131,7 +2155,7 @@ export default function HQStock() {
                           style={{
                             ...sTd,
                             textAlign: "right",
-                            fontFamily: MONO,
+                            fontFamily: T.font,
                             fontWeight: 700,
                             color: avail <= 0 ? T.danger : T.success,
                           }}
@@ -2154,7 +2178,7 @@ export default function HQStock() {
                           style={{
                             ...sTd,
                             textAlign: "right",
-                            fontFamily: MONO,
+                            fontFamily: T.font,
                             fontSize: "12px",
                             color: T.ink500,
                           }}
@@ -2178,7 +2202,7 @@ export default function HQStock() {
                                 style={{
                                   fontSize: "12px",
                                   color: T.ink500,
-                                  fontFamily: MONO,
+                                  fontFamily: T.font,
                                 }}
                               >
                                 {fmtDate(item.expiry_date)}
@@ -2190,7 +2214,7 @@ export default function HQStock() {
                         </td>
                         <td style={{ ...sTd, textAlign: "center" }}>
                           {ac > 0 ? (
-                            <span style={sBadge("warning")}>⚠ {ac}</span>
+                            <span style={sBadge("warning")}><AlertTriangle size={10} style={{marginRight:3,verticalAlign:"middle"}} /> {ac}</span>
                           ) : (
                             <span style={{ color: T.ink300 }}>—</span>
                           )}
@@ -2263,7 +2287,7 @@ export default function HQStock() {
                             ...sTd,
                             fontSize: "11px",
                             color: T.ink500,
-                            fontFamily: MONO,
+                            fontFamily: T.font,
                           }}
                         >
                           {item.batch_lot_number || (
@@ -2473,7 +2497,7 @@ export default function HQStock() {
                           ...sTd,
                           fontSize: "11px",
                           color: T.ink500,
-                          fontFamily: MONO,
+                          fontFamily: T.font,
                           whiteSpace: "nowrap",
                         }}
                       >
@@ -2503,7 +2527,7 @@ export default function HQStock() {
                       <td
                         style={{
                           ...sTd,
-                          fontFamily: MONO,
+                          fontFamily: T.font,
                           fontWeight: 700,
                           color: pos ? T.success : T.danger,
                         }}
@@ -2514,7 +2538,7 @@ export default function HQStock() {
                       <td
                         style={{
                           ...sTd,
-                          fontFamily: MONO,
+                          fontFamily: T.font,
                           fontSize: "12px",
                           color: T.ink500,
                         }}
@@ -2526,7 +2550,7 @@ export default function HQStock() {
                           ...sTd,
                           fontSize: "11px",
                           color: T.ink500,
-                          fontFamily: MONO,
+                          fontFamily: T.font,
                         }}
                       >
                         {m.reference || "—"}
@@ -2595,7 +2619,7 @@ export default function HQStock() {
                 style={{
                   fontSize: "11px",
                   color: T.ink300,
-                  fontFamily: MONO,
+                  fontFamily: T.font,
                 }}
               >
                 {item.sku}
@@ -2745,7 +2769,7 @@ export default function HQStock() {
                 style={{
                   fontSize: "11px",
                   color: T.ink300,
-                  fontFamily: MONO,
+                  fontFamily: T.font,
                 }}
               >
                 {pItems.length} item{pItems.length !== 1 ? "s" : ""}
@@ -3162,7 +3186,7 @@ export default function HQStock() {
               >
                 Action Queue
               </span>
-              <span style={{ fontSize: 10, color: T.ink300, fontFamily: MONO }}>
+              <span style={{ fontSize: 10, color: T.ink300, fontFamily: T.font }}>
                 {new Date().toLocaleTimeString("en-ZA", {
                   hour: "2-digit",
                   minute: "2-digit",
@@ -3192,7 +3216,7 @@ export default function HQStock() {
                   flexShrink: 0,
                 }}
               >
-                ✓
+                <Check size={13} />
               </div>
               <div>
                 <div
@@ -3264,7 +3288,7 @@ export default function HQStock() {
                     style={{
                       fontSize: 22,
                       fontWeight: 400,
-                      fontFamily: MONO,
+                      fontFamily: T.font,
                       fontVariantNumeric: "tabular-nums",
                       color: tile.valueColor,
                       lineHeight: 1,
@@ -3484,7 +3508,7 @@ export default function HQStock() {
                         />
                         <span
                           style={{
-                            fontFamily: MONO,
+                            fontFamily: T.font,
                             fontVariantNumeric: "tabular-nums",
                             color: T.ink700,
                             fontWeight: 600,
@@ -3591,7 +3615,7 @@ export default function HQStock() {
                           ...sTd,
                           fontSize: 11,
                           color: T.ink500,
-                          fontFamily: MONO,
+                          fontFamily: T.font,
                           whiteSpace: "nowrap",
                         }}
                       >
@@ -3622,7 +3646,7 @@ export default function HQStock() {
                       <td
                         style={{
                           ...sTd,
-                          fontFamily: MONO,
+                          fontFamily: T.font,
                           fontVariantNumeric: "tabular-nums",
                           fontWeight: 700,
                           color: qty >= 0 ? T.success : T.danger,
@@ -3636,7 +3660,7 @@ export default function HQStock() {
                           ...sTd,
                           fontSize: 11,
                           color: T.ink500,
-                          fontFamily: MONO,
+                          fontFamily: T.font,
                         }}
                       >
                         {m.reference || "—"}
@@ -3781,7 +3805,7 @@ export default function HQStock() {
                 textTransform: "uppercase",
               }}
             >
-              ⚠ Needs Attention
+              <AlertTriangle size={11} style={{marginRight:4,verticalAlign:"middle"}} /> Needs Attention
             </span>
             {noPrice > 0 && (
               <span style={{ fontSize: 12, color: T.warning }}>
@@ -3918,9 +3942,9 @@ export default function HQStock() {
                 }}
               >
                 {[
-                  { id: "list", label: "☰" },
-                  { id: "grid", label: "⊞" },
-                  { id: "detail", label: "⊟" },
+                  { id: "list", label: <AlignJustify size={14} /> },
+                  { id: "grid", label: <LayoutGrid size={14} /> },
+                  { id: "detail", label: <Table2 size={14} /> },
                 ].map((v) => (
                   <button
                     key={v.id}
@@ -4698,7 +4722,7 @@ export default function HQStock() {
                           style={{
                             fontSize: 10,
                             color: T.ink300,
-                            fontFamily: MONO,
+                            fontFamily: T.font,
                           }}
                         >
                           {item.sku}
@@ -4742,7 +4766,7 @@ export default function HQStock() {
                               fontSize: 14,
                               fontWeight: 800,
                               color: T.accentMid,
-                              fontFamily: MONO,
+                              fontFamily: T.font,
                               fontVariantNumeric: "tabular-nums",
                             }}
                           >
@@ -4789,7 +4813,7 @@ export default function HQStock() {
                           style={{
                             fontSize: 11,
                             color: low ? T.danger : T.ink500,
-                            fontFamily: MONO,
+                            fontFamily: T.font,
                           }}
                         >
                           {fmtQty(item.quantity_on_hand, item.unit)} on hand
@@ -5047,7 +5071,7 @@ export default function HQStock() {
                                   style={{
                                     fontSize: 10,
                                     color: T.ink300,
-                                    fontFamily: MONO,
+                                    fontFamily: T.font,
                                     marginTop: 2,
                                   }}
                                 >
@@ -5098,7 +5122,7 @@ export default function HQStock() {
                               <td
                                 style={{
                                   ...sTd,
-                                  fontFamily: MONO,
+                                  fontFamily: T.font,
                                   fontWeight: 700,
                                   color: low ? T.danger : T.ink700,
                                   fontVariantNumeric: "tabular-nums",
@@ -5109,7 +5133,7 @@ export default function HQStock() {
                               <td
                                 style={{
                                   ...sTd,
-                                  fontFamily: MONO,
+                                  fontFamily: T.font,
                                   fontWeight: 700,
                                   color: avail <= 0 ? T.danger : T.success,
                                   fontVariantNumeric: "tabular-nums",
@@ -5132,7 +5156,7 @@ export default function HQStock() {
                               <td
                                 style={{
                                   ...sTd,
-                                  fontFamily: MONO,
+                                  fontFamily: T.font,
                                   fontWeight: 700,
                                   color: T.accentMid,
                                   fontVariantNumeric: "tabular-nums",
@@ -5183,7 +5207,7 @@ export default function HQStock() {
                               <td
                                 style={{
                                   ...sTd,
-                                  fontFamily: MONO,
+                                  fontFamily: T.font,
                                   fontSize: 12,
                                   color: T.ink500,
                                   fontVariantNumeric: "tabular-nums",
@@ -5324,7 +5348,7 @@ export default function HQStock() {
   );
 
   return (
-    <div style={{ fontFamily: T.font, color: T.ink700 }}>
+    <div style={{ fontFamily: T.font, color: T.ink700, background: "transparent" }}>
       <div
         style={{
           display: "flex",
@@ -5338,9 +5362,10 @@ export default function HQStock() {
         <div>
           <h2
             style={{
-              fontFamily: "'Outfit','Helvetica Neue',Arial,sans-serif",
-              fontSize: "18px",
-              fontWeight: 400,
+              fontFamily: T.font,
+              fontSize: "22px",
+              fontWeight: 700,
+              letterSpacing: "-0.01em",
               color: T.ink900,
               margin: "0 0 4px",
             }}
@@ -5380,7 +5405,7 @@ export default function HQStock() {
               letterSpacing: "0.06em",
             }}
           >
-            📦 Receive Delivery
+            <Package size={13} style={{marginRight:5,verticalAlign:"middle"}} /> Receive Delivery
           </button>
           <button
             style={{
@@ -5414,10 +5439,10 @@ export default function HQStock() {
             { id: "overview", label: "Overview" },
             { id: "items", label: `Items (${items.length})` },
             { id: "movements", label: "Movements" },
-            { id: "pricing", label: "💰 Pricing" },
-            { id: "receipts", label: "📦 Receipts" },
-            { id: "purchase-orders", label: "🛒 Purchase Orders" },
-            ...(isCannabis ? [{ id: "shop", label: "🌐 Shop Manager" }] : []),
+            { id: "pricing", label: "Pricing" },
+            { id: "receipts", label: "Receipts" },
+            { id: "purchase-orders", label: "Purchase Orders" },
+            ...(isCannabis ? [{ id: "shop", label: "Shop Manager" }] : []),
           ].map((t) => (
             <button
               key={t.id}
@@ -5528,7 +5553,7 @@ export default function HQStock() {
                   marginBottom: 2,
                 }}
               >
-                ⚠ {avcoAlertItems.length} item
+                <AlertTriangle size={12} style={{marginRight:4,flexShrink:0,verticalAlign:"middle"}} /> {avcoAlertItems.length} item
                 {avcoAlertItems.length !== 1 ? "s" : ""} had AVCO changes &gt;5%
                 — check your sell prices
               </div>
@@ -5572,7 +5597,7 @@ export default function HQStock() {
                   fontFamily: T.font,
                 }}
               >
-                ✕
+                <X size={13} />
               </button>
             </div>
           </div>
@@ -5714,8 +5739,8 @@ export default function HQStock() {
                     e.currentTarget.style.background = "#fff";
                   }}
                 >
-                  <div style={{ fontSize: 24, marginBottom: 6 }}>
-                    {world.icon || "📦"}
+                  <div style={{ marginBottom: 6 }}>
+                    {WORLD_ICON_MAP[world.id] || <Package size={18} color={T.ink400} />}
                   </div>
                   <div
                     style={{
