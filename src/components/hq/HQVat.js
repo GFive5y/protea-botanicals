@@ -10,6 +10,7 @@
 //   getPeriodIdFromDate: string-safe, no UTC offset issues
 
 import { useState, useEffect, useCallback } from "react";
+import { Receipt, X } from "lucide-react";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
 import { sendVatReminderEmail } from "../../services/emailService";
@@ -46,26 +47,29 @@ function getBiMonthlyPeriods(year = new Date().getFullYear()) {
 function currentPeriodId() { const m = new Date().getMonth() + 1; return `${new Date().getFullYear()}-P${Math.ceil(m / 2)}`; }
 function isOverdue(d) { return d && new Date(d) < new Date(); }
 
-function KPICard({ label, value, sub, color, icon, highlight }) {
+function KPICard({ label, value, sub, color, icon: _icon, highlight }) {
   return (
-    <div style={{ background: highlight || "#fff", borderRadius: 12, padding: "20px 22px", boxShadow: D.shadow, flex: 1, minWidth: 160, border: highlight ? `1px solid ${D.border}` : "none" }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: D.ink500, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: D.font, marginBottom: 10, display: "flex", gap: 6 }}>{icon && <span>{icon}</span>}{label}</div>
+    <div style={{ background: highlight || T.surface, borderRadius: T.radius.lg, padding: "20px 22px", boxShadow: D.shadow, flex: 1, minWidth: 160, border: `1px solid ${D.border}` }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: D.ink400, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: D.font, marginBottom: 10 }}>{label}</div>
       <div style={{ fontSize: 26, fontWeight: 700, color: color || D.accent, fontVariantNumeric: "tabular-nums", fontFamily: D.font, lineHeight: 1 }}>{value}</div>
       {sub && <div style={{ fontSize: 12, color: D.ink500, marginTop: 6, fontFamily: D.font }}>{sub}</div>}
     </div>
   );
 }
 
-function SHead({ label, icon }) {
+function SHead({ label, icon: _icon }) {
   return (
-    <div style={{ padding: "8px 20px", background: D.bg, borderBottom: `1px solid ${D.border}`, fontSize: 10, fontWeight: 700, color: D.ink500, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: D.font, display: "flex", gap: 6, alignItems: "center" }}>{icon && <span>{icon}</span>}{label}</div>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px", borderBottom: `1px solid ${D.border}` }}>
+      <span style={{ display: "inline-block", width: 3, height: 14, borderRadius: 2, background: D.accent, flexShrink: 0 }} />
+      <span style={{ fontSize: 11, fontWeight: 700, color: D.ink400, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: D.font }}>{label}</span>
+    </div>
   );
 }
 
 function VAT201Row({ field, label, value, highlight, note }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "48px 1fr 160px", padding: "12px 20px", borderBottom: `1px solid ${D.border}`, background: highlight ? D.accentLight : "transparent", alignItems: "center" }}>
-      <div style={{ width: 32, height: 32, borderRadius: 6, background: highlight ? D.accent : D.border, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: highlight ? "#fff" : D.ink500, fontFamily: D.font }}>{field}</div>
+      <div style={{ width: 32, height: 32, borderRadius: T.radius.md, background: highlight ? D.accent : D.border, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: highlight ? "#fff" : D.ink500, fontFamily: D.font }}>{field}</div>
       <div style={{ paddingLeft: 12 }}><div style={{ fontSize: 13, color: D.ink700, fontFamily: D.font }}>{label}</div>{note && <div style={{ fontSize: 11, color: D.ink500, marginTop: 2, fontFamily: D.font }}>{note}</div>}</div>
       <div style={{ fontSize: 15, fontWeight: 700, color: highlight ? D.accent : D.ink700, textAlign: "right", fontVariantNumeric: "tabular-nums", fontFamily: D.font }}>{value}</div>
     </div>
@@ -79,7 +83,7 @@ function SourceBadge({ source }) {
     calculated: { bg: D.successLight, bd: D.successBd, txt: D.success },
   };
   const c = palettes[source] || palettes.seeded;
-  return <span style={{ padding: "2px 7px", borderRadius: 5, fontSize: 10, fontWeight: 700, background: c.bg, border: `1px solid ${c.bd}`, color: c.txt, marginLeft: 6 }}>{source}</span>;
+  return <span style={{ padding: "2px 7px", borderRadius: T.radius.sm, fontSize: 10, fontWeight: 700, background: c.bg, border: `1px solid ${c.bd}`, color: c.txt, marginLeft: 6 }}>{source}</span>;
 }
 
 function Overlay({ children }) {
@@ -275,14 +279,14 @@ export default function HQVat() {
     showToast("Exported.");
   };
 
-  const card = { background: "#fff", borderRadius: 12, boxShadow: D.shadow, overflow: "hidden", marginBottom: 20 };
+  const card = { background: T.surface, borderRadius: T.radius.lg, border: `1px solid ${T.border}`, boxShadow: D.shadow, overflow: "hidden", marginBottom: 20 };
 
   if (loading) return <div style={{ textAlign: "center", padding: 60, color: D.ink500, fontFamily: D.font }}>Loading VAT...</div>;
   if (!vatConfig?.vat_registered) return (
     <div style={{ fontFamily: D.font }}>
       <h2 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 8px", color: D.ink900 }}>VAT</h2>
-      <div style={{ padding: "40px 32px", background: D.warningLight, border: `1px solid ${D.warningBd}`, borderRadius: 12, textAlign: "center" }}>
-        <div style={{ fontSize: 36, marginBottom: 12 }}>{"\uD83E\uDDFE"}</div>
+      <div style={{ padding: "40px 32px", background: D.warningLight, border: `1px solid ${D.warningBd}`, borderRadius: T.radius.lg, textAlign: "center" }}>
+        <div style={{ marginBottom: 12, color: D.ink400, display: "flex", justifyContent: "center" }}><Receipt size={36} /></div>
         <div style={{ fontSize: 16, fontWeight: 700, color: D.warning, marginBottom: 6 }}>VAT not registered</div>
         <div style={{ fontSize: 13, color: D.ink500 }}>Update Financial Setup if recently registered with SARS.</div>
       </div>
@@ -292,18 +296,18 @@ export default function HQVat() {
   // ── Filing Modal ─────────────────────────────────────────────
   const FilingModalEl = filingModal && (
     <Overlay>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 32, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", fontFamily: D.font }}>
+      <div style={{ background: T.surface, borderRadius: T.radius.lg, padding: 32, width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", fontFamily: D.font }}>
         <h3 style={{ margin: "0 0 6px", fontSize: 17, fontWeight: 700, color: D.ink900 }}>Mark VAT201 as Filed</h3>
         <p style={{ margin: "0 0 20px", fontSize: 13, color: D.ink500 }}>Period: <strong>{periods.find(p => p.id === filingModal)?.label}</strong></p>
         <div style={{ marginBottom: 20 }}>
           <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: D.ink700, marginBottom: 6 }}>SARS eFiling Reference (optional)</label>
           <input value={submissionRef} onChange={e => setSubmissionRef(e.target.value)} placeholder="e.g. REF-20260509-001234"
-            style={{ width: "100%", boxSizing: "border-box", padding: "10px 14px", border: `1px solid ${D.border}`, borderRadius: 8, fontSize: 13, fontFamily: D.font, outline: "none" }} />
+            style={{ width: "100%", boxSizing: "border-box", padding: "10px 14px", border: `1px solid ${D.border}`, borderRadius: T.radius.md, fontSize: 13, fontFamily: D.font, outline: "none" }} />
           <p style={{ margin: "6px 0 0", fontSize: 11, color: D.ink500 }}>Leave blank if not yet available. Can be updated by re-clicking Mark Filed.</p>
         </div>
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button onClick={() => { setFilingModal(null); setSubmissionRef(""); }} style={{ padding: "9px 18px", border: `1px solid ${D.border}`, borderRadius: 8, background: "#fff", color: D.ink500, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: D.font }}>Cancel</button>
-          <button onClick={confirmFiled} style={{ padding: "9px 18px", border: "none", borderRadius: 8, background: D.success, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: D.font }}>{"\u2713"} Confirm Filed</button>
+          <button onClick={() => { setFilingModal(null); setSubmissionRef(""); }} style={{ padding: "9px 18px", border: `1px solid ${D.border}`, borderRadius: T.radius.md, background: T.surface, color: D.ink500, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: D.font }}>Cancel</button>
+          <button onClick={confirmFiled} style={{ padding: "9px 18px", border: "none", borderRadius: T.radius.md, background: D.success, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: D.font }}>{"\u2713"} Confirm Filed</button>
         </div>
       </div>
     </Overlay>
@@ -316,22 +320,22 @@ export default function HQVat() {
 
   const CloseModalEl = closeModal && (
     <Overlay>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 32, width: 520, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", fontFamily: D.font, maxHeight: "90vh", overflowY: "auto" }}>
+      <div style={{ background: T.surface, borderRadius: T.radius.lg, padding: 32, width: 520, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", fontFamily: D.font, maxHeight: "90vh", overflowY: "auto" }}>
         <h3 style={{ margin: "0 0 6px", fontSize: 17, fontWeight: 700, color: D.ink900 }}>Period Close — {periods.find(p => p.id === closeModal.periodId)?.label}</h3>
         <p style={{ margin: "0 0 20px", fontSize: 13, color: D.ink500 }}>Calculates VAT from source tables. Replaces {closeModal.seededRowCount} seeded row{closeModal.seededRowCount !== 1 ? "s" : ""} with 2 calculated rows.</p>
 
-        <div style={{ background: D.bg, borderRadius: 10, padding: 16, marginBottom: 12, border: `1px solid ${D.border}` }}>
+        <div style={{ background: D.bg, borderRadius: T.radius.md, padding: 16, marginBottom: 12, border: `1px solid ${D.border}` }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: D.ink500, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Output VAT (from orders)</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             {[["Orders", closeModal.calcOrderCount], ["Total incl.", fmtZar(closeModal.totalIncl)], ["Calculated output VAT", fmtZar(closeModal.calcOutputVat)], ["Stored (will be replaced)", fmtZar(closeModal.storedOutputVat)]].map(([l, v]) => (
               <div key={l}><div style={{ fontSize: 10, color: D.ink500, marginBottom: 3 }}>{l}</div><div style={{ fontSize: 13, fontWeight: 700, color: D.ink700 }}>{v}</div></div>
             ))}
           </div>
-          {outputMatch && <div style={{ marginTop: 10, padding: "6px 10px", background: D.successLight, border: `1px solid ${D.successBd}`, borderRadius: 6, fontSize: 12, color: D.success, fontWeight: 600 }}>{"\u2713"} Calculated matches stored — output VAT figure unchanged</div>}
-          {closeModal.calcOrderCount === 0 && <div style={{ marginTop: 10, padding: "6px 10px", background: D.warningLight, border: `1px solid ${D.warningBd}`, borderRadius: 6, fontSize: 12, color: D.warning }}>{"\u26A0"} No orders found for this period. Output VAT will be written as R0.</div>}
+          {outputMatch && <div style={{ marginTop: 10, padding: "6px 10px", background: D.successLight, border: `1px solid ${D.successBd}`, borderRadius: T.radius.md, fontSize: 12, color: D.success, fontWeight: 600 }}>{"\u2713"} Calculated matches stored — output VAT figure unchanged</div>}
+          {closeModal.calcOrderCount === 0 && <div style={{ marginTop: 10, padding: "6px 10px", background: D.warningLight, border: `1px solid ${D.warningBd}`, borderRadius: T.radius.md, fontSize: 12, color: D.warning }}>{"\u26A0"} No orders found for this period. Output VAT will be written as R0.</div>}
         </div>
 
-        <div style={{ background: inputZero ? D.warningLight : D.bg, borderRadius: 10, padding: 16, marginBottom: 12, border: `1px solid ${inputZero ? D.warningBd : D.border}` }}>
+        <div style={{ background: inputZero ? D.warningLight : D.bg, borderRadius: T.radius.md, padding: 16, marginBottom: 12, border: `1px solid ${inputZero ? D.warningBd : D.border}` }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: D.ink500, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Input VAT (from expenses)</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             {[["Expenses", closeModal.calcExpenseCount], ["Calculated input VAT", fmtZar(closeModal.calcInputVat)], ["Stored (will be replaced)", fmtZar(closeModal.storedInputVat)]].map(([l, v]) => (
@@ -339,20 +343,20 @@ export default function HQVat() {
             ))}
           </div>
           {inputZero && (
-            <div style={{ marginTop: 10, padding: "8px 10px", background: "#FFF7ED", border: "1px solid #FED7AA", borderRadius: 6, fontSize: 12, color: "#C2410C", lineHeight: 1.6 }}>
+            <div style={{ marginTop: 10, padding: "8px 10px", background: "#FFF7ED", border: "1px solid #FED7AA", borderRadius: T.radius.md, fontSize: 12, color: "#C2410C", lineHeight: 1.6 }}>
               <strong>{"\u26A0"} Input VAT = R0.</strong> All {totalExpenses} expenses have input_vat_amount = 0.<br />Smart Capture must populate this field before input VAT is accurate.
               {storedInputChanges && <span style={{ display: "block", marginTop: 6, color: D.danger }}><strong>This will replace stored input VAT of {fmtZar(closeModal.storedInputVat)} with R0.</strong> The stored figure is manually seeded and not derived from source data.</span>}
             </div>
           )}
         </div>
 
-        <div style={{ padding: "10px 14px", background: D.infoLight, border: `1px solid ${D.infoBd}`, borderRadius: 8, fontSize: 12, color: D.info, marginBottom: 20, lineHeight: 1.6 }}>
+        <div style={{ padding: "10px 14px", background: D.infoLight, border: `1px solid ${D.infoBd}`, borderRadius: T.radius.md, fontSize: 12, color: D.info, marginBottom: 20, lineHeight: 1.6 }}>
           <strong>Sandbox mode:</strong> Source data is test/seeded. Period Close is fully functional but operates on simulated data. In production this would be locked post-filing.
         </div>
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button onClick={() => setCloseModal(null)} style={{ padding: "9px 18px", border: `1px solid ${D.border}`, borderRadius: 8, background: "#fff", color: D.ink500, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: D.font }}>Cancel</button>
-          <button onClick={confirmClose} disabled={closing} style={{ padding: "9px 18px", border: "none", borderRadius: 8, background: closing ? "#9CA3AF" : D.accent, color: "#fff", fontSize: 13, fontWeight: 700, cursor: closing ? "not-allowed" : "pointer", fontFamily: D.font }}>
+          <button onClick={() => setCloseModal(null)} style={{ padding: "9px 18px", border: `1px solid ${D.border}`, borderRadius: T.radius.md, background: T.surface, color: D.ink500, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: D.font }}>Cancel</button>
+          <button onClick={confirmClose} disabled={closing} style={{ padding: "9px 18px", border: "none", borderRadius: T.radius.md, background: closing ? "#9CA3AF" : D.accent, color: "#fff", fontSize: 13, fontWeight: 700, cursor: closing ? "not-allowed" : "pointer", fontFamily: D.font }}>
             {closing ? "Closing..." : "Confirm Period Close"}
           </button>
         </div>
@@ -372,18 +376,18 @@ export default function HQVat() {
     return (
       <div style={{ fontFamily: D.font, color: D.ink700 }}>
         {FilingModalEl}{CloseModalEl}
-        {toast && <div style={{ position: "fixed", top: 24, right: 24, zIndex: 9999, background: toast.type === "error" ? D.danger : D.accent, color: "#fff", padding: "12px 20px", borderRadius: 10, fontSize: 13, fontWeight: 600 }}>{toast.msg}</div>}
+        {toast && <div style={{ position: "fixed", top: 24, right: 24, zIndex: 9999, background: toast.type === "error" ? D.danger : D.accent, color: "#fff", padding: "12px 20px", borderRadius: T.radius.md, fontSize: 13, fontWeight: 600 }}>{toast.msg}</div>}
 
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-          <button onClick={() => setView("dashboard")} style={{ padding: "7px 14px", border: `1px solid ${D.border}`, borderRadius: 8, background: "#fff", color: D.ink500, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: D.font }}>{"\u2190"} Dashboard</button>
+          <button onClick={() => setView("dashboard")} style={{ padding: "7px 14px", border: `1px solid ${D.border}`, borderRadius: T.radius.md, background: T.surface, color: D.ink500, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: D.font }}>{"\u2190"} Dashboard</button>
           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: D.ink900 }}>VAT201 — {p?.label}</h2>
-          {isFiled && <span style={{ padding: "3px 12px", borderRadius: 12, fontSize: 11, fontWeight: 700, background: D.successLight, color: D.success, border: `1px solid ${D.successBd}` }}>{"\u2713"} Filed</span>}
-          {overdue && <span style={{ padding: "3px 12px", borderRadius: 12, fontSize: 11, fontWeight: 700, background: D.dangerLight, color: D.danger, border: `1px solid ${D.dangerBd}` }}>{"\u26A0"} Overdue</span>}
+          {isFiled && <span style={{ padding: "3px 12px", borderRadius: T.radius.lg, fontSize: 11, fontWeight: 700, background: D.successLight, color: D.success, border: `1px solid ${D.successBd}` }}>{"\u2713"} Filed</span>}
+          {overdue && <span style={{ padding: "3px 12px", borderRadius: T.radius.lg, fontSize: 11, fontWeight: 700, background: D.dangerLight, color: D.danger, border: `1px solid ${D.dangerBd}` }}>{"\u26A0"} Overdue</span>}
           {isFiled && filing?.submission_ref && <span style={{ fontSize: 11, color: D.ink500 }}>Ref: {filing.submission_ref}</span>}
         </div>
 
         {hasDataGap && (
-          <div style={{ padding: "12px 16px", background: D.warningLight, border: `1px solid ${D.warningBd}`, borderRadius: 10, marginBottom: 16, fontSize: 13, color: D.warning, lineHeight: 1.7 }}>
+          <div style={{ padding: "12px 16px", background: D.warningLight, border: `1px solid ${D.warningBd}`, borderRadius: T.radius.md, marginBottom: 16, fontSize: 13, color: D.warning, lineHeight: 1.7 }}>
             <strong>{"\u26A0"} Data quality warning:</strong> This period shows zero output VAT because orders began 9 March 2026. Input VAT of {fmtZar(current.inputVat)} is manually seeded. Verify source documentation before submitting this as a SARS refund claim.
           </div>
         )}
@@ -406,7 +410,7 @@ export default function HQVat() {
           <SHead label="Net Position" icon={"\u2696\uFE0F"} />
           <div style={{ padding: "20px", background: current.netVat >= 0 ? D.dangerLight : D.successLight, borderTop: `2px solid ${current.netVat >= 0 ? D.dangerBd : D.successBd}` }}>
             <div style={{ display: "grid", gridTemplateColumns: "48px 1fr 160px", alignItems: "center" }}>
-              <div style={{ width: 32, height: 32, borderRadius: 6, background: current.netVat >= 0 ? D.danger : D.success, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff" }}>20</div>
+              <div style={{ width: 32, height: 32, borderRadius: T.radius.md, background: current.netVat >= 0 ? D.danger : D.success, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff" }}>20</div>
               <div style={{ paddingLeft: 12 }}>
                 <div style={{ fontSize: 14, fontWeight: 700, color: current.netVat >= 0 ? D.danger : D.success }}>{current.netVat >= 0 ? "Net Payable to SARS" : "Net Refund from SARS"}</div>
                 <div style={{ fontSize: 12, color: D.ink500, marginTop: 2 }}>Field 12 ({fmtZar(current.outputVat)}) − Field 16 ({fmtZar(current.inputVat)})</div>
@@ -479,13 +483,13 @@ export default function HQVat() {
         )}
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button onClick={exportVAT201} style={{ padding: "10px 20px", border: `1px solid ${D.accentMid}`, borderRadius: 8, background: D.accentLight, color: D.accentMid, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: D.font }}>{"\u2193"} Export CSV</button>
-          {!isFiled && <button onClick={() => openFilingModal(selectedPeriod)} style={{ padding: "10px 20px", border: "none", borderRadius: 8, background: D.success, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: D.font }}>{"\u2713"} Mark Filed</button>}
-          {isFiled && <div style={{ padding: "10px 16px", background: D.successLight, border: `1px solid ${D.successBd}`, borderRadius: 8, fontSize: 13, color: D.success, fontWeight: 600 }}>{"\u2713"} Filed{filing?.filed_at ? ` · ${fmtDate(filing.filed_at)}` : ""}</div>}
-          {!isFiled && <button onClick={() => openCloseModal(selectedPeriod)} style={{ padding: "10px 20px", border: `1px solid ${D.warningBd}`, borderRadius: 8, background: D.warningLight, color: D.warning, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: D.font }}>{"\u26A1"} Period Close</button>}
+          <button onClick={exportVAT201} style={{ padding: "10px 20px", border: `1px solid ${D.accentMid}`, borderRadius: T.radius.md, background: D.accentLight, color: D.accentMid, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: D.font }}>{"\u2193"} Export CSV</button>
+          {!isFiled && <button onClick={() => openFilingModal(selectedPeriod)} style={{ padding: "10px 20px", border: "none", borderRadius: T.radius.md, background: D.success, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: D.font }}>{"\u2713"} Mark Filed</button>}
+          {isFiled && <div style={{ padding: "10px 16px", background: D.successLight, border: `1px solid ${D.successBd}`, borderRadius: T.radius.md, fontSize: 13, color: D.success, fontWeight: 600 }}>{"\u2713"} Filed{filing?.filed_at ? ` · ${fmtDate(filing.filed_at)}` : ""}</div>}
+          {!isFiled && <button onClick={() => openCloseModal(selectedPeriod)} style={{ padding: "10px 20px", border: `1px solid ${D.warningBd}`, borderRadius: T.radius.md, background: D.warningLight, color: D.warning, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: D.font }}>{"\u26A1"} Period Close</button>}
         </div>
 
-        <div style={{ marginTop: 20, background: D.bg, borderRadius: 8, padding: "14px 18px", fontSize: 12, color: D.ink500, border: `1px solid ${D.border}`, lineHeight: 1.7 }}>
+        <div style={{ marginTop: 20, background: D.bg, borderRadius: T.radius.md, padding: "14px 18px", fontSize: 12, color: D.ink500, border: `1px solid ${D.border}`, lineHeight: 1.7 }}>
           <strong style={{ color: D.ink700 }}>SARS VAT201:</strong> Submit by last business day of month following period end. Late submission attracts penalties. VAT No: <strong>{vatConfig?.vat_number}</strong>.
         </div>
       </div>
@@ -500,14 +504,14 @@ export default function HQVat() {
   return (
     <div style={{ fontFamily: D.font, color: D.ink700 }}>
       {FilingModalEl}{CloseModalEl}
-      {toast && <div style={{ position: "fixed", top: 24, right: 24, zIndex: 9999, background: toast.type === "error" ? D.danger : D.accent, color: "#fff", padding: "12px 20px", borderRadius: 10, fontSize: 13, fontWeight: 600 }}>{toast.msg}</div>}
+      {toast && <div style={{ position: "fixed", top: 24, right: 24, zIndex: 9999, background: toast.type === "error" ? D.danger : D.accent, color: "#fff", padding: "12px 20px", borderRadius: T.radius.md, fontSize: 13, fontWeight: 600 }}>{toast.msg}</div>}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: D.ink900, letterSpacing: "-0.02em" }}>VAT</h2>
           <p style={{ margin: "4px 0 0", color: D.ink500, fontSize: 13 }}>VAT201 returns · output & input tax · SARS filing</p>
         </div>
-        <div style={{ padding: "7px 14px", background: D.accentLight, border: `1px solid ${D.accentMid}`, borderRadius: 8, fontSize: 12, fontWeight: 700, color: D.accentMid }}>VAT No: {vatConfig?.vat_number} · Bi-Monthly · 15%</div>
+        <div style={{ padding: "7px 14px", background: D.accentLight, border: `1px solid ${D.accentMid}`, borderRadius: T.radius.md, fontSize: 12, fontWeight: 700, color: D.accentMid }}>VAT No: {vatConfig?.vat_number} · Bi-Monthly · 15%</div>
       </div>
 
       <div style={{ display: "flex", gap: 14, marginBottom: 24, flexWrap: "wrap" }}>
@@ -530,7 +534,7 @@ export default function HQVat() {
             const hasDataGap = pd.outputVat === 0 && pd.inputVat > 0 && !(orderStats[p.id]?.count > 0);
             return (
               <button key={p.id} onClick={() => setSelectedPeriod(p.id)}
-                style={{ padding: "12px 16px", borderRadius: 10, cursor: "pointer", border: `2px solid ${isSelected ? D.accent : overdue ? D.dangerBd : isFiled ? D.successBd : D.border}`, background: isSelected ? D.accentLight : overdue ? D.dangerLight : isFiled ? D.successLight : "#fff", textAlign: "left", fontFamily: D.font, minWidth: 140, transition: "all 0.15s" }}>
+                style={{ padding: "12px 16px", borderRadius: T.radius.md, cursor: "pointer", border: `2px solid ${isSelected ? D.accent : overdue ? D.dangerBd : isFiled ? D.successBd : D.border}`, background: isSelected ? D.accentLight : overdue ? D.dangerLight : isFiled ? D.successLight : "#fff", textAlign: "left", fontFamily: D.font, minWidth: 140, transition: "all 0.15s" }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: isSelected ? D.accent : D.ink700, marginBottom: 4 }}>
                   {p.label}{isCurrent && <span style={{ marginLeft: 6, fontSize: 10, color: D.info, fontWeight: 600 }}>CURRENT</span>}
                 </div>
@@ -573,11 +577,11 @@ export default function HQVat() {
         )}
         {current.count === 0 && <div style={{ padding: "28px 20px", textAlign: "center", color: D.ink300, fontSize: 13 }}>No VAT transactions this period</div>}
         <div style={{ padding: "16px 20px", display: "flex", gap: 10, flexWrap: "wrap", borderTop: `1px solid ${D.border}` }}>
-          <button onClick={() => setView("vat201")} style={{ padding: "9px 18px", border: "none", borderRadius: 8, background: D.accent, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: D.font }}>{"\uD83D\uDCCB"} View VAT201</button>
-          <button onClick={exportVAT201} style={{ padding: "9px 18px", border: `1px solid ${D.accentMid}`, borderRadius: 8, background: D.accentLight, color: D.accentMid, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: D.font }}>{"\u2193"} Export CSV</button>
-          {!filingMap[selectedPeriod] && current.count > 0 && <button onClick={() => openFilingModal(selectedPeriod)} style={{ padding: "9px 18px", border: `1px solid ${D.successBd}`, borderRadius: 8, background: D.successLight, color: D.success, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: D.font }}>{"\u2713"} Mark Filed</button>}
-          {filingMap[selectedPeriod] && <div style={{ padding: "9px 16px", background: D.successLight, border: `1px solid ${D.successBd}`, borderRadius: 8, fontSize: 13, color: D.success, fontWeight: 600 }}>{"\u2713"} Filed · {fmtDate(filingMap[selectedPeriod].filed_at)}</div>}
-          <button onClick={() => openCloseModal(selectedPeriod)} style={{ padding: "9px 18px", border: `1px solid ${D.warningBd}`, borderRadius: 8, background: D.warningLight, color: D.warning, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: D.font }}>{"\u26A1"} Period Close</button>
+          <button onClick={() => setView("vat201")} style={{ padding: "9px 18px", border: "none", borderRadius: T.radius.md, background: D.accent, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: D.font }}>View VAT201</button>
+          <button onClick={exportVAT201} style={{ padding: "9px 18px", border: `1px solid ${D.accentMid}`, borderRadius: T.radius.md, background: D.accentLight, color: D.accentMid, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: D.font }}>{"\u2193"} Export CSV</button>
+          {!filingMap[selectedPeriod] && current.count > 0 && <button onClick={() => openFilingModal(selectedPeriod)} style={{ padding: "9px 18px", border: `1px solid ${D.successBd}`, borderRadius: T.radius.md, background: D.successLight, color: D.success, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: D.font }}>{"\u2713"} Mark Filed</button>}
+          {filingMap[selectedPeriod] && <div style={{ padding: "9px 16px", background: D.successLight, border: `1px solid ${D.successBd}`, borderRadius: T.radius.md, fontSize: 13, color: D.success, fontWeight: 600 }}>{"\u2713"} Filed · {fmtDate(filingMap[selectedPeriod].filed_at)}</div>}
+          <button onClick={() => openCloseModal(selectedPeriod)} style={{ padding: "9px 18px", border: `1px solid ${D.warningBd}`, borderRadius: T.radius.md, background: D.warningLight, color: D.warning, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: D.font }}>{"\u26A1"} Period Close</button>
           <button
             onClick={async () => {
               const to = window.prompt("Email VAT period summary to:", "admin@protea.dev");
@@ -598,14 +602,14 @@ export default function HQVat() {
               else if (!res.ok) showToast(`Email failed: ${res.error}`, "error");
               else showToast(`VAT reminder sent to ${to}`);
             }}
-            style={{ padding: "9px 18px", border: `1px solid ${D.infoBd}`, borderRadius: 8, background: D.infoLight, color: D.info, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: D.font }}
+            style={{ padding: "9px 18px", border: `1px solid ${D.infoBd}`, borderRadius: T.radius.md, background: D.infoLight, color: D.info, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: D.font }}
           >
-            {"\uD83D\uDCE7"} Email Reminder
+            Email Reminder
           </button>
         </div>
       </div>
 
-      <div style={{ background: D.bg, borderRadius: 8, padding: "14px 18px", fontSize: 12, color: D.ink500, border: `1px solid ${D.border}`, lineHeight: 1.7 }}>
+      <div style={{ background: D.bg, borderRadius: T.radius.md, padding: "14px 18px", fontSize: 12, color: D.ink500, border: `1px solid ${D.border}`, lineHeight: 1.7 }}>
         <strong style={{ color: D.ink700 }}>VAT policy:</strong> Output VAT on invoice basis. Input VAT claimed on qualifying purchases. Bi-monthly vendor (6 returns/year). Rate: 15%. Submit via SARS eFiling by last business day of month following period end.
       </div>
     </div>
