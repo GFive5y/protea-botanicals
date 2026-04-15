@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 71c7ae9
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 366dcc3
 
 ---
 
@@ -43,22 +43,34 @@ IF DEMO DATE CHANGES: update PENDING-ACTIONS.md first, then this file.
 
 ## CURRENT STATE — 15 April 2026 — Session 284 Close
 
-### DS6 VISUAL UNIFICATION — Session 284 (commit 71c7ae9)
+### DS6 VISUAL UNIFICATION — Session 284 (commit 366dcc3)
 
-Master visual spec created and committed: docs/NUAI-VISUAL-SPEC.md (15 parts,
-1,410 lines). This is now mandatory reading before touching any visual code.
-Added to LOAD CONTEXT as step 2b.
+Master visual spec: docs/NUAI-VISUAL-SPEC.md — mandatory before any visual code.
 
 Files unified this session:
-- AppShell.css — cream #faf9f6 → #f8f9fa (T.bg) platform-wide
-- TenantPortal.js — 4 cream backgrounds eliminated, INNER maxWidth removed
-  (content now pins edge to edge at all zoom levels — LOOP-DS6-001 closed)
-- HQTradingDashboard.js — DM Mono killed, emoji replaced with Lucide, radius
-  tokenised, section accent bars added, KPI tile border 0.5px, chart padding
-- HQOverview.js — SectionLabel industry-aware (T.accent not hardcoded green),
-  label colour → T.ink400, borderRadius tokens, T.surface on all panels
+- AppShell.css — cream → T.bg platform-wide
+- TenantPortal.js — cream eliminated, INNER maxWidth removed (LOOP-DS6-001 closed)
+- HQTradingDashboard.js — DM Mono killed, emoji→Lucide, radius tokenised,
+  section accent bars, KPI border 0.5px, chart padding, sKPISub breathing
+- HQOverview.js — SectionLabel industry-aware (T.accent), label → T.ink400,
+  radius tokens, T.surface panels
+- HQLoyalty.js — 15 changes: emoji removed (🌿💨🍬🌱🧪🔧🍄👕🎯📱📦🔀🎂⏰📊⚡),
+  radius tokenised, T.surface → T.bg where needed, unused consts deleted,
+  outer div → transparent, page header → transparent
+- HQDashboard.js — content wrapper → background: T.bg (eliminates white
+  middleman box for ALL 40+ HQ tabs, not just loyalty)
 
-Group Portal remains the visual reference implementation.
+ARCHITECTURAL LESSON LOCKED THIS SESSION (LL-267):
+Tab-level components (rendered inside HQDashboard or TenantPortal) must NEVER
+set background: T.surface on their outermost return div. This creates a white
+box that sits on top of the grey AppShell page chrome. The correct pattern:
+  outer div → background: "transparent" (or omit background entirely)
+  inner page header div → background: T.surface (intentional white header bar)
+  tab content div → no background (inherits grey from shell)
+  SectionCards/tiles → background: T.surface (white cards float on grey)
+
+Group Portal remains the visual reference. DS6 Phase 2 next: HQStock.js
+(PROTECTED — full file read required before any change per LL-185)
 
 ### FINANCIAL PACKAGE — ALL 5 DEMO TENANTS COMPLETE
 DO NOT re-run financial seeding. DO NOT touch equity_ledger without LL-248.
@@ -101,6 +113,11 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
   and margin:auto from INNER const)
 - DS6 visual unification Phase 1 — SHIPPED. AppShell cream, TenantPortal
   background, HQTradingDashboard, HQOverview all unified. Master spec created.
+- DS6 HQLoyalty.js — SHIPPED (e983731 → 366dcc3). 15 changes + 2 follow-up
+  fixes: outer div background transparent, page header transparent.
+  Root cause of white middleman box identified and eliminated.
+- DS6 HQDashboard.js — SHIPPED (e216d4d). Content wrapper → background: T.bg.
+  Eliminates white box for all 40+ HQ tabs. Pattern matches TenantPortal.
 
 ### KNOWN PERMANENT GAPS — DO NOT CHASE BEFORE 12 MAY
 1. POS VAT pipeline — ~R5k BS gap per tenant (amber banner explains it)
@@ -196,6 +213,10 @@ LL-265: Production URL is protea-botanicals.vercel.app — never use preview URL
          behaviour that doesn't match what's on main.
 LL-266: TenantPortal INNER wrapper must NOT use maxWidth or margin:auto.
          Content must fill 100% between sidebar and scrollbar at all zoom levels.
+LL-267: Tab components (rendered inside HQDashboard or TenantPortal) must NOT
+         set background on their outermost return div. Use background: "transparent"
+         or omit it. Only inner page header divs and cards use T.surface. Violating
+         this creates a white middleman box over the grey AppShell chrome.
 
 ---
 
@@ -213,9 +234,11 @@ LL-266: TenantPortal INNER wrapper must NOT use maxWidth or margin:auto.
 1. **LOOP-NEW-005** — MediCare Revenue MTD R0 fix (Claude Code, dispensing_log source)
 2. **LOOP-NEW-006** — MediCare IFRS BS gap R76,906 (Supabase MCP)
 3. **LOOP-010/011** — Pre-demo: Medi Rec Run Depreciation + 20 IFRS sign-offs
-4. **WP-DS6-UNIFICATION Phase 2** — Next files: HQLoyalty.js, then HQStock.js
+4. **WP-DS6-UNIFICATION Phase 2** — Next file: HQStock.js
    (PROTECTED — read full file before any change). Pattern established in
    Session 284 — follow NUAI-VISUAL-SPEC.md Part 14 checklist for each file.
+   CRITICAL: Apply LL-267 — tab component outer div must be transparent.
+   Check every file for background: T.surface on outermost return div.
 5. **11 May sim-pos-sales** — STANDING ALERT, cannot miss
 6. Eybna unpriced products — HC-0002, BB-LYCHEE-0002, 6-PH-0002
 

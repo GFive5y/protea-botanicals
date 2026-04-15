@@ -388,6 +388,19 @@ at all viewport widths and zoom levels. Individual components manage their own
 internal layout width if needed. The grey T.bg side-strips visible when zoomed
 out are caused by maxWidth centering — this is prohibited. (LOOP-DS6-001 · Session 284)
 
+**RULE (LL-267):** Tab-level components (HQLoyalty, HQTradingDashboard, HQOverview,
+HQStock, etc.) must NEVER set `background: T.surface` on their outermost return div.
+The correct layering:
+```
+Shell (HQDashboard/TenantPortal) — background: T.bg   ← grey page chrome
+└── Tab outer div — background: "transparent"         ← shows grey through
+    ├── Page header div — background: T.surface      ← white sticky header
+    └── Tab content div — no background              ← grey shows through
+        └── SectionCards/tiles — T.surface           ← white cards on grey
+```
+Violating this creates a white middleman box over the grey AppShell chrome.
+(LOOP-DS6-002, LOOP-DS6-003 · Session 284 · HQLoyalty + HQDashboard fixes)
+
 ### 7.3 Group Portal Specific
 
 GroupPortal renders its own internal layout:
@@ -1407,6 +1420,9 @@ INTERACTION
 | OPEN | HQTradingDashboard.js | 10+ emoji (💎💵💳✅⚠️📅) | Replace with Lucide |
 | OPEN | All hq/ components | T.ink500 on section labels | Replace with T.ink400 |
 | OPEN | All hq/ components | fontVariantNumeric missing | Add to all number renders |
+| CLOSED | HQLoyalty.js | outer div background: T.surface | → transparent |
+| CLOSED | HQDashboard.js | content div no background | → background: T.bg |
+| CLOSED | HQLoyalty.js | page header background: T.surface | → transparent |
 
 ---
 

@@ -192,6 +192,18 @@ and any zoom level below 100%. Fixed Session 284 — removed maxWidth from INNER
 Content now pins edge to edge at every zoom level, matching Group Portal behaviour.
 Rule added to docs/NUAI-VISUAL-SPEC.md Part 7.2.
 
+### ✅ CLOSED — LOOP-DS6-002: HQLoyalty white middleman box
+Session 284 · 366dcc3
+HQLoyalty outer div background: T.surface creating white rectangle over grey
+AppShell chrome. CLOSED. Root cause: tab components must not set background
+on outermost div (LL-267). Fix: outer div → transparent, page header → transparent.
+
+### ✅ CLOSED — LOOP-DS6-003: HQDashboard missing grey wrapper
+Session 284 · e216d4d
+All 40+ HQ tabs rendered without background: T.bg context, making tab content
+appear inside a white box. CLOSED. Fix: added background: T.bg to content
+wrapper div in HQDashboard.js. Pattern matches TenantPortal.
+
 ---
 
 ## CLOSED LOOPS — SESSION 282 (15 April 2026)
