@@ -37,8 +37,8 @@ import { T } from "../../styles/tokens";
 // Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
 const sCard = {
-  background: "#fff",
-  borderRadius: 8,
+  background: T.surface,
+  borderRadius: T.radius.md,
   border: `1px solid ${T.border}`,
   padding: 24,
   marginBottom: 20,
@@ -47,7 +47,7 @@ const sCard = {
 const sInput = {
   padding: "9px 12px",
   border: `1px solid ${T.border}`,
-  borderRadius: 4,
+  borderRadius: T.radius.sm,
   fontFamily: T.font,
   fontSize: 13,
   width: "100%",
@@ -55,13 +55,13 @@ const sInput = {
   color: T.ink900,
 };
 const sTh = {
-  padding: "10px 14px",
+  padding: "11px 14px",
   textAlign: "left",
-  fontSize: 10,
+  fontSize: 11,
   fontWeight: 700,
-  color: T.ink500,
+  color: T.ink400,
   textTransform: "uppercase",
-  letterSpacing: "0.1em",
+  letterSpacing: "0.08em",
   borderBottom: `1px solid ${T.border}`,
 };
 const sTd = {
@@ -75,7 +75,7 @@ const sTd = {
 const mkBtn = (variant = "primary", extra = {}) => {
   const base = {
     padding: "8px 16px",
-    borderRadius: 4,
+    borderRadius: T.radius.sm,
     border: "none",
     cursor: "pointer",
     fontFamily: T.font,
@@ -249,7 +249,7 @@ function MarginBadge({ pct, large = false }) {
       style={{
         display: "inline-block",
         padding: large ? "6px 14px" : "3px 10px",
-        borderRadius: 20,
+        borderRadius: T.radius.full,
         fontSize: large ? 15 : 11,
         fontWeight: 700,
         color: c.color,
@@ -380,8 +380,8 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
   return (
     <div
       style={{
-        background: "#fff",
-        borderRadius: 8,
+        background: T.surface,
+        borderRadius: T.radius.md,
         border: `2px solid ${dirty ? T.accent : T.border}`,
         padding: 20,
         transition: "border-color 0.2s",
@@ -526,7 +526,7 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
           <div
             style={{
               background: mc.bg,
-              borderRadius: 6,
+              borderRadius: T.radius.md,
               padding: "10px 14px",
               marginBottom: qtyUnits > 1 ? 6 : 14,
             }}
@@ -575,7 +575,7 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
             <div
               style={{
                 background: T.bg,
-                borderRadius: 6,
+                borderRadius: T.radius.md,
                 padding: "8px 12px",
                 marginBottom: 14,
                 fontSize: 12,
@@ -697,7 +697,7 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
         style={{
           width: "100%",
           padding: "10px",
-          borderRadius: 4,
+          borderRadius: T.radius.sm,
           border: "none",
           cursor: dirty ? "pointer" : "default",
           fontFamily: T.font,
@@ -849,7 +849,7 @@ export default function HQPricing() {
             background: T.accent,
             color: "#fff",
             padding: "12px 18px",
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             fontSize: 13,
             fontWeight: 500,
             boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
@@ -882,7 +882,7 @@ export default function HQPricing() {
               margin: 0,
               fontSize: 22,
               fontFamily: T.font,
-              fontWeight: 300,
+              fontWeight: 600,
               color: T.ink900,
             }}
           >
@@ -898,7 +898,7 @@ export default function HQPricing() {
             style={{
               background: fxLoading ? T.bg : T.successLight,
               border: `1px solid ${T.successBd}`,
-              borderRadius: 4,
+              borderRadius: T.radius.sm,
               padding: "6px 12px",
               fontSize: 12,
               color: T.success,
@@ -1363,7 +1363,7 @@ export default function HQPricing() {
                               fontSize: 11,
                               background: T.infoLight,
                               color: T.info,
-                              borderRadius: 3,
+                              borderRadius: T.radius.sm,
                               padding: "2px 8px",
                               fontWeight: 700,
                             }}
@@ -1384,7 +1384,7 @@ export default function HQPricing() {
                               fontSize: 11,
                               background: T.accentLight,
                               color: T.accent,
-                              borderRadius: 3,
+                              borderRadius: T.radius.sm,
                               padding: "2px 8px",
                               fontWeight: 700,
                             }}
@@ -1398,7 +1398,7 @@ export default function HQPricing() {
                               fontSize: 11,
                               background: T.bg,
                               color: T.ink500,
-                              borderRadius: 3,
+                              borderRadius: T.radius.sm,
                               padding: "2px 8px",
                               fontWeight: 700,
                             }}
@@ -1426,8 +1426,9 @@ export default function HQPricing() {
                       style={{
                         fontFamily: T.font,
                         fontSize: 26,
-                        fontWeight: 400,
+                        fontWeight: 700,
                         color: T.accent,
+                        fontVariantNumeric: "tabular-nums",
                       }}
                     >
                       {fmtZar(selectedCogs)}
@@ -1503,7 +1504,7 @@ export default function HQPricing() {
                 style={{
                   background: T.accentLight,
                   border: `1px solid ${T.accentBd}`,
-                  borderRadius: 8,
+                  borderRadius: T.radius.md,
                   padding: "16px 18px",
                   marginBottom: 20,
                 }}
@@ -1520,9 +1521,9 @@ export default function HQPricing() {
                   {/* Per-unit COGS anchor */}
                   <div
                     style={{
-                      background: "#fff",
+                      background: T.surface,
                       border: `2px solid ${T.accentBd}`,
-                      borderRadius: 6,
+                      borderRadius: T.radius.md,
                       padding: "10px 16px",
                       display: "flex",
                       alignItems: "baseline",
@@ -1545,8 +1546,9 @@ export default function HQPricing() {
                       style={{
                         fontFamily: T.font,
                         fontSize: 24,
-                        fontWeight: 400,
+                        fontWeight: 700,
                         color: T.accent,
+                        fontVariantNumeric: "tabular-nums",
                       }}
                     >
                       {fmtZar(selectedCogs)}
@@ -1659,9 +1661,9 @@ export default function HQPricing() {
                       >
                         <div
                           style={{
-                            background: "#fff",
+                            background: T.surface,
                             border: `1px solid ${T.border}`,
-                            borderRadius: 6,
+                            borderRadius: T.radius.md,
                             padding: "8px 14px",
                             minWidth: 150,
                           }}
@@ -1681,8 +1683,9 @@ export default function HQPricing() {
                             style={{
                               fontFamily: T.font,
                               fontSize: 17,
-                              fontWeight: 400,
+                              fontWeight: 700,
                               color: T.danger,
+                              fontVariantNumeric: "tabular-nums",
                             }}
                           >
                             {fmtZar(totalCogs)}
@@ -1706,9 +1709,9 @@ export default function HQPricing() {
                             </div>
                             <div
                               style={{
-                                background: "#fff",
+                                background: T.surface,
                                 border: `1px solid ${T.border}`,
-                                borderRadius: 6,
+                                borderRadius: T.radius.md,
                                 padding: "8px 14px",
                                 minWidth: 150,
                               }}
@@ -1729,8 +1732,9 @@ export default function HQPricing() {
                                 style={{
                                   fontFamily: T.font,
                                   fontSize: 17,
-                                  fontWeight: 400,
+                                  fontWeight: 700,
                                   color: T.accent,
+                                  fontVariantNumeric: "tabular-nums",
                                 }}
                               >
                                 {fmtZar(totalRev)}
@@ -1755,7 +1759,7 @@ export default function HQPricing() {
                                 background:
                                   totalProfit >= 0 ? "#fff" : T.dangerLight,
                                 border: `1px solid ${totalProfit >= 0 ? T.successBd : T.dangerBd}`,
-                                borderRadius: 6,
+                                borderRadius: T.radius.md,
                                 padding: "8px 14px",
                                 minWidth: 150,
                               }}
@@ -1775,9 +1779,10 @@ export default function HQPricing() {
                                 style={{
                                   fontFamily: T.font,
                                   fontSize: 17,
-                                  fontWeight: 400,
+                                  fontWeight: 700,
                                   color:
                                     totalProfit >= 0 ? T.success : T.danger,
+                                  fontVariantNumeric: "tabular-nums",
                                 }}
                               >
                                 {fmtZar(totalProfit)}
