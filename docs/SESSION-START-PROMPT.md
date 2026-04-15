@@ -21,6 +21,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 1. `docs/PLATFORM-OVERVIEW_v1_0.md`
 2. `docs/NUAI-AGENT-BIBLE.md`
+2b. `docs/NUAI-VISUAL-SPEC.md` — read before touching ANY visual code
 3. `docs/PENDING-ACTIONS.md`
 4. `docs/VIOLATION_LOG_v1_1.md`
 5. `docs/LL-ARCHIVE_v1_0.md` (LL-252 through LL-264 are new this session)
