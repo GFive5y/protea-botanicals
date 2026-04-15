@@ -46,7 +46,7 @@ const C = {
   warm: T.bg,
   border: T.border,
   muted: T.ink500,
-  white: "#fff",
+  white: T.surface,
   text: T.ink700,
   error: T.danger,
   success: T.success,
@@ -115,7 +115,7 @@ const mkBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
   background: disabled ? T.ink300 : bg,
   color,
   border: bg === "transparent" ? `1px solid ${T.border}` : "none",
-  borderRadius: 4,
+  borderRadius: T.radius.sm,
   padding: "9px 18px",
   fontSize: 11,
   fontWeight: 700,
@@ -130,16 +130,16 @@ const inputStyle = {
   width: "100%",
   padding: "8px 12px",
   border: `1px solid ${T.border}`,
-  borderRadius: 4,
+  borderRadius: T.radius.sm,
   fontSize: 13,
   fontFamily: T.font,
   color: T.ink700,
-  background: "#fff",
+  background: T.surface,
   boxSizing: "border-box",
   outline: "none",
 };
 const sectionLabel = {
-  fontSize: 10,
+  fontSize: 11,
   fontWeight: 700,
   letterSpacing: "0.1em",
   textTransform: "uppercase",
@@ -149,9 +149,9 @@ const sectionLabel = {
   display: "block",
 };
 const cardBase = (extra = {}) => ({
-  background: "#fff",
+  background: T.surface,
   border: `1px solid ${T.border}`,
-  borderRadius: 8,
+  borderRadius: T.radius.md,
   padding: 20,
   boxShadow: T.shadow.sm,
   ...extra,
@@ -215,12 +215,12 @@ function Badge({ children, bg, color, border }) {
         background: bg,
         color,
         border: `1px solid ${border || color + "40"}`,
-        fontSize: 9,
+        fontSize: 11,
         fontWeight: 700,
         letterSpacing: "0.1em",
         textTransform: "uppercase",
         padding: "3px 8px",
-        borderRadius: 20,
+        borderRadius: T.radius.full,
         fontFamily: T.font,
         whiteSpace: "nowrap",
       }}
@@ -324,7 +324,7 @@ function DetailPanel({
           right: 0,
           width: 380,
           height: "100vh",
-          background: "#fff",
+          background: T.surface,
           borderLeft: `1px solid ${T.border}`,
           overflowY: "auto",
           zIndex: 201,
@@ -377,7 +377,7 @@ function DetailPanel({
             marginBottom: 16,
             padding: 16,
             background: T.bg,
-            borderRadius: 8,
+            borderRadius: T.radius.md,
           }}
         >
           <QRCodeSVG
@@ -390,7 +390,7 @@ function DetailPanel({
           />
           <div
             style={{
-              fontSize: 10,
+              fontSize: 11,
               color: T.ink500,
               marginTop: 6,
               letterSpacing: "0.08em",
@@ -437,11 +437,11 @@ function DetailPanel({
           <div
             style={{
               fontFamily: "monospace",
-              fontSize: 10,
+              fontSize: 11,
               wordBreak: "break-all",
               padding: "8px 10px",
               background: T.bg,
-              borderRadius: 4,
+              borderRadius: T.radius.sm,
               border: `1px solid ${T.border}`,
             }}
           >
@@ -456,7 +456,7 @@ function DetailPanel({
             gridTemplateColumns: "1fr 1fr",
             gap: "1px",
             background: T.border,
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             overflow: "hidden",
             border: `1px solid ${T.border}`,
             marginBottom: 16,
@@ -476,10 +476,10 @@ function DetailPanel({
             ["Max Scans", code.max_scans || "Unlimited"],
             ["Cooldown", code.cooldown_hrs ? `${code.cooldown_hrs}h` : "None"],
           ].map(([k, v]) => (
-            <div key={k} style={{ background: "#fff", padding: "10px 12px" }}>
+            <div key={k} style={{ background: T.surface, padding: "10px 12px" }}>
               <div
                 style={{
-                  fontSize: 9,
+                  fontSize: 11,
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
                   color: T.ink500,
@@ -510,13 +510,13 @@ function DetailPanel({
               marginBottom: 16,
               padding: "10px 12px",
               background: T.accentLight,
-              borderRadius: 6,
+              borderRadius: T.radius.md,
               border: `1px solid ${T.accentBd}`,
             }}
           >
             <div
               style={{
-                fontSize: 10,
+                fontSize: 11,
                 color: T.accentMid,
                 fontWeight: 700,
                 letterSpacing: "0.08em",
@@ -616,9 +616,9 @@ function DetailPanel({
         >
           <div
             style={{
-              background: "#fff",
+              background: T.surface,
               padding: 32,
-              borderRadius: 8,
+              borderRadius: T.radius.md,
               textAlign: "center",
             }}
             onClick={(e) => e.stopPropagation()}
@@ -647,7 +647,7 @@ function DetailPanel({
             <div
               style={{
                 fontFamily: "monospace",
-                fontSize: 10,
+                fontSize: 11,
                 color: T.ink500,
                 marginTop: 4,
                 wordBreak: "break-all",
@@ -848,7 +848,7 @@ function RegistryTab({ batches, tenantId }) {
           gridTemplateColumns: "repeat(auto-fit,minmax(80px,1fr))",
           gap: "1px",
           background: T.border,
-          borderRadius: 8,
+          borderRadius: T.radius.md,
           overflow: "hidden",
           border: `1px solid ${T.border}`,
           boxShadow: T.shadow.sm,
@@ -888,7 +888,7 @@ function RegistryTab({ batches, tenantId }) {
           <div
             key={lbl}
             style={{
-              background: "#fff",
+              background: T.surface,
               padding: "12px 14px",
               textAlign: "center",
             }}
@@ -908,7 +908,7 @@ function RegistryTab({ batches, tenantId }) {
             </div>
             <div
               style={{
-                fontSize: 9,
+                fontSize: 11,
                 color: T.ink500,
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
@@ -1030,7 +1030,7 @@ function RegistryTab({ batches, tenantId }) {
                     <YAxis
                       tick={{
                         fill: T.ink500,
-                        fontSize: 10,
+                        fontSize: 11,
                         fontFamily: T.font,
                       }}
                       axisLine={false}
@@ -1084,7 +1084,7 @@ function RegistryTab({ batches, tenantId }) {
                           flex: 1,
                           height: 16,
                           background: T.bg,
-                          borderRadius: 3,
+                          borderRadius: T.radius.sm,
                           overflow: "hidden",
                         }}
                       >
@@ -1098,7 +1098,7 @@ function RegistryTab({ batches, tenantId }) {
                                 : d.rate >= 25
                                   ? T.accentMid
                                   : T.warning,
-                            borderRadius: 3,
+                            borderRadius: T.radius.sm,
                             transition: "width 0.5s",
                             display: "flex",
                             alignItems: "center",
@@ -1108,7 +1108,7 @@ function RegistryTab({ batches, tenantId }) {
                           {d.rate >= 15 && (
                             <span
                               style={{
-                                fontSize: 9,
+                                fontSize: 11,
                                 color: "#fff",
                                 fontWeight: 700,
                                 fontFamily: T.font,
@@ -1219,7 +1219,7 @@ function RegistryTab({ batches, tenantId }) {
         <div
           style={{
             border: `1px solid ${T.border}`,
-            borderRadius: 8,
+            borderRadius: T.radius.md,
             overflow: "hidden",
           }}
         >
@@ -1294,7 +1294,7 @@ function RegistryTab({ batches, tenantId }) {
                             alignItems: "center",
                             gap: 8,
                             padding: "9px 16px 9px 36px",
-                            background: "#f8f8f8",
+                            background: T.bg,
                             cursor: "pointer",
                             userSelect: "none",
                           }}
@@ -1312,7 +1312,7 @@ function RegistryTab({ batches, tenantId }) {
                           </span>
                           <span
                             style={{
-                              fontSize: 10,
+                              fontSize: 11,
                               color: T.ink500,
                               fontFamily: T.font,
                             }}
@@ -1369,8 +1369,8 @@ function RegistryTab({ batches, tenantId }) {
         >
           <div
             style={{
-              background: "#fff",
-              borderRadius: 8,
+              background: T.surface,
+              borderRadius: T.radius.md,
               padding: 32,
               maxWidth: 380,
               width: "90%",
@@ -1398,7 +1398,7 @@ function RegistryTab({ batches, tenantId }) {
                 wordBreak: "break-all",
                 background: T.bg,
                 padding: "6px 10px",
-                borderRadius: 4,
+                borderRadius: T.radius.sm,
                 display: "block",
                 marginBottom: 20,
               }}
@@ -1438,7 +1438,7 @@ function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
         padding: "10px 16px 10px 52px",
         borderTop: `1px solid ${T.border}`,
         cursor: "pointer",
-        background: selected ? T.accentLight : isExpired ? "#fafafa" : "#fff",
+        background: selected ? T.accentLight : isExpired ? T.bg : "#fff",
         transition: "background 0.1s",
       }}
       onMouseEnter={(e) => {
@@ -1448,7 +1448,7 @@ function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
         e.currentTarget.style.background = selected
           ? T.accentLight
           : isExpired
-            ? "#fafafa"
+            ? T.bg
             : "#fff";
       }}
     >
@@ -1538,7 +1538,7 @@ function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
           ),
           border: `1px solid ${code.is_active ? T.warningBd : T.successBd}`,
           padding: "3px 8px",
-          fontSize: 9,
+          fontSize: 11,
         }}
       >
         {code.is_active ? "Pause" : "Resume"}
@@ -1552,7 +1552,7 @@ function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
           ...mkBtn(T.dangerLight, T.danger),
           border: `1px solid ${T.dangerBd}`,
           padding: "3px 8px",
-          fontSize: 9,
+          fontSize: 11,
         }}
       >
         Delete
@@ -1835,7 +1835,7 @@ function GenerateTab({
                     minWidth: 130,
                     border: `2px solid ${selectedType === t.value ? T.accentBd : T.border}`,
                     background: selectedType === t.value ? T.accentLight : "#fff",
-                    borderRadius: 8,
+                    borderRadius: T.radius.md,
                   }),
                   textAlign: "center",
                 }}
@@ -1853,7 +1853,7 @@ function GenerateTab({
                   {t.label}
                 </div>
                 <div
-                  style={{ fontSize: 10, color: T.ink500, fontFamily: T.font }}
+                  style={{ fontSize: 11, color: T.ink500, fontFamily: T.font }}
                 >
                   {t.desc}
                 </div>
@@ -1864,7 +1864,7 @@ function GenerateTab({
             <span style={sectionLabel}>
               Link to Inventory Item{" "}
               <span
-                style={{ fontSize: 9, color: T.accentMid, fontWeight: 500 }}
+                style={{ fontSize: 11, color: T.accentMid, fontWeight: 500 }}
               >
                 (dispensary — optional)
               </span>
@@ -1890,7 +1890,7 @@ function GenerateTab({
                   >
                     {selectedInventoryItem.name}
                   </div>
-                  <div style={{ fontSize: 10, color: T.accentMid }}>
+                  <div style={{ fontSize: 11, color: T.accentMid }}>
                     {CAT_LABEL[selectedInventoryItem.category] ||
                       selectedInventoryItem.category}{" "}
                     · {selectedInventoryItem.sku} · R
@@ -1933,9 +1933,9 @@ function GenerateTab({
                       top: "100%",
                       left: 0,
                       right: 0,
-                      background: "#fff",
+                      background: T.surface,
                       border: `1px solid ${T.border}`,
-                      borderRadius: 6,
+                      borderRadius: T.radius.md,
                       boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                       zIndex: 50,
                       maxHeight: 200,
@@ -1990,7 +1990,7 @@ function GenerateTab({
                             >
                               {i.name}
                             </div>
-                            <div style={{ fontSize: 10, color: T.ink500 }}>
+                            <div style={{ fontSize: 11, color: T.ink500 }}>
                               {CAT_LABEL[i.category] || i.category} · {i.sku} ·
                               R{parseFloat(i.sell_price).toFixed(2)}
                             </div>
@@ -2364,7 +2364,7 @@ function GenerateTab({
                 />
                 <div
                   style={{
-                    fontSize: 10,
+                    fontSize: 11,
                     color: T.ink500,
                     marginTop: 4,
                     fontFamily: T.font,
@@ -2384,13 +2384,13 @@ function GenerateTab({
                 background: T.accent,
                 color: "#fff",
                 padding: 16,
-                borderRadius: 8,
+                borderRadius: T.radius.md,
                 maxWidth: 280,
               }}
             >
               <div
                 style={{
-                  fontSize: 10,
+                  fontSize: 11,
                   letterSpacing: "0.1em",
                   color: T.accentBd,
                   marginBottom: 6,
@@ -2475,7 +2475,7 @@ function GenerateTab({
               style={{
                 background: T.dangerLight,
                 border: `1px solid ${T.dangerBd}`,
-                borderRadius: 6,
+                borderRadius: T.radius.md,
                 padding: "12px 16px",
                 fontSize: 13,
                 color: T.danger,
@@ -2552,7 +2552,7 @@ function GenerateTab({
                     />
                     <div
                       style={{
-                        fontSize: 9,
+                        fontSize: 11,
                         color: T.ink500,
                         marginTop: 6,
                         fontFamily: "monospace",
@@ -2568,7 +2568,7 @@ function GenerateTab({
                       style={{
                         ...mkBtn(T.accentMid),
                         padding: "4px 10px",
-                        fontSize: 9,
+                        fontSize: 11,
                         marginTop: 8,
                       }}
                     >
@@ -2602,7 +2602,7 @@ function ActionToggle({ label: lbl, checked, onChange, children }) {
     <div
       style={{
         border: `1px solid ${checked ? T.accentBd : T.border}`,
-        borderRadius: 6,
+        borderRadius: T.radius.md,
         padding: 14,
         marginBottom: 10,
         background: checked ? T.accentLight : "#fff",
@@ -2770,7 +2770,7 @@ function BannersTab({ banners, onRefresh }) {
                         width: 40,
                         height: 34,
                         border: `1px solid ${T.border}`,
-                        borderRadius: 4,
+                        borderRadius: T.radius.sm,
                         cursor: "pointer",
                       }}
                     />
@@ -2845,7 +2845,7 @@ function BannersTab({ banners, onRefresh }) {
             padding: 40,
             textAlign: "center",
             border: `1px dashed ${T.border}`,
-            borderRadius: 8,
+            borderRadius: T.radius.md,
           }}
         >
           No banners yet. Create your first banner above.
@@ -2939,8 +2939,8 @@ function BannersTab({ banners, onRefresh }) {
         >
           <div
             style={{
-              background: "#fff",
-              borderRadius: 8,
+              background: T.surface,
+              borderRadius: T.radius.md,
               padding: 28,
               maxWidth: 360,
               textAlign: "center",
@@ -3026,7 +3026,7 @@ function BannerPreview({ banner, compact = false }) {
             display: "inline-block",
             background: "rgba(255,255,255,0.18)",
             padding: "5px 14px",
-            borderRadius: 4,
+            borderRadius: T.radius.sm,
             fontSize: compact ? 10 : 12,
             fontWeight: 600,
             letterSpacing: "0.06em",
@@ -3308,9 +3308,9 @@ function PrintTab({ tenantId }) {
   };
 
   const sCard = {
-    background: "#fff",
+    background: T.surface,
     border: `1px solid ${T.border}`,
-    borderRadius: 10,
+    borderRadius: T.radius.md,
     overflow: "hidden",
     fontFamily: T.font,
   };
@@ -3321,7 +3321,7 @@ function PrintTab({ tenantId }) {
     background: bg,
     color: col,
     border: "none",
-    borderRadius: 5,
+    borderRadius: T.radius.sm,
     cursor: "pointer",
     fontFamily: T.font,
     letterSpacing: "0.04em",
@@ -3351,7 +3351,7 @@ function PrintTab({ tenantId }) {
               minWidth: 160,
               padding: "7px 10px",
               border: `1px solid ${T.border}`,
-              borderRadius: 6,
+              borderRadius: T.radius.md,
               fontSize: 12,
               fontFamily: T.font,
             }}
@@ -3362,7 +3362,7 @@ function PrintTab({ tenantId }) {
             style={{
               padding: "7px 10px",
               border: `1px solid ${T.border}`,
-              borderRadius: 6,
+              borderRadius: T.radius.md,
               fontSize: 12,
               fontFamily: T.font,
             }}
@@ -3459,7 +3459,7 @@ function PrintTab({ tenantId }) {
                       width: 18,
                       height: 18,
                       border: `2px solid ${sel ? T.accent : T.ink300}`,
-                      borderRadius: 4,
+                      borderRadius: T.radius.sm,
                       background: sel ? T.accent : "transparent",
                       display: "flex",
                       alignItems: "center",
@@ -3492,7 +3492,7 @@ function PrintTab({ tenantId }) {
                     >
                       {item.name}
                     </div>
-                    <div style={{ fontSize: 10, color: T.ink500 }}>
+                    <div style={{ fontSize: 11, color: T.ink500 }}>
                       {CAT_LABEL[item.category] || item.category} · {item.sku}
                     </div>
                   </div>
@@ -3511,10 +3511,10 @@ function PrintTab({ tenantId }) {
                     {hasQr ? (
                       <span
                         style={{
-                          fontSize: 9,
+                          fontSize: 11,
                           fontWeight: 700,
                           padding: "2px 7px",
-                          borderRadius: 8,
+                          borderRadius: T.radius.md,
                           background: activeQr ? T.successLight : T.warningLight,
                           color: activeQr ? T.success : T.warning,
                         }}
@@ -3524,10 +3524,10 @@ function PrintTab({ tenantId }) {
                     ) : (
                       <span
                         style={{
-                          fontSize: 9,
+                          fontSize: 11,
                           fontWeight: 700,
                           padding: "2px 7px",
-                          borderRadius: 8,
+                          borderRadius: T.radius.md,
                           background: T.bg,
                           color: T.ink500,
                         }}
@@ -3593,7 +3593,7 @@ function PrintTab({ tenantId }) {
                 >
                   {l.label}
                 </div>
-                <div style={{ fontSize: 10, color: T.ink500, lineHeight: 1.4 }}>
+                <div style={{ fontSize: 11, color: T.ink500, lineHeight: 1.4 }}>
                   {l.desc}
                 </div>
               </div>
@@ -3631,7 +3631,7 @@ function PrintTab({ tenantId }) {
                 key={k}
                 style={{
                   background: T.surface,
-                  borderRadius: 6,
+                  borderRadius: T.radius.md,
                   padding: "8px 10px",
                 }}
               >
@@ -3647,7 +3647,7 @@ function PrintTab({ tenantId }) {
                 </div>
                 <div
                   style={{
-                    fontSize: 9,
+                    fontSize: 11,
                     color: T.ink500,
                     letterSpacing: "0.08em",
                     textTransform: "uppercase",
@@ -3673,7 +3673,7 @@ function PrintTab({ tenantId }) {
               ),
               padding: "12px 16px",
               fontSize: 13,
-              borderRadius: 8,
+              borderRadius: T.radius.md,
             }}
           >
             {generating
@@ -3711,7 +3711,7 @@ function PrintTab({ tenantId }) {
                 ...sBtnSm("#b5935a"),
                 padding: "12px 16px",
                 fontSize: 13,
-                borderRadius: 8,
+                borderRadius: T.radius.md,
               }}
             >
               🖨 Print / Save as PDF
@@ -3724,7 +3724,7 @@ function PrintTab({ tenantId }) {
                 ...sBtnSm(T.surface, T.ink500),
                 padding: "10px 16px",
                 fontSize: 11,
-                borderRadius: 8,
+                borderRadius: T.radius.md,
               }}
             >
               ← Back to selector
@@ -3739,7 +3739,7 @@ function PrintTab({ tenantId }) {
               style={{
                 padding: "10px 14px",
                 borderBottom: `1px solid ${T.border}`,
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
@@ -3763,9 +3763,9 @@ function PrintTab({ tenantId }) {
                   <div
                     key={item.id}
                     style={{
-                      background: "#fff",
+                      background: T.surface,
                       border: `1px solid ${T.border}`,
-                      borderRadius: 6,
+                      borderRadius: T.radius.md,
                       padding: "8px 6px",
                       display: "flex",
                       flexDirection: "column",
@@ -3795,7 +3795,7 @@ function PrintTab({ tenantId }) {
                     </div>
                     <div
                       style={{
-                        fontSize: 9,
+                        fontSize: 11,
                         fontWeight: 600,
                         textAlign: "center",
                         color: T.ink900,
@@ -3821,7 +3821,7 @@ function PrintTab({ tenantId }) {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: 10,
+                    fontSize: 11,
                     color: T.ink500,
                     fontStyle: "italic",
                   }}
@@ -3995,9 +3995,9 @@ function SecurityTab({ tenantId }) {
     );
 
   const sSec = {
-    background: "#fff",
+    background: T.surface,
     border: `1px solid ${T.border}`,
-    borderRadius: 10,
+    borderRadius: T.radius.md,
     marginBottom: 20,
     overflow: "hidden",
     fontFamily: T.font,
@@ -4024,12 +4024,12 @@ function SecurityTab({ tenantId }) {
     borderBottom: `1px solid ${T.bg}`,
   };
   const sLabel = { fontSize: 12, color: T.ink700, fontWeight: 500 };
-  const sSub = { fontSize: 10, color: T.ink500, marginTop: 2 };
+  const sSub = { fontSize: 11, color: T.ink500, marginTop: 2 };
   const sNum = {
     width: 72,
     padding: "5px 8px",
     border: `1px solid ${T.border}`,
-    borderRadius: 5,
+    borderRadius: T.radius.sm,
     fontSize: 12,
     fontFamily: "monospace",
     textAlign: "right",
@@ -4037,7 +4037,7 @@ function SecurityTab({ tenantId }) {
   const sToggle = (on) => ({
     width: 36,
     height: 20,
-    borderRadius: 10,
+    borderRadius: T.radius.md,
     background: on ? T.accent : T.border,
     position: "relative",
     cursor: "pointer",
@@ -4052,7 +4052,7 @@ function SecurityTab({ tenantId }) {
     width: 14,
     height: 14,
     borderRadius: "50%",
-    background: "#fff",
+    background: T.surface,
     transition: "left 0.2s",
   });
 
@@ -4073,10 +4073,10 @@ function SecurityTab({ tenantId }) {
               <span style={sSecHT}>🛡 Fraud & Velocity Detection</span>
               <span
                 style={{
-                  fontSize: 9,
+                  fontSize: 11,
                   fontWeight: 700,
                   padding: "2px 8px",
-                  borderRadius: 8,
+                  borderRadius: T.radius.md,
                   background: T.dangerLight,
                   color: T.danger,
                 }}
@@ -4100,7 +4100,7 @@ function SecurityTab({ tenantId }) {
                   }
                   style={sNum}
                 />
-                <span style={{ fontSize: 10, color: T.ink500 }}>seconds</span>
+                <span style={{ fontSize: 11, color: T.ink500 }}>seconds</span>
               </div>
             </div>
             <div style={{ ...sRow, borderBottom: `1px solid ${T.bg}` }}>
@@ -4117,7 +4117,7 @@ function SecurityTab({ tenantId }) {
                   }
                   style={sNum}
                 />
-                <span style={{ fontSize: 10, color: T.ink500 }}>scans</span>
+                <span style={{ fontSize: 11, color: T.ink500 }}>scans</span>
               </div>
             </div>
             <div style={{ ...sRow, borderBottom: `1px solid ${T.bg}` }}>
@@ -4164,7 +4164,7 @@ function SecurityTab({ tenantId }) {
                   onChange={(e) => upd("pool_low_threshold", +e.target.value)}
                   style={sNum}
                 />
-                <span style={{ fontSize: 10, color: T.ink500 }}>codes</span>
+                <span style={{ fontSize: 11, color: T.ink500 }}>codes</span>
               </div>
             </div>
           </div>
@@ -4198,7 +4198,7 @@ function SecurityTab({ tenantId }) {
                   onChange={(e) => upd("streak_interval", +e.target.value)}
                   style={sNum}
                 />
-                <span style={{ fontSize: 10, color: T.ink500 }}>scans</span>
+                <span style={{ fontSize: 11, color: T.ink500 }}>scans</span>
               </div>
             </div>
             <div style={sRow}>
@@ -4268,7 +4268,7 @@ function SecurityTab({ tenantId }) {
                   onChange={(e) => upd("gps_prompt_delay_ms", +e.target.value)}
                   style={sNum}
                 />
-                <span style={{ fontSize: 10, color: T.ink500 }}>ms</span>
+                <span style={{ fontSize: 11, color: T.ink500 }}>ms</span>
               </div>
             </div>
           </div>
@@ -4280,7 +4280,7 @@ function SecurityTab({ tenantId }) {
           <div style={sSec}>
             <div style={sSecH}>
               <span style={sSecHT}>✨ Category Point Multipliers</span>
-              <span style={{ fontSize: 9, color: T.ink500 }}>
+              <span style={{ fontSize: 11, color: T.ink500 }}>
                 Applied silently at scan time
               </span>
             </div>
@@ -4379,7 +4379,7 @@ function SecurityTab({ tenantId }) {
                   onChange={(e) => upd("default_cooldown_hrs", +e.target.value)}
                   style={sNum}
                 />
-                <span style={{ fontSize: 10, color: T.ink500 }}>hrs</span>
+                <span style={{ fontSize: 11, color: T.ink500 }}>hrs</span>
               </div>
             </div>
           </div>
@@ -4420,10 +4420,10 @@ function SecurityTab({ tenantId }) {
             <span style={sSecHT}>🚨 Recent Security Alerts</span>
             <span
               style={{
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: 700,
                 padding: "2px 8px",
-                borderRadius: 8,
+                borderRadius: T.radius.md,
                 background: T.dangerLight,
                 color: T.danger,
               }}
@@ -4445,7 +4445,7 @@ function SecurityTab({ tenantId }) {
                 </div>
                 <div
                   style={{
-                    fontSize: 10,
+                    fontSize: 11,
                     color: T.ink500,
                     marginTop: 2,
                     lineHeight: 1.5,
@@ -4453,7 +4453,7 @@ function SecurityTab({ tenantId }) {
                 >
                   {a.body?.slice(0, 120)}
                 </div>
-                <div style={{ fontSize: 9, color: T.ink300, marginTop: 3 }}>
+                <div style={{ fontSize: 11, color: T.ink300, marginTop: 3 }}>
                   {new Date(a.created_at).toLocaleString("en-ZA")}
                 </div>
               </div>
@@ -4462,10 +4462,10 @@ function SecurityTab({ tenantId }) {
                 style={{
                   marginLeft: 12,
                   padding: "4px 10px",
-                  fontSize: 10,
+                  fontSize: 11,
                   background: T.bg,
                   border: "none",
-                  borderRadius: 5,
+                  borderRadius: T.radius.sm,
                   cursor: "pointer",
                   color: T.ink500,
                   flexShrink: 0,
@@ -4483,7 +4483,7 @@ function SecurityTab({ tenantId }) {
         <div style={sSec}>
           <div style={sSecH}>
             <span style={sSecHT}>⚠ Anomaly Scores — Flagged Users</span>
-            <span style={{ fontSize: 10, color: T.ink500 }}>
+            <span style={{ fontSize: 11, color: T.ink500 }}>
               Score &gt; 0 · sorted highest first
             </span>
           </div>
@@ -4512,7 +4512,7 @@ function SecurityTab({ tenantId }) {
                         width: 120,
                         height: 6,
                         background: T.border,
-                        borderRadius: 3,
+                        borderRadius: T.radius.sm,
                         overflow: "hidden",
                       }}
                     >
@@ -4521,7 +4521,7 @@ function SecurityTab({ tenantId }) {
                           width: `${Math.min(score, 100)}%`,
                           height: "100%",
                           background: color,
-                          borderRadius: 3,
+                          borderRadius: T.radius.sm,
                         }}
                       />
                     </div>
@@ -4538,10 +4538,10 @@ function SecurityTab({ tenantId }) {
                     {u.is_suspended && (
                       <span
                         style={{
-                          fontSize: 9,
+                          fontSize: 11,
                           fontWeight: 700,
                           padding: "1px 6px",
-                          borderRadius: 8,
+                          borderRadius: T.radius.md,
                           background: T.dangerLight,
                           color: T.danger,
                         }}
@@ -4557,10 +4557,10 @@ function SecurityTab({ tenantId }) {
                     disabled={resolving === u.id}
                     style={{
                       padding: "4px 10px",
-                      fontSize: 10,
+                      fontSize: 11,
                       background: T.infoLight,
                       border: `1px solid ${T.infoBd}`,
-                      borderRadius: 5,
+                      borderRadius: T.radius.sm,
                       cursor: "pointer",
                       color: T.info,
                     }}
@@ -4572,10 +4572,10 @@ function SecurityTab({ tenantId }) {
                     disabled={resolving === u.id}
                     style={{
                       padding: "4px 10px",
-                      fontSize: 10,
+                      fontSize: 11,
                       background: u.is_suspended ? T.successLight : T.dangerLight,
                       border: `1px solid ${u.is_suspended ? T.successBd : T.dangerBd}`,
-                      borderRadius: 5,
+                      borderRadius: T.radius.sm,
                       cursor: "pointer",
                       color: u.is_suspended ? T.success : T.danger,
                     }}
