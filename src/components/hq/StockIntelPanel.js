@@ -13,10 +13,10 @@
 //   onOpenItem — fn(item)— open StockItemPanel drawer
 
 import React, { useState, useMemo, useEffect } from "react";
+import { Flame, TrendingUp, Zap, Package, Banknote, AlertTriangle, Calendar, BookOpen } from "lucide-react";
 import { supabase } from "../../services/supabaseClient";
 import { CATEGORY_LABELS } from "./ProductWorlds";
 import { T } from "../../styles/tokens";
-const MONO = "'DM Mono','Courier New',monospace";
 
 // CATEGORY_LABELS imported from ProductWorlds.js
 
@@ -30,17 +30,11 @@ const fmt = (n) =>
       });
 
 const SectionLabel = ({ children }) => (
-  <div
-    style={{
-      fontSize: 10,
-      fontWeight: 700,
-      letterSpacing: "0.1em",
-      textTransform: "uppercase",
-      color: T.ink500,
-      fontFamily: T.font,
-    }}
-  >
-    {children}
+  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+    <span style={{ display: "inline-block", width: 3, height: 14, borderRadius: 2, background: T.accent, flexShrink: 0 }} />
+    <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: T.ink400, fontFamily: T.font }}>
+      {children}
+    </span>
   </div>
 );
 
@@ -97,16 +91,12 @@ function IntelPanel({
           background: T.bg,
         }}
       >
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: T.ink700,
-            fontFamily: T.font,
-          }}
-        >
-          {icon} {title}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {icon}
+          <span style={{ fontSize: 11, fontWeight: 700, color: T.ink700, fontFamily: T.font }}>
+            {title}
+          </span>
+        </div>
         {badge && (
           <span
             style={{
@@ -179,10 +169,10 @@ function IntelPanel({
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span
                   style={{
-                    fontSize: 10,
+                    fontSize: 11,
                     fontWeight: 700,
                     color: idx === 0 ? T.accentMid : T.ink300,
-                    fontFamily: MONO,
+                    fontFamily: T.font,
                     width: 14,
                     flexShrink: 0,
                     textAlign: "right",
@@ -237,7 +227,7 @@ function IntelPanel({
                   style={{
                     fontSize: 11,
                     fontWeight: 700,
-                    fontFamily: MONO,
+                    fontFamily: T.font,
                     fontVariantNumeric: "tabular-nums",
                     color: row.valueColor || T.ink700,
                     flexShrink: 0,
@@ -448,24 +438,11 @@ function StockGlossary() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              color: T.ink500,
-            }}
-          >
-            📖 Stock Terms Explained
+          <BookOpen size={13} color={T.ink400} />
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: T.ink400, fontFamily: T.font }}>
+            Stock Terms Explained
           </span>
-          <span
-            style={{
-              fontSize: 10,
-              color: T.ink300,
-              fontFamily: T.font,
-            }}
-          >
+          <span style={{ fontSize: 11, color: T.ink400, fontFamily: T.font }}>
             {GLOSSARY_TERMS.length} terms — AVCO, Margin, Dead Stock and more
           </span>
         </div>
@@ -547,10 +524,10 @@ function StockGlossary() {
                   >
                     <span
                       style={{
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: 700,
                         color: T.accentMid,
-                        fontFamily: MONO,
+                        fontFamily: T.font,
                       }}
                     >
                       {item.term}
@@ -821,11 +798,10 @@ Return ONLY a valid JSON array of exactly 3 objects, no markdown, no explanation
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: 13,
               color: T.warning,
             }}
           >
-            ⚠
+            <AlertTriangle size={14} />
           </div>
           <div>
             <div
@@ -1454,7 +1430,7 @@ export default function StockIntelPanel({
         >
           <IntelPanel
             title="Best Sellers"
-            icon="🔥"
+            icon={<Flame size={13} color={T.danger} />}
             badge={saleOuts.length > 0 ? "last 30d" : null}
             rows={bestSellers}
             emptyMsg={
@@ -1470,7 +1446,7 @@ export default function StockIntelPanel({
 
           <IntelPanel
             title="Margin Heroes"
-            icon="💰"
+            icon={<TrendingUp size={13} color={T.success} />}
             badge={
               marginHeroes.length > 0 ? `${marginHeroes.length} priced` : null
             }
@@ -1483,7 +1459,7 @@ export default function StockIntelPanel({
 
           <IntelPanel
             title="Fast Movers"
-            icon="⚡"
+            icon={<Zap size={13} color={T.warning} />}
             badge={fastMovers.length > 0 ? "days remaining" : null}
             rows={fastMovers}
             emptyMsg="Once sales come through, you'll see how many days of stock remain per item"
@@ -1495,7 +1471,7 @@ export default function StockIntelPanel({
 
           <IntelPanel
             title="Dead Stock"
-            icon="📦"
+            icon={<Package size={13} color={T.warning} />}
             badge={deadStock.length > 0 ? `${DEAD_THRESHOLD}d+ idle` : null}
             badgeColor={{ color: T.warning, bg: T.warningLight, bd: T.warningBd }}
             rows={deadStock}
@@ -1512,7 +1488,7 @@ export default function StockIntelPanel({
       >
         <IntelPanel
           title="Making You Money"
-          icon="💵"
+          icon={<Banknote size={13} color={T.success} />}
           badge={revenueLeaders.length > 0 ? "last 30 days" : null}
           badgeColor={{ color: T.success, bg: T.successLight, bd: T.successBd }}
           rows={revenueLeaders}
@@ -1525,7 +1501,7 @@ export default function StockIntelPanel({
 
         <IntelPanel
           title="Selling Fast, Earning Little"
-          icon="⚠️"
+          icon={<AlertTriangle size={13} color={T.warning} />}
           badge={marginAtRisk.length > 0 ? "under 25% profit" : null}
           badgeColor={{ color: T.danger, bg: T.dangerLight, bd: T.dangerBd }}
           rows={marginAtRisk}
@@ -1536,7 +1512,7 @@ export default function StockIntelPanel({
 
         <IntelPanel
           title="Prices Worth Checking"
-          icon="🗓"
+          icon={<Calendar size={13} color={T.ink400} />}
           badge={priceReview.length > 0 ? "60+ days old" : null}
           badgeColor={{ color: T.warning, bg: T.warningLight, bd: T.warningBd }}
           rows={priceReview}
