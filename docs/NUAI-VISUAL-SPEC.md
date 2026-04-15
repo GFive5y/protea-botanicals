@@ -379,8 +379,14 @@ TenantPortal.js wraps all tab content in:
   
 
 
-// INNER = { maxWidth: 1400, width: "100%", margin: "0 auto" }
+// INNER = { width: "100%", boxSizing: "border-box" }
 ```
+
+RULE: The INNER wrapper in TenantPortal.js must NOT use maxWidth or margin: auto.
+Content must fill 100% of the space between the sidebar and the right scrollbar
+at all viewport widths and zoom levels. Individual components manage their own
+internal layout width if needed. The grey T.bg side-strips visible when zoomed
+out are caused by maxWidth centering — this is prohibited. (LOOP-DS6-001 · Session 284)
 
 ### 7.3 Group Portal Specific
 

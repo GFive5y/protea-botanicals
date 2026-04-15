@@ -183,6 +183,17 @@ Outstanding items — do not chase before 12 May unless time permits:
 
 ---
 
+## CLOSED LOOPS — SESSION 284 (15 April 2026)
+
+### ✅ CLOSED — LOOP-DS6-001: TenantPortal INNER maxWidth causes grey side-strips
+Session 284
+TenantPortal INNER maxWidth causes grey side-strips at wide viewports
+and any zoom level below 100%. Fixed Session 284 — removed maxWidth from INNER const.
+Content now pins edge to edge at every zoom level, matching Group Portal behaviour.
+Rule added to docs/NUAI-VISUAL-SPEC.md Part 7.2.
+
+---
+
 ## CLOSED LOOPS — SESSION 282 (15 April 2026)
 
 ### ✅ CLOSED — DOC-001: SESSION-START-PROMPT.md stale entry point

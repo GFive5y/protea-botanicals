@@ -104,9 +104,8 @@ const T = {
 
 // Shared inner constraint — matches FX bar exactly
 const INNER = {
-  maxWidth: 1400,
   width: "100%",
-  margin: "0 auto",
+  boxSizing: "border-box",
 };
 
 const WATERFALL = [
