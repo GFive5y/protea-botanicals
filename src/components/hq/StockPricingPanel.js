@@ -32,9 +32,9 @@ const Ty = {
 
 const sTh = {
   textAlign: "left",
-  padding: "10px 12px",
+  padding: "11px 12px",
   ...Ty.label,
-  color: T.ink500,
+  color: T.ink400,
   borderBottom: `2px solid ${T.border}`,
   background: T.surface,
   whiteSpace: "nowrap",
@@ -217,7 +217,7 @@ function variantStr(item) {
 const fmtR = (n) =>
   n == null
     ? "—"
-    : "R " +
+    : "R" +
       Number(n).toLocaleString("en-ZA", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
@@ -1210,12 +1210,13 @@ export default function StockPricingPanel({ tenantId }) {
       {/* Table */}
       <div
         style={{
-          background: "#fff",
+          background: T.surface,
           border: `1px solid ${T.border}`,
-          borderRadius: 6,
+          borderRadius: T.radius.lg,
           overflow: "auto",
           boxShadow: T.shadow.sm,
           marginBottom: 12,
+          padding: "0 16px",
         }}
       >
         <table

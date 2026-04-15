@@ -3575,6 +3575,7 @@ export default function HQStock() {
                 View all →
               </button>
             </div>
+            <div style={{ padding: "0 16px" }}>
             <table
               style={{
                 width: "100%",
@@ -3599,7 +3600,7 @@ export default function HQStock() {
                   return (
                     <tr
                       key={m.id}
-                      style={{ background: idx % 2 === 0 ? "#fff" : T.bg }}
+                      style={{ background: idx % 2 === 0 ? T.surface : T.bg }}
                     >
                       <td
                         style={{
@@ -3661,6 +3662,7 @@ export default function HQStock() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </div>
