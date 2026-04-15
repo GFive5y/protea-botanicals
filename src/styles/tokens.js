@@ -71,12 +71,16 @@ export const T = {
   },
 
   // Border radius
+  // Border radius — string values with px units so template literals
+  // like `${T.radius.lg} ${T.radius.lg} 0 0` produce valid CSS.
+  // Inline styles accept both "4px" and 4 for length props, so this
+  // is backwards-compatible with every existing borderRadius: T.radius.xx site.
   radius: {
-    sm:   4,
-    md:   8,
-    lg:   12,
-    xl:   16,
-    full: 9999,
+    sm:   "4px",
+    md:   "8px",
+    lg:   "12px",
+    xl:   "16px",
+    full: "9999px",
   },
 
   // Shadows
@@ -168,14 +172,20 @@ export const T = {
   // luxury accent moments that are NOT semantic warnings.
   brandGold:      "#b5935a",   // Protea Botanicals brand accent (warm gold)
 
-  // ─── BORDER ACCENTS ──────────────────────────────────────────
-  // Added WP-DS-2/P3 (ActionCentre migration). Mid-tier border
-  // colours for pill/badge/alert block outlines — sit between
-  // the surface-light backgrounds and the deeper text-tier
-  // colours. Required because T had no warning/danger border
-  // slots — only light surfaces and bright semantic tiers.
-  warningBorder:  "#FDE68A",   // mid-yellow warning border
-  dangerBorder:   "#FECACA",   // light-pink danger border
+  // ─── SEMANTIC BORDER TOKENS ──────────────────────────────────
+  // Added WP-DS-6 (bridge components). Each semantic state now has
+  // a full token set: colour / mid / light / text / bd (border).
+  // *Bd tokens are the mid-opacity border for alert blocks, badges,
+  // and outlined components. Required by all DS6 bridge files.
+  successBd:   "#BBF7D0",   // success border — soft green
+  warningBd:   "#FDE68A",   // warning border
+  dangerBd:    "#FECACA",   // danger border
+  infoBd:      "#BFDBFE",   // info border — soft blue
+  accentBd:    "#A7D9B8",   // accent border — light mint green
+
+  // Legacy names — kept for PageShell and any remaining consumers
+  warningBorder:  "#FDE68A",   // alias → warningBd
+  dangerBorder:   "#FECACA",   // alias → dangerBd
 
   // WP-DS-6 — Layout & Container Tokens (11 Apr 2026)
   container: {
