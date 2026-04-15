@@ -613,10 +613,13 @@ Deno.serve(async (req: Request) => {
     // ── Upload to Storage + return signed URL ──────────────────────────────────
     const pdfBytes = await doc.save();
     const pdfPath = `${String(tenant_id)}/${String(financial_year)}-${Date.now()}.pdf`;
+    // Wrap Uint8Array in Blob — Supabase Storage client in Deno requires Blob
+    // for correct multipart encoding. Raw Uint8Array causes a silent 500.
+    const pdfBlob = new Blob([pdfBytes], { type: "application/pdf" });
 
     const { error: upErr } = await db.storage
       .from("financial-statements")
-      .upload(pdfPath, pdfBytes, { contentType: "application/pdf", upsert: true });
+      .upload(pdfPath, pdfBlob, { contentType: "application/pdf", upsert: true });
     if (upErr) throw new Error(`Storage upload failed: ${upErr.message}`);
 
     const { data: urlData, error: urlErr } = await db.storage

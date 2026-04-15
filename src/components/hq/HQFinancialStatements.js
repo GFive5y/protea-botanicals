@@ -425,7 +425,7 @@ export default function HQFinancialStatements() {
           equity: equityData,
         },
       });
-      if (error) throw error;
+      if (error) throw new Error(data?.error ?? error.message);
       if (!data?.success) throw new Error(data?.error ?? "PDF generation failed");
       window.open(data.url, "_blank");
       showToast("PDF ready \u2014 opening in new tab");
