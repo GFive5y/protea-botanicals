@@ -7,10 +7,10 @@
 // Visual: T-token system, matches HQStock (WP-VISUAL-SYSTEM v1.0)
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { ClipboardList, Target, X, User, Clock, Package } from "lucide-react";
 import { useTenant } from "../../services/tenantService";
 import { supabase } from "../../services/supabaseClient";
 import { T } from "../../styles/tokens";
-const MONO = "'DM Mono','Courier New',monospace";
 
 const Ty = {
   label: {
@@ -25,7 +25,7 @@ const Ty = {
   data: {
     fontSize: "12px",
     fontWeight: 400,
-    fontFamily: MONO,
+    fontFamily: T.font,
     fontVariantNumeric: "tabular-nums",
   },
 };
@@ -127,54 +127,32 @@ const HASH_SUBS = [
 
 const CATS = [
   { key: "all", label: "All Items", icon: "◈", match: () => true },
-  {
-    key: "flower",
-    label: "Flower",
-    icon: "🌿",
-    match: (i) => i.category === "flower",
-  },
+  { key: "flower", label: "Flower", icon: null, match: (i) => i.category === "flower" },
   {
     key: "concentrate",
     label: "Concentrate",
-    icon: "💧",
-    match: (i) =>
-      i.category === "concentrate" && !HASH_SUBS.includes(i.subcategory),
+    icon: null,
+    match: (i) => i.category === "concentrate" && !HASH_SUBS.includes(i.subcategory),
   },
   {
     key: "hash",
     label: "Hash",
-    icon: "🟤",
-    match: (i) =>
-      i.category === "concentrate" && HASH_SUBS.includes(i.subcategory),
+    icon: null,
+    match: (i) => i.category === "concentrate" && HASH_SUBS.includes(i.subcategory),
   },
-  {
-    key: "finished_product",
-    label: "Vapes",
-    icon: "💨",
-    match: (i) => i.category === "finished_product",
-  },
-  {
-    key: "edible",
-    label: "Edible",
-    icon: "🍬",
-    match: (i) => i.category === "edible",
-  },
-  {
-    key: "hardware",
-    label: "Equipment",
-    icon: "🔧",
-    match: (i) => i.category === "hardware",
-  },
+  { key: "finished_product", label: "Vapes", icon: null, match: (i) => i.category === "finished_product" },
+  { key: "edible", label: "Edible", icon: null, match: (i) => i.category === "edible" },
+  { key: "hardware", label: "Equipment", icon: null, match: (i) => i.category === "hardware" },
 ];
 
 const DISPENSARY_CATS = [
   { key: "all", label: "All Items", icon: "◈", match: () => true },
-  { key: "concentrate", label: "Concentrate", icon: "💧", match: (i) => i.category === "concentrate" },
-  { key: "edible", label: "Edible", icon: "🍬", match: (i) => i.category === "edible" },
-  { key: "flower", label: "Flower", icon: "🌿", match: (i) => i.category === "flower" },
-  { key: "topical", label: "Topical", icon: "🧴", match: (i) => i.category === "topical" },
-  { key: "medical_consumable", label: "Medical", icon: "💊", match: (i) => i.category === "medical_consumable" },
-  { key: "terpene", label: "Terpene", icon: "🌸", match: (i) => i.category === "terpene" },
+  { key: "concentrate", label: "Concentrate", icon: null, match: (i) => i.category === "concentrate" },
+  { key: "edible", label: "Edible", icon: null, match: (i) => i.category === "edible" },
+  { key: "flower", label: "Flower", icon: null, match: (i) => i.category === "flower" },
+  { key: "topical", label: "Topical", icon: null, match: (i) => i.category === "topical" },
+  { key: "medical_consumable", label: "Medical", icon: null, match: (i) => i.category === "medical_consumable" },
+  { key: "terpene", label: "Terpene", icon: null, match: (i) => i.category === "terpene" },
 ];
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -375,14 +353,15 @@ function AuditDrawer({ item, onClose }) {
                 background: "none",
                 border: "none",
                 cursor: "pointer",
-                fontSize: 18,
-                color: T.ink300,
+                color: T.ink400,
                 lineHeight: 1,
                 padding: 4,
                 marginLeft: 8,
+                display: "flex",
+                alignItems: "center",
               }}
             >
-              ✕
+              <X size={16} />
             </button>
           </div>
           {/* KPI strip */}
@@ -490,7 +469,7 @@ function AuditDrawer({ item, onClose }) {
                   color: T.ink300,
                 }}
               >
-                <div style={{ fontSize: 28, marginBottom: 8 }}>📋</div>
+                <div style={{ marginBottom: 8, color: T.ink400 }}><ClipboardList size={32} /></div>
                 <div style={{ ...Ty.body }}>No price changes recorded yet.</div>
                 <div style={{ ...Ty.caption, color: T.ink500, marginTop: 4 }}>
                   Price changes logged here from v1.3 onwards.
@@ -589,11 +568,11 @@ function AuditDrawer({ item, onClose }) {
                       </span>
                     </div>
                     <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                      <span style={{ ...Ty.caption, color: T.ink500 }}>
-                        👤 {ph.changed_by_email || "Unknown"}
+                      <span style={{ ...Ty.caption, color: T.ink500, display: "inline-flex", alignItems: "center", gap: 3 }}>
+                        <User size={10} />{ph.changed_by_email || "Unknown"}
                       </span>
-                      <span style={{ ...Ty.caption, color: T.ink300 }}>
-                        🕐 {fmtDate(ph.changed_at)}
+                      <span style={{ ...Ty.caption, color: T.ink400, display: "inline-flex", alignItems: "center", gap: 3 }}>
+                        <Clock size={10} />{fmtDate(ph.changed_at)}
                       </span>
                     </div>
                   </div>
@@ -608,7 +587,7 @@ function AuditDrawer({ item, onClose }) {
                 color: T.ink300,
               }}
             >
-              <div style={{ fontSize: 28, marginBottom: 8 }}>📦</div>
+              <div style={{ marginBottom: 8, color: T.ink400 }}><Package size={32} /></div>
               <div style={{ ...Ty.body }}>No stock movements recorded.</div>
             </div>
           ) : (
@@ -669,8 +648,8 @@ function AuditDrawer({ item, onClose }) {
                       flexWrap: "wrap",
                     }}
                   >
-                    <span style={{ ...Ty.caption, color: T.ink300 }}>
-                      🕐 {fmtDate(m.created_at)}
+                    <span style={{ ...Ty.caption, color: T.ink400, display: "inline-flex", alignItems: "center", gap: 3 }}>
+                      <Clock size={10} />{fmtDate(m.created_at)}
                     </span>
                     {m.unit_cost > 0 && (
                       <span style={{ ...Ty.caption, color: T.ink500 }}>
@@ -967,7 +946,7 @@ export default function StockPricingPanel({ tenantId }) {
           }}
           onClick={() => setCalcOpen((o) => !o)}
         >
-          🎯 {calcOpen ? "Close" : "Target Margin"}
+          <Target size={12} style={{ marginRight: 4, verticalAlign: "middle" }} />{calcOpen ? "Close" : "Target Margin"}
         </button>
       </div>
 
@@ -1144,7 +1123,7 @@ export default function StockPricingPanel({ tenantId }) {
                 opacity: count === 0 && key !== "all" ? 0.4 : 1,
               }}
             >
-              {icon} {label} <span style={{ opacity: 0.65 }}>×{count}</span>
+              {icon ? <span style={{ marginRight: 2 }}>{icon}</span> : null}{label} <span style={{ opacity: 0.65 }}>×{count}</span>
             </button>
           );
         })}
@@ -1263,7 +1242,7 @@ export default function StockPricingPanel({ tenantId }) {
                 Margin
               </th>
               <th style={{ ...sTh, width: "5%", textAlign: "right" }}>Stock</th>
-              <th style={{ ...sTh, width: "3%", textAlign: "center" }}>📋</th>
+              <th style={{ ...sTh, width: "3%", textAlign: "center" }}><ClipboardList size={13} /></th>
             </tr>
           </thead>
           <tbody>
@@ -1545,13 +1524,14 @@ export default function StockPricingPanel({ tenantId }) {
                           background: "none",
                           border: "none",
                           cursor: "pointer",
-                          color: T.ink300,
-                          fontSize: 13,
+                          color: T.ink400,
                           padding: 2,
                           lineHeight: 1,
+                          display: "flex",
+                          alignItems: "center",
                         }}
                       >
-                        📋
+                        <ClipboardList size={13} />
                       </button>
                     </td>
                   </tr>
