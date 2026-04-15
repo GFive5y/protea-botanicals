@@ -4669,9 +4669,9 @@ export default function HQStock() {
                       <div
                         key={item.id}
                         style={{
-                          background: "#fff",
+                          background: T.surface,
                           border: "1px solid " + (low ? T.dangerBd : T.border),
-                          borderRadius: 8,
+                          borderRadius: T.radius.lg,
                           padding: 14,
                           display: "flex",
                           flexDirection: "column",
@@ -4951,8 +4951,9 @@ export default function HQStock() {
                 style={{
                   background: T.surface,
                   border: "1px solid " + T.border,
-                  borderRadius: T.radius.md,
+                  borderRadius: T.radius.lg,
                   overflow: "auto",
+                  padding: "0 16px",
                 }}
               >
                 <table
