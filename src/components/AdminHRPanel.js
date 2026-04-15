@@ -217,7 +217,7 @@ export default function AdminHRPanel({ tenantId, user }) {
             gridTemplateColumns: "repeat(auto-fit,minmax(110px,1fr))",
             gap: "1px",
             background: T.border,
-            borderRadius: 8,
+            borderRadius: T.radius.md,
             overflow: "hidden",
             border: `1px solid ${T.border}`,
             boxShadow: T.shadow.sm,
@@ -251,18 +251,18 @@ export default function AdminHRPanel({ tenantId, user }) {
             <div
               key={s.label}
               style={{
-                background: "#fff",
+                background: T.surface,
                 padding: "14px 16px",
                 textAlign: "center",
               }}
             >
               <div
                 style={{
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: 700,
                   letterSpacing: "0.08em",
                   textTransform: "uppercase",
-                  color: T.ink500,
+                  color: T.ink400,
                   marginBottom: 6,
                   fontFamily: T.font,
                 }}
@@ -273,7 +273,7 @@ export default function AdminHRPanel({ tenantId, user }) {
                 style={{
                   fontFamily: T.font,
                   fontSize: 22,
-                  fontWeight: 400,
+                  fontWeight: 700,
                   color: s.color,
                   lineHeight: 1,
                   letterSpacing: "-0.02em",
@@ -369,13 +369,13 @@ export default function AdminHRPanel({ tenantId, user }) {
                   />
                   <XAxis
                     dataKey="name"
-                    tick={{ fill: T.ink500, fontSize: 10, fontFamily: T.font }}
+                    tick={{ fill: T.ink500, fontSize: 11, fontFamily: T.font }}
                     axisLine={false}
                     tickLine={false}
                     dy={4}
                   />
                   <YAxis
-                    tick={{ fill: T.ink500, fontSize: 10, fontFamily: T.font }}
+                    tick={{ fill: T.ink500, fontSize: 11, fontFamily: T.font }}
                     axisLine={false}
                     tickLine={false}
                     width={24}
@@ -441,7 +441,7 @@ export default function AdminHRPanel({ tenantId, user }) {
                     >
                       <span
                         style={{
-                          fontSize: 10,
+                          fontSize: 11,
                           color: T.ink500,
                           fontFamily: "monospace",
                           width: 64,
@@ -457,7 +457,7 @@ export default function AdminHRPanel({ tenantId, user }) {
                           flex: 1,
                           height: 14,
                           background: T.bg,
-                          borderRadius: 3,
+                          borderRadius: T.radius.sm,
                           overflow: "hidden",
                         }}
                       >
@@ -466,7 +466,7 @@ export default function AdminHRPanel({ tenantId, user }) {
                             height: "100%",
                             width: `${(d.hours / maxHrs) * 100}%`,
                             background: T.accentMid,
-                            borderRadius: 3,
+                            borderRadius: T.radius.sm,
                             transition: "width 0.5s",
                             display: "flex",
                             alignItems: "center",
@@ -476,7 +476,7 @@ export default function AdminHRPanel({ tenantId, user }) {
                           {d.hours / maxHrs > 0.2 && (
                             <span
                               style={{
-                                fontSize: 9,
+                                fontSize: 11,
                                 color: "#fff",
                                 fontWeight: 700,
                                 fontFamily: T.font,
@@ -489,7 +489,7 @@ export default function AdminHRPanel({ tenantId, user }) {
                       </div>
                       <span
                         style={{
-                          fontSize: 10,
+                          fontSize: 11,
                           color: T.ink500,
                           fontFamily: T.font,
                           minWidth: 28,
@@ -515,7 +515,7 @@ export default function AdminHRPanel({ tenantId, user }) {
             padding: "10px 16px",
             background: T.warningLight,
             border: `1px solid ${T.warningBd}`,
-            borderRadius: 6,
+            borderRadius: T.radius.md,
             marginBottom: 16,
             fontSize: 13,
             color: T.warning,
