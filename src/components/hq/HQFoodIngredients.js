@@ -178,6 +178,14 @@ const ALLERGENS = [
 ];
 
 // ─── HACCP colours ────────────────────────────────────────────────────────────
+// INTENTIONAL CONTENT COLOURS — NOT migrated to T tokens (S293 PR 2b.3 decision).
+// These 4 hues label food-safety risk levels (Low/Medium/High/Critical) and
+// must remain visually distinct for safety. Migrating to getSeverityTokens()
+// would collapse Medium and High into the same warning-amber (both map to
+// "warning" severity), and would shift Critical's red, Low's green, and the
+// bright orange of High toward muted T palette equivalents. See 2b scoping.
+// Revisit post-demo if a proper design audit is performed (would need
+// T.warningStrong etc. to preserve distinctness).
 const HACCP_COLORS = {
   low: { bg: "#F0FDF4", color: "#166534", label: "Low Risk" },
   medium: { bg: "#FEF3C7", color: "#92400E", label: "Medium Risk" },
@@ -186,6 +194,11 @@ const HACCP_COLORS = {
 };
 
 // ─── Temperature colours ──────────────────────────────────────────────────────
+// INTENTIONAL CONTENT COLOURS — NOT migrated to T tokens (S293 PR 2b.3 decision).
+// 3 hues label cold-chain zones (Ambient/Refrigerated/Frozen). Saturated blue
+// for Refrigerated and indigo for Frozen are preserved for visual distinctness;
+// getSeverityTokens's "info" + "purple" alternatives drift the Refrigerated
+// blue toward muted teal and Frozen's indigo toward violet. Revisit post-demo.
 const TEMP_COLORS = {
   ambient: { bg: "#F0FDF4", color: "#166534", label: "Ambient", icon: "☀️" },
   refrigerated: {
