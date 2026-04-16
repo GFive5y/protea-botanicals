@@ -537,3 +537,108 @@ HQStock.js (351bc44).
 Applied to: every tab component going forward — check before shipping.
 
 *LL-265 through LL-267 added: Sessions 282-284 · April 15-16, 2026*
+
+
+---
+
+## LL-268 — Sessions 285-286 (April 15-16, 2026) — DS6 T import pattern
+
+LL-268: DS6 batch scripts check hasLocalT to decide whether to add a bridge.
+Files that use T.* with NO local T block AND NO import will compile with
+"T is not defined". Pattern: if file has bare T.xxx with no local block
+and no import — add `import { T } from "../../styles/tokens";` directly.
+Do NOT add the bridge (no DS alias needed). HRStaffProfile.js was the
+canonical example (db12ac3).
+
+*LL-268 added: Sessions 285-286 · April 15-16, 2026*
+
+---
+
+## LL-269 through LL-274 — Session 287/288 (16 April 2026)
+
+LL-269: PostgREST .neq(col, val) EXCLUDES NULL rows silently.
+When a boolean column is nullable (e.g. dispensing_log.is_voided defaults to
+false but may be NULL in some rows), PostgREST's .neq("is_voided", true)
+generates SQL: is_voided != true — which PostgreSQL evaluates as NULL for
+NULL rows, excluding them from the result set.
+ALWAYS use .eq("is_voided", false) for nullable booleans — it generates:
+is_voided = false AND respects only explicitly false rows.
+Root cause of LOOP-NEW-005: HQOverview fetchDispensingRevenue returned R0
+because all NULL-voided events were dropped. Fixed a447f74.
+Pattern applies to: any nullable boolean filter in PostgREST queries.
+
+LL-270: PostgREST nested join without !inner modifier can return null for the
+related object when the FK is not navigable in context. The syntax
+`inventory_items(sell_price)` performs a LEFT JOIN — if the FK cannot be
+resolved (e.g. missing FK constraint, ambiguous relationship, or PostgREST
+inference failure), the related object returns null and the field is 0.
+The `!inner` modifier forces an INNER JOIN, errors loudly if no FK exists,
+and guarantees a non-null related object.
+ALWAYS use `inventory_items!inner(sell_price)` when the join is mandatory
+and the field drives a financial calculation.
+Applied: HQOverview.js fetchDispensingRevenue (a447f74), HQProfitLoss.js
+fetchDispensingRevenue (working pattern). Also confirmed in useFinSignals.js
+and useIntelStrip.js which both use !inner correctly.
+
+LL-271: leave_balances.available is a GENERATED column in PostgreSQL.
+It is computed automatically from opening_balance + accrued + carried_over
+- used - pending - forfeited. NEVER include `available` in INSERT or UPDATE
+statements — it will cause a PostgreSQL error.
+INSERT columns: staff_profile_id, leave_type_id, tenant_id, cycle_start,
+cycle_end, opening_balance, accrued, carried_over, used, pending, forfeited.
+Applied: LOOP-012 HR top-up Session 288 — 5 staff leave_balances inserted
+without the available column.
+
+LL-272: R-TDZ-01 — useCallback deps cannot reference consts declared after
+early returns in the same component scope.
+Pattern that breaks:
+  if (!tenantId) return <Loading />;   — early return
+  const financialYear = `FY${year}`;   — declared AFTER early return
+  const cb = useCallback(async () => {
+    ... use financialYear ...           — TDZ crash at runtime
+  }, [financialYear]);
+Fix: inline the value inside the callback body instead of referencing the
+outer const. The early return means the const is never initialized when
+the hook's closure captures it.
+Applied: HQFinancialStatements.js handleDownloadPDF (R-TDZ-01 fix).
+
+LL-273: equity_ledger UPDATE sequencing — changing net_profit_for_year
+shifts total_equity. The BS module reads:
+  total_equity = share_capital + opening_retained_earnings + net_profit_for_year
+If net_profit is updated without recalibrating share_capital, total_equity
+changes while total_assets stays fixed — BS shows "does not balance" banner.
+CORRECT SEQUENCE (same session):
+  Step 1: UPDATE equity_ledger SET net_profit_for_year = <correct figure>
+  Step 2: Calculate required share_capital:
+    share_capital = Total_Assets - opening_retained_earnings - net_profit_for_year
+  Step 3: UPDATE equity_ledger SET share_capital = <calculated figure>
+  Step 4: Verify residual_gap = 0:
+    SELECT ROUND(share_capital + opening_retained_earnings
+                 + net_profit_for_year - <total_assets>, 2) AS residual_gap
+Applied: MediCare Dispensary Session 288.
+  net_profit: -418,979 -> -263,672.76
+  share_capital: 752,861.18 -> 623,022.64
+  total_equity: 333,882.18 -> 359,349.88 = total_assets
+See also LL-248 (equity_ledger drift warning).
+
+LL-274: Tenant-selective banner — check data rows BEFORE searching source code.
+When a warning banner appears on some tenant portals but not others (especially
+when the pattern maps to specific tenants missing a config row), the root cause
+is almost always a missing DB row, not a code bug.
+LOOP-015 diagnostic timeline:
+  Source search: 15 files read (AINSBar, useNavIntelligence, HQLoyalty,
+  IntelStrip, useIntelStrip, useBrief, useFinSignals, PromoBanner,
+  LoyaltyBadges, TenantPortal, AIFixture, useNavConfig, all shared/* — 45+ minutes, inconclusive.
+  Data check: SELECT loyalty_config WHERE tenant_id IN (...) — 30 seconds.
+  Result: 3 of 5 tenants missing loyalty_config rows.
+  Fix: INSERT loyalty_config (standard schema) — 2 minutes.
+RULE: When banner is tenant-selective — run the data check FIRST.
+  1. Identify which tenants see the banner
+  2. Identify the likely config table (loyalty_config, tenant_config, etc.)
+  3. SELECT COUNT(*) per affected tenant — find the missing rows
+  4. INSERT the missing rows
+  5. Only if data is present and banner persists — search source code.
+Source component was NOT identified and this is acceptable — the symptom is
+resolved. Do not re-open without a terminal grep result confirming the string.
+
+*LL-269 through LL-274 added: Session 287/288 · April 16, 2026*

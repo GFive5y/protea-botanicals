@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 16 April 2026 — Session 287
+## Updated: 16 April 2026 — Session 288
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 95782e5
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: a447f74
 
 ---
 
@@ -24,10 +24,10 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 2b. `docs/NUAI-VISUAL-SPEC.md` — read before touching ANY visual code
 3. `docs/PENDING-ACTIONS.md`
 4. `docs/VIOLATION_LOG_v1_1.md`
-5. `docs/LL-ARCHIVE_v1_0.md` (LL-265 through LL-268 are new)
+5. `docs/LL-ARCHIVE_v1_0.md` (LL-269 through LL-274 are new this session)
 
 After reading, confirm out loud:
-- Current HEAD (should be db12ac3 or later)
+- Current HEAD (should be a447f74 or later)
 - DS6 status: COMPLETE (all portals, HQ, HR, Admin, Consumer — see below)
 - All open loops from PENDING-ACTIONS.md
 - Any new violations
@@ -41,7 +41,7 @@ IF DEMO DATE CHANGES: update PENDING-ACTIONS.md first, then this file.
 
 ---
 
-## CURRENT STATE — 16 April 2026 — Session 286 Close
+## CURRENT STATE — 16 April 2026 — Session 287/288 Close
 
 ### DS6 VISUAL UNIFICATION — COMPLETE (Session 286)
 
@@ -75,9 +75,6 @@ HQProduction · SmartInventory · PlatformBar
 AdminHRPanel · HRStaffDirectory · HRLeave · HRTimesheets · HRContracts ·
 HRDisciplinary · HRPayroll · HRPerformance · HRRoster · HRCalendar ·
 HRComms · HRLoans · HRSettings · HRStaffProfile · HRStockView
-NOTE: HRStaffProfile had no local T block AND no T import — had bare T.*
-references from a prior partial edit. Fix: add `import { T } from "../../styles/tokens";`
-directly. This pattern (T.* with no local block, no import) = direct import, no bridge.
 
 #### Admin components ok
 AdminQRCodes · StockControl
@@ -88,25 +85,6 @@ IMPORTANT: Cormorant Garamond + Jost fonts are intentionally preserved on
 ALL 5 consumer-facing pages. These are brand typography choices, not violations.
 Do NOT replace them with T.font on consumer pages.
 
-#### DS6 bridge pattern (for remaining files or future components)
-Files with a local `const T = { ink900: "#0D0D0D", ... }` block:
-  1. Add `import { T as DS } from "../../styles/tokens";`
-  2. Replace the entire local T block with the DS bridge:
- const T = {
-   ...DS,
-   ink150: DS.border, ink075: DS.bg, ink050: DS.surface,
-   successBg: DS.successLight, warningBg: DS.warningLight,
-   dangerBg: DS.dangerLight, infoBg: DS.infoLight,
-   accentLit: DS.accentLight, fontUi: DS.font, fontData: DS.font,
-   shadow: DS.shadow.sm, shadowMd: DS.shadow.md,
- };
-  3. Fix sLabel (11px/0.08em/T.ink400), sCard (T.surface/T.radius.md),
-     sBtn (T.radius.sm), sInput (T.surface/T.radius.sm),
-     sTh Part 16 (11px/T.ink400/0.08em/T.surface bg)
-  4. Global: fontSize 9/10→11, borderRadius numeric/string→T.radius.*, #fff→T.surface
-
-Files using T.* with NO local block AND NO import: add `import { T } from "../../styles/tokens";`
-
 #### Remaining (optional, not blocking demo)
 7 Admin tab components: AdminCommsCenter · AdminCustomerEngagement ·
 AdminFraudSecurity · AdminNotifications · AdminShipments ·
@@ -115,7 +93,7 @@ These inherit correct font/spacing from AdminDashboard shell. Internal
 raw hex / fontSize violations are cosmetic only.
 
 ### FINANCIAL PACKAGE — ALL 5 DEMO TENANTS COMPLETE
-DO NOT re-run financial seeding. DO NOT touch equity_ledger without LL-248.
+DO NOT re-run financial seeding. DO NOT touch equity_ledger without LL-248 + LL-273.
 All bank recons at 0 unmatched lines.
 
 | Tenant | Industry | Fin Suite | Bank Recon |
@@ -126,40 +104,41 @@ All bank recons at 0 unmatched lines.
 | MediCare Dispensary | cannabis_dispensary | COMPLETE | 0 unmatched |
 | Metro Hardware (Pty) Ltd | general_retail | COMPLETE | 0 unmatched |
 
+### MEDICARE DISPENSARY — SPECIFIC DATA STATE (Session 288)
+- equity_ledger: net_profit_for_year = -263,672.76 · share_capital = 623,022.64
+  total_equity = 359,349.88 = total_assets — BS balanced, IFRS IS consistent
+- depreciation_entries: all months posted from purchase to Apr 2026
+- dispensing revenue source: dispensing_log!inner(sell_price) + eq(is_voided,false)
+- loyalty_config: inserted (was missing)
+
+### MEDI RECREATIONAL — SPECIFIC DATA STATE (Session 288)
+- FA-001 (Display Refrigerator): accum_dep R5,400 · NBV R7,100 (27 months posted)
+- FA-002 (Security Camera): accum_dep R6,425.52 · NBV R2,474.48 (26 months posted)
+- FA-003 (Shop Fitout): accum_dep R11,250 · NBV R33,750 (30 months posted)
+
 ### GROUP PORTAL — COMPLETE (Session 282)
 NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
-- LOOP-NEW-005: MediCare Revenue MTD shows R0 — reads from orders, must read
-  from dispensing_log for cannabis_dispensary profile per LL-231.
-  Fix: find Revenue MTD tile in dispensary dashboard component, switch source.
-- LOOP-NEW-006: MediCare IFRS BS gap R76,906 — equity_ledger recalibration
-  via Supabase MCP.
-- LOOP-010: Medi Rec — Run Depreciation via UI (step through each missing month)
-- LOOP-011: All 5 tenants — IFRS Mark Reviewed + Auditor Sign-Off (20 statements)
-- LOOP-015: Loyalty warning banner — source unidentified
-  Next: grep -r "no rows\|config row\|rewards engine" src/
-  Ruled out: AINSBar.js, useNavIntelligence.js, HQLoyalty.js, IntelStrip.js
+- **LOOP-011**: All 5 tenants — IFRS Mark Reviewed + Auditor Sign-Off
+  Owner action: 5 tenants x 4 statements = 20 sign-offs via UI.
+  Navigate: /tenant-portal — IFRS Statements — Mark Reviewed — Auditor Sign-Off.
 
-### CLOSED THIS SESSION (287)
-- LOOP-FIN-002: PDF Audit Package EF (95782e5) — CLOSED
-  generate-financial-statements EF deployed to uvicrqapgzcdvozxrreo.
-  7-page A4 PDF: Cover + TOC + 4 IFRS statements + Notes (5) + Trial Balance.
-  npm:pdf-lib StandardFonts, Storage bucket `financial-statements` (private,
-  7-day signed URL). Download PDF button live in HQFinancialStatements.js.
-
-### CLOSED SESSION 286
-- LOOP-DS6-004: HQStock.js DS6 Phase 2b — CLOSED (shipped by Claude Code)
-- DS6 full platform pass — all portals, HQ, HR, Admin, Consumer unified
-- tokens.js *Bd tokens + radius string fix — CRITICAL BUG CLOSED
-- HRStaffProfile missing T import — CLOSED (db12ac3)
+### CLOSED THIS SESSION (287/288) — 16 April 2026
+- **LOOP-FIN-002**: PDF Audit Package EF (95782e5) — CLOSED
+- **LOOP-FIN-003**: VAT exclusion — already live, confirmed from disk (adfe712)
+- **LOOP-NEW-005**: MediCare Revenue MTD R0 — CLOSED (a447f74)
+- **LOOP-NEW-006**: MediCare IFRS BS gap — CLOSED (Supabase MCP)
+- **LOOP-014**: MediCare IFRS IS dispensing revenue — CLOSED (visual verification via PDF)
+- **LOOP-012**: HR top-up 3 tenants — CLOSED (Supabase MCP)
+- **LOOP-010**: Medi Rec Run Depreciation — CLOSED (Supabase MCP)
+- **LOOP-015**: Loyalty warning banner — CLOSED (Supabase MCP)
+- **LOOP-DS6-004**: HQStock.js DS6 Phase 2b — CLOSED (Session 286, Claude Code)
 
 ### KNOWN PERMANENT GAPS — DO NOT CHASE BEFORE 12 MAY
 1. POS VAT pipeline — ~R5k BS gap per tenant (amber banner explains it)
-2. MediCare IFRS BS gap R76,906 — tracked as LOOP-NEW-006 (fix next session)
-3. Metro Hardware IFRS BS gap — CLOSED Session 283
-4. Cash flow opening balance — not wired to bank recon
-5. Pricing data source red (0) — no product_pricing linked to recipes
+2. Cash flow opening balance — not wired to bank recon
+3. Pricing data source red (0) — no product_pricing linked to recipes
 
 ---
 
@@ -180,11 +159,11 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ## QUICK DEBUG PROTOCOL
 
 ### "Bug on Vercel"
-Check localhost FIRST. Same bug → code issue. Only on Vercel → SW cache.
+Check localhost FIRST. Same bug — code issue. Only on Vercel — SW cache.
 Fix: open NEW incognito window. Not refresh. Not existing incognito tab. (LL-257, LL-259)
 
 ### "T is not defined in a HQ/HR component"
-Check the file: does it have a local `const T = {` block? No → add `import { T } from "../../styles/tokens";` directly. Yes → check if `import { T as DS }` was added but the bridge body was not — paste the bridge block. (LL-268)
+Check the file: does it have a local `const T = {` block? No — add `import { T } from "../../styles/tokens";` directly. Yes — check if `import { T as DS }` was added but the bridge body was not — paste the bridge block. (LL-268)
 
 ### "border: 1px solid undefined on a semantic badge/card"
 tokens.js is missing a *Bd token. Check: T.successBd, T.warningBd, T.dangerBd,
@@ -195,6 +174,20 @@ T.infoBd, T.accentBd all exist as of 9d0da07. If a component uses a custom
 Use T.radius.lg directly as a string (it's "12px" as of 9d0da07). If you need
 multi-corner: `` `${T.radius.lg} ${T.radius.lg} 0 0` `` now correctly produces
 "12px 12px 0 0". (Session 286 fix)
+
+### "PostgREST query returns R0 revenue for dispensary even though data exists"
+Check the join modifier and voided filter:
+  WRONG: inventory_items(sell_price) + .neq("is_voided", true)
+  RIGHT: inventory_items!inner(sell_price) + .eq("is_voided", false)
+.neq(true) excludes NULL rows silently. !inner forces FK resolution. (LL-269, LL-270)
+
+### "equity_ledger UPDATE breaks BS balance"
+Updating net_profit_for_year changes total equity. share_capital must be
+recalibrated: share_capital = Total_Assets - opening_RE - net_profit_for_year
+Verify: residual_gap = 0 before closing the loop. (LL-273)
+
+### "leave_balances INSERT fails or available column error"
+`available` is a GENERATED column. Never include it in INSERT statements. (LL-271)
 
 ### "Group Portal: infinite recursion detected in tenant_groups"
 Already fixed in prod. If it returns:
@@ -217,7 +210,7 @@ Already fixed in prod. If it returns:
   New item must be in ALL relevant arrays. (LL-258)
 
 ### "Bar chart bars invisible"
-  T.neutralLight ≈ #F4F4F3 (near-white). Never use as chart fill. (LL-263)
+  T.neutralLight = #F4F4F3 (near-white). Never use as chart fill. (LL-263)
   Use BAR_PALETTE. See StoreComparison.js for the pattern.
 
 ---
@@ -247,56 +240,74 @@ LL-251: Run 8-point anomaly audit SQL at every session start.
 LL-252: StockIntelPanel saleOuts: filter sale_out OR sale_pos.
 LL-253: auth.users SQL: all token fields must be '' not null.
 LL-254: RLS circular ref: SECURITY DEFINER function to break cycle.
-LL-255: T.neutralLight ≈ white. Never use for chart bar fills.
+LL-255: T.neutralLight = white. Never use for chart bar fills.
 LL-256: Diverged local: git fetch + reset --hard + npm install.
 LL-257: Vercel SW cache: new incognito window, not refresh.
 LL-258: useNavConfig: 4 arrays — update ALL relevant ones.
 LL-259: Check localhost before assuming Vercel bug = cache.
-LL-260: git pull blocked → git reset --hard origin/main.
-LL-261: qrcode.react missing after reset → npm install.
-LL-262: tenant_groups RLS recursion → get_my_group_ids() SECURITY DEFINER.
-LL-263: T.neutralLight invisible on white → BAR_PALETTE for chart bars.
+LL-260: git pull blocked — git reset --hard origin/main.
+LL-261: qrcode.react missing after reset — npm install.
+LL-262: tenant_groups RLS recursion — get_my_group_ids() SECURITY DEFINER.
+LL-263: T.neutralLight invisible on white — BAR_PALETTE for chart bars.
 LL-264: NEVER create NEXT-SESSION-PROMPT_vXXX.md. Update SESSION-START-PROMPT.md
          in-place instead.
 LL-265: Production URL is protea-botanicals.vercel.app — never use preview URLs.
 LL-266: TenantPortal INNER wrapper must NOT use maxWidth or margin:auto.
-LL-267: Tab components (rendered inside HQDashboard or TenantPortal) must NOT
-         set background on their outermost return div. Use background: "transparent"
-         or omit it. Only inner page header divs and cards use T.surface.
+LL-267: Tab components must NOT set background on their outermost return div.
 LL-268: DS6 batch scripts check hasLocalT to decide whether to add a bridge.
          Files that use T.* with NO local T block AND NO import will compile with
          "T is not defined". Pattern: if file has bare T.xxx with no local block
-         and no import → add `import { T } from "../../styles/tokens";` directly.
-         Do NOT add the bridge (no DS alias needed). HRStaffProfile.js was the
-         canonical example (db12ac3).
+         and no import — add `import { T } from "../../styles/tokens";` directly.
+LL-269: PostgREST .neq(col, val) EXCLUDES NULL rows silently. When column is
+         a nullable boolean (e.g. is_voided), use .eq(col, false) — not .neq(col, true).
+         .neq("is_voided", true) misses rows where is_voided IS NULL.
+LL-270: PostgREST nested join without !inner modifier can return null for the
+         related object when FK is nullable or not resolvable in context. Always
+         use inventory_items!inner(sell_price) not inventory_items(sell_price)
+         when the join is mandatory and the result drives a revenue calculation.
+LL-271: leave_balances.available is a GENERATED column. NEVER include it in
+         INSERT statements. Insert: opening_balance, accrued, carried_over,
+         used, pending, forfeited. available computes automatically.
+LL-272: useCallback deps cannot reference consts declared after an early return.
+         Pattern: const cb = useCallback(async () => { ... use X ... }, [X]);
+         where X is declared AFTER an if(!tenantId) return;
+         Fix: inline X inside the callback body rather than referencing it from
+         outer scope. (R-TDZ-01 — applied to HQFinancialStatements.js)
+LL-273: equity_ledger UPDATE: changing net_profit_for_year shifts total equity.
+         share_capital must be recalibrated so BS stays balanced:
+         share_capital = Total_Assets - opening_retained_earnings - net_profit_for_year
+         Verify residual_gap = 0 before closing. Wrong sequence:
+         update net_profit — equity jumps — BS "does not balance" banner appears.
+         Correct sequence: update net_profit + recalibrate share_capital in same session.
+         Applied: MediCare Dispensary Session 288 (net_profit -263,672.76 · sc 623,022.64).
+LL-274: LOOP-015 pattern — when a banner appears only for specific tenants:
+         Check missing config rows BEFORE searching 15+ source files.
+         Symptom: warning on 3 of 5 portals — 3 tenants missing loyalty_config.
+         Source component search took 45+ minutes and was inconclusive.
+         Data fix (INSERT loyalty_config) resolved the symptom in 2 minutes.
+         Rule: tenant-selective behaviour — check data first (config, lookup rows),
+         then code. Add to session start: grep confirms which tenants are affected.
 
 ---
 
 ## PRE-DEMO RITUAL (30 min before — 12 May 2026 09:30)
 1. Run LL-251 8-point anomaly audit SQL — all 8 queries clean
 2. Run audit_tenant_isolation.py — must exit 0
-3. Visual checklist new incognito: P&L → BS → Journals → VAT →
-   Fixed Assets → Bank Recon → Group Portal → Nav for each tenant
+3. Visual checklist new incognito: P&L — BS — Journals — VAT —
+   Fixed Assets — Bank Recon — Group Portal — Nav for each tenant
 4. Confirm sim-pos-sales ran 11 May (stock_movements has recent sale_pos rows)
 5. git status clean, HEAD matches expected commit
 
 ---
 
 ## NEXT PRIORITIES (choose with owner at session start)
-FIN SUITE NOTE FOR NEXT AGENT: The financial data collection layer is complete
-but the CA-facing OUTPUT layer is missing. Read LOOP-FIN-002 through LOOP-FIN-005
-in PENDING-ACTIONS.md before any fin work. The most impactful item is
-LOOP-FIN-002 (PDF Audit Package EF) — spec in WP-FINANCIALS-v1_1.md Section 7.5.
-Also read FIN-AUDIT_v1_0.md for the full technical gap map (10 confirmed gaps).
 
-1. **LOOP-NEW-005** — MediCare Revenue MTD R0 fix (Claude Code, dispensing_log source)
-2. **LOOP-NEW-006** — MediCare IFRS BS gap R76,906 (Supabase MCP)
-3. **LOOP-010/011** — Pre-demo: Medi Rec Run Depreciation + 20 IFRS sign-offs
-4. **LOOP-015** — Loyalty warning banner grep (5 min diagnostic)
-5. **Optional DS6 mop-up** — 7 remaining Admin tab components (AdminCommsCenter,
+1. **LOOP-011** — All 5 tenants: IFRS Sign-Off (owner UI clicks, 20 statements)
+2. **11 May sim-pos-sales** — STANDING ALERT, cannot miss
+3. **Optional DS6 mop-up** — 7 remaining Admin tab components (AdminCommsCenter,
    AdminCustomerEngagement, AdminFraudSecurity, AdminNotifications,
    AdminShipments, AdminBatchManager, AdminProductionModule). Not blocking demo.
-6. **11 May sim-pos-sales** — STANDING ALERT, cannot miss
+4. **LOOP-FIN-004** — Trial Balance Excel export (2hrs, SheetJS) — nice-to-have
 
 ---
 
