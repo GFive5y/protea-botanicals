@@ -373,7 +373,7 @@ export function useNavConfig() {
     }
     return {
       pages: HQ_PAGES,
-      title: "Protea HQ",
+      title: "NuAi HQ",
       subtitle: "Super Admin",
       initials,
       bubbleName: displayName,
