@@ -34,16 +34,17 @@ export const T = {
 
   // Type scale (px values for inline styles)
   text: {
-    xxs:  10,
-    xs:   11,
-    sm:   12,
-    base: 14,
-    md:   15,
-    lg:   16,
-    xl:   18,
-    "2xl": 22,
-    "3xl": 28,
-    "4xl": 36,
+    xxs:    10,
+    xs:     11,
+    sm:     12,
+    smPlus: 13,   // added S293 WP-TABLE-UNIFY 2b.1 — body density between sm and base (23 uses in HQFoodIngredients)
+    base:   14,
+    md:     15,
+    lg:     16,
+    xl:     18,
+    "2xl":  22,
+    "3xl":  28,
+    "4xl":  36,
   },
 
   // Font weights
@@ -77,12 +78,18 @@ export const T = {
   // like `${T.radius.lg} ${T.radius.lg} 0 0` produce valid CSS.
   // Inline styles accept both "4px" and 4 for length props, so this
   // is backwards-compatible with every existing borderRadius: T.radius.xx site.
+  //
+  // Naming convention: xxs < xs < sm < smPlus < md < mdPlus < lg < xl
+  // "Plus" suffix denotes a value slightly larger than the named size,
+  // matching the xxs convention (slightly smaller than xs). Applied S293.
   radius: {
-    sm:   "4px",
-    md:   "8px",
-    lg:   "12px",
-    xl:   "16px",
-    full: "9999px",
+    sm:     "4px",
+    smPlus: "6px",    // added S293 WP-TABLE-UNIFY 2b.1 — between sm and md (20 uses in HQFoodIngredients)
+    md:     "8px",
+    mdPlus: "10px",   // added S293 WP-TABLE-UNIFY 2b.1 — between md and lg (8 uses in HQFoodIngredients)
+    lg:     "12px",
+    xl:     "16px",
+    full:   "9999px",
   },
 
   // Shadows
