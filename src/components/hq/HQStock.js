@@ -1891,6 +1891,19 @@ export default function HQStock() {
             })}
           </div>
         )}
+
+        {/* ── ZONES 4-6: AI Intelligence (same as GeneralOverview) ── */}
+        <StockIntelPanel
+          items={items}
+          movements={movements}
+          tenantId={tenantId}
+          onNavigate={setSubTab}
+          onOpenItem={setPanelItem}
+        />
+
+        {/* ── ZONE 7: Channel Stock Hold ── */}
+        <StockChannelPanel tenantId={tenantId} />
+
       </div>
     );
   };
@@ -5335,10 +5348,31 @@ export default function HQStock() {
       </div>
     );
 
-  const lowTotal = items.filter(isLowFn).length;
-  const totalVal = items.reduce(
-    (s, i) => s + (i.quantity_on_hand || 0) * (i.weighted_avg_cost || 0),
-    0,
+  // ── Top-level KPI computations (shared across all overviews) ────────────
+  const activeItems = useMemo(
+    () => items.filter(i => i.is_active !== false), [items]
+  );
+  const totalVal = useMemo(
+    () => activeItems.reduce((s, i) => s + (i.quantity_on_hand || 0) * (i.weighted_avg_cost || 0), 0),
+    [activeItems]
+  );
+  const inStockCount = useMemo(
+    () => activeItems.filter(i => (i.quantity_on_hand || 0) > 0).length, [activeItems]
+  );
+  const lowTotal = useMemo(
+    () => activeItems.filter(isLowFn).length, [activeItems]
+  );
+  const avgMarginPct = useMemo(() => {
+    const p = activeItems.filter(i => i.sell_price > 0 && i.weighted_avg_cost > 0);
+    if (!p.length) return null;
+    return p.reduce((s, i) => s + ((i.sell_price - i.weighted_avg_cost) / i.sell_price) * 100, 0) / p.length;
+  }, [activeItems]);
+  const expiringCount = useMemo(
+    () => activeItems.filter(i => {
+      if (!i.expiry_date) return false;
+      const d = Math.ceil((new Date(i.expiry_date) - new Date()) / 86400000);
+      return d >= 0 && d <= 30;
+    }).length, [activeItems]
   );
 
   return (
@@ -5420,6 +5454,41 @@ export default function HQStock() {
       </div>
 
       <>
+        {/* ── Stock Command KPI Bar ────────────────────────────────────── */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+          gap: 1,
+          background: T.border,
+          border: "1px solid " + T.border,
+          borderRadius: T.radius.lg,
+          overflow: "hidden",
+          marginBottom: 16,
+          marginTop: 8,
+        }}>
+          {[
+            { label: "Stock Value", value: fmt(totalVal), sub: "at cost (AVCO)", color: T.accent },
+            { label: "In Stock", value: `${inStockCount} / ${items.length}`, sub: "SKUs available", color: inStockCount === items.length ? T.success : T.warning },
+            { label: "Avg Margin", value: avgMarginPct !== null ? `${Math.round(avgMarginPct)}%` : "\u2014", sub: "across priced items", color: avgMarginPct > 50 ? T.success : avgMarginPct > 30 ? T.warning : T.danger },
+            { label: "Reorder Alerts", value: lowTotal, sub: "below threshold", color: lowTotal > 0 ? T.danger : T.success },
+            ...(expiringCount > 0 ? [{ label: "Expiring <30d", value: expiringCount, sub: "items need action", color: T.warning }] : []),
+          ].map((kpi) => (
+            <div key={kpi.label} style={{
+              background: T.surface,
+              padding: "14px 18px",
+              borderTop: `3px solid ${kpi.color}`,
+            }}>
+              <div style={{ fontSize: 22, fontWeight: 600, color: T.ink900, fontFamily: T.font, lineHeight: 1, marginBottom: 3, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>
+                {kpi.value}
+              </div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: T.ink400, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                {kpi.label}
+              </div>
+              <div style={{ fontSize: 10, color: T.ink300, marginTop: 2 }}>{kpi.sub}</div>
+            </div>
+          ))}
+        </div>
+
         <div
           style={{
             display: "flex",
