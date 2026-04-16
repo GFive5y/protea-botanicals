@@ -369,6 +369,25 @@ LL-287: Session prompt provenance check. At session start, compare the prompt
      git commit -m "docs(S###): update session docs in-place"
      git push origin main
 
+7. Update Claude.ai project knowledge (prevents LL-287 drift):
+   After the commit lands on main, open the NuAi project in Claude.ai,
+   go to Project knowledge, find the existing SESSION-START-PROMPT
+   entry, and replace its content with the current repo version.
+
+   Why this step is non-optional: project knowledge is a static
+   snapshot, not a live link to the repo. If you skip step 7, the
+   next session's agent sees a stale protocol file in project
+   knowledge while the repo file has moved on. LL-287's provenance
+   check will fire on every turn-one until the two are reconciled,
+   wasting session start time.
+
+   Paste source: the output of
+     git show HEAD:docs/SESSION-START-PROMPT.md
+   or just open the file on main in the GitHub web UI and copy.
+
+   PLATFORM-OVERVIEW.md stays in project knowledge unchanged. It's
+   a slower-moving doc and does not need per-session refresh.
+
 NEVER create NEXT-SESSION-PROMPT_vXXX.md. (LL-264)
 
 *SESSION-START-PROMPT · NuAi Platform · No version number · Updated each session in-place*
