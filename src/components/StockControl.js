@@ -291,16 +291,17 @@ export default function StockControl() {
 
   // GAP-02: write a system_alert (non-blocking, fire-and-forget)
   const writeAlert = useCallback(async (alertType, severity, title, body) => {
+    if (!tenantId) return;
     try {
       const { count } = await supabase
         .from("system_alerts")
         .select("*", { count: "exact", head: true })
-        .eq("tenant_id", "43b34c33-6864-4f02-98dd-df1d340475c3")
+        .eq("tenant_id", tenantId)
         .eq("alert_type", alertType)
         .is("acknowledged_at", null);
       if (count > 0) return;
       await supabase.from("system_alerts").insert({
-        tenant_id: "43b34c33-6864-4f02-98dd-df1d340475c3",
+        tenant_id: tenantId,
         alert_type: alertType,
         severity,
         status: "open",
@@ -312,6 +313,7 @@ export default function StockControl() {
   }, []);
 
   const fetchAll = useCallback(async () => {
+    if (!tenantId) return;
     setLoading(true);
     setError(null);
     try {
@@ -319,7 +321,7 @@ export default function StockControl() {
         supabase
           .from("inventory_items")
           .select("*, suppliers(name)")
-          .in("category", ["finished_product", "accessory"])
+          .eq("is_active", true)
           .order("name"),
         supabase
           .from("stock_movements")
