@@ -314,10 +314,10 @@ export default function HQOverview({ onNavigate }) {
       const { data } = await supabase
         .from("dispensing_log")
         .select(
-          "quantity_dispensed, dispensed_at, is_voided, inventory_items(sell_price)",
+          "quantity_dispensed, dispensed_at, inventory_items!inner(sell_price)",
         )
         .eq("tenant_id", tenantId)
-        .neq("is_voided", true)
+        .eq("is_voided", false)
         .gte("dispensed_at", monthStart)
         .lt("dispensed_at", monthEnd);
 
