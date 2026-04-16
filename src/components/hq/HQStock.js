@@ -862,6 +862,50 @@ export default function HQStock() {
   const isCannabis = CANNABIS_PROFILES.includes(industryProfile);
   const labels = PANEL_LABELS[industryProfile] || PANEL_LABELS.general_retail;
 
+  // ── Top-level KPI computations — MUST stay before early returns (LL-127) ──
+  const activeItems = useMemo(
+    () => items.filter((i) => i.is_active !== false),
+    [items],
+  );
+  const totalVal = useMemo(
+    () => activeItems.reduce(
+      (s, i) => s + (i.quantity_on_hand || 0) * (i.weighted_avg_cost || 0), 0
+    ),
+    [activeItems],
+  );
+  const inStockCount = useMemo(
+    () => activeItems.filter((i) => (i.quantity_on_hand || 0) > 0).length,
+    [activeItems],
+  );
+  const lowTotal = useMemo(
+    () => activeItems.filter(isLowFn).length,
+    [activeItems],
+  );
+  const avgMarginPct = useMemo(() => {
+    const p = activeItems.filter(
+      (i) => i.sell_price > 0 && i.weighted_avg_cost > 0,
+    );
+    if (!p.length) return null;
+    return (
+      p.reduce(
+        (s, i) =>
+          s + ((i.sell_price - i.weighted_avg_cost) / i.sell_price) * 100,
+        0,
+      ) / p.length
+    );
+  }, [activeItems]);
+  const expiringCount = useMemo(
+    () =>
+      activeItems.filter((i) => {
+        if (!i.expiry_date) return false;
+        const d = Math.ceil(
+          (new Date(i.expiry_date) - new Date()) / 86400000,
+        );
+        return d >= 0 && d <= 30;
+      }).length,
+    [activeItems],
+  );
+
   const load = useCallback(async () => {
     if (!tenantId) return;
     // Background QR status fetch — non-blocking
@@ -5347,33 +5391,6 @@ export default function HQStock() {
         Error: {error}
       </div>
     );
-
-  // ── Top-level KPI computations (shared across all overviews) ────────────
-  const activeItems = useMemo(
-    () => items.filter(i => i.is_active !== false), [items]
-  );
-  const totalVal = useMemo(
-    () => activeItems.reduce((s, i) => s + (i.quantity_on_hand || 0) * (i.weighted_avg_cost || 0), 0),
-    [activeItems]
-  );
-  const inStockCount = useMemo(
-    () => activeItems.filter(i => (i.quantity_on_hand || 0) > 0).length, [activeItems]
-  );
-  const lowTotal = useMemo(
-    () => activeItems.filter(isLowFn).length, [activeItems]
-  );
-  const avgMarginPct = useMemo(() => {
-    const p = activeItems.filter(i => i.sell_price > 0 && i.weighted_avg_cost > 0);
-    if (!p.length) return null;
-    return p.reduce((s, i) => s + ((i.sell_price - i.weighted_avg_cost) / i.sell_price) * 100, 0) / p.length;
-  }, [activeItems]);
-  const expiringCount = useMemo(
-    () => activeItems.filter(i => {
-      if (!i.expiry_date) return false;
-      const d = Math.ceil((new Date(i.expiry_date) - new Date()) / 86400000);
-      return d >= 0 && d <= 30;
-    }).length, [activeItems]
-  );
 
   return (
     <div style={{ fontFamily: T.font, color: T.ink700, background: "transparent" }}>
