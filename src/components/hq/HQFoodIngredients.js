@@ -81,7 +81,7 @@ const C = {
   amberBg: T.warningLight,
   red: T.danger,
   redBg: T.dangerLight,
-  blue: "#1D4ED8",
+  blue: "#1D4ED8",     // KEPT — cold-chain info panels. T.info drifts from Tailwind blue to muted teal (same as TEMP_COLORS decision). Revisit post-demo.
   blueBg: T.infoLight,
   purple: T.purpleText,
   purpleBg: T.purpleLight,
@@ -2507,7 +2507,7 @@ function AllergenBadge({ flags, compact = false }) {
     );
   if (compact)
     return (
-      <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: T.gap.xs, flexWrap: "wrap" }}>
         {present.map((a) => (
           <span
             key={a.key}
@@ -2515,7 +2515,7 @@ function AllergenBadge({ flags, compact = false }) {
             style={{
               background: "#FEF3C7",
               color: "#92400E",
-              border: "1px solid #FDE68A",
+              border: `1px solid ${T.warningBd}`,
               borderRadius: T.radius.sm,
               padding: "1px 6px",
               fontSize: T.text.xxs,
@@ -2535,7 +2535,7 @@ function AllergenBadge({ flags, compact = false }) {
           style={{
             background: "#FEF3C7",
             color: "#92400E",
-            border: "1px solid #FDE68A",
+            border: `1px solid ${T.warningBd}`,
             borderRadius: T.radius.sm,
             padding: "2px 8px",
             fontSize: T.text.xs,
@@ -2714,7 +2714,7 @@ function IngredientDrawer({ ingredient, onClose }) {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 10,
+                gap: T.gap.md,
                 marginBottom: 6,
               }}
             >
@@ -3125,7 +3125,7 @@ function IngredientDrawer({ ingredient, onClose }) {
                 style={{
                   background: C.redBg,
                   color: C.red,
-                  border: `1px solid #FECACA`,
+                  border: `1px solid ${T.dangerBd}`,
                   borderRadius: T.radius.sm,
                   padding: "3px 10px",
                   fontSize: T.text.sm,
@@ -3638,7 +3638,7 @@ export default function HQFoodIngredients() {
           <div
             style={{
               display: "flex",
-              gap: 10,
+              gap: T.gap.md,
               flexWrap: "wrap",
               marginBottom: 18,
               alignItems: "center",
@@ -3904,7 +3904,7 @@ export default function HQFoodIngredients() {
                           {ing.is_seeded && (
                             <span
                               style={{
-                                fontSize: 9,
+                                fontSize: T.text.xxs,
                                 color: C.accent,
                                 fontWeight: T.weight.bold,
                                 marginTop: 2,
@@ -3936,7 +3936,7 @@ export default function HQFoodIngredients() {
                             <div
                               style={{
                                 display: "flex",
-                                gap: 3,
+                                gap: T.gap.xs,
                                 flexWrap: "wrap",
                               }}
                             >
@@ -3947,8 +3947,8 @@ export default function HQFoodIngredients() {
                                   style={{
                                     background: C.amberBg,
                                     color: C.amber,
-                                    border: "1px solid #FDE68A",
-                                    borderRadius: 3,
+                                    border: `1px solid ${T.warningBd}`,
+                                    borderRadius: T.radius.sm,
                                     padding: "1px 5px",
                                     fontSize: T.text.xxs,
                                     fontWeight: T.weight.bold,
@@ -4022,7 +4022,7 @@ export default function HQFoodIngredients() {
                               background: inCompare ? C.accent : C.bg,
                               color: inCompare ? T.surface : C.inkMid,
                               border: `1px solid ${inCompare ? C.accent : C.border}`,
-                              borderRadius: 5,
+                              borderRadius: T.radius.smPlus,
                               cursor: "pointer",
                               fontWeight: T.weight.semibold,
                             }}
@@ -4381,7 +4381,7 @@ export default function HQFoodIngredients() {
                 style={{
                   display: "grid",
                   gridTemplateColumns: "repeat(5, 1fr)",
-                  gap: 10,
+                  gap: T.gap.md,
                 }}
               >
                 {[
@@ -4427,7 +4427,7 @@ export default function HQFoodIngredients() {
                         width: "100%",
                         padding: "7px 8px",
                         border: `1px solid ${C.border}`,
-                        borderRadius: 5,
+                        borderRadius: T.radius.smPlus,
                         fontSize: T.text.sm,
                         fontFamily: "inherit",
                         boxSizing: "border-box",
@@ -4518,7 +4518,7 @@ export default function HQFoodIngredients() {
               </div>
             </div>
 
-            {/* Regulatory toggles */}
+            {/* Regulatory toggles — gap: 20 intentional (between T.gap.lg=16 and T.gap.xl=24) */}
             <div style={{ display: "flex", gap: 20, marginBottom: 24 }}>
               <label
                 style={{
@@ -4936,7 +4936,7 @@ export default function HQFoodIngredients() {
                             <div
                               style={{
                                 display: "flex",
-                                gap: 6,
+                                gap: T.gap.sm,
                                 flexWrap: "wrap",
                               }}
                             >
