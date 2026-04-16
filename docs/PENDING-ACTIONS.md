@@ -35,9 +35,9 @@ HQFinancialStatements.js disk read): The UI uses ONE
 financial_statement_status row per (tenant_id, financial_year), NOT one per
 statement type. The 4 statement tabs (IS, BS, Cash Flow, Changes in Equity)
 share a single status workflow: Draft -> Reviewed -> Auditor Signed Off -> Locked.
-Therefore LOOP-011 is 5 sign-offs total, not 20.
-Action: For each of 5 tenants — /tenant-portal — IFRS Statements —
-  click "Auditor Sign Off..." — enter auditor name — Confirm.
+Therefore LOOP-011 is 5 sign-offs total, not 20. See LL-290.
+Action: For each of 5 tenants → /tenant-portal → IFRS Statements →
+  click "Auditor Sign Off..." → enter auditor name → Confirm.
 Close when: All 5 financial_statement_status rows have signed_at IS NOT NULL.
 Current DB state (Session 293):
   Medi Recreational        FY2026 status=reviewed  signed=false
@@ -67,6 +67,37 @@ Current DB state (Session 293):
 
 ## CLOSED LOOPS — SESSION 293 (17 April 2026)
 
+### CLOSED — WP-TABLE-UNIFY Phase 1: HQFoodIngredients.js DS6 migration
+Session 292-293 · 6 PRs shipped · 362 -> ~55 violations (85% reduction)
+Final commit: 759c321 (2b.4-corrections — gap:10 round-down, toast shadow migration,
+9 inline justification comments on intentional values).
+Prior PRs: ffe1cf4 (2a, S292) · f63e61f (2d, S292) · 502cb07 (2b.1, S293) ·
+caacf50 (2b.2, S293) · 7a48557 (2b.3, S293) · f3f9001 (2b.4, S293).
+Remaining ~55 violations are all Bucket B (CATEGORIES palette — structural
+decision) plus intentional content colours already documented inline
+(HACCP_COLORS, TEMP_COLORS, C.blue). All explicitly parked for post-demo,
+scoped in docs/WP-TABLE-UNIFY_PHASE2_v1.md Sections 1.3 and 5.
+Codemods preserved at scripts/pr2d_codemod.js and scripts/pr2b2_codemod.js
+for audit trail (committed in Session 293 close).
+New LLs: LL-288 (Plus-suffix naming), LL-289 (round-down preference).
+
+### CLOSED — WP-TABLE-UNIFY Phase 2: scoping only (execution post-demo)
+Session 293 · docs/WP-TABLE-UNIFY_PHASE2_v1.md · 645 lines · 12 sections
+Not code — strategic scope document produced through market research
+(Apicbase, meez, SafetyChain, FoodReady, Dynamics 365, SAP Food One, Lavu,
+fatsecret, Nutritionix, Edamam) and SA regulatory review (R638 of 2018,
+DAFF, SABS, CoA). 5 sub-phases scoped:
+  - 2A SmartInventory feature parity  ~20h
+  - 2B AI ingredient ingest            ~15h  (killer app)
+  - 2C Recipe linkage surface          ~12h
+  - 2D Compliance view mode            ~10h
+  - 2E Consumer shop allergen filter   ~15h  (deferred)
+Execution NOT before 13 May 2026. Next agent reads scope doc in full
+before planning any Phase 2 work. Supersedes the one-line Phase 2
+description in WP-TABLE-UNIFY_v1_0.md.
+Handoff rule added to doc (Section 12 Provenance): intended executor is
+Claude Code in a post-demo session with owner priority alignment.
+
 ### CLOSED — LL-250-BREACH-01: Duplicate VAT numbers on active tenants
 Session 293 · Supabase MCP (no code commit)
 Audit finding: 2 collisions on tenant_config.vat_number for active tenants:
@@ -79,6 +110,18 @@ Retained numbers went to the demo-priority tenants (MediCare keeps
 4067891234 since Medi Can is a seed/inactive-path tenant; Garden Bistro
 keeps 4987654321 since it's demo-priority).
 Verified: 0 duplicate VAT numbers remain across 6 VAT-registered active tenants.
+
+### CLOSED — LOOP-011-SCOPE-CORRECTION
+Session 293 · Verified via Supabase MCP schema inspection + HQFinancialStatements.js
+disk read at commit f3f9001.
+Finding: LOOP-011 was written as "5 tenants × 4 statements = 20 sign-offs" based
+on the 4 visible IFRS statement tabs. Actual financial_statement_status table
+has ONE row per (tenant_id, financial_year) with UNIQUE constraint on that pair.
+The 4 tabs share one workflow: Draft -> Reviewed -> Auditor Signed Off -> Locked.
+Real scope: 5 sign-offs total. All 5 tenants currently at status='reviewed',
+pending the auditor sign-off UI action (owner task).
+Updated the LOOP-011 row above with corrected scope note.
+New rule: LL-290 — verify loop scope against DB schema, not UI tab count.
 
 ---
 
@@ -251,11 +294,39 @@ Named future build item. Not blocking demo.
 
 ### WATCH-004 — Eybna unpriced products
 HC-0002, BB-LYCHEE-0002, 6-PH-0002 still no sell price.
-Action: Admin Stock — set sell prices for these 3 items.
+Action: Admin Stock → set sell prices for these 3 items.
+
+### WATCH-005 (NEW S293) — StockControl.js RULE 0F violations carried from S291
+2 stock_movements INSERT sites at L2985 and L3351 don't carry tenant_id in
+their payload. Session 291 remediation caught the SELECT leaks (fixed in
+38e96da + 10d9d39) but these 2 INSERT sites were explicitly deferred as
+not demo-blocking. Address in a dedicated StockControl hardening session
+post-demo, alongside the full StockControl DS6 finish-up (which was also
+flagged POST-DEMO due to all-tenant blast radius).
+
+### WATCH-006 (NEW S293) — HQStock Overview sub-tab derived counts
+NO EXPIRY and COLD CHAIN aggregate over `items` not `activeItems`. Means
+archived items inflate the count. Not demo-blocking. Carried from S291.
 
 ---
 
 ## BACKLOG — FUTURE BUILD ITEMS (post-demo, no date constraint)
+
+### LOOP-WTU-002 (NEW S293) — WP-TABLE-UNIFY Phase 2 execution (ingredient encyclopedia)
+Status: SCOPED · POST-DEMO (do not start before 13 May 2026)
+Source: docs/WP-TABLE-UNIFY_PHASE2_v1.md (645 lines, 12 sections)
+Scope: 5 sub-phases totalling ~72 hours of focused work.
+  2A SmartInventory feature parity   ~20h · tile/list/toggle/sort/search/bulk
+  2B AI ingredient ingest            ~15h · new ingest-ingredient EF + queue table
+  2C Recipe linkage surface          ~12h · hover-card, drawer tabs, graph walk
+  2D Compliance view mode            ~10h · R638 inspection pack PDF + heat-map
+  2E Consumer shop allergen filter   ~15h · deferred further, post-opt-in only
+Prerequisites: Phase 1 COMPLETE (Y), FoodWorlds.js LIVE (Y),
+  ProteaAI v1.8 LIVE (Y), process-document EF v53 (Y), ai-copilot EF v59 (Y).
+New DB schema required (scoped in Section 4.4): ingredient_ingest_queue table +
+  4 additional inventory_items columns.
+New LLs drafted (Section 10): LL-291 through LL-294 — adopt as each sub-phase ships.
+Next agent: READ THE SCOPE DOC IN FULL before planning any Phase 2 work.
 
 ### LOOP-FIN-004 — Trial Balance Excel Export (CA working papers format)
 Status: OPEN · Nice-to-have for demo

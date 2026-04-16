@@ -1627,3 +1627,102 @@ systemically wrong.
 **Principle:** The session prompt handed in chat is a *claim*. The
 SESSION-START-PROMPT.md file in the repo is the *fact*. Trust the
 repo.
+
+---
+
+## Session 293 — 17 April 2026 — WP-TABLE-UNIFY Phase 1 close + Phase 2 scoping
+
+### LL-288 — DENSITY-GAP TOKEN NAMING: "Plus" SUFFIX CONVENTION
+
+**Rule:** When adding a token that sits between two existing named sizes,
+use the `xxxPlus` suffix to indicate "slightly larger than the named size."
+Mirrors the existing `xxs` convention ("slightly smaller than xs").
+
+**Examples from Session 293 (commit 502cb07, PR 2b.1):**
+- `T.text.smPlus = 13` — between `sm=12` and `base=14`
+- `T.radius.smPlus = "6px"` — between `sm=4` and `md=8`
+- `T.radius.mdPlus = "10px"` — between `md=8` and `lg=12`
+
+**Apply:** Document each `*Plus` token in the block comment of its token
+family in `src/styles/tokens.js`. Never rename an existing token to make
+room for a `*Plus` — additions only. WP-UNIFY rule WTU-006 amendment (S292)
+permits strict-superset additions when audit-justified.
+
+**Why this matters:** PR 2d scanner identified 51 violations that could be
+cleared by adding 3 density-gap tokens. Without a naming convention, future
+agents would invent inconsistent names (smHalf, smMid, sm2) and the token
+scale drifts. The `xxxPlus` convention is symmetric with the existing `xxs`
+convention and keeps the scale readable.
+
+---
+
+### LL-289 — EQUIDISTANT ROUND-UP: PREFER ROUNDING DOWN
+
+**Rule:** When migrating a raw numeric value to a T token and the value sits
+halfway between two named sizes (equidistant from both), prefer the smaller
+token. Rounding down preserves the original visual density. Rounding up
+consistently loosens layouts and reads as drift.
+
+**Examples:**
+- `gap: 10` — equidistant between `T.gap.sm=8` and `T.gap.md=12`.
+  Prefer `T.gap.sm` (round down).
+- `borderRadius: 5` — equidistant between `T.radius.sm=4` and `T.radius.smPlus=6`.
+  Prefer `T.radius.sm` (round down, crisper).
+
+**Not an absolute rule:** If the surrounding context is airy / relaxed and
+the original design clearly leaned loose, rounding up can be correct. The
+default for unclear cases is DOWN.
+
+**Why this rule exists:** PR 2b.4 initial pass (commit f3f9001) rounded 3×
+`gap: 10` instances UP to `T.gap.md=12`. The correction commit (759c321)
+pulled them DOWN to `T.gap.sm=8`. Direct A/B in dev confirmed the tighter
+spacing matched the original intent; the looser version looked indulgent.
+
+**Apply:** When a codemod generates equidistant-round candidates, default
+the round direction to DOWN. Flag any UP round for explicit justification
+in the commit body.
+
+---
+
+### LL-290 — LOOP SCOPE VERIFIED AGAINST DB SCHEMA, NOT UI TAB COUNT
+
+**Rule:** When writing a PENDING-ACTIONS loop that references "N × M = K
+iterations of a workflow," verify the scope against the actual DB schema
+(primary keys, unique constraints) before committing the estimate. UI tab
+counts lie: multiple tabs often share a single underlying workflow row.
+
+**Discovery (Session 293):**
+
+LOOP-011 was written as "5 tenants × 4 IFRS statements = 20 sign-offs"
+based on the 4 visible statement tabs (Income Statement, Balance Sheet,
+Cash Flow, Changes in Equity) in HQFinancialStatements.js. The table
+`financial_statement_status` has a UNIQUE constraint on
+`(tenant_id, financial_year)` — one status workflow row per tenant covers
+all 4 statements. The 4 tabs share a single
+`Draft -> Reviewed -> Auditor Signed Off -> Locked` workflow.
+
+Real scope: **5 sign-offs total.** Owner action time: ~15 minutes. The
+wrong estimate was ~60 minutes. A 4× overestimate on a demo-blocking loop.
+
+**Apply:**
+
+1. Before writing any loop estimate involving a multiplier, query schema:
+   ```sql
+   SELECT conname, pg_get_constraintdef(oid)
+   FROM pg_constraint
+   WHERE conrelid = '<table>'::regclass
+     AND contype IN ('p', 'u');
+   ```
+2. Check if the UNIQUE columns tell you the workflow is per-group not per-tab.
+3. Read the component's status-update handler to confirm which field(s) get
+   written (e.g. a single `status` column vs. 4 per-statement columns).
+4. Only then estimate scope.
+
+**Signal patterns that should trigger schema verification:**
+- "N × M = K iterations" where N or M comes from counting UI tabs
+- Loop description references "for each tab" / "for each statement" / "for each view"
+- Estimate feels high relative to the visible UI interaction (clicks to complete)
+
+---
+
+*LL-288 / LL-289 / LL-290 added 17 April 2026 · Session 293 close*
