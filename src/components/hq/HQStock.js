@@ -833,6 +833,7 @@ export default function HQStock() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [subTab, setSubTab] = useState("overview");
+  const [showArchived, setShowArchived] = useState(false);
   const [openPanels, setOpenPanels] = useState({
     p1: true,
     p2: true,
@@ -865,6 +866,10 @@ export default function HQStock() {
   // ── Top-level KPI computations — MUST stay before early returns (LL-127) ──
   const activeItems = useMemo(
     () => items.filter((i) => i.is_active !== false),
+    [items],
+  );
+  const archivedCount = useMemo(
+    () => items.filter((i) => i.is_active === false).length,
     [items],
   );
   const totalVal = useMemo(
@@ -1960,7 +1965,7 @@ export default function HQStock() {
     const [allergenFilter, setAllergenFilter] = useState("all");
     const [sortBy, setSortBy] = useState("name");
 
-    const filtered = items
+    const filtered = (showArchived ? items : activeItems)
       .filter((i) => {
         if (catFilter !== "all" && i.category !== catFilter) return false;
         if (
@@ -2056,6 +2061,27 @@ export default function HQStock() {
             <option value="avco">Sort: AVCO High–Low</option>
           </select>
           <div style={{ flex: 1 }} />
+          {archivedCount > 0 && (
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 12,
+                color: T.ink500,
+                cursor: "pointer",
+                userSelect: "none",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={showArchived}
+                onChange={(e) => setShowArchived(e.target.checked)}
+                style={{ cursor: "pointer" }}
+              />
+              Show archived ({archivedCount})
+            </label>
+          )}
           <span style={{ fontSize: "12px", color: T.ink500 }}>
             {filtered.length} item{filtered.length !== 1 ? "s" : ""}
           </span>
@@ -5418,7 +5444,12 @@ export default function HQStock() {
             HQ Stock
           </h2>
           <p style={{ fontSize: "12px", color: T.ink300, margin: 0 }}>
-            {items.length} item{items.length !== 1 ? "s" : ""} · Total value:{" "}
+            {activeItems.length} item{activeItems.length !== 1 ? "s" : ""}
+            {archivedCount > 0 && (
+              <span style={{ color: T.ink300, marginLeft: 4 }}>
+                (+{archivedCount} archived)
+              </span>
+            )} · Total value:{" "}
             {fmt(totalVal)}
             {lowTotal > 0 && (
               <span
@@ -5485,7 +5516,7 @@ export default function HQStock() {
         }}>
           {[
             { label: "Stock Value", value: fmt(totalVal), sub: "at cost (AVCO)", color: T.accent },
-            { label: "In Stock", value: `${inStockCount} / ${items.length}`, sub: "SKUs available", color: inStockCount === items.length ? T.success : T.warning },
+            { label: "In Stock", value: `${inStockCount} / ${activeItems.length}`, sub: "SKUs available", color: inStockCount === activeItems.length ? T.success : T.warning },
             { label: "Avg Margin", value: avgMarginPct !== null ? `${Math.round(avgMarginPct)}%` : "\u2014", sub: "across priced items", color: avgMarginPct > 50 ? T.success : avgMarginPct > 30 ? T.warning : T.danger },
             { label: "Reorder Alerts", value: lowTotal, sub: "below threshold", color: lowTotal > 0 ? T.danger : T.success },
             ...(expiringCount > 0 ? [{ label: "Expiring <30d", value: expiringCount, sub: "items need action", color: T.warning }] : []),
@@ -5517,7 +5548,7 @@ export default function HQStock() {
         >
           {[
             { id: "overview", label: "Overview" },
-            { id: "items", label: `Items (${items.length})` },
+            { id: "items", label: `Items (${activeItems.length})` },
             { id: "movements", label: "Movements" },
             { id: "pricing", label: "Pricing" },
             { id: "receipts", label: "Receipts" },
