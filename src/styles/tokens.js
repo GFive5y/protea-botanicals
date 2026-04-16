@@ -34,6 +34,7 @@ export const T = {
 
   // Type scale (px values for inline styles)
   text: {
+    xxs:  10,
     xs:   11,
     sm:   12,
     base: 14,
@@ -47,10 +48,11 @@ export const T = {
 
   // Font weights
   weight: {
-    normal:   400,
-    medium:   500,
-    semibold: 600,
-    bold:     700,
+    normal:    400,
+    medium:    500,
+    semibold:  600,
+    bold:      700,
+    extrabold: 800,
   },
 
   // Spacing scale (8px grid — all values multiples of 4)
@@ -156,6 +158,16 @@ export const T = {
   neutral:      "#6c757d",
   neutralLight: "#f1f3f5",
   neutralText:  "#212529",
+
+  // ─── SEMANTIC — PURPLE (added WP-TABLE-UNIFY LOOP-WTU-001) ──
+  // Added S292 for F&B ingredient category highlights in HQFoodIngredients.
+  // Tailwind violet family. Follows same shape as other semantic blocks
+  // (main / mid / light / text / bd).
+  purple:       "#7c3aed",   // violet-600 — main purple
+  purpleMid:    "#8b5cf6",   // violet-500 — mid purple
+  purpleLight:  "#f5f3ff",   // violet-50  — light purple background
+  purpleText:   "#5b21b6",   // violet-800 — dark purple (on light bg)
+  purpleBd:     "#ddd6fe",   // violet-200 — purple border
 
   // ─── DARK SURFACES ───────────────────────────────────────────
   // Added WP-DS-2 (PageShell migration). No dark-surface token
