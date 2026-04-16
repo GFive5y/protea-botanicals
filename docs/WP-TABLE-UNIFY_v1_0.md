@@ -5,6 +5,27 @@
 
 ---
 
+## SESSION 291 REMEDIATION NOTE — 17 APRIL 2026
+
+This work package was named in NEXT-SESSION-PROMPT_v291.md, a stale
+handoff doc that violated LL-264 and contradicted the authoritative
+SESSION-START-PROMPT.md (which had DS6 marked COMPLETE post-Session
+286 and no active WP-TABLE-UNIFY phase).
+
+Despite the wrong framing, Phases 0, 0.5, and 0.7 executed real
+fixes (commits 38e96da, db93f26, 10d9d39, 4956d26). The commits
+are retained. The phase status table below reflects what shipped.
+
+Before starting any "Phase 1" work from this doc, cross-reference
+SESSION-START-PROMPT.md to confirm WP-TABLE-UNIFY is an active
+priority in the current session. As of Session 291 remediation,
+the active priorities are LOOP-011, sim-pos-sales, and DS6 mop-up
+— NOT continued WP-TABLE-UNIFY work.
+
+Reference: LL-287 (session prompt provenance check).
+
+---
+
 ## WHAT THIS WORK PACKAGE IS
 
 WP-TABLE-UNIFY addresses three simultaneous defects visible in screenshots taken 17 April 2026:

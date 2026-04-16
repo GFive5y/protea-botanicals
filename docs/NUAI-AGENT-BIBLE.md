@@ -1581,3 +1581,49 @@ component before writing code.
 ---
 
 *Session 291 closed 17 April 2026 at commit 4956d26.*
+
+
+---
+
+## Session 291 remediation — 17 April 2026
+
+### LL-287 — SESSION PROMPT PROVENANCE CHECK
+
+**Rule:** At the start of every session, before acting on the task,
+verify that the session prompt you were handed matches the
+authoritative docs/SESSION-START-PROMPT.md in the repo. If they
+disagree, stop and flag it. Do not build on a prompt that contradicts
+the in-repo protocol file.
+
+**Why this rule exists:**
+
+Session 291 shipped 4 commits operating on
+NEXT-SESSION-PROMPT_v291.md — a document that violated LL-264
+(never create versioned next-session files; update
+SESSION-START-PROMPT.md in place). The stale prompt described a
+StockControl.js bug and a "WP-TABLE-UNIFY Phase 0" that contradicted
+the authoritative SESSION-START-PROMPT, which had already closed
+Session 288 with DS6 complete and the open priorities being LOOP-011
+and the 11 May sim-pos-sales alert.
+
+The agent working Session 291 never cross-referenced the stale prompt
+against the in-repo protocol file. All five mandatory docs in the
+stale prompt were real, but the prompt had omitted the authoritative
+one — so the reads looked internally consistent while being
+systemically wrong.
+
+**Apply:**
+
+1. GitHub:get_file_contents docs/SESSION-START-PROMPT.md — always
+2. Compare the HEAD hash it names against the actual repo HEAD via
+   GitHub API
+3. Compare its session number and CURRENT STATE section against
+   whatever session prompt you were handed in chat
+4. If any field disagrees, STOP and surface the disagreement to the
+   owner before acting on the task
+5. If the session prompt pasted in chat is a NEXT-SESSION-PROMPT_vXXX
+   file, that is itself an LL-264 violation — flag it
+
+**Principle:** The session prompt handed in chat is a *claim*. The
+SESSION-START-PROMPT.md file in the repo is the *fact*. Trust the
+repo.

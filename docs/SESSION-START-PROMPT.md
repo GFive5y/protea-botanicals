@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 16 April 2026 — Session 288
+## Updated: 17 April 2026 — Session 291 (remediation)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: a447f74
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: c0f2ab4
 
 ---
 
@@ -134,6 +134,44 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 - **LOOP-010**: Medi Rec Run Depreciation — CLOSED (Supabase MCP)
 - **LOOP-015**: Loyalty warning banner — CLOSED (Supabase MCP)
 - **LOOP-DS6-004**: HQStock.js DS6 Phase 2b — CLOSED (Session 286, Claude Code)
+
+### SESSION 291 — 17 April 2026 — REMEDIATION
+
+Session 291 operated on NEXT-SESSION-PROMPT_v291.md, a stale handoff
+doc created in violation of LL-264. The stale prompt described a
+43-vs-31 StockControl bug and a "WP-TABLE-UNIFY Phase 0" that were
+either resolved in Session 286 (DS6 work) or never scoped as the
+actual Session 288-close priority (which was LOOP-011 IFRS sign-offs
+and the 11 May sim-pos-sales standing alert).
+
+Despite the wrong framing, four commits shipped:
+
+| SHA | What | Status |
+|---|---|---|
+| 38e96da | Tenant scoping on inventory_items fetchAll L322 | KEPT — real LL-205 cross-tenant leak fix |
+| db93f26 | Component map comment blocks + version lineage | KEPT — documentation only, no harm |
+| 10d9d39 | Tenant scoping on 3 sibling queries (stock_movements, suppliers, purchase_orders) | KEPT — same real leak, three more tables |
+| 4956d26 | HQStock.js archived-items UX toggle + count fixes | KEPT — real UX gap, archived finished_product items were rendering in default view with no visual distinction |
+
+Remediation commit:
+- docs/NEXT-SESSION-PROMPT_v291.md moved to docs/archive/
+- docs/SESSION-STATE_v291.md moved to docs/archive/
+- SESSION-START-PROMPT.md updated in place (this subsection)
+- NUAI-AGENT-BIBLE.md — LL-287 added (provenance check)
+- WP-TABLE-UNIFY_v1_0.md — header warning added
+- LL-285 and LL-286 retained in Bible (valid learnings)
+
+KNOWN DEBT carried into next session:
+- 2 stock_movements INSERT sites in StockControl.js (L2985, L3351)
+  don't carry tenant_id in payload. RULE 0F violations. Deferred.
+- HQStock Overview sub-tab derived counts (NO EXPIRY, COLD CHAIN)
+  still aggregate over `items` not `activeItems`. Not demo-blocking.
+
+Priority stack UNCHANGED post-remediation:
+1. LOOP-011 — IFRS sign-offs (5 tenants x 4 statements)
+2. 11 May sim-pos-sales (STANDING ALERT)
+3. Optional DS6 mop-up (7 Admin tab components)
+4. LOOP-FIN-004 — Trial Balance Excel export
 
 ### KNOWN PERMANENT GAPS — DO NOT CHASE BEFORE 12 MAY
 1. POS VAT pipeline — ~R5k BS gap per tenant (amber banner explains it)
@@ -287,6 +325,14 @@ LL-274: LOOP-015 pattern — when a banner appears only for specific tenants:
          Data fix (INSERT loyalty_config) resolved the symptom in 2 minutes.
          Rule: tenant-selective behaviour — check data first (config, lookup rows),
          then code. Add to session start: grep confirms which tenants are affected.
+LL-285: LL-205 bypass + unscoped SELECT = cross-tenant leak. Every table with
+         an hq_all_* RLS bypass must have .eq("tenant_id", tenantId) on every
+         React-level SELECT. Pair the policy with an audit in the same session.
+LL-286: Bug-report component attribution is a claim, not a fact. Verify which
+         component the screenshot was taken of before diagnosing.
+LL-287: Session prompt provenance check. At session start, compare the prompt
+         handed in chat against docs/SESSION-START-PROMPT.md in the repo. If
+         they disagree, STOP and flag it. The repo file is the fact.
 
 ---
 
