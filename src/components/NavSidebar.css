@@ -8,9 +8,9 @@
   --rh: 36px;
   --strip-w: 52px;
   --panel-w: 188px;
-  --nav-green: #1a5c38;
-  --nav-green-bg: #e8f4ed;
-  --nav-green-ring: #b7dfc8;
+  --nav-green: #1A3D2B;
+  --nav-green-bg: #E8F5EE;
+  --nav-green-ring: #A7D9B8;
   --nav-transition: 0.24s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -80,8 +80,8 @@
 }
 .nav-title {
   font-size: 13px;
-  font-weight: 500;
-  color: #111;
+  font-weight: 600;
+  color: var(--nav-green);
 }
 .nav-subtitle {
   font-size: 11px;
