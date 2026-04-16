@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 17 April 2026 — Session 291 (remediation)
+## Updated: 17 April 2026 — Session 292 (WP-TABLE-UNIFY audit)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -172,6 +172,30 @@ Priority stack UNCHANGED post-remediation:
 2. 11 May sim-pos-sales (STANDING ALERT)
 3. Optional DS6 mop-up (7 Admin tab components)
 4. LOOP-FIN-004 — Trial Balance Excel export
+
+### SESSION 292 — 17 April 2026 — WP-TABLE-UNIFY AUDIT
+
+Session 292 produced `docs/WP-TABLE-UNIFY_PHASE1_AUDIT_v1.md` — a
+read-only DS6 violation audit for the two Phase 1 target files. No
+code changes. Audit was scoped after confirming (via LL-287 provenance
+check + direct disk read of WP-TABLE-UNIFY_v1_0.md) that the WP is on
+planning-freeze until post-demo, per the header warning added in S291.
+
+Key findings (full detail in the audit doc):
+
+| File | Lines | Violations | State |
+|---|---:|---:|---|
+| HQFoodIngredients.js | 5,140 | 420 | Not bridged — local C has hardcoded hex |
+| StockControl.js | 4,743 | 261 | S286 bridge applied — leftover inline "11px" strings |
+
+- 93 of 102 unique hex uses map cleanly to existing T tokens
+- 9 uses (Tailwind purple/indigo family) have no token — design gate
+- 3 new design questions surfaced: purple family, sub-11px font, fontWeight 800
+- Phase 1 should split into 3 PRs, not 1 (tokens.js additions, HQFI pass, StockControl finish)
+- StockControl PR recommended POST-DEMO due to all-tenant blast radius
+
+New loop opened: **LOOP-WTU-001** — Phase 1 design-gate decisions
+(3 questions, ~30 min owner decision). Blocks PR 1 of 3.
 
 ### KNOWN PERMANENT GAPS — DO NOT CHASE BEFORE 12 MAY
 1. POS VAT pipeline — ~R5k BS gap per tenant (amber banner explains it)
@@ -350,10 +374,13 @@ LL-287: Session prompt provenance check. At session start, compare the prompt
 
 1. **LOOP-011** — All 5 tenants: IFRS Sign-Off (owner UI clicks, 20 statements)
 2. **11 May sim-pos-sales** — STANDING ALERT, cannot miss
-3. **Optional DS6 mop-up** — 7 remaining Admin tab components (AdminCommsCenter,
+3. **LOOP-WTU-001** — Phase 1 design decisions (NEW, S292): purple tokens,
+   T.text.xxs, fontWeight.extrabold. Unblocks WP-TABLE-UNIFY Phase 1 PR 1.
+   ~30 min owner input. See docs/WP-TABLE-UNIFY_PHASE1_AUDIT_v1.md Section 3.
+4. **Optional DS6 mop-up** — 7 remaining Admin tab components (AdminCommsCenter,
    AdminCustomerEngagement, AdminFraudSecurity, AdminNotifications,
    AdminShipments, AdminBatchManager, AdminProductionModule). Not blocking demo.
-4. **LOOP-FIN-004** — Trial Balance Excel export (2hrs, SheetJS) — nice-to-have
+5. **LOOP-FIN-004** — Trial Balance Excel export (2hrs, SheetJS) — nice-to-have
 
 ---
 

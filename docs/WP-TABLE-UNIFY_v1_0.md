@@ -58,10 +58,40 @@ WP-TABLE-UNIFY addresses three simultaneous defects visible in screenshots taken
 | 0   | Foundation & Bug Fix (StockControl.js L322) | CLOSED 17 Apr 2026 · 38e96da |
 | 0.5 | Sibling tenant scoping (3 queries) | CLOSED 17 Apr 2026 · 10d9d39 |
 | 0.7 | HQStock.js archived-items UX | CLOSED 17 Apr 2026 · 4956d26 |
-| 1   | DS6 Token Compliance | READY · start with HQFoodIngredients.js |
+| 1   | DS6 Token Compliance | BLOCKED ON LOOP-WTU-001 · Audit complete S292 · See WP-TABLE-UNIFY_PHASE1_AUDIT_v1.md · Split into 3 PRs (tokens · HQFI · StockControl-POST-DEMO) |
 | 2   | Ingredient Encyclopedia Rebuild | After Phase 1 gate |
 | 3   | Stock Control Feature Parity | After Phase 2 gate |
 | 4   | Advanced Excel-like Features | Post-demo |
+
+---
+
+## PHASE 1 — AUDIT COMPLETE (Session 292, 17 April 2026)
+
+Phase 1 scope was refined by a read-only DS6 violation audit. See
+`docs/WP-TABLE-UNIFY_PHASE1_AUDIT_v1.md` for the full report.
+
+Summary:
+- HQFoodIngredients.js: 420 violations (not bridged, local C with hex)
+- StockControl.js: 261 violations (S286 bridge applied, leftover inline styles)
+- 91% of hex uses map to existing T tokens
+- 9 purple/indigo uses require token addition OR remap decision
+- 3 design questions open: feed LOOP-WTU-001
+
+Revised Phase 1 structure (supersedes single-PR assumption):
+
+| PR | Scope | Effort | Risk | Timing |
+|---|---|---:|---|---|
+| PR 1 | tokens.js additions (purple + xxs + extrabold if chosen) | 30 min | zero | After LOOP-WTU-001 |
+| PR 2 | HQFoodIngredients.js full DS6 pass | ~5 hrs | medium (F&B-only) | After PR 1, pre- OR post-demo |
+| PR 3 | StockControl.js DS6 finish | ~2.5 hrs | medium (all-tenant) | POST-DEMO ONLY |
+
+**WTU-006 rule exception required for PR 1:** the rule "No tokens.js changes
+under this WP" was written before audit data existed. PR 1 adds strict-superset
+tokens — no renames, no value changes. Amendment text proposed:
+
+> WTU-006 (amended): No tokens.js value changes or renames under this WP.
+> Strict-superset additions (new tokens that no existing consumer references)
+> are permitted with audit-doc justification.
 
 ---
 

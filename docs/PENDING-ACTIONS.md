@@ -35,6 +35,21 @@ Action: For each of 5 tenants — IFRS Statements — click Mark Reviewed
   20 statements total.
 Close when: All 20 marked Reviewed + Signed Off.
 
+### LOOP-WTU-001 — WP-TABLE-UNIFY Phase 1 design-gate decisions
+Status: OPEN · Not demo-blocking · Unblocks WP-TABLE-UNIFY Phase 1 PR 1
+Action: Owner decision on three design questions surfaced by S292 audit:
+  Q1 — Purple/indigo token family: add T.purple* (5 tokens) OR remap to T.info
+       OR remap to T.accentMid. 9 uses across HQFoodIngredients.
+       Recommended: Option A (add tokens) — requires WTU-006 rule exception
+       for strict-superset tokens.js additions.
+  Q2 — Sub-11px fontSize (9/10px, 11 uses): bump to T.text.xs OR add T.text.xxs.
+       Recommended: Option B (add xxs = 10).
+  Q3 — fontWeight 800 (2 uses): add T.weight.extrabold OR normalise to 700.
+       Recommended: Option B (normalise).
+See: docs/WP-TABLE-UNIFY_PHASE1_AUDIT_v1.md Section 3 for full context.
+Close when: All 3 decisions made + recorded in WP-TABLE-UNIFY_v1_0.md
+  Phase 1 row + tokens.js PR #1 scoped.
+
 ---
 
 ## KNOWN PERMANENT GAPS (document and explain in demo — do not fix before 12 May)
@@ -51,6 +66,25 @@ Close when: All 20 marked Reviewed + Signed Off.
 
 3. **Pricing data source red (0)** — no product_pricing records linked to recipes.
    Affects costing dashboard only. Not on demo critical path.
+
+---
+
+## CLOSED LOOPS — SESSION 292 (17 April 2026)
+
+### CLOSED — AUDIT-WTU-001: WP-TABLE-UNIFY Phase 1 audit
+Session 292 · Read-only · No commit (Claude.ai cannot write per RULE 0Q)
+Deliverable: docs/WP-TABLE-UNIFY_PHASE1_AUDIT_v1.md (pending Claude Code commit)
+Scope: HQFoodIngredients.js (5,140L) + StockControl.js (4,743L)
+Findings: 420 + 261 violations across 6 DS6 categories.
+  - 93/102 hex uses map to existing T tokens (91% coverage)
+  - 9 unmapped uses (purple/indigo) feed LOOP-WTU-001
+  - HQFI violations concentrated L2500+ (render code)
+  - StockControl already bridged post-S286 (LL-268 pattern)
+  - 1 false positive logged: borderRadius "50%" circle shape, L601
+Method: Custom Python scanner run on files fetched via GitHub:get_file_contents
+  at main HEAD. Scanner at /home/claude/audit/scan.py in session ephemeral.
+Output: 3-PR Phase 1 structure recommended (split vs. monolithic),
+  StockControl PR flagged POST-DEMO due to all-tenant blast radius.
 
 ---
 
