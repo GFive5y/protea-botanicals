@@ -1,55 +1,56 @@
-// src/components/StockControl.js v2.4 — WP-TABLE-UNIFY Phase 0: LL-206 tenant scoping on fetchAll()
-//        (commit 11015a1 fixed category filter but missed tenant_id;
-//         HQ operator sees all tenants' active items via LL-205 bypass)
+// src/components/StockControl.js v2.5 — WP-TABLE-UNIFY Phase 0: tenant scoping on fetchAll (LL-206 + LL-205 cross-tenant leak fix)
+// v2.4 — commit 11015a1: category filter .in() → .eq("is_active", true) (LL-276), fetchAll guard, writeAlert LL-206
 // v2.3 — WP-IND Session 2: category filter by industry profile — WP-STK Phase 2: AVCO + cost drift + unit_cost in history
 // v2.0 — WP-THEME: Unified design system applied
-/* ═══════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════
  * COMPONENT MAP — StockControl.js — WP-TABLE-UNIFY Phase 0 (17 Apr 2026)
- * ═══════════════════════════════════════════════════════════════
- * STATE VARIABLES
- *   items            — inventory_items array (active only, tenant-scoped)
- *   movements        — stock_movements array (last 200)
- *   suppliers        — suppliers array
- *   orders           — purchase_orders array
- *   loading/error    — fetch state
- *   activeTab        — 'stock' | 'movements' | 'suppliers' | 'orders'
- *   showForm         — add/edit item modal open
- *   editItem         — item being edited (null = add mode)
- *   search           — search text for filtering
- *   selectedPo       — expanded PO in detail modal
- *   showReceiveModal — StockReceiveModal open state
+ * ═══════════════════════════════════════════════════════════════════
+ * LOCATION           src/components/StockControl.js (NOT under hq/)
+ * LINES              ~4,680
+ * CONSUMED IN        /admin dashboard · store operator Stock tab
+ * TENANT CONTEXT     useTenant() at L276 → { industryProfile, tenantId }
+ *
+ * STATE VARIABLES    (survey; adjust during Phase 1 migration)
+ *   items, movements, suppliers, orders     — fetchAll() outputs
+ *   loading, error                          — fetch UX
+ *   activeTab                               — sub-tab router
+ *   showForm, editItem, form, saving        — item/movement CRUD
+ *   selectedPo, receiveOpen                 — PO + receive modal
  *
  * SUPABASE CALLS
- *   L322  fetchAll() — SELECT inventory_items WHERE tenant_id + is_active
- *   L327  fetchAll() — SELECT stock_movements (last 200)
- *   L331  fetchAll() — SELECT suppliers
- *   L332  fetchAll() — SELECT purchase_orders
- *   L1363 handleSave — UPDATE inventory_items by id
- *   L1369 handleSave — INSERT inventory_items
- *   L1386 handleDeactivate — UPDATE is_active=false by id
- *   L2990 handleReceive — UPDATE quantity_on_hand by id
- *   L3362 handlePoStatusChange — UPDATE quantity_on_hand by id
- *   L298  writeAlert — SELECT/INSERT system_alerts
+ *   fetchAll (Promise.all, L316)
+ *     L322  inventory_items  .eq("tenant_id", tenantId).eq("is_active", true)
+ *                            ← FIXED this session (was leak per LL-205)
+ *     L328  stock_movements  NO tenant filter · NOT fixed this session
+ *     L332  suppliers        NO tenant filter · NOT fixed this session
+ *     L333  purchase_orders  NO tenant filter · NOT fixed this session
+ *     ↑ Phase 1/2 must add .eq("tenant_id", tenantId) to the three
+ *       siblings. Pre-check their hq_all_ policies per LL-205 first.
+ *   writeAlert (L297) — system_alerts INSERT, already tenant-scoped
+ *   handleSave (L1363/1369) — inventory_items UPDATE/INSERT (by id)
+ *   handleDeactivate (L1386) — inventory_items UPDATE (by id)
+ *   movement submit (L2990) — inventory_items UPDATE (by id)
+ *   PO receive (L3362) — inventory_items UPDATE (by id)
  *
- * RENDER SECTIONS
- *   L~4100  Tab bar (4 tabs)
- *   L~4200  Stock tab: search + item list (accordion cards)
- *   L~4500  Movements tab: table
- *   L~4600  Suppliers tab: cards
- *   L~4700  Orders tab: PO list + detail modal
+ * RENDER SECTIONS (approx. line anchors)
+ *   L~580  ReceiveModal gate
+ *   L~1400 ItemsView (table + form + categoryFilter pills)
+ *   L~2440 KpiCards · Charts · Movements list
+ *   L~3360 PurchaseOrders tab
  *
- * DS6 VIOLATIONS (for Phase 1)
- *   DS bridge already applied (Session 286). Main remaining issues:
- *   - No tile view, no world pills, no column sort
- *   - Accordion card layout (not SmartInventory-style list/tile toggle)
- *   - Missing FNB_SUBCATEGORY_ICONS for F&B items
+ * DS6 VIOLATIONS (for WP-TABLE-UNIFY Phase 1)
+ *   Local `C` alias block at L42-60 (legacy palette)
+ *   Row heights on table exceed LL-284 (44/56/72 cap)
+ *   Mixed border weights — audit and unify in Phase 1
  *
  * WP-TABLE-UNIFY PLANNED ADDITIONS
- *   Phase 1: DS6 token sweep on remaining violations
- *   Phase 3: SC-01 tile view, SC-03 toggle, SC-06 FNB_PILL_HIERARCHY,
- *            SC-07 sort, SC-08 group select, SC-10 smart search, SC-13 CSV
- * ═══════════════════════════════════════════════════════════════
- */
+ *   Phase 1  DS6 token migration (T import already present L39)
+ *   Phase 2  FoodWorld pills when industryProfile === 'food_beverage'
+ *            (LL-282 isFoodBev guard mandatory)
+ *   Phase 3  SmartInventory feature parity — tile view, world picker,
+ *            column sort, bulk actions, smart search (SC-01..SC-15)
+ *   Phase 4  Advanced Excel-like features (post-demo)
+ * ═══════════════════════════════════════════════════════════════════ */
 //   - Outfit replaces Cormorant Garamond + Jost everywhere
 //   - DM Mono for all metric/numeric values
 //   - StatCard: coloured top borders removed — semantic colour on value only

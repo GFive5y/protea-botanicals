@@ -3,10 +3,16 @@
 // Built: March 25, 2026
 // Rules: RULE 0F (tenant_id), RULE 0G (useTenant inside component),
 //        WorkflowGuide first element, InfoTooltip on key fields
-/* ═══════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════
  * COMPONENT MAP — HQFoodIngredients.js — WP-TABLE-UNIFY Phase 0 (17 Apr 2026)
- * ═══════════════════════════════════════════════════════════════
- * STATE VARIABLES
+ * ═══════════════════════════════════════════════════════════════════
+ * LOCATION           src/components/hq/HQFoodIngredients.js
+ * LINES              ~5,083
+ * CONSUMED IN        HQ Command Centre → hq-ingredients tab (F&B only)
+ * TENANT CONTEXT     useTenant() at L3128 inside component body (RULE 0G)
+ *                    destructure: { tenantId }
+ *
+ * STATE VARIABLES    15 useState hooks — SEED_INGREDIENTS frozen (WTU-007)
  *   searchQ              — plain text search (no tokens yet)
  *   filterCat            — category filter string
  *   filterAllergen       — allergen filter string
@@ -18,37 +24,41 @@
  *   (MISSING: sortField, sortDir, viewMode, tileSize, groupFilter,
  *    subFilter, pillExpanded, selectMode, selectedIds, colPickerOpen)
  *
- * SUPABASE CALLS
- *   fetchIngredients()     — SELECT * FROM food_ingredients WHERE tenant_id
- *   handleSeedLibrary()    — INSERT batch from SEED_INGREDIENTS
- *   handleSaveIngredient() — INSERT/UPDATE food_ingredients
- *   handleDeleteIngredient() — DELETE food_ingredients
+ * SUPABASE CALLS     (3 total — all on food_ingredients, NOT inventory_items)
+ *   L3185  food_ingredients SELECT  .or("is_seeded.eq.true,tenant_id.eq."+tenantId)
+ *   L3228  food_ingredients UPDATE  (by id)
+ *   L3273  food_ingredients INSERT  tenant_id: tenantId (RULE 0F)
  *
- * RENDER SECTIONS (approx line numbers)
- *   L~3130  Component function start
- *   L~3610  Filter bar (2 dropdowns only — no world pills, no sort)
- *   L~3748  Ingredient table (flat HTML table, no tile view)
- *   L~3789  tbody row render
- *   L~4100+ Detail panel + compare view + nutrition panel
+ * RENDER SECTIONS (return anchors)
+ *   L2419  primary component return
+ *   L2436/2442/2463/2488/2510/2538 — sub-component returns
+ *   L2614  large card-grid block
+ *   L3355  main ingredient grid return
  *
- * DS6 VIOLATIONS (for Phase 1)
- *   L15-34   local C palette (not from tokens.js)
- *   L37-106  local CATEGORIES array (not from FoodWorlds.js)
- *   L126-132 local HACCP_COLORS (not DS6 semantic tokens)
- *   L3753-3756 borderRadius: 10 (integer, should be T.radius.lg)
- *   L3641-3645 borderRadius: 6 (integer, should be T.radius.md)
- *   Row height ~80-100px (DS6 target: 44px single-line)
- *   Font sizes 9px, 10px present (min T.text.xs = 11px)
+ * DS6 VIOLATIONS (per WP-TABLE-UNIFY_v1_0.md DS6 map — confirmed)
+ *   L15-34   Local `C` palette (partial WP-UNIFY done — still raw hex:
+ *            #D4CFC4, #1D4ED8, #5B21B6, #245C43, #F5F3FF)
+ *   L37-106  Local CATEGORIES array with per-category raw hex — should
+ *            migrate to FOOD_WORLDS from FoodWorlds.js (LL-278)
+ *   L126-132 HACCP_COLORS: #F0FDF4/#166534, #FEF3C7/#92400E,
+ *            #FFF7ED/#C2410C, #FEF2F2/#991B1B
+ *            → T.successLight/Text, warningLight/Text, dangerLight/Text
+ *   L3484,3707,3754,3983,4546  borderRadius: 10 (integer) → T.radius.lg
+ *   L3641-3645 (per gospel) borderRadius: 6 → T.radius.md
+ *   Row heights: target 44px single-line, 56px two-line (LL-284)
  *
  * WP-TABLE-UNIFY PLANNED ADDITIONS
- *   Phase 1: Remove local C palette, wire T tokens, fix row heights
- *   Phase 2: SC-01 tile view, SC-02 list view, SC-03 toggle,
- *            SC-04 size picker, SC-06 FNB_PILL_HIERARCHY world navigation,
- *            SC-07 column sort, SC-08 group select, SC-09 bulk actions,
- *            SC-10 smart search with FNB_FIELD_MAP tokens,
- *            SC-11 column picker, SC-13 export CSV
- * ═══════════════════════════════════════════════════════════════
- */
+ *   Phase 1  DS6 compliance pass · T import exists at L12 · Remove `C`,
+ *            migrate HACCP_COLORS + TEMP_COLORS to token-derived map
+ *   Phase 2  Ingredient Encyclopedia rebuild — FoodWorld banner icons
+ *            (SC-17), FNB_PILL_HIERARCHY drill-down (SC-06),
+ *            FNB_SUBCATEGORY_ICONS[item.subcategory] in CATEGORY column
+ *            (LL-283)
+ *   Phase 3  SmartInventory feature parity — tile view, bulk actions,
+ *            smart search with FNB tokens (expiry<7, zone:frozen,
+ *            allergen:dairy, portions>10)
+ *   Phase 4  Column resize + advanced filters (post-demo)
+ * ═══════════════════════════════════════════════════════════════════ */
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../../services/supabaseClient";
