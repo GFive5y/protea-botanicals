@@ -642,3 +642,20 @@ Source component was NOT identified and this is acceptable — the symptom is
 resolved. Do not re-open without a terminal grep result confirming the string.
 
 *LL-269 through LL-274 added: Session 287/288 · April 16, 2026*
+
+
+---
+
+## LL-290 — Session 293 (17 April 2026)
+
+LL-290: PENDING-ACTIONS loop scope must be verified against DB schema before
+closing, not inferred from UI tab count. LOOP-011 was logged as "5
+tenants x 4 statements = 20 sign-offs" based on the 4-tab UI in
+HQFinancialStatements.js. Actual schema: financial_statement_status
+has one row per (tenant_id, financial_year) with a single `status`
+column — all 4 statement tabs share the workflow. Real scope: 5
+sign-offs total. Rule: before closing or sizing a PENDING-ACTIONS
+loop, inspect the underlying table's PRIMARY/UNIQUE key constraints
+— not the rendered tabs. Applied Session 293, 17 April 2026.
+
+*LL-290 added: Session 293 · 17 April 2026*

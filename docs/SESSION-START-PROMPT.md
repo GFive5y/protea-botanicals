@@ -431,6 +431,10 @@ LL-288: Tools before assumptions. Deferred tools are invisible until searched.
 LL-289: Project knowledge is a CACHE, not source of truth. The repo wins.
          Do not require owner to manually refresh project knowledge every
          session — wasted effort. GitHub MCP read is live; use it.
+LL-290: PENDING-ACTIONS loop scope must be verified against DB schema, not
+         UI tab count. LOOP-011 was sized "5 x 4 = 20" based on 4 UI tabs;
+         actual schema is one financial_statement_status row per tenant+FY.
+         Rule: inspect PK/UNIQUE constraints before closing or sizing a loop.
 
 ---
 

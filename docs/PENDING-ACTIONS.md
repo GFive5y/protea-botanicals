@@ -28,12 +28,23 @@ When this changes:
 
 ## OUTSTANDING — MUST COMPLETE BEFORE 12 MAY 2026
 
-### LOOP-011 — All 5 tenants: IFRS Statements Mark Reviewed + Sign-Off
-Status: OPEN
-Action: For each of 5 tenants — IFRS Statements — click Mark Reviewed
-  on all 4 statements (IS, BS, Cash Flow, Changes in Equity) — Auditor Sign-Off.
-  20 statements total.
-Close when: All 20 marked Reviewed + Signed Off.
+### LOOP-011 — All 5 tenants: IFRS Statements Auditor Sign-Off
+Status: OPEN (Mark Reviewed step COMPLETE — 5/5 tenants at status='reviewed')
+Scope correction (Session 293, 17 April 2026 — verified via Supabase MCP +
+HQFinancialStatements.js disk read): The UI uses ONE
+financial_statement_status row per (tenant_id, financial_year), NOT one per
+statement type. The 4 statement tabs (IS, BS, Cash Flow, Changes in Equity)
+share a single status workflow: Draft -> Reviewed -> Auditor Signed Off -> Locked.
+Therefore LOOP-011 is 5 sign-offs total, not 20.
+Action: For each of 5 tenants — /tenant-portal — IFRS Statements —
+  click "Auditor Sign Off..." — enter auditor name — Confirm.
+Close when: All 5 financial_statement_status rows have signed_at IS NOT NULL.
+Current DB state (Session 293):
+  Medi Recreational        FY2026 status=reviewed  signed=false
+  MediCare Dispensary      FY2026 status=reviewed  signed=false
+  Metro Hardware (Pty) Ltd FY2026 status=reviewed  signed=false
+  Nourish Kitchen & Deli   FY2026 status=reviewed  signed=false
+  The Garden Bistro        FY2026 status=reviewed  signed=false
 
 ---
 
@@ -51,6 +62,23 @@ Close when: All 20 marked Reviewed + Signed Off.
 
 3. **Pricing data source red (0)** — no product_pricing records linked to recipes.
    Affects costing dashboard only. Not on demo critical path.
+
+---
+
+## CLOSED LOOPS — SESSION 293 (17 April 2026)
+
+### CLOSED — LL-250-BREACH-01: Duplicate VAT numbers on active tenants
+Session 293 · Supabase MCP (no code commit)
+Audit finding: 2 collisions on tenant_config.vat_number for active tenants:
+  - 4067891234 -> Medi Can Dispensary + MediCare Dispensary
+  - 4987654321 -> The Garden Bistro + Metro Hardware (Pty) Ltd
+Fix (UPDATE tenant_config):
+  - Medi Can Dispensary (2bd41eb7...): 4067891234 -> 4100200300
+  - Metro Hardware (57156762...): 4987654321 -> 4200300400
+Retained numbers went to the demo-priority tenants (MediCare keeps
+4067891234 since Medi Can is a seed/inactive-path tenant; Garden Bistro
+keeps 4987654321 since it's demo-priority).
+Verified: 0 duplicate VAT numbers remain across 6 VAT-registered active tenants.
 
 ---
 

@@ -70,23 +70,21 @@ import { T } from "../../styles/tokens";
 // WP-UNIFY: F&B local palette mapped to tokens.js T where equivalent
 const C = {
   bg: T.surface,
-  surface: "#ffffff",
+  surface: T.surface,
   border: T.border,
-  borderMid: "#D4CFC4",
   ink: T.ink900,
   inkMid: T.ink700,
   inkLight: T.ink500,
   accent: T.accentMid,
   accentBg: T.accentLight,
-  accentHov: "#245C43",
   amber: T.warning,
   amberBg: T.warningLight,
   red: T.danger,
   redBg: T.dangerLight,
   blue: "#1D4ED8",
   blueBg: T.infoLight,
-  purple: "#5B21B6",
-  purpleBg: "#F5F3FF",
+  purple: T.purpleText,
+  purpleBg: T.purpleLight,
 };
 
 // ─── Category config ──────────────────────────────────────────────────────────
