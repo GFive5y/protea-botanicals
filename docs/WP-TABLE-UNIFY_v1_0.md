@@ -58,7 +58,7 @@ WP-TABLE-UNIFY addresses three simultaneous defects visible in screenshots taken
 | 0   | Foundation & Bug Fix (StockControl.js L322) | CLOSED 17 Apr 2026 · 38e96da |
 | 0.5 | Sibling tenant scoping (3 queries) | CLOSED 17 Apr 2026 · 10d9d39 |
 | 0.7 | HQStock.js archived-items UX | CLOSED 17 Apr 2026 · 4956d26 |
-| 1   | DS6 Token Compliance | BLOCKED ON LOOP-WTU-001 · Audit complete S292 · See WP-TABLE-UNIFY_PHASE1_AUDIT_v1.md · Split into 3 PRs (tokens · HQFI · StockControl-POST-DEMO) |
+| 1   | DS6 Token Compliance | IN PROGRESS · PR 1 (tokens.js) SHIPPED 5395543 · PR 2 (HQFI pass) READY · PR 3 (StockControl) POST-DEMO |
 | 2   | Ingredient Encyclopedia Rebuild | After Phase 1 gate |
 | 3   | Stock Control Feature Parity | After Phase 2 gate |
 | 4   | Advanced Excel-like Features | Post-demo |

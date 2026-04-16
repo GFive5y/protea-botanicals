@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 17 April 2026 — Session 292 (WP-TABLE-UNIFY audit)
+## Updated: 17 April 2026 — Session 292 (WP-TABLE-UNIFY audit + PR 1)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -194,8 +194,15 @@ Key findings (full detail in the audit doc):
 - Phase 1 should split into 3 PRs, not 1 (tokens.js additions, HQFI pass, StockControl finish)
 - StockControl PR recommended POST-DEMO due to all-tenant blast radius
 
-New loop opened: **LOOP-WTU-001** — Phase 1 design-gate decisions
-(3 questions, ~30 min owner decision). Blocks PR 1 of 3.
+LOOP-WTU-001 opened and CLOSED same session. Owner decisions:
+  Q1 Purple tokens: ADD 5-token family (T.purple / purpleMid / purpleLight
+     / purpleText / purpleBd — Tailwind violet)
+  Q2 Sub-11px font: ADD T.text.xxs = 10
+  Q3 fontWeight 800: ADD T.weight.extrabold = 800
+
+**PR 1 shipped as 5395543** — tokens.js +16/-4. Zero regression risk.
+WP-TABLE-UNIFY Phase 1 PR 2 (HQFoodIngredients.js) now unblocked.
+PR 3 (StockControl.js) still POST-DEMO per audit recommendation.
 
 ### KNOWN PERMANENT GAPS — DO NOT CHASE BEFORE 12 MAY
 1. POS VAT pipeline — ~R5k BS gap per tenant (amber banner explains it)

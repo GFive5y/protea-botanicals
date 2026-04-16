@@ -35,21 +35,6 @@ Action: For each of 5 tenants — IFRS Statements — click Mark Reviewed
   20 statements total.
 Close when: All 20 marked Reviewed + Signed Off.
 
-### LOOP-WTU-001 — WP-TABLE-UNIFY Phase 1 design-gate decisions
-Status: OPEN · Not demo-blocking · Unblocks WP-TABLE-UNIFY Phase 1 PR 1
-Action: Owner decision on three design questions surfaced by S292 audit:
-  Q1 — Purple/indigo token family: add T.purple* (5 tokens) OR remap to T.info
-       OR remap to T.accentMid. 9 uses across HQFoodIngredients.
-       Recommended: Option A (add tokens) — requires WTU-006 rule exception
-       for strict-superset tokens.js additions.
-  Q2 — Sub-11px fontSize (9/10px, 11 uses): bump to T.text.xs OR add T.text.xxs.
-       Recommended: Option B (add xxs = 10).
-  Q3 — fontWeight 800 (2 uses): add T.weight.extrabold OR normalise to 700.
-       Recommended: Option B (normalise).
-See: docs/WP-TABLE-UNIFY_PHASE1_AUDIT_v1.md Section 3 for full context.
-Close when: All 3 decisions made + recorded in WP-TABLE-UNIFY_v1_0.md
-  Phase 1 row + tokens.js PR #1 scoped.
-
 ---
 
 ## KNOWN PERMANENT GAPS (document and explain in demo — do not fix before 12 May)
@@ -70,6 +55,23 @@ Close when: All 3 decisions made + recorded in WP-TABLE-UNIFY_v1_0.md
 ---
 
 ## CLOSED LOOPS — SESSION 292 (17 April 2026)
+
+### CLOSED — LOOP-WTU-001: Phase 1 design-gate decisions
+Session 292 · Owner decisions: all Option A (additive)
+Q1 Purple family: ADD 5 tokens. Q2 Sub-11px: ADD T.text.xxs. Q3 fontWeight 800: ADD T.weight.extrabold.
+All strict-superset additions. No existing consumer affected.
+
+### CLOSED — PR 1: WP-TABLE-UNIFY Phase 1 tokens.js additions
+Session 292 · 5395543 · src/styles/tokens.js +16/-4
+Added 7 tokens per LOOP-WTU-001 decisions.
+Zero-risk additive commit. Unblocks PR 2 (HQFoodIngredients DS6 pass).
+
+### CLOSED — DOCS-S292: CLAUDE.md reconciliation + archive cleanup
+Session 292 · d6fab84 + c91e3ea
+d6fab84: CLAUDE.md reconciled with LL-264 (removed NEXT-SESSION-PROMPT pattern,
+  removed ghost CLAUDE-COLLABORATION-PROTOCOL.md reference, rewrote close protocol).
+c91e3ea: 11 stranded session-handoff files moved to docs/archive/
+  (5 NEXT-SESSION-PROMPT + 6 SESSION-STATE, v258-v290).
 
 ### CLOSED — AUDIT-WTU-001: WP-TABLE-UNIFY Phase 1 audit
 Session 292 · Read-only · No commit (Claude.ai cannot write per RULE 0Q)
