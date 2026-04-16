@@ -1,5 +1,5 @@
 # NuAi — Claude Code Session Instructions
-## Version: 2.0 · Updated: 11 April 2026
+## Version: 2.2 · Updated: 17 April 2026
 ## This file is loaded into every Claude Code session at start.
 ## Purpose: Orientation + absolute rules only.
 ## State, priorities, and rule details live in dedicated docs.
@@ -22,7 +22,7 @@ cannabis_retail · cannabis_dispensary · food_beverage · general_retail
 George Fivaz is non-technical. He uses Claude.ai (chat) for
 strategy, architecture, and decisions. Claude Code (you) handles
 all file edits, commits, and pushes. This is the standard
-two-agent operating procedure. See docs/CLAUDE-COLLABORATION-PROTOCOL.md.
+two-agent operating procedure.
 
 ---
 
@@ -37,10 +37,12 @@ two-agent operating procedure. See docs/CLAUDE-COLLABORATION-PROTOCOL.md.
 1. git log --oneline -1
    → confirm HEAD before touching anything
 
-2. Find and read the latest session docs:
-   ls docs/NEXT-SESSION-PROMPT* | sort | tail -1
-   ls docs/SESSION-STATE* | sort | tail -1
-   Read BOTH in full before any task.
+2. Read the single live session ledger:
+   cat docs/SESSION-START-PROMPT.md
+   This is the one authoritative handoff doc. Versioned
+   NEXT-SESSION-PROMPT_vXXX.md and SESSION-STATE_vXXX.md files
+   are legacy — do NOT read or create them (LL-264). If you see
+   them outside docs/archive/, treat them as stale.
 
 2.5  Read these three files next:
    docs/SYSTEM-GROUND-TRUTH.md   <- current tenant state from live DB
@@ -268,18 +270,41 @@ For HEAD:               run git log --oneline -1
 ## SESSION CLOSE PROTOCOL
 
 At end of every session, Claude Code must:
+
 0. Run: python3 docs/update_ground_truth.py
    -> regenerates SYSTEM-GROUND-TRUTH.md from live DB before committing
-1. Append a date-stamped addendum to SESSION-STATE_v[current].md
-2. Write NEXT-SESSION-PROMPT_v[next].md with HEAD hash
-3. Commit all: "docs: SESSION-STATE + NEXT-SESSION-PROMPT v[N]"
 
+1. Update docs/SESSION-START-PROMPT.md IN PLACE (LL-264):
+   - bump session number in the header
+   - update CURRENT STATE section with what this session closed
+   - move completed loops to CLOSED, add any new loops to OPEN
+   - add any new LLs to the CRITICAL RULES block
+   - update HEAD reference to the new commit (write the hash after
+     the commit, amend if needed)
+
+2. Update docs/PENDING-ACTIONS.md if any loops opened or closed.
+
+3. Append new LLs to docs/NUAI-AGENT-BIBLE.md and docs/LL-ARCHIVE_v1_0.md.
+
+4. Commit specifically (LL-246 — never git add -A):
+   git add docs/SESSION-START-PROMPT.md docs/PENDING-ACTIONS.md \
+           docs/NUAI-AGENT-BIBLE.md docs/LL-ARCHIVE_v1_0.md
+   (add any other files specifically touched this session)
+   git commit -m "docs(S###): in-place session close"
+   git push origin main
+
+5. Inform Claude.ai operator to refresh project knowledge:
+   After push, the human must paste the new SESSION-START-PROMPT.md
+   into Claude.ai project knowledge (LL-287 provenance drift prevention).
+   Without step 5, next Claude.ai session starts on stale snapshot.
+
+NEVER create docs/NEXT-SESSION-PROMPT_v[next].md (LL-264).
+NEVER create a new versioned docs/SESSION-STATE_v[next].md (LL-264).
 Claude.ai must confirm the state is accurate before session close.
 
 ---
 
-*CLAUDE.md v2.1 · NuAi · 13 April 2026*
-*Replaces: CLAUDE.md v1.0 (09 April 2026, HEAD 9939421)*
+*CLAUDE.md v2.2 · NuAi · 17 April 2026*
+*Replaces: CLAUDE.md v2.1 (13 April 2026) — reconciled with LL-264*
 *Rule source:     docs/NUAI-AGENT-BIBLE.md*
-*State source:    docs/SESSION-STATE_v[latest].md*
-*Priority source: docs/NEXT-SESSION-PROMPT_v[latest].md*
+*State source:    docs/SESSION-START-PROMPT.md (in-place, never versioned)*
