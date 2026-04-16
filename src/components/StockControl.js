@@ -1,4 +1,4 @@
-// src/components/StockControl.js v2.5 — WP-TABLE-UNIFY Phase 0: tenant scoping on fetchAll (LL-206 + LL-205 cross-tenant leak fix)
+// src/components/StockControl.js v2.6 — WP-TABLE-UNIFY Phase 0.5: tenant scoping on all four fetchAll() queries (inventory_items, stock_movements, suppliers, purchase_orders)
 // v2.4 — commit 11015a1: category filter .in() → .eq("is_active", true) (LL-276), fetchAll guard, writeAlert LL-206
 // v2.3 — WP-IND Session 2: category filter by industry profile — WP-STK Phase 2: AVCO + cost drift + unit_cost in history
 // v2.0 — WP-THEME: Unified design system applied
@@ -21,11 +21,15 @@
  *   fetchAll (Promise.all, L316)
  *     L322  inventory_items  .eq("tenant_id", tenantId).eq("is_active", true)
  *                            ← FIXED this session (was leak per LL-205)
- *     L328  stock_movements  NO tenant filter · NOT fixed this session
- *     L332  suppliers        NO tenant filter · NOT fixed this session
- *     L333  purchase_orders  NO tenant filter · NOT fixed this session
- *     ↑ Phase 1/2 must add .eq("tenant_id", tenantId) to the three
- *       siblings. Pre-check their hq_all_ policies per LL-205 first.
+ *     L328  stock_movements  .eq("tenant_id", tenantId)  (fixed in 0.5)
+ *     L333  suppliers        .eq("tenant_id", tenantId)  (fixed in 0.5)
+ *     L336  purchase_orders  .eq("tenant_id", tenantId)  (fixed in 0.5)
+ *
+ *   KNOWN DEBT (RULE 0F — existing bugs, not this session's scope)
+ *     L2985  stock_movements INSERT — no tenant_id in payload
+ *     L3351  stock_movements INSERT — no tenant_id in payload
+ *     Fix pattern: add  tenant_id: tenantId  to the insert object.
+ *     Deferred to a dedicated LL-282/RULE-0F audit pass.
  *   writeAlert (L297) — system_alerts INSERT, already tenant-scoped
  *   handleSave (L1363/1369) — inventory_items UPDATE/INSERT (by id)
  *   handleDeactivate (L1386) — inventory_items UPDATE (by id)
@@ -378,14 +382,20 @@ export default function StockControl() {
         supabase
           .from("stock_movements")
           .select("*, inventory_items(name, sku)")
+          .eq("tenant_id", tenantId)
           .order("created_at", { ascending: false })
           .limit(200),
-        supabase.from("suppliers").select("*").order("name"),
+        supabase
+          .from("suppliers")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .order("name"),
         supabase
           .from("purchase_orders")
           .select(
             "*, suppliers(name, country, currency), purchase_order_items(*, supplier_products(name, sku, category))",
           )
+          .eq("tenant_id", tenantId)
           .order("created_at", { ascending: false }),
       ]);
       if (iR.error) throw iR.error;
