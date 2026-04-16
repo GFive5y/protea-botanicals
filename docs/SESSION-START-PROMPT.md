@@ -81,6 +81,9 @@ The owner is non-technical.
 3. `docs/PENDING-ACTIONS.md`
 4. `docs/VIOLATION_LOG_v1_1.md`
 5. `docs/LL-ARCHIVE_v1_0.md` (LL-269 through LL-274 are new this session)
+6. `docs/SYSTEM-GROUND-TRUTH.md` — live DB snapshot (tenant state, known bugs,
+   baselines). If stale (>2 days old), ask owner to run update_ground_truth.py
+   at session end. Do not proceed on stale ground truth without flagging.
 
 After reading, confirm out loud:
 - Current HEAD (should be a447f74 or later)
