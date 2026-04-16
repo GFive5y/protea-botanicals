@@ -162,7 +162,9 @@ Next agent: read WP-FINANCIALS-v1_1.md Section 7.5 before touching anything.
 Close when: EF deployed, PDF accessible from IFRS Statements screen via Download button.
 
 ### LOOP-FIN-003 — Revenue VAT Exclusion (GAP-01 from FIN-AUDIT_v1_0.md)
-Status: OPEN · Code fix · Ref: docs/FIN-AUDIT_v1_0.md Section 3
+Status: CLOSED — already shipped (confirmed 16 Apr 2026)
+Fix: const VAT_RATE = 1.15; applied to websiteRevenue, productMargins line_total,
+and gross margin trend chart in HQProfitLoss.js. EF inherits via pre-computed data.
 Priority: HIGH — every CA will spot this immediately
 
 Issue: Revenue shown as VAT-inclusive (R473,480 actual → should be ~R411,722 ex-VAT)
