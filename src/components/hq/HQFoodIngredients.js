@@ -3,6 +3,52 @@
 // Built: March 25, 2026
 // Rules: RULE 0F (tenant_id), RULE 0G (useTenant inside component),
 //        WorkflowGuide first element, InfoTooltip on key fields
+/* ═══════════════════════════════════════════════════════════════
+ * COMPONENT MAP — HQFoodIngredients.js — WP-TABLE-UNIFY Phase 0 (17 Apr 2026)
+ * ═══════════════════════════════════════════════════════════════
+ * STATE VARIABLES
+ *   searchQ              — plain text search (no tokens yet)
+ *   filterCat            — category filter string
+ *   filterAllergen       — allergen filter string
+ *   filterHaccp          — HACCP risk level filter
+ *   filterTemp           — temperature zone filter
+ *   selectedIngredient   — detail panel open state
+ *   compareList          — ingredient comparison array
+ *   activeTab            — 'library' | 'my-ingredients' | 'create'
+ *   (MISSING: sortField, sortDir, viewMode, tileSize, groupFilter,
+ *    subFilter, pillExpanded, selectMode, selectedIds, colPickerOpen)
+ *
+ * SUPABASE CALLS
+ *   fetchIngredients()     — SELECT * FROM food_ingredients WHERE tenant_id
+ *   handleSeedLibrary()    — INSERT batch from SEED_INGREDIENTS
+ *   handleSaveIngredient() — INSERT/UPDATE food_ingredients
+ *   handleDeleteIngredient() — DELETE food_ingredients
+ *
+ * RENDER SECTIONS (approx line numbers)
+ *   L~3130  Component function start
+ *   L~3610  Filter bar (2 dropdowns only — no world pills, no sort)
+ *   L~3748  Ingredient table (flat HTML table, no tile view)
+ *   L~3789  tbody row render
+ *   L~4100+ Detail panel + compare view + nutrition panel
+ *
+ * DS6 VIOLATIONS (for Phase 1)
+ *   L15-34   local C palette (not from tokens.js)
+ *   L37-106  local CATEGORIES array (not from FoodWorlds.js)
+ *   L126-132 local HACCP_COLORS (not DS6 semantic tokens)
+ *   L3753-3756 borderRadius: 10 (integer, should be T.radius.lg)
+ *   L3641-3645 borderRadius: 6 (integer, should be T.radius.md)
+ *   Row height ~80-100px (DS6 target: 44px single-line)
+ *   Font sizes 9px, 10px present (min T.text.xs = 11px)
+ *
+ * WP-TABLE-UNIFY PLANNED ADDITIONS
+ *   Phase 1: Remove local C palette, wire T tokens, fix row heights
+ *   Phase 2: SC-01 tile view, SC-02 list view, SC-03 toggle,
+ *            SC-04 size picker, SC-06 FNB_PILL_HIERARCHY world navigation,
+ *            SC-07 column sort, SC-08 group select, SC-09 bulk actions,
+ *            SC-10 smart search with FNB_FIELD_MAP tokens,
+ *            SC-11 column picker, SC-13 export CSV
+ * ═══════════════════════════════════════════════════════════════
+ */
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../../services/supabaseClient";

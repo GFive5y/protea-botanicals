@@ -1,5 +1,55 @@
-// src/components/StockControl.js v2.3 — WP-IND Session 2: category filter by industry profile — WP-STK Phase 2: AVCO + cost drift + unit_cost in history
+// src/components/StockControl.js v2.4 — WP-TABLE-UNIFY Phase 0: LL-206 tenant scoping on fetchAll()
+//        (commit 11015a1 fixed category filter but missed tenant_id;
+//         HQ operator sees all tenants' active items via LL-205 bypass)
+// v2.3 — WP-IND Session 2: category filter by industry profile — WP-STK Phase 2: AVCO + cost drift + unit_cost in history
 // v2.0 — WP-THEME: Unified design system applied
+/* ═══════════════════════════════════════════════════════════════
+ * COMPONENT MAP — StockControl.js — WP-TABLE-UNIFY Phase 0 (17 Apr 2026)
+ * ═══════════════════════════════════════════════════════════════
+ * STATE VARIABLES
+ *   items            — inventory_items array (active only, tenant-scoped)
+ *   movements        — stock_movements array (last 200)
+ *   suppliers        — suppliers array
+ *   orders           — purchase_orders array
+ *   loading/error    — fetch state
+ *   activeTab        — 'stock' | 'movements' | 'suppliers' | 'orders'
+ *   showForm         — add/edit item modal open
+ *   editItem         — item being edited (null = add mode)
+ *   search           — search text for filtering
+ *   selectedPo       — expanded PO in detail modal
+ *   showReceiveModal — StockReceiveModal open state
+ *
+ * SUPABASE CALLS
+ *   L322  fetchAll() — SELECT inventory_items WHERE tenant_id + is_active
+ *   L327  fetchAll() — SELECT stock_movements (last 200)
+ *   L331  fetchAll() — SELECT suppliers
+ *   L332  fetchAll() — SELECT purchase_orders
+ *   L1363 handleSave — UPDATE inventory_items by id
+ *   L1369 handleSave — INSERT inventory_items
+ *   L1386 handleDeactivate — UPDATE is_active=false by id
+ *   L2990 handleReceive — UPDATE quantity_on_hand by id
+ *   L3362 handlePoStatusChange — UPDATE quantity_on_hand by id
+ *   L298  writeAlert — SELECT/INSERT system_alerts
+ *
+ * RENDER SECTIONS
+ *   L~4100  Tab bar (4 tabs)
+ *   L~4200  Stock tab: search + item list (accordion cards)
+ *   L~4500  Movements tab: table
+ *   L~4600  Suppliers tab: cards
+ *   L~4700  Orders tab: PO list + detail modal
+ *
+ * DS6 VIOLATIONS (for Phase 1)
+ *   DS bridge already applied (Session 286). Main remaining issues:
+ *   - No tile view, no world pills, no column sort
+ *   - Accordion card layout (not SmartInventory-style list/tile toggle)
+ *   - Missing FNB_SUBCATEGORY_ICONS for F&B items
+ *
+ * WP-TABLE-UNIFY PLANNED ADDITIONS
+ *   Phase 1: DS6 token sweep on remaining violations
+ *   Phase 3: SC-01 tile view, SC-03 toggle, SC-06 FNB_PILL_HIERARCHY,
+ *            SC-07 sort, SC-08 group select, SC-10 smart search, SC-13 CSV
+ * ═══════════════════════════════════════════════════════════════
+ */
 //   - Outfit replaces Cormorant Garamond + Jost everywhere
 //   - DM Mono for all metric/numeric values
 //   - StatCard: coloured top borders removed — semantic colour on value only
@@ -321,6 +371,7 @@ export default function StockControl() {
         supabase
           .from("inventory_items")
           .select("*, suppliers(name)")
+          .eq("tenant_id", tenantId)
           .eq("is_active", true)
           .order("name"),
         supabase
