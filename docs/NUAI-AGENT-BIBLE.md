@@ -1506,3 +1506,78 @@ All 8 queries should return clean results. Investigate any anomalies before demo
 *Maintained by: Claude Code after each major session*
 *Owner reviews: after each WP completion*
 *Replace this file: never — append and version it*
+
+
+---
+
+## Session 291 — 17 April 2026
+
+### LL-285 — LL-205 BYPASS + UNSCOPED SELECT = CROSS-TENANT LEAK
+
+**Rule:** Every table with an `hq_all_*` RLS bypass policy (LL-205)
+must have every React-level SELECT on that table carry
+`.eq("tenant_id", tenantId)`. LL-205 removes the tenant-isolation
+safety net for HQ users. Component queries that were implicitly
+tenant-scoped by standard RLS policy become wide-open for HQ users
+the moment the bypass policy exists.
+
+**Pairing rule:** When you add a new `hq_all_*` policy, grep the
+entire src/ tree for all `.from("<tablename>")` invocations and
+audit each one. Ship the policy AND the audit fixes in the same
+session — do not leave the audit to drift.
+
+**Pattern that caused the discovery (session 291):**
+
+Session 291 found StockControl.js had 4 unscoped SELECTs in a single
+`fetchAll()` Promise.all — on `inventory_items`, `stock_movements`,
+`suppliers`, `purchase_orders`. All four tables had `hq_all_*`
+policies. HQ operators viewing Garden Bistro saw cross-tenant data
+on every one. Fixed in commits 38e96da + 10d9d39.
+
+**Audit SQL to find all hq_all_ policies:**
+
+```sql
+SELECT tablename, policyname FROM pg_policies
+WHERE schemaname = 'public' AND policyname LIKE 'hq_all_%'
+ORDER BY tablename;
+```
+
+For each row, grep the repo for `.from("<tablename>")` and verify
+every SELECT carries `.eq("tenant_id", tenantId)`. Insert/Update
+by `.eq("id", ...)` is safe — only SELECTs leak.
+
+---
+
+### LL-286 — BUG-REPORT COMPONENT ATTRIBUTION IS A CLAIM, NOT A FACT
+
+**Rule:** When a session prompt or bug report cites a specific
+component as the source of a visible bug, verify the screenshot was
+actually taken of that component's render before forming a diagnosis.
+Route URLs can host multiple components. Chrome headers from one
+component can sit above content rendered by another. A screenshot
+showing "Stock Control" at the top and "HQ Stock ITEMS (43)" below
+is two different components, not one component with conflicting data.
+
+**Discovery (session 291):**
+
+NEXT-SESSION-PROMPT_v291 attributed the "43 vs 31 archived items
+visible" bug to StockControl.js. After two fix commits that did not
+resolve the user-visible symptom, browser verification at
+`/tenant-portal?tab=stock` revealed HQStock.js was the component
+rendering the buggy "ITEMS (43)" tab — StockControl only contributed
+the chrome header.
+
+**Apply:**
+
+Before planning code changes based on a bug report, answer:
+1. What URL was the screenshot taken of?
+2. Which components render on that URL?
+3. Which component is rendering the visible element that's wrong?
+4. Does the component the report names match the answer to #3?
+
+If you can't answer #3 confidently, ask the owner to identify the
+component before writing code.
+
+---
+
+*Session 291 closed 17 April 2026 at commit 4956d26.*

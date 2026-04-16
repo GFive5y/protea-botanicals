@@ -22,7 +22,7 @@ WP-TABLE-UNIFY addresses three simultaneous defects visible in screenshots taken
 | File | Size | Risk | Work |
 |---|---|---|---|
 | src/components/hq/HQFoodIngredients.js | 158KB / 5,084L | HIGH | Full DS6 + all 17 SC features |
-| src/components/hq/StockControl.js | ~80KB | CRITICAL | Bug fix + DS6 + FoodWorld pills + tile view |
+| src/components/StockControl.js | ~150KB | CRITICAL | Bug fix + DS6 + FoodWorld pills + tile view |
 | src/components/hq/SmartInventory.js | 182KB / 5,432L | HIGH | isFoodBev branch: FoodWorld icons + FNB_PILL + FNB tokens |
 | src/components/hq/HQStock.js | 211KB | MEDIUM | FoodItemsView: FoodWorld pill zone |
 | src/components/hq/StockReceiveModal.js | 72KB | MEDIUM | F&B world receiveAttrs |
@@ -32,13 +32,15 @@ WP-TABLE-UNIFY addresses three simultaneous defects visible in screenshots taken
 
 ## PHASES
 
-| Phase | Name | Gate Condition |
+| Phase | Name | Status |
 |---|---|---|
-| 0 | Foundation & Bug Fix | Immediate — first session |
-| 1 | DS6 Token Compliance | After Phase 0 gate |
-| 2 | Ingredient Encyclopedia Rebuild | After Phase 1 gate |
-| 3 | Stock Control Feature Parity | After Phase 2 gate |
-| 4 | Advanced Excel-like Features | Post-demo |
+| 0   | Foundation & Bug Fix (StockControl.js L322) | CLOSED 17 Apr 2026 · 38e96da |
+| 0.5 | Sibling tenant scoping (3 queries) | CLOSED 17 Apr 2026 · 10d9d39 |
+| 0.7 | HQStock.js archived-items UX | CLOSED 17 Apr 2026 · 4956d26 |
+| 1   | DS6 Token Compliance | READY · start with HQFoodIngredients.js |
+| 2   | Ingredient Encyclopedia Rebuild | After Phase 1 gate |
+| 3   | Stock Control Feature Parity | After Phase 2 gate |
+| 4   | Advanced Excel-like Features | Post-demo |
 
 ---
 
@@ -112,6 +114,8 @@ Phase 0 is complete when ALL of these are satisfied:
 - **LL-282** — isFoodBev guards mandatory in shared components
 - **LL-283** — F&B CATEGORY column must show FNB_SUBCATEGORY_ICONS[item.subcategory]
 - **LL-284** — DS6 row heights: 44px single-line, 56px two-line, 72px max
+- **LL-285** — LL-205 bypass + unscoped SELECT = cross-tenant leak (session 291)
+- **LL-286** — Bug-report component attribution is a claim, not a fact (session 291)
 
 ---
 *WP-TABLE-UNIFY v1.0 · NuAi · 17 April 2026*
