@@ -2687,7 +2687,7 @@ function IngredientDrawer({ ingredient, onClose }) {
         width: 540,
         height: "100vh",
         background: C.surface,
-        boxShadow: "-4px 0 32px rgba(0,0,0,0.12)",
+        boxShadow: "-4px 0 32px rgba(0,0,0,0.12)", // Custom drawer shadow — negative horizontal offset, not in T.shadow.*
         zIndex: 1000,
         overflowY: "auto",
         display: "flex",
@@ -2714,7 +2714,7 @@ function IngredientDrawer({ ingredient, onClose }) {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: T.gap.md,
+                gap: T.gap.sm,
                 marginBottom: 6,
               }}
             >
@@ -3439,7 +3439,7 @@ export default function HQFoodIngredients() {
             borderRadius: T.radius.md,
             fontWeight: T.weight.medium,
             fontSize: T.text.base,
-            boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
+            boxShadow: T.shadow.lg,
             maxWidth: 400,
           }}
         >
@@ -3463,7 +3463,7 @@ export default function HQFoodIngredients() {
               style={{
                 margin: 0,
                 fontWeight: T.weight.extrabold,
-                fontSize: 24,
+                fontSize: 24, // Hero page title — distinct from T.text scale, visual hierarchy
                 letterSpacing: "-0.02em",
               }}
             >
@@ -3492,7 +3492,7 @@ export default function HQFoodIngredients() {
                 fontWeight: T.weight.bold,
                 fontSize: T.text.base,
                 fontFamily: "inherit",
-                boxShadow: "0 2px 8px rgba(45,106,79,0.3)",
+                boxShadow: "0 2px 8px rgba(45,106,79,0.3)", // Custom accent-tinted shadow, not in T.shadow.*
               }}
             >
               {saving
@@ -3556,7 +3556,7 @@ export default function HQFoodIngredients() {
           >
             <div
               style={{
-                fontSize: 26,
+                fontSize: 26, // KPI tile number — distinct display size
                 fontWeight: T.weight.extrabold,
                 color: kpi.accent,
                 letterSpacing: "-0.02em",
@@ -3622,7 +3622,7 @@ export default function HQFoodIngredients() {
         <div
           style={{
             textAlign: "center",
-            padding: 60,
+            padding: 60, // Empty-state hero padding — intentional, larger than any T.pad value
             color: C.inkLight,
             fontSize: T.text.base,
           }}
@@ -3638,7 +3638,7 @@ export default function HQFoodIngredients() {
           <div
             style={{
               display: "flex",
-              gap: T.gap.md,
+              gap: T.gap.sm,
               flexWrap: "wrap",
               marginBottom: 18,
               alignItems: "center",
@@ -4048,7 +4048,7 @@ export default function HQFoodIngredients() {
               background: C.surface,
               border: `1px solid ${C.border}`,
               borderRadius: T.radius.mdPlus,
-              padding: 28,
+              padding: 28, // Custom card inset, between T.pad.xl (24) and T.pad.xxl
             }}
           >
             <h3 style={{ margin: "0 0 24px", fontSize: T.text.lg, fontWeight: T.weight.bold }}>
@@ -4381,7 +4381,7 @@ export default function HQFoodIngredients() {
                 style={{
                   display: "grid",
                   gridTemplateColumns: "repeat(5, 1fr)",
-                  gap: T.gap.md,
+                  gap: T.gap.sm,
                 }}
               >
                 {[
@@ -5135,7 +5135,7 @@ export default function HQFoodIngredients() {
               left: 0,
               right: 0,
               bottom: 0,
-              background: "rgba(0,0,0,0.3)",
+              background: "rgba(0,0,0,0.3)", // Modal backdrop scrim, not in T.overlay (add post-demo)
               zIndex: 999,
             }}
           />
