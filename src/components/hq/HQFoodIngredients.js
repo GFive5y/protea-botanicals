@@ -2488,7 +2488,7 @@ function AllergenBadge({ flags, compact = false }) {
   const present = getAllergenList(flags);
   if (present.length === 0)
     return (
-      <span style={{ fontSize: 11, color: C.inkLight, fontStyle: "italic" }}>
+      <span style={{ fontSize: T.text.xs, color: C.inkLight, fontStyle: "italic" }}>
         None declared
       </span>
     );
@@ -2503,10 +2503,10 @@ function AllergenBadge({ flags, compact = false }) {
               background: "#FEF3C7",
               color: "#92400E",
               border: "1px solid #FDE68A",
-              borderRadius: 4,
+              borderRadius: T.radius.sm,
               padding: "1px 6px",
-              fontSize: 10,
-              fontWeight: 600,
+              fontSize: T.text.xxs,
+              fontWeight: T.weight.semibold,
             }}
           >
             {a.icon} {a.label}
@@ -2515,7 +2515,7 @@ function AllergenBadge({ flags, compact = false }) {
       </div>
     );
   return (
-    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+    <div style={{ display: "flex", gap: T.gap.xs, flexWrap: "wrap" }}>
       {present.map((a) => (
         <span
           key={a.key}
@@ -2523,10 +2523,10 @@ function AllergenBadge({ flags, compact = false }) {
             background: "#FEF3C7",
             color: "#92400E",
             border: "1px solid #FDE68A",
-            borderRadius: 4,
+            borderRadius: T.radius.sm,
             padding: "2px 8px",
-            fontSize: 11,
-            fontWeight: 600,
+            fontSize: T.text.xs,
+            fontWeight: T.weight.semibold,
           }}
         >
           {a.icon} {a.label}
@@ -2545,10 +2545,10 @@ function HaccpBadge({ level }) {
         background: s.bg,
         color: s.color,
         border: `1px solid ${s.color}30`,
-        borderRadius: 4,
+        borderRadius: T.radius.sm,
         padding: "2px 8px",
-        fontSize: 11,
-        fontWeight: 700,
+        fontSize: T.text.xs,
+        fontWeight: T.weight.bold,
         letterSpacing: "0.03em",
         textTransform: "uppercase",
       }}
@@ -2567,10 +2567,10 @@ function TempBadge({ zone }) {
         background: s.bg,
         color: s.color,
         border: `1px solid ${s.color}30`,
-        borderRadius: 4,
+        borderRadius: T.radius.sm,
         padding: "2px 7px",
-        fontSize: 11,
-        fontWeight: 600,
+        fontSize: T.text.xs,
+        fontWeight: T.weight.semibold,
       }}
     >
       {s.icon} {s.label}
@@ -2581,7 +2581,7 @@ function TempBadge({ zone }) {
 // ─── Nutrition mini display ───────────────────────────────────────────────────
 function NutritionMini({ n }) {
   if (!n || Object.keys(n).length === 0)
-    return <span style={{ color: C.inkLight, fontSize: 11 }}>No data</span>;
+    return <span style={{ color: C.inkLight, fontSize: T.text.xs }}>No data</span>;
   const items = [
     { label: "Energy", value: `${formatNutrition(n, "energy_kj")}kJ` },
     { label: "Protein", value: `${formatNutrition(n, "protein_g")}g` },
@@ -2590,15 +2590,15 @@ function NutritionMini({ n }) {
     { label: "Sodium", value: `${formatNutrition(n, "sodium_mg")}mg` },
   ];
   return (
-    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+    <div style={{ display: "flex", gap: T.gap.md, flexWrap: "wrap" }}>
       {items.map((item) => (
         <div key={item.label} style={{ textAlign: "center", minWidth: 52 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
+          <div style={{ fontSize: 13, fontWeight: T.weight.bold, color: C.ink }}>
             {item.value}
           </div>
           <div
             style={{
-              fontSize: 10,
+              fontSize: T.text.xxs,
               color: C.inkLight,
               textTransform: "uppercase",
               letterSpacing: "0.05em",
@@ -2707,11 +2707,11 @@ function IngredientDrawer({ ingredient, onClose }) {
             >
               <span
                 style={{
-                  fontSize: 22,
+                  fontSize: T.text["2xl"],
                   background: cat.color + "18",
                   width: 40,
                   height: 40,
-                  borderRadius: 8,
+                  borderRadius: T.radius.md,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -2723,8 +2723,8 @@ function IngredientDrawer({ ingredient, onClose }) {
                 <h2
                   style={{
                     margin: 0,
-                    fontSize: 18,
-                    fontWeight: 700,
+                    fontSize: T.text.xl,
+                    fontWeight: T.weight.bold,
                     color: C.ink,
                   }}
                 >
@@ -2742,7 +2742,7 @@ function IngredientDrawer({ ingredient, onClose }) {
             <div
               style={{
                 display: "flex",
-                gap: 8,
+                gap: T.gap.sm,
                 flexWrap: "wrap",
                 marginTop: 10,
               }}
@@ -2752,10 +2752,10 @@ function IngredientDrawer({ ingredient, onClose }) {
                   background: cat.color + "18",
                   color: cat.color,
                   border: `1px solid ${cat.color}30`,
-                  borderRadius: 4,
+                  borderRadius: T.radius.sm,
                   padding: "2px 8px",
-                  fontSize: 11,
-                  fontWeight: 600,
+                  fontSize: T.text.xs,
+                  fontWeight: T.weight.semibold,
                 }}
               >
                 {cat.label}
@@ -2768,10 +2768,10 @@ function IngredientDrawer({ ingredient, onClose }) {
                     background: C.accentBg,
                     color: C.accent,
                     border: `1px solid ${C.accent}30`,
-                    borderRadius: 4,
+                    borderRadius: T.radius.sm,
                     padding: "2px 8px",
-                    fontSize: 11,
-                    fontWeight: 600,
+                    fontSize: T.text.xs,
+                    fontWeight: T.weight.semibold,
                   }}
                 >
                   📚 Platform Library
@@ -2784,11 +2784,11 @@ function IngredientDrawer({ ingredient, onClose }) {
             style={{
               background: "none",
               border: "none",
-              fontSize: 22,
+              fontSize: T.text["2xl"],
               cursor: "pointer",
               color: C.inkLight,
               lineHeight: 1,
-              padding: 4,
+              padding: T.pad.xs,
             }}
           >
             ×
@@ -2801,8 +2801,8 @@ function IngredientDrawer({ ingredient, onClose }) {
         <div style={{ marginBottom: 22 }}>
           <div
             style={{
-              fontSize: 11,
-              fontWeight: 700,
+              fontSize: T.text.xs,
+              fontWeight: T.weight.bold,
               color: C.inkLight,
               textTransform: "uppercase",
               letterSpacing: "0.08em",
@@ -2839,9 +2839,9 @@ function IngredientDrawer({ ingredient, onClose }) {
               >
                 <div
                   style={{
-                    fontSize: 10,
+                    fontSize: T.text.xxs,
                     color: C.inkLight,
-                    fontWeight: 600,
+                    fontWeight: T.weight.semibold,
                     textTransform: "uppercase",
                     letterSpacing: "0.06em",
                   }}
@@ -2867,8 +2867,8 @@ function IngredientDrawer({ ingredient, onClose }) {
         <div style={{ marginBottom: 22 }}>
           <div
             style={{
-              fontSize: 11,
-              fontWeight: 700,
+              fontSize: T.text.xs,
+              fontWeight: T.weight.bold,
               color: C.inkLight,
               textTransform: "uppercase",
               letterSpacing: "0.08em",
@@ -2881,7 +2881,7 @@ function IngredientDrawer({ ingredient, onClose }) {
             style={{
               background: allergenList.length > 0 ? C.amberBg : C.accentBg,
               border: `1px solid ${allergenList.length > 0 ? "#FDE68A" : C.accent + "30"}`,
-              borderRadius: 8,
+              borderRadius: T.radius.md,
               padding: "12px 14px",
             }}
           >
@@ -2889,8 +2889,8 @@ function IngredientDrawer({ ingredient, onClose }) {
               <>
                 <div
                   style={{
-                    fontSize: 12,
-                    fontWeight: 700,
+                    fontSize: T.text.sm,
+                    fontWeight: T.weight.bold,
                     color: "#92400E",
                     marginBottom: 8,
                   }}
@@ -2900,16 +2900,16 @@ function IngredientDrawer({ ingredient, onClose }) {
                 <AllergenBadge flags={ingredient.allergen_flags} />
               </>
             ) : (
-              <div style={{ fontSize: 12, color: C.accent, fontWeight: 600 }}>
+              <div style={{ fontSize: T.text.sm, color: C.accent, fontWeight: T.weight.semibold }}>
                 ✅ No common allergens declared
               </div>
             )}
           </div>
           <div style={{ marginTop: 8 }}>
-            <div style={{ fontSize: 11, color: C.inkLight, marginBottom: 6 }}>
+            <div style={{ fontSize: T.text.xs, color: C.inkLight, marginBottom: 6 }}>
               All 14 R638 allergens:
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: T.gap.xs }}>
               {ALLERGENS.map((a) => (
                 <span
                   key={a.key}
@@ -2921,9 +2921,9 @@ function IngredientDrawer({ ingredient, onClose }) {
                       ? "#92400E"
                       : C.inkLight,
                     border: `1px solid ${ingredient.allergen_flags?.[a.key] ? "#FDE68A" : C.border}`,
-                    borderRadius: 4,
+                    borderRadius: T.radius.sm,
                     padding: "2px 7px",
-                    fontSize: 11,
+                    fontSize: T.text.xs,
                     fontWeight: ingredient.allergen_flags?.[a.key] ? 700 : 400,
                   }}
                 >
@@ -2938,8 +2938,8 @@ function IngredientDrawer({ ingredient, onClose }) {
         <div style={{ marginBottom: 22 }}>
           <div
             style={{
-              fontSize: 11,
-              fontWeight: 700,
+              fontSize: T.text.xs,
+              fontWeight: T.weight.bold,
               color: C.inkLight,
               textTransform: "uppercase",
               letterSpacing: "0.08em",
@@ -2951,7 +2951,7 @@ function IngredientDrawer({ ingredient, onClose }) {
           <div
             style={{
               border: `1px solid ${C.border}`,
-              borderRadius: 8,
+              borderRadius: T.radius.md,
               overflow: "hidden",
             }}
           >
@@ -2962,8 +2962,8 @@ function IngredientDrawer({ ingredient, onClose }) {
                 padding: "8px 14px",
                 display: "flex",
                 justifyContent: "space-between",
-                fontSize: 11,
-                fontWeight: 700,
+                fontSize: T.text.xs,
+                fontWeight: T.weight.bold,
                 letterSpacing: "0.05em",
               }}
             >
@@ -2995,7 +2995,7 @@ function IngredientDrawer({ ingredient, onClose }) {
                   <span
                     style={{
                       fontSize: 13,
-                      fontWeight: 700,
+                      fontWeight: T.weight.bold,
                       color: m.color || C.ink,
                     }}
                   >
@@ -3004,8 +3004,8 @@ function IngredientDrawer({ ingredient, onClose }) {
                     {m.val2 !== undefined && (
                       <span
                         style={{
-                          fontSize: 11,
-                          fontWeight: 400,
+                          fontSize: T.text.xs,
+                          fontWeight: T.weight.normal,
                           color: C.inkLight,
                           marginLeft: 4,
                         }}
@@ -3026,8 +3026,8 @@ function IngredientDrawer({ ingredient, onClose }) {
           <div style={{ marginBottom: 22 }}>
             <div
               style={{
-                fontSize: 11,
-                fontWeight: 700,
+                fontSize: T.text.xs,
+                fontWeight: T.weight.bold,
                 color: C.inkLight,
                 textTransform: "uppercase",
                 letterSpacing: "0.08em",
@@ -3041,15 +3041,15 @@ function IngredientDrawer({ ingredient, onClose }) {
                 style={{
                   background: C.blueBg,
                   border: `1px solid ${C.blue}20`,
-                  borderRadius: 8,
+                  borderRadius: T.radius.md,
                   padding: "10px 14px",
                   marginBottom: 8,
                 }}
               >
                 <div
                   style={{
-                    fontSize: 11,
-                    fontWeight: 700,
+                    fontSize: T.text.xs,
+                    fontWeight: T.weight.bold,
                     color: C.blue,
                     marginBottom: 4,
                   }}
@@ -3068,14 +3068,14 @@ function IngredientDrawer({ ingredient, onClose }) {
                     ? C.redBg
                     : C.amberBg,
                   border: `1px solid ${ingredient.handling_notes.includes("HACCP") ? "#FECACA" : "#FDE68A"}`,
-                  borderRadius: 8,
+                  borderRadius: T.radius.md,
                   padding: "10px 14px",
                 }}
               >
                 <div
                   style={{
-                    fontSize: 11,
-                    fontWeight: 700,
+                    fontSize: T.text.xs,
+                    fontWeight: T.weight.bold,
                     color: ingredient.handling_notes.includes("HACCP")
                       ? C.red
                       : C.amber,
@@ -3096,8 +3096,8 @@ function IngredientDrawer({ ingredient, onClose }) {
         <div style={{ marginBottom: 22 }}>
           <div
             style={{
-              fontSize: 11,
-              fontWeight: 700,
+              fontSize: T.text.xs,
+              fontWeight: T.weight.bold,
               color: C.inkLight,
               textTransform: "uppercase",
               letterSpacing: "0.08em",
@@ -3106,17 +3106,17 @@ function IngredientDrawer({ ingredient, onClose }) {
           >
             Regulatory
           </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: T.gap.sm, flexWrap: "wrap" }}>
             {ingredient.requires_fsca_approval && (
               <span
                 style={{
                   background: C.redBg,
                   color: C.red,
                   border: `1px solid #FECACA`,
-                  borderRadius: 4,
+                  borderRadius: T.radius.sm,
                   padding: "3px 10px",
-                  fontSize: 12,
-                  fontWeight: 700,
+                  fontSize: T.text.sm,
+                  fontWeight: T.weight.bold,
                 }}
               >
                 🏛️ FSCA Approval Required
@@ -3128,10 +3128,10 @@ function IngredientDrawer({ ingredient, onClose }) {
                   background: "#FFF7ED",
                   color: "#C2410C",
                   border: "1px solid #FED7AA",
-                  borderRadius: 4,
+                  borderRadius: T.radius.sm,
                   padding: "3px 10px",
-                  fontSize: 12,
-                  fontWeight: 700,
+                  fontSize: T.text.sm,
+                  fontWeight: T.weight.bold,
                 }}
               >
                 🔒 Controlled Additive
@@ -3143,10 +3143,10 @@ function IngredientDrawer({ ingredient, onClose }) {
                   background: C.purpleBg,
                   color: C.purple,
                   border: `1px solid ${C.purple}30`,
-                  borderRadius: 4,
+                  borderRadius: T.radius.sm,
                   padding: "3px 10px",
-                  fontSize: 12,
-                  fontWeight: 600,
+                  fontSize: T.text.sm,
+                  fontWeight: T.weight.semibold,
                 }}
               >
                 {ingredient.fsca_category.replace(/_/g, " ")}
@@ -3159,10 +3159,10 @@ function IngredientDrawer({ ingredient, onClose }) {
                     background: C.accentBg,
                     color: C.accent,
                     border: `1px solid ${C.accent}30`,
-                    borderRadius: 4,
+                    borderRadius: T.radius.sm,
                     padding: "3px 10px",
-                    fontSize: 12,
-                    fontWeight: 600,
+                    fontSize: T.text.sm,
+                    fontWeight: T.weight.semibold,
                   }}
                 >
                   ✅ No special regulatory approval
@@ -3423,9 +3423,9 @@ export default function HQFoodIngredients() {
             border: `1px solid ${toast.type === "error" ? "#FECACA" : "#BBF7D0"}`,
             color: toast.type === "error" ? C.red : "#166534",
             padding: "12px 20px",
-            borderRadius: 8,
-            fontWeight: 500,
-            fontSize: 14,
+            borderRadius: T.radius.md,
+            fontWeight: T.weight.medium,
+            fontSize: T.text.base,
             boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
             maxWidth: 400,
           }}
@@ -3442,14 +3442,14 @@ export default function HQFoodIngredients() {
             alignItems: "center",
             justifyContent: "space-between",
             flexWrap: "wrap",
-            gap: 12,
+            gap: T.gap.md,
           }}
         >
           <div>
             <h2
               style={{
                 margin: 0,
-                fontWeight: 800,
+                fontWeight: T.weight.extrabold,
                 fontSize: 24,
                 letterSpacing: "-0.02em",
               }}
@@ -3460,7 +3460,7 @@ export default function HQFoodIngredients() {
                 body="A world-class ingredient reference database. 200+ pre-seeded SA ingredients with full nutritional data (DAFF), 14-allergen R638 flags, HACCP risk levels, and regulatory status. Foundation of the recipe engine, HACCP system, and nutritional label generator."
               />
             </h2>
-            <p style={{ margin: "4px 0 0", color: C.inkLight, fontSize: 14 }}>
+            <p style={{ margin: "4px 0 0", color: C.inkLight, fontSize: T.text.base }}>
               {kpis.total} ingredients · {kpis.categories} categories · SA R638
               compliant
             </p>
@@ -3474,10 +3474,10 @@ export default function HQFoodIngredients() {
                 background: C.accent,
                 color: "#fff",
                 border: "none",
-                borderRadius: 8,
+                borderRadius: T.radius.md,
                 cursor: "pointer",
-                fontWeight: 700,
-                fontSize: 14,
+                fontWeight: T.weight.bold,
+                fontSize: T.text.base,
                 fontFamily: "inherit",
                 boxShadow: "0 2px 8px rgba(45,106,79,0.3)",
               }}
@@ -3492,7 +3492,7 @@ export default function HQFoodIngredients() {
 
       {/* KPI strip */}
       <div
-        style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}
+        style={{ display: "flex", gap: T.gap.md, flexWrap: "wrap", marginBottom: 24 }}
       >
         {[
           {
@@ -3544,7 +3544,7 @@ export default function HQFoodIngredients() {
             <div
               style={{
                 fontSize: 26,
-                fontWeight: 800,
+                fontWeight: T.weight.extrabold,
                 color: kpi.accent,
                 letterSpacing: "-0.02em",
               }}
@@ -3553,16 +3553,16 @@ export default function HQFoodIngredients() {
             </div>
             <div
               style={{
-                fontSize: 12,
+                fontSize: T.text.sm,
                 color: kpi.accent,
-                fontWeight: 600,
+                fontWeight: T.weight.semibold,
                 marginTop: 2,
               }}
             >
               {kpi.label}
             </div>
             <div
-              style={{ fontSize: 11, color: kpi.accent + "BB", marginTop: 2 }}
+              style={{ fontSize: T.text.xs, color: kpi.accent + "BB", marginTop: 2 }}
             >
               {kpi.sub}
             </div>
@@ -3574,7 +3574,7 @@ export default function HQFoodIngredients() {
       <div
         style={{
           display: "flex",
-          gap: 4,
+          gap: T.gap.xs,
           borderBottom: `2px solid ${C.border}`,
           marginBottom: 24,
         }}
@@ -3588,7 +3588,7 @@ export default function HQFoodIngredients() {
               border: "none",
               background: "none",
               cursor: "pointer",
-              fontSize: 14,
+              fontSize: T.text.base,
               fontFamily: "inherit",
               fontWeight: activeTab === tab.id ? 700 : 400,
               color: activeTab === tab.id ? C.accent : C.inkLight,
@@ -3611,7 +3611,7 @@ export default function HQFoodIngredients() {
             textAlign: "center",
             padding: 60,
             color: C.inkLight,
-            fontSize: 14,
+            fontSize: T.text.base,
           }}
         >
           Loading ingredient library…
@@ -3639,7 +3639,7 @@ export default function HQFoodIngredients() {
                 padding: "9px 14px",
                 border: `1px solid ${C.border}`,
                 borderRadius: 6,
-                fontSize: 14,
+                fontSize: T.text.base,
                 fontFamily: "inherit",
                 flex: 2,
                 minWidth: 220,
@@ -3766,15 +3766,15 @@ export default function HQFoodIngredients() {
               <div style={{ fontSize: 32, marginBottom: 12 }}>🌱</div>
               <div
                 style={{
-                  fontSize: 16,
-                  fontWeight: 700,
+                  fontSize: T.text.lg,
+                  fontWeight: T.weight.bold,
                   color: C.accent,
                   marginBottom: 8,
                 }}
               >
                 Library not yet seeded
               </div>
-              <div style={{ fontSize: 14, color: C.inkMid, marginBottom: 20 }}>
+              <div style={{ fontSize: T.text.base, color: C.inkMid, marginBottom: 20 }}>
                 Click "Seed Platform Library" to load {SEED_INGREDIENTS.length}+
                 ingredients with full nutritional data, allergen flags, and
                 HACCP risk levels.
@@ -3787,10 +3787,10 @@ export default function HQFoodIngredients() {
                   background: C.accent,
                   color: "#fff",
                   border: "none",
-                  borderRadius: 8,
+                  borderRadius: T.radius.md,
                   cursor: "pointer",
-                  fontWeight: 700,
-                  fontSize: 14,
+                  fontWeight: T.weight.bold,
+                  fontSize: T.text.base,
                   fontFamily: "inherit",
                 }}
               >
@@ -3827,9 +3827,9 @@ export default function HQFoodIngredients() {
                         style={{
                           padding: "10px 14px",
                           textAlign: "left",
-                          fontSize: 11,
+                          fontSize: T.text.xs,
                           color: C.inkLight,
-                          fontWeight: 700,
+                          fontWeight: T.weight.bold,
                           letterSpacing: "0.06em",
                           textTransform: "uppercase",
                           borderBottom: `1px solid ${C.border}`,
@@ -3858,7 +3858,7 @@ export default function HQFoodIngredients() {
                         <td style={{ padding: "12px 14px" }}>
                           <div
                             style={{
-                              fontWeight: 600,
+                              fontWeight: T.weight.semibold,
                               fontSize: 13,
                               color: C.ink,
                             }}
@@ -3868,7 +3868,7 @@ export default function HQFoodIngredients() {
                           {ing.common_name && (
                             <div
                               style={{
-                                fontSize: 11,
+                                fontSize: T.text.xs,
                                 color: C.inkLight,
                                 marginTop: 2,
                               }}
@@ -3879,7 +3879,7 @@ export default function HQFoodIngredients() {
                           {ing.e_number && (
                             <div
                               style={{
-                                fontSize: 10,
+                                fontSize: T.text.xxs,
                                 color: C.inkLight,
                                 marginTop: 1,
                                 fontFamily: "monospace",
@@ -3893,7 +3893,7 @@ export default function HQFoodIngredients() {
                               style={{
                                 fontSize: 9,
                                 color: C.accent,
-                                fontWeight: 700,
+                                fontWeight: T.weight.bold,
                                 marginTop: 2,
                                 display: "block",
                               }}
@@ -3908,10 +3908,10 @@ export default function HQFoodIngredients() {
                               background: cat.color + "15",
                               color: cat.color,
                               border: `1px solid ${cat.color}25`,
-                              borderRadius: 4,
+                              borderRadius: T.radius.sm,
                               padding: "2px 8px",
-                              fontSize: 11,
-                              fontWeight: 600,
+                              fontSize: T.text.xs,
+                              fontWeight: T.weight.semibold,
                               whiteSpace: "nowrap",
                             }}
                           >
@@ -3937,8 +3937,8 @@ export default function HQFoodIngredients() {
                                     border: "1px solid #FDE68A",
                                     borderRadius: 3,
                                     padding: "1px 5px",
-                                    fontSize: 10,
-                                    fontWeight: 700,
+                                    fontSize: T.text.xxs,
+                                    fontWeight: T.weight.bold,
                                   }}
                                 >
                                   {a.icon}
@@ -3947,9 +3947,9 @@ export default function HQFoodIngredients() {
                               {allergenList.length > 3 && (
                                 <span
                                   style={{
-                                    fontSize: 10,
+                                    fontSize: T.text.xxs,
                                     color: C.amber,
-                                    fontWeight: 700,
+                                    fontWeight: T.weight.bold,
                                   }}
                                 >
                                   +{allergenList.length - 3}
@@ -3957,7 +3957,7 @@ export default function HQFoodIngredients() {
                               )}
                             </div>
                           ) : (
-                            <span style={{ fontSize: 11, color: C.inkLight }}>
+                            <span style={{ fontSize: T.text.xs, color: C.inkLight }}>
                               —
                             </span>
                           )}
@@ -3977,7 +3977,7 @@ export default function HQFoodIngredients() {
                         <td
                           style={{
                             padding: "12px 14px",
-                            fontSize: 12,
+                            fontSize: T.text.sm,
                             color: C.inkMid,
                           }}
                         >
@@ -4004,14 +4004,14 @@ export default function HQFoodIngredients() {
                             }
                             style={{
                               padding: "4px 10px",
-                              fontSize: 11,
+                              fontSize: T.text.xs,
                               fontFamily: "inherit",
                               background: inCompare ? C.accent : C.bg,
                               color: inCompare ? "#fff" : C.inkMid,
                               border: `1px solid ${inCompare ? C.accent : C.border}`,
                               borderRadius: 5,
                               cursor: "pointer",
-                              fontWeight: 600,
+                              fontWeight: T.weight.semibold,
                             }}
                           >
                             {inCompare ? "✓ Added" : "+ Compare"}
@@ -4038,7 +4038,7 @@ export default function HQFoodIngredients() {
               padding: 28,
             }}
           >
-            <h3 style={{ margin: "0 0 24px", fontSize: 16, fontWeight: 700 }}>
+            <h3 style={{ margin: "0 0 24px", fontSize: T.text.lg, fontWeight: T.weight.bold }}>
               Add Custom Ingredient
             </h3>
 
@@ -4047,7 +4047,7 @@ export default function HQFoodIngredients() {
               style={{
                 display: "grid",
                 gridTemplateColumns: "1fr 1fr",
-                gap: 16,
+                gap: T.gap.lg,
                 marginBottom: 20,
               }}
             >
@@ -4055,8 +4055,8 @@ export default function HQFoodIngredients() {
                 <label
                   style={{
                     display: "block",
-                    fontSize: 12,
-                    fontWeight: 700,
+                    fontSize: T.text.sm,
+                    fontWeight: T.weight.bold,
                     color: C.inkLight,
                     marginBottom: 6,
                     textTransform: "uppercase",
@@ -4076,7 +4076,7 @@ export default function HQFoodIngredients() {
                     padding: "9px 12px",
                     border: `1px solid ${C.border}`,
                     borderRadius: 6,
-                    fontSize: 14,
+                    fontSize: T.text.base,
                     fontFamily: "inherit",
                     boxSizing: "border-box",
                     background: C.surface,
@@ -4087,8 +4087,8 @@ export default function HQFoodIngredients() {
                 <label
                   style={{
                     display: "block",
-                    fontSize: 12,
-                    fontWeight: 700,
+                    fontSize: T.text.sm,
+                    fontWeight: T.weight.bold,
                     color: C.inkLight,
                     marginBottom: 6,
                     textTransform: "uppercase",
@@ -4108,7 +4108,7 @@ export default function HQFoodIngredients() {
                     padding: "9px 12px",
                     border: `1px solid ${C.border}`,
                     borderRadius: 6,
-                    fontSize: 14,
+                    fontSize: T.text.base,
                     fontFamily: "inherit",
                     boxSizing: "border-box",
                     background: C.surface,
@@ -4119,8 +4119,8 @@ export default function HQFoodIngredients() {
                 <label
                   style={{
                     display: "block",
-                    fontSize: 12,
-                    fontWeight: 700,
+                    fontSize: T.text.sm,
+                    fontWeight: T.weight.bold,
                     color: C.inkLight,
                     marginBottom: 6,
                     textTransform: "uppercase",
@@ -4139,7 +4139,7 @@ export default function HQFoodIngredients() {
                     padding: "9px 12px",
                     border: `1px solid ${C.border}`,
                     borderRadius: 6,
-                    fontSize: 14,
+                    fontSize: T.text.base,
                     fontFamily: "inherit",
                     boxSizing: "border-box",
                     background: C.surface,
@@ -4156,8 +4156,8 @@ export default function HQFoodIngredients() {
                 <label
                   style={{
                     display: "block",
-                    fontSize: 12,
-                    fontWeight: 700,
+                    fontSize: T.text.sm,
+                    fontWeight: T.weight.bold,
                     color: C.inkLight,
                     marginBottom: 6,
                     textTransform: "uppercase",
@@ -4176,7 +4176,7 @@ export default function HQFoodIngredients() {
                     padding: "9px 12px",
                     border: `1px solid ${C.border}`,
                     borderRadius: 6,
-                    fontSize: 14,
+                    fontSize: T.text.base,
                     fontFamily: "inherit",
                     boxSizing: "border-box",
                     background: C.surface,
@@ -4193,8 +4193,8 @@ export default function HQFoodIngredients() {
                 <label
                   style={{
                     display: "block",
-                    fontSize: 12,
-                    fontWeight: 700,
+                    fontSize: T.text.sm,
+                    fontWeight: T.weight.bold,
                     color: C.inkLight,
                     marginBottom: 6,
                     textTransform: "uppercase",
@@ -4213,7 +4213,7 @@ export default function HQFoodIngredients() {
                     padding: "9px 12px",
                     border: `1px solid ${C.border}`,
                     borderRadius: 6,
-                    fontSize: 14,
+                    fontSize: T.text.base,
                     fontFamily: "inherit",
                     boxSizing: "border-box",
                     background: C.surface,
@@ -4228,8 +4228,8 @@ export default function HQFoodIngredients() {
                 <label
                   style={{
                     display: "block",
-                    fontSize: 12,
-                    fontWeight: 700,
+                    fontSize: T.text.sm,
+                    fontWeight: T.weight.bold,
                     color: C.inkLight,
                     marginBottom: 6,
                     textTransform: "uppercase",
@@ -4250,7 +4250,7 @@ export default function HQFoodIngredients() {
                     padding: "9px 12px",
                     border: `1px solid ${C.border}`,
                     borderRadius: 6,
-                    fontSize: 14,
+                    fontSize: T.text.base,
                     fontFamily: "inherit",
                     boxSizing: "border-box",
                     background: C.surface,
@@ -4264,8 +4264,8 @@ export default function HQFoodIngredients() {
               <label
                 style={{
                   display: "block",
-                  fontSize: 12,
-                  fontWeight: 700,
+                  fontSize: T.text.sm,
+                  fontWeight: T.weight.bold,
                   color: C.inkLight,
                   marginBottom: 8,
                   textTransform: "uppercase",
@@ -4278,7 +4278,7 @@ export default function HQFoodIngredients() {
                   body="Critical = requires mandatory monitoring log per batch. High = enhanced vigilance. Medium = standard monitoring. Low = no special HACCP requirements."
                 />
               </label>
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", gap: T.gap.sm }}>
                 {Object.entries(HACCP_COLORS).map(([k, s]) => (
                   <button
                     key={k}
@@ -4292,8 +4292,8 @@ export default function HQFoodIngredients() {
                       border: `2px solid ${s.color}`,
                       borderRadius: 6,
                       cursor: "pointer",
-                      fontSize: 12,
-                      fontWeight: 700,
+                      fontSize: T.text.sm,
+                      fontWeight: T.weight.bold,
                       fontFamily: "inherit",
                     }}
                   >
@@ -4308,8 +4308,8 @@ export default function HQFoodIngredients() {
               <label
                 style={{
                   display: "block",
-                  fontSize: 12,
-                  fontWeight: 700,
+                  fontSize: T.text.sm,
+                  fontWeight: T.weight.bold,
                   color: C.inkLight,
                   marginBottom: 8,
                   textTransform: "uppercase",
@@ -4318,7 +4318,7 @@ export default function HQFoodIngredients() {
               >
                 Allergen Flags (SA R638 + EU 1169/2011)
               </label>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: T.gap.sm }}>
                 {ALLERGENS.map((a) => {
                   const on = form.allergen_flags[a.key];
                   return (
@@ -4337,7 +4337,7 @@ export default function HQFoodIngredients() {
                         border: `2px solid ${on ? "#FDE68A" : C.border}`,
                         borderRadius: 6,
                         cursor: "pointer",
-                        fontSize: 12,
+                        fontSize: T.text.sm,
                         fontWeight: on ? 700 : 400,
                         fontFamily: "inherit",
                       }}
@@ -4354,8 +4354,8 @@ export default function HQFoodIngredients() {
               <label
                 style={{
                   display: "block",
-                  fontSize: 12,
-                  fontWeight: 700,
+                  fontSize: T.text.sm,
+                  fontWeight: T.weight.bold,
                   color: C.inkLight,
                   marginBottom: 8,
                   textTransform: "uppercase",
@@ -4387,9 +4387,9 @@ export default function HQFoodIngredients() {
                     <label
                       style={{
                         display: "block",
-                        fontSize: 10,
+                        fontSize: T.text.xxs,
                         color: C.inkLight,
-                        fontWeight: 600,
+                        fontWeight: T.weight.semibold,
                         marginBottom: 4,
                         textTransform: "uppercase",
                         letterSpacing: "0.04em",
@@ -4415,7 +4415,7 @@ export default function HQFoodIngredients() {
                         padding: "7px 8px",
                         border: `1px solid ${C.border}`,
                         borderRadius: 5,
-                        fontSize: 12,
+                        fontSize: T.text.sm,
                         fontFamily: "inherit",
                         boxSizing: "border-box",
                         background: C.surface,
@@ -4431,7 +4431,7 @@ export default function HQFoodIngredients() {
               style={{
                 display: "grid",
                 gridTemplateColumns: "1fr 1fr",
-                gap: 16,
+                gap: T.gap.lg,
                 marginBottom: 24,
               }}
             >
@@ -4439,8 +4439,8 @@ export default function HQFoodIngredients() {
                 <label
                   style={{
                     display: "block",
-                    fontSize: 12,
-                    fontWeight: 700,
+                    fontSize: T.text.sm,
+                    fontWeight: T.weight.bold,
                     color: C.inkLight,
                     marginBottom: 6,
                     textTransform: "uppercase",
@@ -4473,8 +4473,8 @@ export default function HQFoodIngredients() {
                 <label
                   style={{
                     display: "block",
-                    fontSize: 12,
-                    fontWeight: 700,
+                    fontSize: T.text.sm,
+                    fontWeight: T.weight.bold,
                     color: C.inkLight,
                     marginBottom: 6,
                     textTransform: "uppercase",
@@ -4511,7 +4511,7 @@ export default function HQFoodIngredients() {
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 8,
+                  gap: T.gap.sm,
                   cursor: "pointer",
                   fontSize: 13,
                 }}
@@ -4532,7 +4532,7 @@ export default function HQFoodIngredients() {
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 8,
+                  gap: T.gap.sm,
                   cursor: "pointer",
                   fontSize: 13,
                 }}
@@ -4550,7 +4550,7 @@ export default function HQFoodIngredients() {
 
             {/* Actions */}
             <div
-              style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}
+              style={{ display: "flex", gap: T.gap.md, justifyContent: "flex-end" }}
             >
               <button
                 onClick={() => setForm(emptyForm)}
@@ -4561,7 +4561,7 @@ export default function HQFoodIngredients() {
                   borderRadius: 6,
                   cursor: "pointer",
                   fontFamily: "inherit",
-                  fontSize: 14,
+                  fontSize: T.text.base,
                   color: C.inkMid,
                 }}
               >
@@ -4577,8 +4577,8 @@ export default function HQFoodIngredients() {
                   border: "none",
                   borderRadius: 6,
                   cursor: "pointer",
-                  fontWeight: 700,
-                  fontSize: 14,
+                  fontWeight: T.weight.bold,
+                  fontSize: T.text.base,
                   fontFamily: "inherit",
                 }}
               >
@@ -4605,8 +4605,8 @@ export default function HQFoodIngredients() {
               <div style={{ fontSize: 32, marginBottom: 12 }}>⚖️</div>
               <div
                 style={{
-                  fontSize: 15,
-                  fontWeight: 700,
+                  fontSize: T.text.md,
+                  fontWeight: T.weight.bold,
                   color: C.blue,
                   marginBottom: 8,
                 }}
@@ -4628,7 +4628,7 @@ export default function HQFoodIngredients() {
                   marginBottom: 16,
                 }}
               >
-                <div style={{ fontSize: 14, fontWeight: 600, color: C.inkMid }}>
+                <div style={{ fontSize: T.text.base, fontWeight: T.weight.semibold, color: C.inkMid }}>
                   Comparing {compareList.length} ingredient
                   {compareList.length !== 1 ? "s" : ""} per 100g
                 </div>
@@ -4669,9 +4669,9 @@ export default function HQFoodIngredients() {
                         style={{
                           padding: "10px 16px",
                           textAlign: "left",
-                          fontSize: 12,
+                          fontSize: T.text.sm,
                           color: C.inkLight,
-                          fontWeight: 700,
+                          fontWeight: T.weight.bold,
                           textTransform: "uppercase",
                           letterSpacing: "0.06em",
                           borderBottom: `1px solid ${C.border}`,
@@ -4685,8 +4685,8 @@ export default function HQFoodIngredients() {
                           style={{
                             padding: "10px 14px",
                             textAlign: "right",
-                            fontSize: 12,
-                            fontWeight: 700,
+                            fontSize: T.text.sm,
+                            fontWeight: T.weight.bold,
                             borderBottom: `1px solid ${C.border}`,
                           }}
                         >
@@ -4702,7 +4702,7 @@ export default function HQFoodIngredients() {
                               border: "none",
                               color: C.inkLight,
                               cursor: "pointer",
-                              fontSize: 12,
+                              fontSize: T.text.sm,
                               fontFamily: "inherit",
                               marginTop: 4,
                             }}
@@ -4742,7 +4742,7 @@ export default function HQFoodIngredients() {
                               padding: "11px 16px",
                               fontSize: 13,
                               color: C.inkMid,
-                              fontWeight: 500,
+                              fontWeight: T.weight.medium,
                             }}
                           >
                             {label} ({unit})
@@ -4768,7 +4768,7 @@ export default function HQFoodIngredients() {
                                 {isMax && (
                                   <span
                                     style={{
-                                      fontSize: 10,
+                                      fontSize: T.text.xxs,
                                       marginLeft: 4,
                                       color: C.accent,
                                     }}
@@ -4793,7 +4793,7 @@ export default function HQFoodIngredients() {
                         style={{
                           padding: "11px 16px",
                           fontSize: 13,
-                          fontWeight: 700,
+                          fontWeight: T.weight.bold,
                           color: C.amber,
                         }}
                       >
@@ -4824,8 +4824,8 @@ export default function HQFoodIngredients() {
             <h3
               style={{
                 margin: "0 0 14px",
-                fontSize: 15,
-                fontWeight: 700,
+                fontSize: T.text.md,
+                fontWeight: T.weight.bold,
                 color: C.red,
               }}
             >
@@ -4838,7 +4838,7 @@ export default function HQFoodIngredients() {
               );
               if (controlled.length === 0)
                 return (
-                  <div style={{ color: C.inkLight, fontSize: 14 }}>
+                  <div style={{ color: C.inkLight, fontSize: T.text.base }}>
                     None in your library.
                   </div>
                 );
@@ -4867,9 +4867,9 @@ export default function HQFoodIngredients() {
                             style={{
                               padding: "9px 14px",
                               textAlign: "left",
-                              fontSize: 11,
+                              fontSize: T.text.xs,
                               color: C.red,
-                              fontWeight: 700,
+                              fontWeight: T.weight.bold,
                               textTransform: "uppercase",
                               letterSpacing: "0.06em",
                             }}
@@ -4894,7 +4894,7 @@ export default function HQFoodIngredients() {
                             style={{
                               padding: "10px 14px",
                               fontSize: 13,
-                              fontWeight: 600,
+                              fontWeight: T.weight.semibold,
                             }}
                           >
                             {ing.name}
@@ -4902,7 +4902,7 @@ export default function HQFoodIngredients() {
                           <td
                             style={{
                               padding: "10px 14px",
-                              fontSize: 12,
+                              fontSize: T.text.sm,
                               fontFamily: "monospace",
                               color: C.inkMid,
                             }}
@@ -4912,7 +4912,7 @@ export default function HQFoodIngredients() {
                           <td
                             style={{
                               padding: "10px 14px",
-                              fontSize: 12,
+                              fontSize: T.text.sm,
                               fontFamily: "monospace",
                               color: C.inkLight,
                             }}
@@ -4933,10 +4933,10 @@ export default function HQFoodIngredients() {
                                     background: C.redBg,
                                     color: C.red,
                                     border: "1px solid #FECACA",
-                                    borderRadius: 4,
+                                    borderRadius: T.radius.sm,
                                     padding: "2px 7px",
-                                    fontSize: 10,
-                                    fontWeight: 700,
+                                    fontSize: T.text.xxs,
+                                    fontWeight: T.weight.bold,
                                   }}
                                 >
                                   FSCA
@@ -4948,10 +4948,10 @@ export default function HQFoodIngredients() {
                                     background: "#FFF7ED",
                                     color: "#C2410C",
                                     border: "1px solid #FED7AA",
-                                    borderRadius: 4,
+                                    borderRadius: T.radius.sm,
                                     padding: "2px 7px",
-                                    fontSize: 10,
-                                    fontWeight: 700,
+                                    fontSize: T.text.xxs,
+                                    fontWeight: T.weight.bold,
                                   }}
                                 >
                                   CONTROLLED
@@ -4965,7 +4965,7 @@ export default function HQFoodIngredients() {
                           <td
                             style={{
                               padding: "10px 14px",
-                              fontSize: 11,
+                              fontSize: T.text.xs,
                               color: C.inkLight,
                               maxWidth: 200,
                             }}
@@ -4989,8 +4989,8 @@ export default function HQFoodIngredients() {
             <h3
               style={{
                 margin: "0 0 14px",
-                fontSize: 15,
-                fontWeight: 700,
+                fontSize: T.text.md,
+                fontWeight: T.weight.bold,
                 color: C.amber,
               }}
             >
@@ -5002,7 +5002,7 @@ export default function HQFoodIngredients() {
               );
               if (flagged.length === 0)
                 return (
-                  <div style={{ color: C.inkLight, fontSize: 14 }}>
+                  <div style={{ color: C.inkLight, fontSize: T.text.base }}>
                     None in your library.
                   </div>
                 );
@@ -5029,9 +5029,9 @@ export default function HQFoodIngredients() {
                             style={{
                               padding: "9px 14px",
                               textAlign: "left",
-                              fontSize: 11,
+                              fontSize: T.text.xs,
                               color: C.amber,
-                              fontWeight: 700,
+                              fontWeight: T.weight.bold,
                               textTransform: "uppercase",
                               letterSpacing: "0.06em",
                             }}
@@ -5061,7 +5061,7 @@ export default function HQFoodIngredients() {
                               style={{
                                 padding: "10px 14px",
                                 fontSize: 13,
-                                fontWeight: 600,
+                                fontWeight: T.weight.semibold,
                               }}
                             >
                               {ing.name}
@@ -5071,10 +5071,10 @@ export default function HQFoodIngredients() {
                                 style={{
                                   background: cat.color + "15",
                                   color: cat.color,
-                                  borderRadius: 4,
+                                  borderRadius: T.radius.sm,
                                   padding: "2px 7px",
-                                  fontSize: 11,
-                                  fontWeight: 600,
+                                  fontSize: T.text.xs,
+                                  fontWeight: T.weight.semibold,
                                 }}
                               >
                                 {cat.icon} {cat.label}
@@ -5089,7 +5089,7 @@ export default function HQFoodIngredients() {
                             <td
                               style={{
                                 padding: "10px 14px",
-                                fontSize: 11,
+                                fontSize: T.text.xs,
                                 color: C.inkMid,
                               }}
                             >
