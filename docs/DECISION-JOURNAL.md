@@ -4,6 +4,40 @@
 
 ---
 
+## S319 — 18 April 2026 — GAP-002: Cash flow reconciliation wiring
+
+**Context:** Register framed GAP-002 as "cosmetic blank field requiring
+prior-period closing balance snapshot table (does not exist)." Disk
+inspection showed bank_accounts.opening_balance column exists and 4 of
+6 active tenants have seeded values. Fix was wiring, not new
+infrastructure.
+
+**Alternative considered:** Build a proper period_snapshots table to
+hold true FY-start cash balances. Rejected — for tenants with
+opening_date inside the reporting FY (Nourish opened 2026-03-01 in
+FY2026), the seed-at-setup value IS the correct opening cash position.
+The snapshot table would recover partial-year accuracy, which is
+Phase B scope, not GAP-002.
+
+**Alternative considered:** Frontend-only change, leave PDF EF as-is.
+Rejected — the PDF is a demo-facing audit package. Divergence between
+on-screen statement and PDF would be immediately visible and look like
+a bug.
+
+**Almost-mistake avoided:** Initially scoped as pure rendering. Disk
+grounding on the EF caught that page 4 of the PDF mirrors the on-screen
+Cash Flow. Two commits, not one.
+
+**Calibration update:** GAP-002 register severity was "permanent —
+requires new infrastructure." Actual: Size S-M, two commits, ~40 lines.
+Another row for LOOP-CALIBRATION — register descriptions drift toward
+over-estimating scope when the framer assumed infrastructure was missing
+without checking.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S318 — 18 April 2026 — Capstone-003: campaign retrospective synthesis
 
 **Context:** Safety + financial campaigns ran S293-S317 (~25 sessions, ~140

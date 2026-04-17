@@ -598,11 +598,11 @@ They should be explained during any demo, not fixed.
 - **Why permanent:** Fixing requires touching live POS order flow + historical backfill. Regression risk outweighs cosmetic gap.
 - **Demo handling:** Amber banner on BS explains the gap
 
-### GAP-002: Cash Flow Opening Balance
+### GAP-002: Cash Flow Opening Balance — **FIXED S319**
 - **Symptom:** Cosmetic blank field on cash flow statement
-- **Root cause:** Prior-period closing balance snapshot table does not exist
-- **Why permanent:** Requires new table + migration + backfill logic
-- **Demo handling:** Not on critical demo path
+- **Root cause (reframed):** bank_accounts.opening_balance column existed; 4/6 tenants had seeded values. Fix was wiring (frontend + EF), not new infrastructure.
+- **Fix:** +1 query to bank_accounts, +3 render rows (opening → net → closing), mirrored in PDF EF page 4.
+- **Phase B (deferred):** Partial-year-aware opening for tenants opened mid-FY.
 
 ### GAP-003: Pricing Data Source
 - **Symptom:** Pricing data source shows red (0) on costing dashboard

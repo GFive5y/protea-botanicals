@@ -38,11 +38,12 @@ separate audit event with a predicted count and a measured actual count.
 | S314.3c HQ bypass with_check | 57 | 65 | +14% | Mechanical, close to predicted |
 | S316.5b.2 WP triage | 32 correct | 26 correct / 6 wrong | -19% accuracy | 81% first-pass; all 6 errors in under-count direction |
 | S317 FIN-002 hardcode sites | 4 | 5 (+1 bug) | +25% | Register missed L332 readonly input and calendar-year bug |
+| S319 GAP-002 register scope | "new table required" (L) | wiring (S-M) | -50% (over-estimate) | Register framed GAP-002 as infrastructure; disk showed column existed. Rare over-estimate case |
 
-**Median deviation:** +40% (under-count)
-**Over-estimate cases:** 1 of 12 (S314.3b)
-**Zero-deviation cases:** 0 of 12
-**Direction bias:** strongly toward under-count (11 of 12)
+**Median deviation:** +33% (under-count)
+**Over-estimate cases:** 2 of 13 (S314.3b, S319)
+**Zero-deviation cases:** 0 of 13
+**Direction bias:** strongly toward under-count (11 of 13)
 
 ---
 

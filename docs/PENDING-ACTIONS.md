@@ -46,9 +46,9 @@ Trigger date: PENDING (depends on demo date confirmation).
    Why deferred: fixing requires touching live POS order flow + historical backfill.
    Regression risk outweighs cosmetic gap 4 weeks before demo.
 
-2. **Cash flow opening balance not wired to bank recon** — cosmetic blank field.
-   Requires prior-period closing balance snapshot table (does not exist).
-   Not on demo critical path.
+2. ~~**Cash flow opening balance not wired to bank recon**~~ — **FIXED S319**.
+   bank_accounts.opening_balance column existed; 4/6 tenants had seeded values.
+   Fix was wiring (frontend + EF), not new infrastructure.
 
 3. **Pricing data source red (0)** — no product_pricing records linked to recipes.
    Affects costing dashboard only. Not on demo critical path.
@@ -320,6 +320,18 @@ Session 262 · 15 April 2026
 
 ### CLOSED — SB-FIX-001 through SB-FIX-009, CC-01 through CC-04
 Session 261 · All fin packages, bank recons, IFRS fixes
+
+## CLOSED LOOPS — SESSION 319 (18 April 2026)
+
+### CLOSED — GAP-002: Cash flow opening/closing balance reconciliation
+Session 319 · 2 commits (frontend + EF)
+Root cause (reframed): register described this as "new snapshot table
+needed." Disk showed bank_accounts.opening_balance column already exists
+with 4 of 6 active tenants seeded. Fix was wiring, not infrastructure.
+Added opening → net movement → closing reconciliation to both the
+on-screen Cash Flow statement and the PDF audit package (page 4).
+Frontend: +1 parallel query (bank_accounts), +3 render rows.
+EF: matched restructure of page 4 terminal block.
 
 ## CLOSED LOOPS — SESSION 318
 

@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 318 close (Capstone-003 — campaign retrospective synthesis)
+## Updated: 18 April 2026 — Session 319 close (GAP-002 — cash flow opening/closing balance)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -148,7 +148,14 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (318) — 18 April 2026
+### CLOSED THIS SESSION (319) — 18 April 2026
+- **GAP-002 FIXED** — Cash flow opening/closing balance reconciliation.
+  Commit 1: Frontend (+1 query to bank_accounts, +3 render rows, updated note).
+  Commit 2: EF deploy (mirrored reconciliation on PDF page 4).
+  Register framed as "new infrastructure needed" — disk showed bank_accounts.opening_balance
+  column existed with 4/6 tenants seeded. Fix was wiring, not infrastructure (LL-075).
+
+### CLOSED SESSION 318 — 18 April 2026
 - **Capstone-003 — campaign retrospective synthesis.** 5 artifacts:
   1. DEBT_REGISTER_v1 Section 6: pattern tagging (findings → methodology cross-ref)
   2. AGENT-METHODOLOGY Section 4: Failure Mode Evidence Map (FM1-FM8 grounded)
