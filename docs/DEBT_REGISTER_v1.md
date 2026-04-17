@@ -247,18 +247,18 @@ the request body without verifying the caller has authority over that tenant.
 | ID | EF | Line | Type | Description | Size |
 |---|---|---|---|---|---|
 | SAFETY-071 | auto-post-capture | L48 | SELECT | Initial capture_queue fetch by ID only, no tenant_id filter. Any caller can trigger processing of any tenant's capture queue entry. | S |
-| SAFETY-072 | auto-post-capture | — | AUTH | No caller authorization. Service-role bypass + no JWT verification = any caller can auto-post for any tenant. | M |
-| SAFETY-073 | seed-tenant | — | AUTH | No caller authorization. Any caller can seed any tenant (mitigated by idempotency guard `seed_complete`). | M |
-| SAFETY-074 | sim-pos-sales | — | AUTH | No caller authorization. Any caller can flood any tenant with fake POS data. | M |
+| SAFETY-072 | auto-post-capture | — | AUTH | **FIXED** 90be33c (S306). verifyTenantAuth('tenant', cap.tenant_id) after record fetch. | M |
+| SAFETY-073 | seed-tenant | — | AUTH | **FIXED** 90be33c (S306). verifyTenantAuth('operator-only'). | M |
+| SAFETY-074 | sim-pos-sales | — | AUTH | **FIXED** 90be33c (S306). verifyTenantAuth('operator-only'). | M |
 | SAFETY-075 | sim-pos-sales | L323-328 | SQL | `wipe_sql` response interpolates tenant_id + SIM_TAG directly into SQL strings. Latent injection if strings are ever executed programmatically. | S |
 
 **MEDIUM:**
 
 | ID | EF | Line | Type | Description | Size |
 |---|---|---|---|---|---|
-| SAFETY-076 | invite-user | — | AUTH | No explicit auth check in code. Caller-provided tenant_id trusted without verification. | M |
-| SAFETY-077 | generate-financial-statements | — | AUTH | No auth check. Caller can generate financial PDFs (P&L, BS, trial balance, VAT numbers) for any tenant. All DB reads ARE correctly tenant-filtered. | M |
-| SAFETY-078 | ai-copilot | — | AUTH | No auth check. tenantId from unverified `userContext` in request body. Allows querying any tenant's data across 46 tables. | M |
+| SAFETY-076 | invite-user | — | AUTH | **FIXED** 90be33c (S306). verifyTenantAuth('tenant', tenant_id). | M |
+| SAFETY-077 | generate-financial-statements | — | AUTH | **FIXED** 90be33c (S306). verifyTenantAuth('tenant', tenant_id). | M |
+| SAFETY-078 | ai-copilot | — | AUTH | **FIXED** 90be33c (S306). verifyTenantAuth('tenant', tenantId) when tenantId provided. | M |
 
 **LOW:**
 

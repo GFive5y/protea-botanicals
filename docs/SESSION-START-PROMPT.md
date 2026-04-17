@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 305 close (SAFETY-070 fixed + SAFETY-080 logged)
+## Updated: 18 April 2026 — Session 306 close (EF Auth Helper + 6-EF Rollout)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 5404b74
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 90be33c
 
 ---
 
@@ -148,14 +148,17 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (305) — 18 April 2026
-- **SAFETY-070 FIXED** — process-document duplicate invoice guard now tenant-
-  scoped. Added `.eq("tenant_id", tenant_id)` + tightened guard to require
-  tenant_id. EF deployed. Commit 5404b74.
-- **SAFETY-070 reclassified** CRITICAL → HIGH (latent, not active per S304.5 DB evidence).
-- **SAFETY-080 logged** — Supplier tenancy architectural data debt. 4 NULL-tenant
-  + 5 HQ-tenant suppliers, 0 demo-tenant suppliers. Parked for later stage.
-- **SAFETY-030 annotated** — Hardcoded UUID identified as Nu Ai HQ operator tenant.
+### CLOSED THIS SESSION (306) — 18 April 2026
+- **verifyTenantAuth.ts** — Shared EF auth helper built at supabase/functions/_shared/.
+  Two modes: 'tenant' (same-tenant OR HQ operator) and 'operator-only' (HQ admin).
+  Commit e63bc96.
+- **SAFETY-072, 073, 074, 076, 077, 078 FIXED** — 6 EFs now use verifyTenantAuth.
+  auto-post-capture, invite-user, generate-financial-statements, ai-copilot (tenant),
+  seed-tenant, sim-pos-sales (operator-only). All 6 deployed. Commit 90be33c.
+
+### CLOSED SESSION 305 — 18 April 2026
+- **SAFETY-070 FIXED** — process-document dedup guard tenant-scoped. Commit 5404b74.
+- **SAFETY-080 logged** — Supplier tenancy data debt. Parked.
 
 ### CLOSED SESSION 304 — 18 April 2026
 - **Tier 2 Workstream A: EF Safety Audit** — 14 EFs audited, 10 findings
@@ -458,11 +461,12 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **EF auth hardening (S306):** SAFETY-071 to 078 — 8 EFs lack caller authorization.
-   Systemic JWT verification pattern needed. Priority: generate-financial-statements
-   + ai-copilot (both expose sensitive tenant data).
+1. **EF data-scoping fixes (S307):** SAFETY-071 (auto-post-capture initial fetch),
+   075 (sim-pos-sales SQL interpolation), 079 (verify-qr products read). 3 remaining.
 
-2. **SAFETY-080:** Supplier tenancy architectural debt — dedicated session, data migration.
+2. **Financial findings:** FIN-001 to 003, FIN-006.
+
+3. **SAFETY-080:** Supplier tenancy architectural debt — dedicated session.
 
 2. **Financial findings** — FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded
    FY2026), FIN-003 (VAT_RATE), FIN-006 (equity join filter).
