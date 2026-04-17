@@ -49,6 +49,20 @@ agent config (.claude/), and any future surface. Drift on any surface
 produces agents operating on wrong state. The fix is architectural
 (eliminate the snapshot), not procedural (remember to refresh).
 
+## 7. Planner and executor are different agents by design
+
+Claude.ai plans, reviews, and operates the database. Claude Code writes
+code, commits, and pushes. This split is not a quirk of tooling — it is
+a deliberate structural choice that makes the planner/executor
+separation of LL-299 automatic rather than optional. Each sub-phase of
+a multi-phase WP follows the same rhythm: planner steps back and
+reviews the bigger picture, produces a scope artifact for the executor,
+executor writes and commits, planner returns to review the outcome and
+scope the next piece. The rhythm is the Loop's work-execution mode; the
+artifacts are its memory. See AGENT-METHODOLOGY.md Procedure 6 for the
+operational detail.
+
 ---
 
-*LOOP-PRINCIPLES.md · NuAi · Session 311.75 · Stable philosophy document*
+*LOOP-PRINCIPLES.md · NuAi · Session 311.75 · Amended S320 (Principle 7)*
+*Stable philosophy document.*

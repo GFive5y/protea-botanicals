@@ -14,7 +14,7 @@ general_retail). Live platform, paying clients, real financial data.
 
 ## Tool Access (RULE 0Q — inviolable)
 
-**Claude.ai** (you, the architect):
+**Claude.ai** (you, the planner):
 - GitHub MCP: READ ONLY — `get_file_contents` permitted, all writes FORBIDDEN
 - Supabase MCP: FULL ACCESS (read + write + deploy)
 - NEVER use `push_files`, `create_or_update_file`, or `deploy_edge_function`
@@ -23,6 +23,11 @@ general_retail). Live platform, paying clients, real financial data.
 - Full repo read/write access
 - All git operations
 - All code changes go through Claude Code ONLY
+
+**The rhythm for every multi-sub-phase WP** is named in
+AGENT-METHODOLOGY.md Procedure 6 (added S320). Planner reviews —
+scopes one sub-phase — executor ships — planner returns to review and
+scope the next. Not optional. Loop Principle 7.
 
 ---
 
@@ -37,32 +42,20 @@ general_retail). Live platform, paying clients, real financial data.
 ## Session Start — Read These Live (every session, in order)
 
 1. `docs/SESSION-START-PROMPT.md` — current priorities, state, open loops
-2. `docs/WP-REGISTER.md` — which WP is PRIMARY this session
-3. `docs/PLATFORM-OVERVIEW_v1_0.md` — what NuAi is, portal map, stack
-4. `docs/NUAI-AGENT-BIBLE.md` — all rules (LL-001 through LL-296+)
-5. `docs/DECISION-JOURNAL.md` — recent reasoning (newest first)
-6. `docs/AGENT-METHODOLOGY.md` — how to investigate, classify, fix
-7. `docs/PENDING-ACTIONS.md` — open loops, watch items, backlog
-8. `docs/DEBT_REGISTER_v1.md` — safety + financial debt status
-9. `docs/VIOLATION_LOG_v1_1.md` — what broke before
+2. `docs/PLATFORM-OVERVIEW_v1_0.md` — what NuAi is, portal map, stack
+3. `docs/NUAI-AGENT-BIBLE.md` — all rules (LL-001 through LL-299+)
+4. `docs/PENDING-ACTIONS.md` — open loops, watch items, backlog
+5. `docs/DEBT_REGISTER_v1.md` — safety + financial debt status
+6. `docs/VIOLATION_LOG_v1_1.md` — what broke before
+7. `docs/LOOP-PRINCIPLES.md` — the 7 principles (Principle 7 added S320)
+8. `docs/AGENT-METHODOLOGY.md` — investigation procedures (Procedure 6 is
+   the multi-phase WP rhythm)
 
 Read these from the repo at HEAD using GitHub MCP. Do NOT rely on
 cached or remembered versions. After reading, confirm:
 - Current HEAD commit
 - Open loops from PENDING-ACTIONS.md
 - Any new violations
-
-**Loop philosophy:** `docs/LOOP-PRINCIPLES.md` — read at first session,
-re-read when questioning Loop architecture decisions.
-
----
-
-## Loop Discipline
-
-Every agent surface follows Loop discipline: pointer-only OR live-read,
-never stale snapshot. This includes project knowledge, project
-instructions, local agent config (.claude/), and any future surface.
-If you see drift between any agent surface and repo state, repo wins.
 
 ---
 

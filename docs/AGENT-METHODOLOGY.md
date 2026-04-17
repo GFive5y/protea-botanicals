@@ -400,6 +400,108 @@ Historical example: S316 fixed FIN-001 with a one-line addition
 the fix to any financial_year-scoped UPDATE. Parallel-schema debt
 (year_end_closed vs year_closed duplicate fields) was flagged but not fixed.
 
+### Procedure 6: Multi-phase WP execution rhythm
+
+This procedure exists because multi-sub-phase work packages (WP-TABLE-UNIFY
+Phase 2, WP-FINANCIALS, WP-UNIFY, etc.) repeatedly drift when the planner
+agent either scopes everything up front and hands off to the executor blindly,
+or writes code directly from Claude.ai in violation of RULE 0Q. The rhythm
+below prevents both failures.
+
+**Tool split is the constraint:**
+- Claude.ai (planner): reads GitHub, reads/writes Supabase, produces artifacts
+- Claude Code (executor): reads + writes repo, compiles, commits, pushes
+- The split is enforced by RULE 0Q. It is not a style preference.
+
+**The rhythm — one cycle per sub-phase, not one per WP:**
+
+1. **Review the bigger picture (planner).** Before scoping the next sub-phase,
+   planner re-reads the WP scope doc at live HEAD and asks four questions:
+   - Did anything change since the doc was written? (schema drift, new LLs,
+     retired rules, dependency updates)
+   - Has the prior sub-phase revealed anything that changes the next one?
+     (e.g. PR 2A.1 surfaces a pattern that simplifies 2B)
+   - Can I eliminate any sub-phase, merge any, or catch a missed one?
+   - What's the blast radius right now? (tenant count, data volume, risk)
+
+   Output: a short chat review (5–15 lines). If the review produces
+   material findings, the WP scope doc is amended in the same session via
+   Claude Code. If findings are minor, note them inline and proceed.
+
+2. **Scope the next sub-phase (planner).** Produce one self-contained
+   Claude Code instruction block per LL-203 format. The block includes:
+   - Files to create or modify (exact paths)
+   - Exact content changes (diffs, str_replace targets, or full file content)
+   - Compile / build verification step
+   - Git commands (add specific files, commit message, push)
+   - Any DB migrations that are the planner's job to apply via Supabase MCP
+     (called out separately — Claude Code does not apply DB migrations)
+
+   A sub-phase should be one PR. If the scope exceeds a single coherent PR,
+   split it into numbered sub-PRs (2A.1, 2A.2, ...) and scope only the first.
+
+3. **Handoff to executor (owner action).** Owner pastes the instruction block
+   into their Claude Code terminal session. Claude Code executes.
+
+4. **Executor ships (Claude Code).** Writes files, compiles, commits, pushes.
+   Reports back: commit SHA, files changed, compile status, any deviations
+   from the spec.
+
+5. **Planner reviews the shipped work (planner).** Fetches the commit via
+   GitHub MCP. Verifies against the spec. Records a Decision Journal entry if
+   the session made substantive decisions (Principle 1: reasoning has a
+   half-life). Asks: "did the shipped code match the spec? what surprised us?"
+
+6. **Gate check before next sub-phase (planner).** Was this sub-phase's gate
+   condition met? (Each sub-phase in the WP scope doc declares gate conditions
+   — smoke tests, migration verification, no regressions on N tenants.)
+   If YES — return to step 1 for the next sub-phase.
+   If NO — fix before proceeding. Do not accumulate gate debt across sub-phases.
+
+**What makes this different from just "scope, then build":**
+
+- The "step back" in step 1 is mandatory, not optional. It's what catches
+  the schema drift that scope docs always develop between planning and
+  execution. WP-TABLE-UNIFY Phase 2's `food_ingredients` vs `inventory_items`
+  drift (S320) is the canonical example — caught by live Supabase inspection
+  at step 1, not by the original S293 scoping pass.
+- The gate check in step 6 is per-sub-phase, not per-WP. Phase 1 (WP-TABLE-
+  UNIFY) shipped 6 PRs across 2 sessions. Without per-PR gates, a regression
+  in PR 2b.2 could have compounded through 2b.3 and 2b.4 silently.
+- DB migrations are planner's job (Supabase MCP). Code is executor's job.
+  The split is clean and leaves no ambiguity about who does what.
+
+**What is NOT in this procedure:**
+
+- Pre-execution checks (session start, read Bible, verify HEAD) — covered
+  by Section 3 of NUAI-AGENT-BIBLE.md and the LL-292 live-read architecture
+- Tenant-isolation investigation — Procedure 1
+- Data cleanup — Procedure 2
+- Migration safety — Procedure 4 (used inside step 2 when applicable)
+
+**Anti-patterns this procedure prevents:**
+
+- **Big-bang scoping.** Planner scopes all 5 sub-phases up front, hands to
+  executor, executor builds in order, scope drift accumulates unchecked.
+- **RULE 0Q violations.** Planner writes code directly because the rhythm
+  wasn't named, so "just this once" becomes the pattern.
+- **Gate debt.** Executor ships sub-phase N+1 while sub-phase N's smoke
+  test was never run. Regressions compound.
+- **Doc-vs-disk drift.** Scope doc references tables or columns that have
+  moved since the doc was written. Step 1 catches this every cycle.
+
+**Evidence / reference sessions:**
+
+- S293 scoped WP-TABLE-UNIFY Phase 2 without live-disk verification. S320
+  caught target-table drift (`food_ingredients` not `inventory_items`) only
+  because step 1 mandated re-reading the scope at live HEAD.
+- S316 vs S317 (LL-299) — the integrated flow shipped a clean one-liner
+  (FIN-001); the planner/executor split shipped FIN-002 *and* caught a
+  calendar-year P&L bug that wasn't in the register. Splitting found
+  gaps integrated flow missed.
+- S292-S293 WP-TABLE-UNIFY Phase 1 — 6 PRs with per-PR gate checks. No
+  regressions across the 6 commits. Gate discipline held.
+
 ---
 
 ## SECTION 3 — DESIGN PATTERNS REGISTRY
