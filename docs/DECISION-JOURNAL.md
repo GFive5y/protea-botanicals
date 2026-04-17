@@ -4,6 +4,40 @@
 
 ---
 
+## S314.2b — 18 April 2026 — Architecture A clarification + MEDIUM RLS fixes
+
+**Decision A (architectural):** Confirmed NuAi uses Architecture A (shared
+database, RLS-isolated multi-tenant). This affects every RLS classification:
+tenant admins manage their own tenant's data, HQ operators manage platform-
+wide. Delete permission exists at every scope level, bounded by what that
+scope can see.
+
+**Decision B (MEDIUM fixes):** Applied tenant-scoping + HQ bypass to 5
+tenant-data tables, HQ-only to 2 platform tables, FK-based scoping to 2
+child tables, HQ-only-until-schema to 2 tables missing tenant_id.
+
+**Schema discovery:** 6 of 11 target tables lack tenant_id column entirely
+(audit_log, deletion_requests, purchase_order_items, double_points_campaigns,
+survey_responses, ticket_messages). Initial migration attempted tenant_id-
+based policies on all 11 and failed. Split into Group 1 (tenant_id tables)
+and Group 2 (FK-based or HQ-only). The schema gap is itself a finding —
+these tables should eventually get tenant_id columns.
+
+**Patterns observed:**
+- `auth_is_admin()` without tenant scope was a consistent anti-pattern
+  across all 11 findings. Same wrong-shape, likely from a development
+  period before the tenant isolation model was fully internalised.
+- Tables without tenant_id can still be tenant-scoped via FK joins to
+  parent tables that DO have tenant_id (purchase_order_items → purchase_orders,
+  ticket_messages → support_tickets).
+
+**Parked:** RLS-031 (message_templates) — lacks tenant_id AND needs schema
+change + generic-default seeding + LL-293 pattern. Dedicated session S314.2c.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S314.2a — 18 April 2026 — RLS CRITICAL residuals sweep: 10 more policies fixed
 
 **Decision:** Fixed 10 residual `true`-clause policies that S314's audit
