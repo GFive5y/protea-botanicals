@@ -1726,3 +1726,49 @@ wrong estimate was ~60 minutes. A 4× overestimate on a demo-blocking loop.
 ---
 
 *LL-288 / LL-289 / LL-290 added 17 April 2026 · Session 293 close*
+
+---
+
+## Session 298 — 17 April 2026 — Safety debt Stages 1-3 pattern taxonomy
+
+### LL-291 — TENANT-SOURCE SELECTION FOR INSERT PAYLOADS
+
+**Rule:** When writing to a tenant-scoped table, identify the tenant source
+from these three patterns before applying tenant_id:
+
+**Pattern A — TRIGGER TENANT** ("whose surface triggered the event?")
+Used when: consumer-facing flows where the action happens on a specific
+tenant's surface (storefront, QR scan, survey).
+Source: storefrontTenantId, scanned-QR tenant, etc.
+Examples (S295): OrderSuccess, Account, SurveyWidget, ScanResult.
+
+**Pattern B — VIEWER TENANT** ("whose logged-in session is this?")
+Used when: admin/tenant-portal flows where the user acts within their
+own tenant context.
+Source: `const { tenantId } = useTenant();`
+Examples (S296): StockControl stock movements, PO creation, supplier creation.
+
+**Pattern C — RECORD TENANT** ("whose record is this even if the viewer
+is elsewhere?")
+Used when: HQ-level flows where an operator actions a record belonging
+to a different tenant. The HQ operator is viewing; the record belongs
+elsewhere.
+Source: selectedRecord.tenant_id (never the viewer's tenantId)
+Examples (S297): HQDocuments Smart Capture — AI-extracted suppliers and
+stock_movements attribute to the document's owning tenant, not the HQ
+operator.
+
+**Why wrong pattern is worse than missing tenant_id:**
+Wrong pattern = misattribution, silent corruption, or orphaned rows.
+Wrong pattern is harder to detect than missing tenant_id because the row
+looks valid — it just belongs to the wrong tenant.
+
+**Default:** Pattern B (VIEWER) is correct for most tenant-portal work.
+If the user is HQ or can cross tenant boundaries, pattern C (RECORD) is
+usually right. Pattern A is for consumer flows.
+
+**When unclear, STOP and flag. Do not guess.**
+
+---
+
+*LL-291 added 17 April 2026 · Session 298 (taxonomy from Stages 1-3)*

@@ -323,6 +323,16 @@ tenantId prop threaded to MovementsView, OrdersView, SuppliersView.
 NO EXPIRY and COLD CHAIN aggregate over `items` not `activeItems`. Means
 archived items inflate the count. Not demo-blocking. Carried from S291.
 
+### WATCH-007 (NEW S297) — Audit coverage floor, not ceiling
+S294 manual grep audit (audit_tenant_isolation.py couldn't execute)
+missed >=1 INSERT site caught organically during S297 scoped work
+(HQDocuments.js:2361 inventory_items). Assume DEBT_REGISTER_v1.md
+is a floor count, not ceiling. Agents working in any file with
+known safety findings should re-grep that file for other INSERTs
+on tenant-scoped tables before commit. Permanent audit coverage
+fix lives in: extending audit_tenant_isolation.py TENANT_SCOPED
+set per Section 1.3 of the register.
+
 ---
 
 ## BACKLOG — FUTURE BUILD ITEMS (post-demo, no date constraint)
