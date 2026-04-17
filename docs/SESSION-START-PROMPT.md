@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 314 close (Tier 2C RLS Policy Audit)
+## Updated: 18 April 2026 — Session 314.1 close (Tier 2C.1 — CRITICAL RLS fixes)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -148,12 +148,17 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (314) — 18 April 2026
-- **Tier 2C RLS Policy Audit** — 401 policies across 120 tables audited.
-  155 findings: 9 CRITICAL (live cross-tenant exposure), 37 HIGH (missing
-  with_check), 11 MEDIUM (is_admin without tenant scope), 53 naming convention,
-  45 duplicate cleanups. Fix campaign: 4 sessions (S314.1-S314.4).
-  See docs/RLS-FINDINGS_v1.md.
+### CLOSED THIS SESSION (314.1) — 18 April 2026
+- **10 CRITICAL RLS policies fixed** — Bucket A (6 `true` clauses) + Bucket B
+  (3 `auth_is_admin()`) + 1 local_inputs caught by final sweep. All eliminated.
+  Replaced with tenant-scoped + is_hq_user() policies.
+- **RLS-006 classified as BUG** (not design) — loyalty config is competitive data.
+- **9 additional `true`-clause policies** found during final sweep (batches,
+  document_log, qr_codes, qr_security_settings, stock_receipts). Logged for S314.2.
+- **Code dependency:** Loyalty.js:183 fallback path needs tenant scoping (follow-up).
+
+### CLOSED SESSION 314 — 18 April 2026
+- **Tier 2C RLS audit** — 401 policies, 155 findings. See RLS-FINDINGS_v1.md.
 
 ### CLOSED SESSION 313.5 — 18 April 2026
 - **SAFETY-080 FIXED + TIER 2B COMPLETE.** 90/97 NOT NULL (93%).
@@ -497,8 +502,8 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **S314.1: CRITICAL RLS fixes** — 9 policies with `true` or `auth_is_admin()`
-   using_clause. Live cross-tenant exposure. See RLS-FINDINGS_v1.md.
+1. **S314.2: Additional `true`-clause RLS fixes** — 9 more policies on batches,
+   document_log, qr_codes, qr_security_settings, stock_receipts.
 
 2. **Financial findings:** FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded FY2026),
    FIN-003 (VAT_RATE), FIN-006 (equity join filter).

@@ -4,6 +4,35 @@
 
 ---
 
+## S314.1 — 18 April 2026 — RLS CRITICAL fixes: 10 broken policies eliminated
+
+**Decision:** Fixed 10 live cross-tenant exposure policies (9 from brief + 1
+caught by final sweep). Pattern: DROP broken policy, CREATE tenant-scoped +
+hq_bypass replacements where needed.
+
+**Classify-before-fix results:**
+- RLS-006 (loyalty_config.public_read): classified as BUG. Loyalty config
+  contains competitive info (pts rates, thresholds). Consumer shop code
+  already filters by storefrontTenantId. The public_read policy was a
+  convenience from early development, not design. Code fallback at
+  Loyalty.js:183 (`.single()` without tenant filter) is a separate code
+  bug — logged for follow-up, not blocking the RLS fix.
+
+**Patterns observed:**
+- Policy names lie: 'hq_all' + 'hq_admin_all' were often using_clause='true'
+  (grants to everyone, not just HQ). The name suggests restriction; the
+  implementation grants unrestricted access.
+- `auth_is_admin()` function is NOT tenant-aware (any admin from any tenant).
+  Only `is_hq_user()` correctly identifies HQ operators.
+
+**Additional findings from final sweep:** 9 more `true`-clause policies on
+tenant-scoped tables (batches 2, document_log 1, qr_codes 2,
+qr_security_settings 2, stock_receipts 2). Logged for S314.2.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S314 — 18 April 2026 — RLS policy audit: 155 findings across 120 tables
 
 **Decision:** Audit-only session, no fixes. Follow Tier 1 pattern (S294).

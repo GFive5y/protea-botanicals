@@ -18,8 +18,8 @@
 | NOT-A-BUG | 159 | Correctly scoped or intentional design patterns |
 | **Total** | **314** | |
 
-**Immediate action required:** 9 policies (Bucket A + B) are live cross-tenant
-data exposures. These exist TODAY and any authenticated user can exploit them.
+**Bucket A + B FIXED (S314.1).** 10 broken policies eliminated (9 original + 1 sweep).
+9 additional `true`-clause policies found during final sweep — logged for S314.2.
 
 ---
 
