@@ -25,11 +25,9 @@
  *     L333  suppliers        .eq("tenant_id", tenantId)  (fixed in 0.5)
  *     L336  purchase_orders  .eq("tenant_id", tenantId)  (fixed in 0.5)
  *
- *   KNOWN DEBT (RULE 0F — existing bugs, not this session's scope)
- *     L2985  stock_movements INSERT — no tenant_id in payload
- *     L3351  stock_movements INSERT — no tenant_id in payload
- *     Fix pattern: add  tenant_id: tenantId  to the insert object.
- *     Deferred to a dedicated LL-282/RULE-0F audit pass.
+ *   RULE 0F DEBT — FIXED in Session 296 (SAFETY-001 to 005)
+ *     All 5 INSERT sites now include tenant_id: tenantId.
+ *     See DEBT_REGISTER_v1.md Section 1.1 Cluster 1.
  *   writeAlert (L297) — system_alerts INSERT, already tenant-scoped
  *   handleSave (L1363/1369) — inventory_items UPDATE/INSERT (by id)
  *   handleDeactivate (L1386) — inventory_items UPDATE (by id)
@@ -625,6 +623,7 @@ export default function StockControl() {
             <MovementsView
               movements={movements}
               items={items}
+              tenantId={tenantId}
               onRefresh={fetchAll}
             />
           )}
@@ -633,11 +632,12 @@ export default function StockControl() {
               orders={orders}
               suppliers={suppliers}
               items={items}
+              tenantId={tenantId}
               onRefresh={fetchAll}
             />
           )}
           {subTab === "suppliers" && (
-            <SuppliersView suppliers={suppliers} onRefresh={fetchAll} />
+            <SuppliersView suppliers={suppliers} tenantId={tenantId} onRefresh={fetchAll} />
           )}
         </>
       )}
@@ -3014,7 +3014,7 @@ function ItemForm({
 }
 
 // ─── Movements ────────────────────────────────────────────────────────────────
-function MovementsView({ movements, items, onRefresh }) {
+function MovementsView({ movements, items, tenantId, onRefresh }) {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -3039,6 +3039,7 @@ function MovementsView({ movements, items, onRefresh }) {
       );
       const finalQty = isOut ? -Math.abs(qty) : Math.abs(qty);
       const { error: mE } = await supabase.from("stock_movements").insert({
+        tenant_id: tenantId,
         item_id: form.item_id,
         quantity: finalQty,
         movement_type: form.movement_type,
@@ -3297,7 +3298,7 @@ function MovementsView({ movements, items, onRefresh }) {
 }
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
-function OrdersView({ orders, suppliers, items, onRefresh }) {
+function OrdersView({ orders, suppliers, items, tenantId, onRefresh }) {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedPo, setSelectedPo] = useState(null);
@@ -3355,6 +3356,7 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
       const { data: po, error: pE } = await supabase
         .from("purchase_orders")
         .insert({
+          tenant_id: tenantId,
           po_number: genPONum(),
           supplier_id: form.supplier_id,
           expected_date: form.expected_date || null,
@@ -3368,6 +3370,7 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
       if (pE) throw pE;
       const { error: lE } = await supabase.from("purchase_order_items").insert(
         valid.map((l) => ({
+          tenant_id: tenantId,
           po_id: po.id,
           item_id: l.item_id,
           quantity_ordered: parseFloat(l.quantity_ordered),
@@ -3411,6 +3414,7 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
       for (const line of po.purchase_order_items) {
         if (!line.item_id) continue;
         await supabase.from("stock_movements").insert({
+          tenant_id: tenantId,
           item_id: line.item_id,
           quantity: line.quantity_ordered,
           movement_type: "purchase_in",
@@ -4486,7 +4490,7 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
 }
 
 // ─── Suppliers ────────────────────────────────────────────────────────────────
-function SuppliersView({ suppliers, onRefresh }) {
+function SuppliersView({ suppliers, tenantId, onRefresh }) {
   const [showForm, setShowForm] = useState(false);
   const [editSupplier, setEditSupplier] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -4535,7 +4539,7 @@ function SuppliersView({ suppliers, onRefresh }) {
           .eq("id", editSupplier.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("suppliers").insert(data);
+        const { error } = await supabase.from("suppliers").insert({ ...data, tenant_id: tenantId });
         if (error) throw error;
       }
       setShowForm(false);
