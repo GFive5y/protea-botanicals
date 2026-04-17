@@ -242,7 +242,8 @@ export default function HQTenantProfiles() {
       `)
       .neq("industry_profile", "operator")
       .order("is_active", { ascending: false })
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: true })
+      .order("financial_year", { ascending: false, foreignTable: "equity_ledger" });
 
     const tenantList = raw || [];
     const ids = tenantList.map(t => t.id);
