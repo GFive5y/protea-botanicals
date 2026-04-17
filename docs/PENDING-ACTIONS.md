@@ -356,11 +356,11 @@ DEBT_REGISTER_v1.md Section 1.7. Not blocking safety or financial work.
 SAFETY-081: retailer_performance and scan_geo_summary were broken self-
 referencing views, not tables. Dropped in S310. No data loss.
 
-### WATCH-011 (NEW S308) — SAFETY-082: 9 tables with 100% NULL tenant_id
-customer_messages, notification_log, product_formats, product_strains,
-production_runs, products, public_holidays, scans, support_tickets.
-Architectural decision needed: some may be cross-tenant reference data,
-others are data integrity findings. See DEBT_REGISTER_v1.md Section 1.8 (2B.4).
+### WATCH-011 — SAFETY-082 SPLIT (Session 311)
+082a CLOSED: public_holidays, product_formats, product_strains — intentional
+shared-reference-data pattern (LL-293). NULL tenant_id is design, not bug.
+082b OPEN: 6 tables × 23 rows backfill needed (customer_messages, notification_log,
+products, production_runs, scans, support_tickets). Target: S312.
 
 ---
 

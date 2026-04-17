@@ -1786,3 +1786,41 @@ the snapshot entirely: project knowledge holds only stable pointers
 ---
 
 *LL-292 added 18 April 2026 · Session 303.5*
+
+---
+
+## Session 311 — 18 April 2026 — Shared-reference-data pattern documentation
+
+### LL-293 — SHARED-REFERENCE-DATA PATTERN: NULL tenant_id IS INTENTIONAL
+
+**Rule:** NULL tenant_id is NOT a bug on tables whose RLS policy uses
+`(tenant_id IS NULL) OR (tenant_id = user_tenant_id())`. This is an
+intentional design: NULL rows are globally-visible platform defaults,
+non-NULL rows are per-tenant overrides.
+
+**Tables using this pattern (as of S311):**
+- `public_holidays` — SA public holidays shared across all tenants;
+  tenants can add their own (non-NULL tenant_id) for custom holidays
+- `product_formats` — default hardware formats shared across cannabis
+  tenants; tenants can override with tenant-specific formats
+- `product_strains` — default strain catalogue; tenants can override
+
+**Do NOT:**
+- Drop the tenant_id column on these tables
+- Force NOT NULL constraints
+- Backfill NULL rows to arbitrary tenants — that converts defaults
+  into overrides, making them invisible to other tenants
+- Flag these tables in audit scripts as tenant-isolation bugs
+
+**Detection:** Check `pg_policies` for `tenant_id IS NULL OR tenant_id =`
+patterns on any table flagged by audit scripts. If present, that table
+is design, not a bug.
+
+**To add a new shared-reference table:** Create with nullable tenant_id,
+seed default rows with NULL tenant_id, add RLS policy matching the
+`(tenant_id IS NULL) OR (tenant_id = user_tenant_id())` pattern.
+Document in this LL.
+
+---
+
+*LL-293 added 18 April 2026 · Session 311*

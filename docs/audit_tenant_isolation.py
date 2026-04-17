@@ -48,6 +48,17 @@ TENANT_SCOPED = {
     "document_log",
 }
 
+# Tables using the shared-defaults-with-overrides pattern (LL-293).
+# NULL tenant_id is intentional on these; RLS policy uses
+# (tenant_id IS NULL) OR (tenant_id = user_tenant_id()).
+# Queries without tenant_id filter are CORRECT — the policy handles isolation.
+# Investigation: S310.5 pg_policies queries, 18 April 2026.
+SHARED_REFERENCE_TABLES = {
+    "public_holidays",
+    "product_formats",
+    "product_strains",
+}
+
 CROSS_TENANT_PERMANENT = {
     "scan_logs", "fx_rates", "tenants", "supplier_products",
     "local_inputs",
@@ -79,7 +90,7 @@ for root, dirs, files in os.walk("src"):
             if not m:
                 continue
             table = m.group(1)
-            if table not in TENANT_SCOPED and table not in CROSS_TENANT_PERMANENT:
+            if table not in TENANT_SCOPED and table not in CROSS_TENANT_PERMANENT and table not in SHARED_REFERENCE_TABLES:
                 continue
             context = "".join(lines[max(0, i - 3):min(len(lines), i + 18)])
             # Check for SELECT filter (.eq("tenant_id"...)) or INSERT payload (tenant_id: ...)
@@ -92,11 +103,13 @@ for root, dirs, files in os.walk("src"):
             # Single-record operations (.eq("id", X)) are inherently scoped
             is_single_record = '.eq("id"' in context and ('.update(' in context or '.delete(' in context)
             permanent = table in CROSS_TENANT_PERMANENT
+            shared_ref = table in SHARED_REFERENCE_TABLES
             intentional = INTENTIONAL_MARKER in context
             verdict = (
                 "OK"             if has_filter else
                 "OK_INTENTIONAL" if intentional else
                 "ACCEPT"         if permanent else
+                "OK_SHARED"      if shared_ref else
                 "OK_SINGLE"      if is_single_record else
                 "BLEED"
             )
@@ -104,7 +117,7 @@ for root, dirs, files in os.walk("src"):
 
 bleeds  = [r for r in query_results if r[3] == "BLEED"]
 accepts = [r for r in query_results if r[3] == "ACCEPT"]
-oks     = [r for r in query_results if r[3] in ("OK", "OK_INTENTIONAL", "OK_SINGLE")]
+oks     = [r for r in query_results if r[3] in ("OK", "OK_INTENTIONAL", "OK_SINGLE", "OK_SHARED")]
 
 print(f"\n{'='*90}")
 print("NUAI LAYER 1 TENANT ISOLATION AUDIT v2.0")

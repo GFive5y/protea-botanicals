@@ -356,13 +356,33 @@ Backup: `_migration_backup_s309` table retained (174 rows).
 references retailer_performance but the query always failed (|| [] fallback,
 same behaviour post-drop). No DB object dependencies found.
 
-#### 2B.4 — SAFETY-082 (NEW S308): 100% NULL tenant_id on 9 tables
+#### 2B.4a — SAFETY-082a: Shared-reference-data tables (S311) — CLOSED, NOT A BUG
 
-Tables with tenant_id column where every row has NULL. Two sub-classes:
-- Legitimately cross-tenant reference data (`public_holidays`): column
-  may be incorrect — consider dropping
-- Tenant-scoped but never populated: data integrity finding, architectural
-  decision needed
+Tables: `public_holidays` (40 rows), `product_formats` (14), `product_strains` (18)
+
+**Status:** CLOSED — intentional design. RLS policies use
+`(tenant_id IS NULL) OR (tenant_id = user_tenant_id())` pattern.
+NULL tenant_id rows are globally-visible platform defaults; non-NULL rows
+are per-tenant overrides. The 100% NULL state means no tenant has created
+overrides yet — the feature is dormant, not broken. See LL-293.
+
+Verified: S310.5 pg_policies query. Audit script updated to exclude
+these tables from tenant-scoping checks (SHARED_REFERENCE_TABLES).
+
+#### 2B.4b — SAFETY-082b: Tenant-scoped tables with 100% NULL tenant_id — OPEN
+
+Tables with strict tenant_id RLS policies where every row has NULL:
+
+| Table | Rows | Notes |
+|---|---|---|
+| customer_messages | 7 | FK to user_id — recoverable |
+| notification_log | 7 | FK to user_id — recoverable |
+| products | 2 | FK to batch_id — recoverable |
+| production_runs | 4 | FK to batch_id — recoverable (note: 4 junk runs deleted S309, remaining are real) |
+| scans | 2 | Legacy table, may be deprecated |
+| support_tickets | 1 | FK to user_id — recoverable |
+
+**Status:** OPEN — S312 backfill. Total: 23 rows across 6 tables.
 
 ---
 
