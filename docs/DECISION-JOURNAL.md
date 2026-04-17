@@ -4,6 +4,36 @@
 
 ---
 
+## S314.2c — 18 April 2026 — message_templates schema + RLS migration
+
+**Decision:** Added tenant_id to message_templates. Migrated 9 existing
+Protea-branded rows to Pure Premium. Seeded 9 placeholder generic defaults
+(NULL tenant_id, is_active=false). Applied LL-293 shared-defaults RLS with
+asymmetric WITH CHECK (tenants can read shared defaults but only HQ can
+write them).
+
+**CRITICAL escape closed:** templates_public_read (using='true' on SELECT)
+had been live since before the campaign. Neither S314 audit, S314.1, nor
+S314.2a sweeps caught it. This is the second audit escape (first was S314.1's
+sweep finding Bucket A residuals). Root cause: message_templates had no
+tenant_id column, so the audit script may have excluded it from tenant-scoped
+checks entirely. The table slipped through classification as "not tenant-scoped"
+when it actually held tenant-specific content.
+
+**WITH CHECK asymmetry (LL-293 refinement):**
+- USING: `(tenant_id IS NULL) OR (tenant_id = user_tenant_id())`
+- WITH CHECK: `(tenant_id IS NULL AND is_hq_user()) OR (tenant_id = user_tenant_id())`
+The asymmetry prevents tenants from accidentally creating NULL-tenant rows
+that would be visible to all tenants. Only HQ can write shared defaults.
+
+**Follow-ups logged:**
+- S314.2c-b: owner writes real content for 9 generic defaults
+- `{{business_name}}` not supported in send-notification or send-email EFs
+
+**Fresh at close:** Yes.
+
+---
+
 ## S314.3d — 18 April 2026 — Stock_take legacy pattern migration
 
 **Decision:** Migrated 3 stock_take_* tables from `current_setting('app.tenant_id')`

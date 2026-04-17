@@ -57,6 +57,7 @@ SHARED_REFERENCE_TABLES = {
     "public_holidays",
     "product_formats",
     "product_strains",
+    "message_templates",  # S314.2c — LL-293 shared-defaults pattern
 }
 
 CROSS_TENANT_PERMANENT = {

@@ -65,9 +65,9 @@ Trigger date: PENDING (depends on new demo date confirmation).
 
 ### stock_take_* — CLOSED (S314.3d). Migrated to standard user_tenant_id() pattern.
 
-### S314.2c — message_templates schema + seeding + RLS
-RLS-031. Table lacks tenant_id. Needs schema change + generic-default
-seeding + LL-293 pattern. Dedicated session.
+### S314.2c — CLOSED. message_templates schema + RLS + 9 placeholder defaults.
+### S314.2c-b — Owner writes real content for 9 generic default templates (at own pace).
+### FOLLOW-UP: {{business_name}} not supported in send-notification/send-email EFs.
 
 ### S314.4 — LOW: Bucket C naming + duplicate cleanup (~98 policies)
 Audit hygiene. No security impact.
