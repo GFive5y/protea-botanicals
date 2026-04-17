@@ -316,6 +316,46 @@ tenant has documents.
 
 ---
 
+### 1.8 Database Hardening — Tier 2 Workstream B (S308+)
+
+#### 2B.1 — NOT NULL constraints on tenant_id (S308) — COMPLETE
+
+25 tables constrained via migration `20260417132906_tier2b1_not_null_tenant_id.sql`.
+All confirmed zero NULL rows pre-apply. Post-apply verified `is_nullable='NO'`.
+Negative test confirmed constraint enforcement (ERROR 23502).
+
+Tables: batches, document_log, email_logs, expenses, food_ingredients, inventory,
+local_inputs, loyalty_config, orders, price_history, product_cogs, product_format_bom,
+product_pricing, purchase_orders, qr_codes, qr_security_settings, shipments,
+stock_receipts, stock_transfers, supplier_products, tenant_usage_log, user_profiles,
+wholesale_messages, wholesale_orders, wholesale_partners.
+
+#### 2B.2 — Pending: 13 nullable-tenant_id tables (data cleanup required)
+
+| Status | Tables | NULL Count |
+|---|---|---|
+| Partial NULL — investigation needed | inventory_items | 21/1186 |
+| Partial NULL — investigation needed | loyalty_transactions | 1/673 |
+| Partial NULL — investigation needed | stock_movements | 152/15097 |
+| Already logged as SAFETY-080 | suppliers | 4/9 |
+| 100% NULL (SAFETY-082) | customer_messages (7), notification_log (7), product_formats (14), product_strains (18), production_runs (8), products (2), public_holidays (40), scans (2), support_tickets (1) | all rows |
+
+#### 2B.3 — SAFETY-081 (NEW S308): Recursive rules on 2 tables
+
+`retailer_performance` and `scan_geo_summary` throw "infinite recursion
+detected in rules" when queried. Cannot census tenant_id NULL counts until
+rules are fixed. Logged for dedicated session.
+
+#### 2B.4 — SAFETY-082 (NEW S308): 100% NULL tenant_id on 9 tables
+
+Tables with tenant_id column where every row has NULL. Two sub-classes:
+- Legitimately cross-tenant reference data (`public_holidays`): column
+  may be incorrect — consider dropping
+- Tenant-scoped but never populated: data integrity finding, architectural
+  decision needed
+
+---
+
 ## SECTION 2: FINANCIAL DATA DEBT
 
 ### 2.1 Active Findings
