@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 314.4 close (TIER 2C COMPLETE)
+## Updated: 18 April 2026 — Session 315 close (LL-251 audit maintenance)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -148,15 +148,15 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (314.4) — 18 April 2026
-- **8 final CRITICAL escapes fixed** — brand_image_library (2), double_points_campaigns,
-  fx_rates, qr_banners, redemptions (2), stock_receipt_lines. All HQ-only, user-scoped,
-  or FK-based (no tenant_id on any table). tenants policy tightened.
-- **TIER 2C COMPLETE.** Zero using='true' bugs remain. Only LL-293 (public_holidays)
-  and LL-295 (qr_codes) remain as documented design. 146 total policies fixed
-  across S314.1-S314.4 (11 sessions).
-- **4 rounds of Bucket A escapes:** S314 audit found 6, total actual was ~28.
-  Audit under-count: 79%. WATCH-007 at campaign scale.
+### CLOSED THIS SESSION (315) — 18 April 2026
+- **LL-251 audit maintenance** — Fixed Q5 (period_month text→count) and Q6
+  (closing_balance→opening_balance). Full 8-query audit run clean.
+- **Failure Mode 7 documented** — LL query drift: LLs with runnable SQL go stale
+  silently on schema changes. Added to AGENT-METHODOLOGY Section 4.
+- Audit baseline established for financial fix verification.
+
+### CLOSED SESSION 314.4 — 18 April 2026
+- **TIER 2C COMPLETE.** 146 policies fixed across 11 sessions. Zero bugs remain.
 
 ### CLOSED SESSION 314.2c — 18 April 2026
 - **message_templates schema + RLS.** CRITICAL escape closed. Total: 138.

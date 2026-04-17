@@ -1479,15 +1479,25 @@ SELECT reference, journal_date, status, financial_year FROM journal_entries
 WHERE journal_type = 'AUTO-CAPTURE' AND journal_date < '2025-01-01'
   AND status = 'posted' AND tenant_id IN ([demo tenant ids]);
 
--- 5. Depreciation entries coverage (each active asset should have current month)
-SELECT fa.asset_code, MAX(de.period_year * 12 + de.period_month::integer) AS latest_period
+-- 5. Depreciation entries coverage (each active asset should have entries)
+-- NOTE (S315): period_month is TEXT ("Apr"), not integer. Cannot do arithmetic.
+SELECT fa.asset_code,
+  COUNT(de.id) AS depreciation_entries,
+  MAX(de.period_year) AS latest_year,
+  CASE WHEN COUNT(de.id) = 0 THEN 'NO DEPRECIATION' ELSE 'OK' END AS status
 FROM fixed_assets fa
 LEFT JOIN depreciation_entries de ON de.asset_id = fa.id
-WHERE fa.is_active = true GROUP BY fa.asset_code;
+WHERE fa.is_active = true
+GROUP BY fa.asset_code
+ORDER BY status DESC, fa.asset_code;
 
--- 6. All demo tenant bank accounts have closing balance > 0
-SELECT t.name, ba.closing_balance FROM bank_accounts ba
-JOIN tenants t ON t.id = ba.tenant_id WHERE t.is_active = true;
+-- 6. All demo tenant bank accounts have opening balance set
+-- NOTE (S315): column is opening_balance, not closing_balance (schema drift).
+SELECT t.name, ba.bank_name, ba.account_name, ba.opening_balance
+FROM bank_accounts ba
+JOIN tenants t ON t.id = ba.tenant_id
+WHERE t.is_active = true
+ORDER BY t.name;
 
 -- 7. No demo tenant has zero journal entries
 SELECT t.name, COUNT(*) AS journal_count FROM journal_entries je

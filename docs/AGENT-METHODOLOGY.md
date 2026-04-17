@@ -528,6 +528,25 @@ before the fix?" If yes, log a data-cleanup item.
 is the canonical example — the code fix shipped in S299, but historical
 rows remain misattributed.
 
+### Failure 7: LL query drift (S315)
+
+**Symptom:** An LL in the Bible that encodes runnable SQL fails or returns
+wrong results because the underlying schema changed after the LL was written.
+
+**Why it happens:** Code fails loudly on schema drift (compile error, runtime
+error). Documentation fails silently — the query sits in the Bible unchanged,
+looking correct, until someone actually runs it and gets a column-not-found
+error or an integer-cast failure on a text column.
+
+**Corrective:** Run LL queries against the live DB periodically (at minimum
+before any demo). When a query fails, update the LL inline with a dated
+comment explaining the schema change. Consider CI validation of LL SQL
+against the schema.
+
+**Evidence:** S315 discovered LL-251 Q5 (period_month is TEXT not integer,
+arithmetic failed) and Q6 (closing_balance column doesn't exist, should be
+opening_balance). Both had been stale since before the safety campaign.
+
 ---
 
 ## SECTION 5 — OPEN QUESTIONS AND GAPS

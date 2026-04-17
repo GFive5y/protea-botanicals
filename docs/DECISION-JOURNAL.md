@@ -4,6 +4,29 @@
 
 ---
 
+## S315 — 18 April 2026 — LL-251 audit maintenance + Failure Mode 7
+
+**Decision:** Fixed 2 stale queries in LL-251 (Q5 period_month text→count,
+Q6 closing_balance→opening_balance). Ran full 8-query audit. Documented
+LL query drift as Failure Mode 7 in AGENT-METHODOLOGY.
+
+**Audit results (post-fix):**
+- Q1: clean (no duplicate VATs — S293 fix held)
+- Q2: Garden Bistro 4 unmatched bank lines (expected demo noise)
+- Q3: all active tenants have equity_ledger (Medi Can has row)
+- Q4: clean (no stale auto-capture)
+- Q5: all 17 assets OK (fixed query)
+- Q6: 4 tenants have opening_balance >0, 2 at R0 (Medi Can, Nourish — sparse seeding)
+- Q7: 6 tenants have journals (Pure Premium absent — not live)
+- Q8: 4 tenants have VAT filings
+
+**Institutional learning:** LLs with runnable SQL go stale silently when
+schema changes. Code fails loud; docs fail silent. Named as Failure Mode 7.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S314.4 — 18 April 2026 — Final Bucket A sweep + audit hardening
 
 **Decision:** Fixed 8 remaining CRITICAL using='true' escapes across 7 tables.
