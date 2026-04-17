@@ -12,6 +12,7 @@
 // }
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { verifyTenantAuth } from '../_shared/verifyTenantAuth.ts';
 
 const SIM_TAG = 'sim_data_v1';
 
@@ -100,8 +101,12 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({
         error: 'tenant_id is required in request body',
         usage: 'POST body: { "tenant_id": "UUID", "days": 30, "orders_per_day": 12 }'
-      }), { status: 400 });
+      }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
+
+    // SAFETY-074: Operator-only access
+    const auth = await verifyTenantAuth(req, { mode: 'operator-only' });
+    if (!auth.ok) return new Response(JSON.stringify({ error: auth.error }), { status: auth.status, headers: { 'Content-Type': 'application/json' } });
 
     let USER_ID: string = body.user_id ?? null;
     if (!USER_ID) {

@@ -5,6 +5,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { verifyTenantAuth } from '../_shared/verifyTenantAuth.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,6 +26,10 @@ serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
+
+    // SAFETY-076: Verify caller is authorized for this tenant
+    const auth = await verifyTenantAuth(req, { mode: 'tenant', tenantId: tenant_id })
+    if (!auth.ok) return new Response(JSON.stringify({ error: auth.error }), { status: auth.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
     // Service role client — never use anon key for auth.admin calls
     const supabaseAdmin = createClient(

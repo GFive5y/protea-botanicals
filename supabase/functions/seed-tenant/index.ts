@@ -7,6 +7,7 @@
 // LL-226: dispensing_log entries are never hard-deleted.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { verifyTenantAuth } from '../_shared/verifyTenantAuth.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -132,6 +133,10 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}))
     const { tenant_id, industry_profile = 'general_retail' } = body
     if (!tenant_id) return new Response(JSON.stringify({ success: false, error: 'tenant_id is required' }), { headers: { ...CORS, 'Content-Type': 'application/json' }, status: 400 })
+
+    // SAFETY-073: Operator-only access
+    const auth = await verifyTenantAuth(req, { mode: 'operator-only' })
+    if (!auth.ok) return new Response(JSON.stringify({ success: false, error: auth.error }), { headers: { ...CORS, 'Content-Type': 'application/json' }, status: auth.status })
     const supported = ['general_retail', 'food_beverage', 'cannabis_dispensary']
     if (!supported.includes(industry_profile)) return new Response(JSON.stringify({ success: false, error: `seed-tenant v4 supports: ${supported.join(', ')}` }), { headers: { ...CORS, 'Content-Type': 'application/json' }, status: 400 })
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''

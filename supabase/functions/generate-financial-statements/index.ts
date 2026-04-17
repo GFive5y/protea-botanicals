@@ -9,6 +9,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb } from "npm:pdf-lib";
+import { verifyTenantAuth } from "../_shared/verifyTenantAuth.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -205,6 +206,11 @@ Deno.serve(async (req: Request) => {
     } = body;
 
     if (!tenant_id) throw new Error("tenant_id required");
+
+    // SAFETY-077: Verify caller is authorized for this tenant
+    const auth = await verifyTenantAuth(req, { mode: "tenant", tenantId: tenant_id });
+    if (!auth.ok) return new Response(JSON.stringify({ error: auth.error }), { status: auth.status, headers: JSON_H });
+
     if (!inc || !bs || !cf || !eq) throw new Error("All 4 statement data objects required (income, balance_sheet, cash_flow, equity)");
 
     const db = createClient(

@@ -4,6 +4,7 @@
 // VAT: writes input_vat_amount to expense → expense_vat_sync trigger creates vat_transaction
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { verifyTenantAuth } from '../_shared/verifyTenantAuth.ts';
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -47,6 +48,10 @@ Deno.serve(async (req) => {
 
     const { data: cap, error: cErr } = await db.from("capture_queue").select("*").eq("id", capture_queue_id).single();
     if (cErr || !cap) throw new Error(`Not found: ${capture_queue_id}`);
+
+    // SAFETY-072: Verify caller is authorized for this tenant
+    const auth = await verifyTenantAuth(req, { mode: 'tenant', tenantId: cap.tenant_id });
+    if (!auth.ok) return new Response(JSON.stringify({ error: auth.error }), { status: auth.status, headers: JSON_H });
     if (["approved","auto_posted"].includes(cap.status))
       return new Response(JSON.stringify({ success: true, already_posted: true, expense_id: cap.expense_id }), { headers: JSON_H });
 

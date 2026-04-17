@@ -10,6 +10,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { verifyTenantAuth } from "../_shared/verifyTenantAuth.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -251,6 +252,9 @@ serve(async(req: Request)=>{
     const {messages,userContext=null,systemOverride=null,stream=false}=body;
     if (messages?.length===1&&messages[0]?.content==="__health_check__") return new Response(JSON.stringify({reply:"ok"}),{status:200,headers:{...CORS_HEADERS,"Content-Type":"application/json"}});
     if (!messages||!Array.isArray(messages)||messages.length===0) return new Response(JSON.stringify({error:"No messages."}),{status:400,headers:{...CORS_HEADERS,"Content-Type":"application/json"}});
+    // SAFETY-078: Verify caller is authorized for tenant context
+    const _tenantId=(userContext?.tenantId as string)||null;
+    if(_tenantId){const auth=await verifyTenantAuth(req,{mode:"tenant",tenantId:_tenantId});if(!auth.ok)return new Response(JSON.stringify({error:auth.error}),{status:auth.status,headers:{...CORS_HEADERS,"Content-Type":"application/json"}});}
     const apiKey=Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) {
       const msg="AI not configured.";
