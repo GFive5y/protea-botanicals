@@ -4,6 +4,43 @@
 
 ---
 
+## S314.2a — 18 April 2026 — RLS CRITICAL residuals sweep: 10 more policies fixed
+
+**Decision:** Fixed 10 residual `true`-clause policies that S314's audit
+script missed. Found by S314.1's post-fix sweep. Same methodology.
+
+**WATCH-007 validation:** S314 audit under-counted Bucket A by ~53%
+(10 additional found beyond the 9 originally registered). The documented
+~17% under-count rate applies to manual grep; RLS audit scripts have
+a higher miss rate because policy text matching is more complex than
+code pattern matching.
+
+**Classification decisions:**
+- qr_codes.public_read_qr: classified as BUG. Consumer QR scanner reads
+  `products` table (verified S307), not `qr_codes`. All qr_codes access
+  is authenticated admin. The `public` role grant was early dev scaffold.
+- public_holidays.ph_read_all: confirmed NOT-A-BUG (LL-293). Left alone.
+
+**Duplicate-policy anti-pattern:** qr_security_settings and stock_receipts
+each had TWO identical `true`-clause policies (`app_access` + `app_access_X`).
+Likely from someone "fixing" a policy by adding a new one instead of
+replacing the broken one. Both dropped, single correct replacement created.
+
+**Post-fix sweep:** Zero `qual='true'` WRITE policies remain on any
+tenant-scoped table. public_read_qr (SELECT, true) preserved as LL-295.
+public_holidays.ph_read_all preserved as LL-293.
+
+**Near-miss: verify-before-correct.** Initially mis-read the migration
+output and believed public_read_qr had been dropped. Prepared a corrective
+recreate. Owner verified via live Supabase MCP query that the policy was
+still present — the migration hadn't dropped it. The corrective was
+unnecessary. Lesson: before running a "fix for a fix," verify the current
+state via live query first. The migration log is a plan; pg_policies is truth.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S314.1 — 18 April 2026 — RLS CRITICAL fixes: 10 broken policies eliminated
 
 **Decision:** Fixed 10 live cross-tenant exposure policies (9 from brief + 1

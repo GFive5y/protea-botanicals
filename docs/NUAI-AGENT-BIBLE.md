@@ -1872,3 +1872,33 @@ model, different isolation rule.
 ---
 
 *LL-294 added 18 April 2026 · Session 313*
+
+---
+
+## Session 314.2a — 18 April 2026 — RLS audit design classifications
+
+### LL-295 — PUBLIC-READ QR CODES ARE DESIGN, NOT BUG
+
+**Rule:** `qr_codes.public_read_qr` with `using_clause='true'` on SELECT
+is intentional design. Public QR scanning is a NuAi feature — a customer
+with a phone camera can scan a product QR without being logged in. The
+scan returns valid product information via the verify-qr Edge Function.
+
+**Distinction from LL-293:** This is NOT the shared-defaults-with-overrides
+pattern. QR codes are tenant-owned data (tenant_id NOT NULL). The public
+SELECT policy provides unauthenticated read access for a specific product
+feature. Writes to qr_codes MUST remain tenant-scoped.
+
+**Detection:** If audit flags `qr_codes.public_read_qr` as Bucket A
+(`using_clause='true'`), check this LL before treating as bug.
+
+**Do NOT:** Drop `public_read_qr`. Replace with tenant-scoped SELECT.
+Add authentication requirement to QR scanning flow.
+
+**Do:** Ensure write policies (INSERT/UPDATE/DELETE) remain tenant-scoped.
+The `admin_write_qr` policy with `using_clause='true'` on ALL WAS a bug
+(fixed S314.2a). Only the SELECT read should be public.
+
+---
+
+*LL-295 added 18 April 2026 · Session 314.2a*

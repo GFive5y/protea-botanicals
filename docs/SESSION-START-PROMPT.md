@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 314.1 close (Tier 2C.1 — CRITICAL RLS fixes)
+## Updated: 18 April 2026 — Session 314.2a close (Tier 2C.1b — RLS sweep residuals)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -148,14 +148,18 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (314.1) — 18 April 2026
-- **10 CRITICAL RLS policies fixed** — Bucket A (6 `true` clauses) + Bucket B
-  (3 `auth_is_admin()`) + 1 local_inputs caught by final sweep. All eliminated.
-  Replaced with tenant-scoped + is_hq_user() policies.
-- **RLS-006 classified as BUG** (not design) — loyalty config is competitive data.
-- **9 additional `true`-clause policies** found during final sweep (batches,
-  document_log, qr_codes, qr_security_settings, stock_receipts). Logged for S314.2.
-- **Code dependency:** Loyalty.js:183 fallback path needs tenant scoping (follow-up).
+### CLOSED THIS SESSION (314.2a) — 18 April 2026
+- **10 more CRITICAL RLS policies fixed** — sweep residuals from S314.1.
+  batches (3), document_log (1), qr_codes (2), qr_security_settings (2),
+  stock_receipts (2). All `true`-clause. All replaced with tenant-scoped +
+  is_hq_user(). Post-fix sweep: ZERO Bucket A findings platform-wide.
+- **qr_codes.public_read classified as BUG** — consumer scanner reads `products`,
+  not `qr_codes`. All qr_codes access is authenticated admin.
+- **BUCKET A CLEAN.** No `true`-clause or `auth_is_admin()` policies remain on
+  any tenant-scoped table. S314.1 + S314.2a = 20 broken policies eliminated.
+
+### CLOSED SESSION 314.1 — 18 April 2026
+- **10 CRITICAL RLS policies fixed** — Bucket A + B original findings.
 
 ### CLOSED SESSION 314 — 18 April 2026
 - **Tier 2C RLS audit** — 401 policies, 155 findings. See RLS-FINDINGS_v1.md.
@@ -502,8 +506,8 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **S314.2: Additional `true`-clause RLS fixes** — 9 more policies on batches,
-   document_log, qr_codes, qr_security_settings, stock_receipts.
+1. **S314.2b: MEDIUM RLS fixes** — is_admin() without tenant scope (7-11 policies).
+   inventory_items, purchase_orders, stock_movements, suppliers, staff-profile-only.
 
 2. **Financial findings:** FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded FY2026),
    FIN-003 (VAT_RATE), FIN-006 (equity join filter).
