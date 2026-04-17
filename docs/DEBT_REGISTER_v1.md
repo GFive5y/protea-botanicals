@@ -330,15 +330,23 @@ product_pricing, purchase_orders, qr_codes, qr_security_settings, shipments,
 stock_receipts, stock_transfers, supplier_products, tenant_usage_log, user_profiles,
 wholesale_messages, wholesale_orders, wholesale_partners.
 
-#### 2B.2 — Pending: 13 nullable-tenant_id tables (data cleanup required)
+#### 2B.2 — Data cleanup + NOT NULL on 3 tables (S309) — COMPLETE
 
-| Status | Tables | NULL Count |
-|---|---|---|
-| Partial NULL — investigation needed | inventory_items | 21/1186 |
-| Partial NULL — investigation needed | loyalty_transactions | 1/673 |
-| Partial NULL — investigation needed | stock_movements | 152/15097 |
-| Already logged as SAFETY-080 | suppliers | 4/9 |
-| 100% NULL (SAFETY-082) | customer_messages (7), notification_log (7), product_formats (14), product_strains (18), production_runs (8), products (2), public_holidays (40), scans (2), support_tickets (1) | all rows |
+Migration: `20260417134822_tier2b2_cleanup_not_null.sql`
+Backup: `_migration_backup_s309` table retained (174 rows).
+
+| Table | Before | Action | After |
+|---|---|---|---|
+| inventory_items | 21 NULL / 1186 | Deleted 5 junk (FP-test etc + cascading dependents), backfilled 16 to Pure Premium | NOT NULL |
+| stock_movements | 152 NULL / 15097 | Backfilled 146 from parent item tenant_id | NOT NULL |
+| loyalty_transactions | 1 NULL / 673 | Backfilled 1 to Pure Premium (order cross-verified) | NOT NULL |
+
+#### 2B.2 remaining — 10 nullable tables
+
+| Status | Tables |
+|---|---|
+| Already logged as SAFETY-080 | suppliers (4/9 NULL) |
+| 100% NULL (SAFETY-082) | customer_messages (7), notification_log (7), product_formats (14), product_strains (18), production_runs (8), products (2), public_holidays (40), scans (2), support_tickets (1) |
 
 #### 2B.3 — SAFETY-081 (NEW S308): Recursive rules on 2 tables
 
