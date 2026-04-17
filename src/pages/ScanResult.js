@@ -1743,6 +1743,7 @@ export default function ScanResult() {
               .eq("id", currentUser.id);
             await supabase.from("loyalty_transactions").insert({
               user_id: currentUser.id,
+              tenant_id: tenantId || null,
               transaction_type: "EARNED",
               points: STREAK_BONUS_PTS,
               balance_after: afterStreak,
@@ -2011,6 +2012,7 @@ export default function ScanResult() {
                     <SurveyWidget
                       userId={user.id}
                       totalScans={totalScans}
+                      tenantId={tenantId}
                       onComplete={(bonusPts) => {
                         setSurveyBonusAwarded(bonusPts);
                         setTotalPoints((prev) => prev + bonusPts);

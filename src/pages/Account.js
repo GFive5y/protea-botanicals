@@ -18,6 +18,7 @@ import CustomerSupportWidget from "../components/CustomerSupportWidget";
 import { RoleContext } from "../App";
 import ClientHeader from "../components/ClientHeader";
 import { T } from "../styles/tokens";
+import { useStorefront } from "../contexts/StorefrontContext";
 import CustomerInbox, {
   getInboxUnreadCount,
 } from "../components/CustomerInbox";
@@ -442,6 +443,7 @@ function AdminConfigModal({ config, onSave, onClose }) {
 // OTP VERIFICATION PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
 function OTPPanel({ currentPhone, userId, onVerified, config }) {
+  const { storefrontTenantId } = useStorefront();
   const [phase, setPhase] = useState("intro");
   const [phone, setPhone] = useState(currentPhone || "");
   const [otp, setOtp] = useState("");
@@ -548,6 +550,7 @@ function OTPPanel({ currentPhone, userId, onVerified, config }) {
       .eq("id", userId);
     await supabase.from("loyalty_transactions").insert({
       user_id: userId,
+      tenant_id: storefrontTenantId,
       points: ptsToAward,
       transaction_type: "PROFILE_COMPLETION",
       description: `Phone verified — +${ptsToAward} bonus points`,
@@ -1237,6 +1240,7 @@ function AccountView({
   onSignOut,
   onProfileUpdate,
 }) {
+  const { storefrontTenantId } = useStorefront();
   const navigate = useNavigate();
   const location = useLocation();
   const [profile, setProfile] = useState(initialProfile || {});
@@ -1447,6 +1451,7 @@ function AccountView({
         .eq("id", user.id);
       await supabase.from("loyalty_transactions").insert({
         user_id: user.id,
+        tenant_id: storefrontTenantId,
         points: pointsToAward,
         transaction_type: "PROFILE_COMPLETION",
         description: `Profile: ${fieldLabel} added`,

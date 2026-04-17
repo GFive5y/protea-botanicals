@@ -216,6 +216,7 @@ export default function OrderSuccess() {
           .eq("id", userId);
         await supabase.from("loyalty_transactions").insert({
           user_id: userId,
+          tenant_id: storefrontTenantId,
           transaction_type: "EARNED",
           points: purchasePts,
           balance_after: newPts,
@@ -253,6 +254,7 @@ export default function OrderSuccess() {
               .eq("id", userId);
             await supabase.from("loyalty_transactions").insert({
               user_id: userId,
+              tenant_id: storefrontTenantId,
               transaction_type: "EARNED",
               points: refBonus,
               balance_after: newPts,
@@ -281,6 +283,7 @@ export default function OrderSuccess() {
                 .eq("id", refCode.owner_id);
               await supabase.from("loyalty_transactions").insert({
                 user_id: refCode.owner_id,
+                tenant_id: storefrontTenantId,
                 transaction_type: "EARNED",
                 points: referrerBonus,
                 balance_after: referrerNewPts,

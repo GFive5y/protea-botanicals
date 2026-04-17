@@ -13,7 +13,7 @@ const LIGHT_GRN = "#EDF4E5";
 const Q1_OPTIONS = ["Recreational", "Medical", "Both"];
 const Q2_OPTIONS = ["QR code", "Friend", "Social media", "In store"];
 
-export default function SurveyWidget({ userId, totalScans, onComplete }) {
+export default function SurveyWidget({ userId, totalScans, onComplete, tenantId }) {
   // status: 'checking' | 'hidden' | 'visible' | 'done'
   const [status, setStatus] = useState("checking");
   const [step, setStep] = useState(1);
@@ -74,6 +74,7 @@ export default function SurveyWidget({ userId, totalScans, onComplete }) {
 
       await supabase.from("loyalty_transactions").insert({
         user_id: userId,
+        tenant_id: tenantId || null,
         transaction_type: "EARNED",
         points: 25,
         balance_after: newBalance,
