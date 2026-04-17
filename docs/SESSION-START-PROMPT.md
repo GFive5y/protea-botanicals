@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 303 close (Stage 6B — SAFETY TIER 1 COMPLETE)
+## Updated: 18 April 2026 — Session 303.5 (Architecture: retire project knowledge snapshot)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -414,9 +414,10 @@ LL-285: LL-205 bypass + unscoped SELECT = cross-tenant leak. Every table with
          React-level SELECT.
 LL-286: Bug-report component attribution is a claim, not a fact. Verify which
          component the screenshot was taken of before diagnosing.
-LL-287: Session prompt provenance check. At session start, compare the prompt
-         handed in chat against docs/SESSION-START-PROMPT.md in the repo. If
-         they disagree, STOP and flag it. The repo file is the fact.
+LL-287: RETIRED S303.5. Superseded by LL-292 (read live from repo).
+LL-292 (NEW S303.5): Read all state live from repo at session start. Project
+         knowledge holds only AGENT-ORIENTATION.md (pointers, no state).
+         Never trust cached/remembered versions of docs.
 LL-288 (NEW S293): Density-gap tokens use "Plus" suffix convention. Names slightly
          larger than a named size get xxxPlus: text.smPlus=13 (between sm=12 and
          base=14), radius.smPlus="6px" (between sm=4 and md=8), radius.mdPlus="10px"
@@ -474,28 +475,15 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 4. Update OPEN LOOPS (close completed, add new)
 5. Add any new LLs to CRITICAL RULES
 6. Commit:
-     git add docs/SESSION-START-PROMPT.md docs/LL-ARCHIVE_v1_0.md docs/PENDING-ACTIONS.md
+     git add docs/SESSION-START-PROMPT.md docs/NUAI-AGENT-BIBLE.md
+         docs/PENDING-ACTIONS.md
      git commit -m "docs(S###): update session docs in-place"
      git push origin main
 
-7. Update Claude.ai project knowledge (prevents LL-287 drift):
-   After the commit lands on main, open the NuAi project in Claude.ai,
-   go to Project knowledge, find the existing SESSION-START-PROMPT
-   entry, and replace its content with the current repo version.
-
-   Why this step is non-optional: project knowledge is a static
-   snapshot, not a live link to the repo. If you skip step 7, the
-   next session's agent sees a stale protocol file in project
-   knowledge while the repo file has moved on. LL-287's provenance
-   check will fire on every turn-one until the two are reconciled,
-   wasting session start time.
-
-   Paste source: the output of
-     git show HEAD:docs/SESSION-START-PROMPT.md
-   or just open the file on main in the GitHub web UI and copy.
-
-   PLATFORM-OVERVIEW.md stays in project knowledge unchanged. It's
-   a slower-moving doc and does not need per-session refresh.
+   Step 7 RETIRED S303.5 — project knowledge no longer contains
+   SESSION-START-PROMPT.md. See docs/AGENT-ORIENTATION.md in project
+   knowledge for the new architecture. Repo docs are read live every
+   session via GitHub MCP (LL-292). No manual refresh required.
 
 NEVER create NEXT-SESSION-PROMPT_vXXX.md. (LL-264)
 

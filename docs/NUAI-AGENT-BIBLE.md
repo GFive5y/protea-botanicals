@@ -1587,46 +1587,23 @@ component before writing code.
 
 ## Session 291 remediation — 17 April 2026
 
-### LL-287 — SESSION PROMPT PROVENANCE CHECK
+### LL-287 — SESSION PROMPT PROVENANCE CHECK — RETIRED S303.5
 
-**Rule:** At the start of every session, before acting on the task,
-verify that the session prompt you were handed matches the
-authoritative docs/SESSION-START-PROMPT.md in the repo. If they
-disagree, stop and flag it. Do not build on a prompt that contradicts
-the in-repo protocol file.
+**RETIRED:** Superseded by LL-292 (read live from repo). The project-
+knowledge snapshot pattern that LL-287 guarded against has been replaced
+with a live-read-on-demand architecture. AGENT-ORIENTATION.md in project
+knowledge contains only pointers; all state is read from repo at HEAD.
 
-**Why this rule exists:**
+**Original rule (preserved for history):**
+At the start of every session, verify that the session prompt you were
+handed matches docs/SESSION-START-PROMPT.md in the repo. If they disagree,
+stop and flag it. Created after Session 291 operated on a stale versioned
+prompt file (NEXT-SESSION-PROMPT_v291.md) that contradicted the authoritative
+SESSION-START-PROMPT.md.
 
-Session 291 shipped 4 commits operating on
-NEXT-SESSION-PROMPT_v291.md — a document that violated LL-264
-(never create versioned next-session files; update
-SESSION-START-PROMPT.md in place). The stale prompt described a
-StockControl.js bug and a "WP-TABLE-UNIFY Phase 0" that contradicted
-the authoritative SESSION-START-PROMPT, which had already closed
-Session 288 with DS6 complete and the open priorities being LOOP-011
-and the 11 May sim-pos-sales alert.
-
-The agent working Session 291 never cross-referenced the stale prompt
-against the in-repo protocol file. All five mandatory docs in the
-stale prompt were real, but the prompt had omitted the authoritative
-one — so the reads looked internally consistent while being
-systemically wrong.
-
-**Apply:**
-
-1. GitHub:get_file_contents docs/SESSION-START-PROMPT.md — always
-2. Compare the HEAD hash it names against the actual repo HEAD via
-   GitHub API
-3. Compare its session number and CURRENT STATE section against
-   whatever session prompt you were handed in chat
-4. If any field disagrees, STOP and surface the disagreement to the
-   owner before acting on the task
-5. If the session prompt pasted in chat is a NEXT-SESSION-PROMPT_vXXX
-   file, that is itself an LL-264 violation — flag it
-
-**Principle:** The session prompt handed in chat is a *claim*. The
-SESSION-START-PROMPT.md file in the repo is the *fact*. Trust the
-repo.
+**Why retired:** With live-read architecture, there is no snapshot to drift.
+The agent reads SESSION-START-PROMPT.md from the repo every session. No
+provenance check needed because the source is always authoritative.
 
 ---
 
@@ -1772,3 +1749,40 @@ usually right. Pattern A is for consumer flows.
 ---
 
 *LL-291 added 17 April 2026 · Session 298 (taxonomy from Stages 1-3)*
+
+---
+
+## Session 303.5 — 18 April 2026 — Architecture: live-read replaces snapshots
+
+### LL-292 — READ LIVE STATE FROM REPO, NEVER TRUST SNAPSHOTS
+
+**Rule:** At every session start, read all orientation docs live from the
+repo at HEAD via GitHub MCP. AGENT-ORIENTATION.md in project knowledge
+contains only pointers — never stateful content.
+
+**Do not trust:**
+- Cached or remembered versions of docs from prior sessions
+- Content pasted into chat that claims to be current state
+- Any doc's HEAD hash, session number, or priority list without
+  verifying it against the live repo version
+
+**Session start sequence:**
+1. Read docs/SESSION-START-PROMPT.md from repo (current state + priorities)
+2. Read docs/PLATFORM-OVERVIEW_v1_0.md from repo (system identity)
+3. Read docs/NUAI-AGENT-BIBLE.md from repo (rules)
+4. Read docs/PENDING-ACTIONS.md from repo (open loops)
+5. Read docs/DEBT_REGISTER_v1.md from repo (debt status)
+6. Confirm HEAD, open loops, violations
+
+**Why this rule exists:**
+LL-287 (now retired) required a provenance check comparing a project-
+knowledge snapshot against the repo file. The snapshot drifted regularly
+because Step 7 (manual refresh) was often skipped. The fix is to eliminate
+the snapshot entirely: project knowledge holds only stable pointers
+(AGENT-ORIENTATION.md), and all state is read live.
+
+**Supersedes:** LL-287 (retired S303.5)
+
+---
+
+*LL-292 added 18 April 2026 · Session 303.5*
