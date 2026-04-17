@@ -55,10 +55,12 @@ export default function AdminHRPanel({ tenantId, user }) {
       const [staffRes, leaveRes, timesheetRes] = await Promise.all([
         supabase
           .from("staff_profiles")
-          .select("id,status,employment_type,department"),
+          .select("id,status,employment_type,department")
+          .eq("tenant_id", tenantId),
         supabase
           .from("leave_requests")
           .select("id,status,leave_type_id,start_date,end_date")
+          .eq("tenant_id", tenantId)
           .gte(
             "start_date",
             new Date(new Date().getFullYear(), 0, 1).toISOString(),
@@ -66,6 +68,7 @@ export default function AdminHRPanel({ tenantId, user }) {
         supabase
           .from("timesheet_entries")
           .select("id,staff_profile_id,hours_worked,is_late,status")
+          .eq("tenant_id", tenantId)
           .gte(
             "created_at",
             new Date(Date.now() - 30 * 86400000).toISOString(),

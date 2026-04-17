@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
+import { useTenant } from "../../services/tenantService";
 import { T as DS } from "../../styles/tokens";
 
 const T = {
@@ -488,7 +489,7 @@ function EditProductPanel({ product, suppliers, onClose, onSaved }) {
 }
 
 // ─── Add Supplier panel ───────────────────────────────────────────────────────
-function AddSupplierPanel({ onClose, onSaved }) {
+function AddSupplierPanel({ tenantId, onClose, onSaved }) {
   const [form, setForm] = useState({
     name: "",
     country: "South Africa",
@@ -513,6 +514,7 @@ function AddSupplierPanel({ onClose, onSaved }) {
     setError("");
     const { error: err } = await supabase.from("suppliers").insert([
       {
+        tenant_id: tenantId,
         name: form.name.trim(),
         country: form.country.trim() || "Unknown",
         currency: form.currency,
@@ -1240,6 +1242,7 @@ function ShippingCalculator({ fx }) {
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export default function HQSuppliers() {
+  const { tenantId } = useTenant();
   const { fx, loading: fxLoading, refresh: refreshFx } = useFxRate();
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
@@ -1273,6 +1276,7 @@ export default function HQSuppliers() {
         supabase
           .from("suppliers")
           .select("id, name, country, currency, contact_name, vat_registered, vat_number")
+          .eq("tenant_id", tenantId)
           .order("name"),
         supabase
           .from("supplier_products")
@@ -2408,6 +2412,7 @@ export default function HQSuppliers() {
       )}
       {showAddSupplier && (
         <AddSupplierPanel
+          tenantId={tenantId}
           onClose={() => setShowAddSupplier(false)}
           onSaved={() => {
             setShowAddSupplier(false);

@@ -194,7 +194,8 @@ export default function HQAnalytics() {
           .from("shipments")
           .select(
             "id,shipment_number,destination_name,status,courier,shipped_date,delivered_date,confirmed_date,estimated_arrival,created_at,shipment_items(*)",
-          );
+          )
+          .eq("tenant_id", tenantId);
         return r.data || [];
       });
       result.scans = await safe(async () => {
@@ -341,6 +342,7 @@ export default function HQAnalytics() {
             .select(
               "id,run_number,batch_id,status,planned_units,actual_units,started_at,completed_at,notes,created_at,production_run_inputs(*)",
             )
+            .eq("tenant_id", tenantId)
             .then(({ data: runs }) => {
               if (runs)
                 setData((prev) =>

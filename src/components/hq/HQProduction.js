@@ -1905,10 +1905,12 @@ export default function HQProduction() {
           supabase
             .from("wholesale_partners")
             .select("id,business_name,contact_name")
+            .eq("tenant_id", tenantId)
             .order("business_name"),
           supabase
             .from("product_formats")
             .select("*")
+            .eq("tenant_id", tenantId)
             .eq("is_active", true)
             .order("sort_order", { ascending: true }),
           supabase
@@ -1921,6 +1923,7 @@ export default function HQProduction() {
             .select(
               "id,format_id,inventory_item_id,material_type,quantity_per_unit,unit,notes,sort_order,inventory_items(id,name,sku,unit,quantity_on_hand,cost_price,weighted_avg_cost,category)",
             )
+            .eq("tenant_id", tenantId)
             .order("sort_order", { ascending: true }),
         ]);
       const batchesR = await batchQuery;
@@ -4773,6 +4776,7 @@ function NewRunPanel({
       const { data: run, error: runErr } = await supabase
         .from("production_runs")
         .insert({
+          tenant_id: tenantId,
           batch_id: batch.id,
           run_number: runNumber,
           status: "completed",
@@ -4814,6 +4818,7 @@ function NewRunPanel({
       if (isVape && !isMultiChamber) {
         await supabase.from("production_run_inputs").insert([
           {
+            tenant_id: tenantId,
             run_id: run.id,
             item_id: form.distillate_item_id,
             quantity_planned: distNeeded,
@@ -4821,6 +4826,7 @@ function NewRunPanel({
             notes: "Distillate",
           },
           {
+            tenant_id: tenantId,
             run_id: run.id,
             item_id: form.terpene_item_id,
             quantity_planned: terpNeeded,
@@ -4887,6 +4893,7 @@ function NewRunPanel({
         for (const ch of chamberData) {
           runInputs.push(
             {
+              tenant_id: tenantId,
               run_id: run.id,
               item_id: ch.mediumId,
               quantity_planned: ch.cMedNeeded,
@@ -4894,6 +4901,7 @@ function NewRunPanel({
               notes: `Chamber ${ch.ci + 1} medium`,
             },
             {
+              tenant_id: tenantId,
               run_id: run.id,
               item_id: ch.terpeneId,
               quantity_planned: ch.cTerpNeeded,
@@ -4926,6 +4934,7 @@ function NewRunPanel({
         }
         // Hardware — shared across all chambers
         runInputs.push({
+          tenant_id: tenantId,
           run_id: run.id,
           item_id: hwSelId,
           quantity_planned: planned,
@@ -4974,6 +4983,7 @@ function NewRunPanel({
       if (hasBom && !isVape && bomLineData.length > 0) {
         await supabase.from("production_run_inputs").insert(
           bomLineData.map((bl) => ({
+            tenant_id: tenantId,
             run_id: run.id,
             item_id: bl.selItemId,
             quantity_planned: bl.needed,
