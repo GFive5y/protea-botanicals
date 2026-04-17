@@ -2079,6 +2079,7 @@ export default function HQDocuments({ initialDocId = null }) {
     const { data: newSupplier, error: insErr } = await supabase
       .from("suppliers")
       .insert({
+        tenant_id: selectedDoc?.tenant_id ?? null,
         name: supplierData.name.trim(),
         country: supplierData.country.trim() || null,
         currency: supplierData.currency || "ZAR",
@@ -2357,6 +2358,7 @@ export default function HQDocuments({ initialDocId = null }) {
           const { data: newInvItem, error: invErr } = await supabase
             .from("inventory_items")
             .insert({
+              tenant_id: selectedDoc.tenant_id ?? null,
               sku: invSku,
               name: newProduct.name || data.name,
               category: invCat,
@@ -2380,6 +2382,7 @@ export default function HQDocuments({ initialDocId = null }) {
             const { error: movErr } = await supabase
               .from("stock_movements")
               .insert({
+                tenant_id: selectedDoc.tenant_id ?? null,
                 item_id: newInvItem.id,
                 quantity: qty,
                 movement_type: "purchase_in",
@@ -2500,6 +2503,7 @@ export default function HQDocuments({ initialDocId = null }) {
           const { error: movErr } = await supabase
             .from("stock_movements")
             .insert({
+              tenant_id: selectedDoc.tenant_id ?? null,
               item_id: itemId,
               quantity: qty,
               movement_type: data.movement_type || "purchase_in",
