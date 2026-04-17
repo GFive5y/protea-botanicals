@@ -131,8 +131,73 @@ several tables that have `tenant_id` columns:
 - `shipments`, `shipment_items`
 - `product_pricing` (SAFETY-022 would have been caught)
 
-**Recommendation:** Extend the script's `TENANT_SCOPED` set before the next
-audit run. This is a S-sized script change.
+**Status:** DONE in S301. Script extended to 50+ tables, detection logic
+enhanced to cover INSERT payloads and single-record operations.
+
+### 1.4 Script Verification Run (Session 301)
+
+Script: `docs/audit_tenant_isolation.py` v2.0 (extended S301)
+Run: `python docs/audit_tenant_isolation.py` from repo root
+Result: **62 raw BLEEDs → 24 TRUE BLEEDs after triage, 38 false positives**
+
+False positives caused by: child-row queries scoped by parent ID (journal_lines
+by journal_id, stock_movements by item_id), single-record UPDATE/DELETE by `.eq("id")`,
+context window too small (tenant filter exists but >18 lines away), non-standard
+column names (`destination_tenant_id` in ShopOverview).
+
+### 1.5 NEW Findings from Script Verification (Stage 6 input)
+
+#### Cluster 8: usePageContext.js (21 violations — CRITICAL)
+
+The CONTEXT_QUERIES engine powers the WorkflowGuide AI assistant across all
+portals. `tenantId` is passed as a parameter to every query function but used
+on fewer than half of them. Cross-tenant data leaks into AI context.
+
+| ID | File:Line | Table | Impact | Size |
+|---|---|---|---|---|
+| SAFETY-036 | usePageContext.js:85 | product_cogs | AI context cross-tenant | S |
+| SAFETY-037 | usePageContext.js:151 | batches | AI context cross-tenant | S |
+| SAFETY-038 | usePageContext.js:159 | inventory_items | AI context cross-tenant | S |
+| SAFETY-039 | usePageContext.js:166 | inventory_items | AI context cross-tenant | S |
+| SAFETY-040 | usePageContext.js:172 | production_runs | AI context cross-tenant | S |
+| SAFETY-041 | usePageContext.js:398 | inventory_items | AI context cross-tenant | S |
+| SAFETY-042 | usePageContext.js:440 | qr_codes | AI context cross-tenant | S |
+| SAFETY-043 | usePageContext.js:499 | inventory_items | AI context cross-tenant | S |
+| SAFETY-044 | usePageContext.js:504 | support_tickets | AI context cross-tenant | S |
+| SAFETY-045 | usePageContext.js:577 | orders | AI context cross-tenant | S |
+| SAFETY-046 | usePageContext.js:581 | loyalty_transactions | AI context cross-tenant | S |
+| SAFETY-047 | usePageContext.js:713 | document_log | AI context cross-tenant | S |
+| SAFETY-048 | usePageContext.js:717 | document_log | AI context cross-tenant | S |
+| SAFETY-049 | usePageContext.js:721 | document_log | AI context cross-tenant | S |
+| SAFETY-050 | usePageContext.js:787 | product_cogs | AI context cross-tenant | S |
+| SAFETY-051 | usePageContext.js:789 | product_pricing | AI context cross-tenant | S |
+| SAFETY-052 | usePageContext.js:867 | batches | AI context cross-tenant | S |
+| SAFETY-053 | usePageContext.js:968 | customer_messages | AI context cross-tenant | S |
+| SAFETY-054 | usePageContext.js:972 | support_tickets | AI context cross-tenant | S |
+| SAFETY-055 | usePageContext.js:1146 | shipments | AI context cross-tenant | S |
+| SAFETY-056 | usePageContext.js:1150 | production_runs | AI context cross-tenant | S |
+
+#### Cluster 9: HQProduction.js (4 violations)
+
+| ID | File:Line | Table | Impact | Size |
+|---|---|---|---|---|
+| SAFETY-057 | HQProduction.js:1906 | wholesale_partners | Cross-tenant read | S |
+| SAFETY-058 | HQProduction.js:1910 | product_formats | Cross-tenant read | S |
+| SAFETY-059 | HQProduction.js:1920 | product_format_bom | Cross-tenant read | S |
+| SAFETY-060 | HQProduction.js:4774 | production_runs | INSERT missing tenant_id | S |
+
+#### Cluster 10: Other files (5 violations)
+
+| ID | File:Line | Table | Impact | Size |
+|---|---|---|---|---|
+| SAFETY-061 | HQSuppliers.js:514 | suppliers | INSERT no tenant_id (no useTenant in component) | S |
+| SAFETY-062 | HQSuppliers.js:1274 | suppliers | SELECT cross-tenant (no useTenant in component) | M |
+| SAFETY-063 | AdminHRPanel.js:57,60 | staff_profiles, leave_requests | fetchSummary cross-tenant | S |
+| SAFETY-064 | ExpenseManager.js:307 | expenses | INSERT missing tenant_id in payload | S |
+| SAFETY-065 | HQAnalytics.js:194,340 | shipments, production_runs | SELECT cross-tenant | S |
+
+**Total new findings: 30 (SAFETY-036 to 065)**
+**Stage 6 required: YES**
 
 ---
 

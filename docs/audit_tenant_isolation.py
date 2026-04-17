@@ -12,21 +12,51 @@ Version history:
 import os, re, sys
 
 TENANT_SCOPED = {
+    # Core commerce
     "orders", "inventory_items", "user_profiles", "expenses",
-    "journal_entries", "invoices", "purchase_orders", "staff_profiles",
-    "timesheets", "leave_requests", "leave_balances", "fixed_assets",
+    "journal_entries", "journal_lines", "invoices",
+    "purchase_orders", "purchase_order_items",
+    # Staff / HR
+    "staff_profiles", "timesheets", "leave_requests", "leave_balances",
+    "employment_contracts",
+    # Assets / finance
+    "fixed_assets", "depreciation_entries", "bank_accounts",
+    "bank_statement_lines", "vat_transactions", "vat_period_filings",
+    "chart_of_accounts", "equity_ledger", "financial_statement_status",
+    "financial_year_archive",
+    # Cannabis / medical
     "batches", "dispensing_log", "patients", "prescriptions",
+    # Loyalty / consumer
     "loyalty_transactions", "support_tickets", "customer_messages",
-    "wholesale_messages", "stock_movements", "vat_transactions",
-    "vat_period_filings", "bank_accounts", "qr_codes",
+    "wholesale_messages", "qr_codes",
+    # Stock / supply chain
+    "stock_movements", "suppliers", "stock_receipts", "stock_receipt_lines",
+    "shipments", "shipment_items",
+    # Production
+    "production_runs", "production_run_inputs",
+    "product_formats", "product_format_bom",
+    # F&B
     "food_recipes", "food_recipe_lines", "haccp_control_points",
     "haccp_log_entries", "cold_chain_locations", "temperature_logs",
+    # Pricing / COGS
     "product_cogs", "product_pricing",
+    # System / audit
+    "audit_log", "system_alerts", "recall_events",
+    # Tenant config
+    "tenant_config", "wholesale_partners",
+    # Documents
+    "document_log",
 }
 
 CROSS_TENANT_PERMANENT = {
     "scan_logs", "fx_rates", "tenants", "supplier_products",
     "local_inputs",
+    # user_profiles is scoped by auth user.id, not tenant_id
+    "user_profiles",
+    # survey_responses is scoped by user_id
+    "survey_responses",
+    # referral_codes is scoped by owner_id / code
+    "referral_codes",
 }
 
 INTENTIONAL_MARKER = "INTENTIONAL: HQ aggregate"
@@ -52,20 +82,29 @@ for root, dirs, files in os.walk("src"):
             if table not in TENANT_SCOPED and table not in CROSS_TENANT_PERMANENT:
                 continue
             context = "".join(lines[max(0, i - 3):min(len(lines), i + 18)])
-            has_filter = '.eq("tenant_id"' in context or ".eq('tenant_id'" in context
+            # Check for SELECT filter (.eq("tenant_id"...)) or INSERT payload (tenant_id: ...)
+            has_filter = (
+                '.eq("tenant_id"' in context or
+                ".eq('tenant_id'" in context or
+                'tenant_id:' in context or
+                '"tenant_id"' in context  # embedded join syntax
+            )
+            # Single-record operations (.eq("id", X)) are inherently scoped
+            is_single_record = '.eq("id"' in context and ('.update(' in context or '.delete(' in context)
             permanent = table in CROSS_TENANT_PERMANENT
             intentional = INTENTIONAL_MARKER in context
             verdict = (
                 "OK"             if has_filter else
                 "OK_INTENTIONAL" if intentional else
                 "ACCEPT"         if permanent else
+                "OK_SINGLE"      if is_single_record else
                 "BLEED"
             )
             query_results.append((fpath.replace("src/", ""), i + 1, table, verdict))
 
 bleeds  = [r for r in query_results if r[3] == "BLEED"]
 accepts = [r for r in query_results if r[3] == "ACCEPT"]
-oks     = [r for r in query_results if r[3] in ("OK", "OK_INTENTIONAL")]
+oks     = [r for r in query_results if r[3] in ("OK", "OK_INTENTIONAL", "OK_SINGLE")]
 
 print(f"\n{'='*90}")
 print("NUAI LAYER 1 TENANT ISOLATION AUDIT v2.0")
