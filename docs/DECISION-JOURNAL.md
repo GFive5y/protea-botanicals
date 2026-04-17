@@ -4,6 +4,34 @@
 
 ---
 
+## S314.3a — 18 April 2026 — Tenant-scoped HIGH RLS with_check fixes
+
+**Decision:** Fixed 11 tenant-scoped policies with missing with_check.
+Mechanical fix: copy using_clause to with_check. Preserves existing
+isolation logic; closes INSERT/UPDATE defense-in-depth gap.
+
+**Scope discovery:** S314 audit registered 37 HIGH findings. Live DB
+query found 83 policies matching the pattern. Split by risk tier:
+- Tier A (this session): 11 tenant-scoped — real defense-in-depth gap
+- Tier B (S314.3b): ~24 HR cluster — need scope rewrite, not just with_check
+- Tier C (deferred): ~40+ HQ bypass — cosmetic, low actual risk
+
+WATCH-007 at 2.2x: audit under-counted HIGH by 124% (83 vs 37 registered).
+Higher than the ~17% rate seen in Tier 1. RLS audit detection logic needs
+a second pass after Tier 2C closes.
+
+**Deferred:** stock_take_* (3 policies) use legacy
+`current_setting('app.tenant_id')` pattern instead of `user_tenant_id()`.
+Need migration to standard functions — logged as separate loop.
+
+**Naming inconsistency:** disciplinary_records and employment_contracts
+use `current_user_tenant_id()` + `is_admin_user()` while the rest of the
+platform uses `user_tenant_id()` + `user_role()`. Flagged for LOW cleanup.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S314.2b — 18 April 2026 — Architecture A clarification + MEDIUM RLS fixes
 
 **Decision A (architectural):** Confirmed NuAi uses Architecture A (shared

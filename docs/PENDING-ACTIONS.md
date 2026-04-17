@@ -57,18 +57,25 @@ Trigger date: PENDING (depends on new demo date confirmation).
 
 ## OUTSTANDING — RLS FIX CAMPAIGN (S314.1-S314.4)
 
-### S314.1 — CRITICAL: 9 policies with true/auth_is_admin using_clause
-RLS-001 to RLS-009. Live cross-tenant exposure. 6 Bucket A (true) + 3 Bucket B
-(auth_is_admin). Fix: DROP + CREATE with is_hq_user(). IMMEDIATE priority.
+### S314.1 — CLOSED. 10 CRITICAL policies fixed (Bucket A + B).
+### S314.2a — CLOSED. 9 sweep residual policies fixed + LL-295.
+### S314.2b — CLOSED. 11 MEDIUM is_admin() policies fixed.
+### S314.3a — CLOSED. 11 HIGH with_check fixes (tenant-scoped Tier A).
 
-### S314.2 — MEDIUM: 7 is_admin() policies without tenant scope
-RLS-049 to RLS-054 + RLS-050. Admin can access any tenant's data.
+### S314.3b — HR cluster RLS rewrite (~24 policies)
+is_hr_user() without tenant scope. Need scope change, not just with_check.
+Owner classified HR functions as tenant-scoped (S314.2b.5).
 
-### S314.3 — HIGH: 37 missing with_check on HR/stock-take write ops
-RLS-010 to RLS-046. Add WITH CHECK matching using_clause.
+### stock_take_* legacy RLS migration (3 policies)
+RLS-051 to RLS-053. Use current_setting('app.tenant_id') instead of
+user_tenant_id(). Need migration to standard function pattern.
 
-### S314.4 — LOW: 53 naming convention + 45 duplicate cleanup
-Bucket C renames + duplicate consolidation. Audit hygiene.
+### S314.2c — message_templates schema + seeding + RLS
+RLS-031. Table lacks tenant_id. Needs schema change + generic-default
+seeding + LL-293 pattern. Dedicated session.
+
+### S314.4 — LOW: Bucket C naming + duplicate cleanup (~98 policies)
+Audit hygiene. No security impact.
 
 ---
 

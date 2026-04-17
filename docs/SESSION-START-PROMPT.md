@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 314.2b close (Tier 2C.2 — MEDIUM RLS fixes)
+## Updated: 18 April 2026 — Session 314.3a close (Tier 2C.3a — HIGH with_check fixes)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -148,15 +148,17 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (314.2b) — 18 April 2026
-- **11 MEDIUM RLS policies fixed** — RLS-020 to RLS-030. 5 tenant-scoped +
-  HQ bypass (inventory_items, purchase_orders, stock_movements, suppliers,
-  user_profiles). 2 HQ-only (audit_log, deletion_requests). 2 FK-based
-  (purchase_order_items → POs, ticket_messages → support_tickets). 2 HQ-only
-  until tenant_id added (double_points_campaigns, survey_responses).
-- **Schema discovery:** 6 tables lack tenant_id. Some need schema migration.
-- **RLS-031 parked** for S314.2c (message_templates needs schema change).
-- Post-fix sweep: only message_templates remains with unscoped auth_is_admin().
+### CLOSED THIS SESSION (314.3a) — 18 April 2026
+- **11 HIGH with_check fixes** — RLS-040 to RLS-050. Mechanical: copy
+  using_clause to with_check on tenant-scoped policies. Closes INSERT/UPDATE
+  defense-in-depth gap. 9 standard pattern + 2 alternate function names.
+- **Scope discovery:** S314 registered 37 HIGH. Live DB found 83 (2.2x).
+  Split: Tier A 11 (this session), Tier B ~24 HR (S314.3b), Tier C ~40+ HQ (deferred).
+- **stock_take_* (3) deferred** — legacy current_setting() pattern needs migration.
+- **Function naming inconsistency flagged** — current_user_tenant_id() vs user_tenant_id().
+
+### CLOSED SESSION 314.2b — 18 April 2026
+- **11 MEDIUM RLS fixes** — RLS-020 to 030. RLS-031 parked for S314.2c.
 
 ### CLOSED SESSION 314.2a — 18 April 2026
 - **BUCKET A CLEAN.** 9 sweep residuals fixed + LL-295 (QR public read design).
@@ -509,8 +511,8 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **S314.3: HIGH RLS fixes** — 37 missing with_check on write operations.
-   Concentrated in HR module (20/37) and stock-take (6/37).
+1. **S314.3b: HR cluster RLS rewrite** — ~24 policies using is_hr_user()
+   without tenant scope. Scope change, not just with_check addition.
 
 2. **Financial findings:** FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded FY2026),
    FIN-003 (VAT_RATE), FIN-006 (equity join filter).
