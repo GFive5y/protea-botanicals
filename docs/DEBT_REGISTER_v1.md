@@ -612,6 +612,107 @@ They should be explained during any demo, not fixed.
 
 ---
 
+## SECTION 6: PATTERN TAGGING
+
+Added S318 (Capstone-003). Maps each finding cluster from Sections 1-2 to the
+methodology patterns (AGENT-METHODOLOGY Section 3) and failure modes
+(AGENT-METHODOLOGY Section 4) it exemplifies. Use this to retrieve findings
+BY pattern ("show me all Pattern B clusters") or to see which failure modes
+have the richest evidence.
+
+Legend:
+  PA = Pattern A (Trigger Tenant)       PB = Pattern B (Viewer Tenant)
+  PC = Pattern C (Record Tenant)        SD = Shared-Defaults (LL-293)
+  HQB = HQ Bypass                       SR = Service-Role EF
+  PU = Per-User Scoping
+  FM1-FM8 = Failure Modes 1 through 8   P5 = Procedure 5 (Financial)
+
+### Safety Clusters (Section 1.1)
+
+| Cluster | Finding Range | Tenant Pattern | Failure Modes | Notes |
+|---|---|---|---|---|
+| StockControl INSERTs | SAFETY-001 to 005 | PB | FM1 | Classic viewer-tenant — threaded tenantId prop through sub-views |
+| Loyalty pipeline | SAFETY-013 to 019 | PA | — | Consumer surfaces — storefrontTenantId not useTenant |
+| HQDocuments Smart Capture | SAFETY-006 to 008, +S297 | PC | FM1 | Record-tenant from selectedDoc — HQ viewing, record owned elsewhere. Re-grep caught +1 |
+| HQ Purchase Orders | SAFETY-011, 012, 031, 032 | PB | FM1 | WATCH-007 re-grep caught +2 |
+| HQMedical dispensing | SAFETY-009 | PB | — | Mirrors L1020 dispensing_log pattern |
+| Admin Production | SAFETY-020, 033, 034 | PB | FM1 | Re-grep caught +2 |
+| HQFraud audit + alerts | SAFETY-021, 035 | PB | FM1 | Re-grep caught hardcoded UUID +1 |
+| HQPricing | SAFETY-022 | PB | — | One-liner |
+| ScanResult hardcoded UUID | SAFETY-030 | PA | FM6 | **WATCH-008 — historical misattribution remains** |
+| HQYearEnd journal_lines | SAFETY-023 | PB | — | 3 push sites, one commit |
+
+### SELECT-without-tenant-filter Clusters (Section 1.2)
+
+| Cluster | Finding Range | Tenant Pattern | Failure Modes | Notes |
+|---|---|---|---|---|
+| HQ bypass UX correctness | SAFETY-024 to 029 | HQB + PB | — | LL-285 canon — HQ RLS bypass doesn't excuse UI-layer scoping |
+| usePageContext AI engine | SAFETY-036 to 056 | PB | FM1 | 21 in one file. Biggest single-file finding of the campaign |
+| HQProduction chambers | SAFETY-057 to 060, 066-069 | PB | FM1 | Re-grep caught +4 |
+| Other SELECT misses | SAFETY-061 to 065 | PB | FM1 | 1 false positive from context window |
+
+### Edge Function Findings (Section 1.6)
+
+| Cluster | Finding Range | Pattern | Failure Modes | Notes |
+|---|---|---|---|---|
+| process-document cross-tenant dedup | SAFETY-070 | SR | FM3 | Initially CRITICAL; S305 DB investigation proved latent (1 tenant only) → reclass HIGH |
+| No-auth EF cluster | SAFETY-072, 073, 074, 076, 077, 078 | SR | — | 6 EFs needed verifyTenantAuth — two-mode helper shipped S306 |
+| Intentional-design EFs | SAFETY-071, 079 | SR | — | auto-post-capture initial fetch + verify-qr public — documented, not fixed |
+| False positive | SAFETY-075 | — | — | sim-pos-sales SQL interpolation is response body, not execution |
+
+### Supplier Architecture (Section 1.7)
+
+| Cluster | Finding | Pattern | Failure Modes | Notes |
+|---|---|---|---|---|
+| Supplier tenancy debt | SAFETY-080 | PB + new LL-294 | FM4 | Per-tenant copies. S313 decided, S313.5 executed. Facility A FK to Medi Rec caught during execution, not plan |
+
+### Database Hardening (Section 1.8)
+
+| Cluster | Finding | Pattern | Failure Modes | Notes |
+|---|---|---|---|---|
+| NOT NULL on 25 clean tables | 2B.1 | — | — | Zero NULL rows pre-apply, mechanical DDL |
+| Backfill + NOT NULL on 3 tables | 2B.2 | — | FM4 | 174-row backup. **S309 pivoted attribution from Medi Rec to Pure Premium mid-session** — canonical FM4 example |
+| Self-referencing views | SAFETY-081 | — | — | Grep-before-drop found silent failure in GeoAnalyticsDashboard.js:485 |
+| Shared-defaults pattern | SAFETY-082a | SD | FM2 | 3 tables. Would-have-been-backfilled. Classified as design via RLS policy evidence |
+| Backfill + NOT NULL on 6 tables | SAFETY-082b | — | FM4 | 23-row backup. Phone-owner attribution rule for notification_log |
+
+### RLS Policy Campaign (from PENDING-ACTIONS, not yet in register section)
+
+| Cluster | Sessions | Pattern | Failure Modes | Notes |
+|---|---|---|---|---|
+| Bucket A CRITICAL using='true' | S314.1 | — | FM1 (4 rounds) | 10 + 10 + 1 + 8 = 29 policies across 4 sweep rounds. Largest FM1 example of campaign |
+| HIGH tenant-scoped with_check | S314.3a | — | FM1 | 83 live vs 37 registered = 2.2x under-count |
+| HR cluster with_check | S314.3b | — | FM1 over-estimate | 24 actual vs 32 predicted = -25% (only over-estimate in campaign) |
+| HQ bypass with_check | S314.3c | HQB | FM1 | 65 live vs 57 predicted = +14% |
+| Stock_take legacy migration | S314.3d | — | — | Unused feature, migrated for consistency dividend |
+| message_templates schema | S314.2c | SD (refined) | — | Added tenant_id + asymmetric WITH CHECK. LL-293 refinement |
+| Final Bucket A escapes | S314.4 | — | FM1 | 8 more tables, none had tenant_id — fixed via HQ-only / user-scoped / FK patterns |
+
+### Financial Findings (Section 2)
+
+| Finding | Session | Pattern | Failure Modes | Procedure | Notes |
+|---|---|---|---|---|---|
+| FIN-001 HQYearEnd FY filter | S316 | — | FM1 (latent) | P5 | Single-year data state — would corrupt on first multi-year tenant. LL-296 |
+| FIN-002 Hardcoded FY2026 | S317 | — | FM1 | P5 | Register said 4 sites, disk had 5. **Also caught HQTenants calendar-year P&L-period bug not in register.** LL-297 |
+| FIN-003 Hardcoded VAT_RATE | S317 | — | — | P5 | 3 module-level constants → per-tenant tenant_config.vat_rate. LL-298 |
+| FIN-006 Unsorted equity_ledger join | S317 | — | FM1 (latent) | P5 | 1 row per tenant today. Time bomb Jan 2027 |
+| FIN-004/005 | — | — | — | P5 | **Confirmed CLEAN** — all query sites + UNIQUE constraint verified |
+
+### LL Maintenance (Section 2.4)
+
+| Finding | Session | Failure Modes | Notes |
+|---|---|---|---|
+| LL-251 Q5 period_month TEXT not integer | S315 | FM7 | Stale since before campaign |
+| LL-251 Q6 closing_balance column doesn't exist | S315 | FM7 | Should be opening_balance. Same fix. |
+
+### WP Register (Section 1.9)
+
+| Cluster | Session | Failure Modes | Notes |
+|---|---|---|---|
+| WP doc status drift | S316.5b.1-3 | FM8 | 6/32 WPs (19%) reclassified at verification. All 6 under-classified (SCOPED → SHIPPED). Same direction as FM1 |
+
+---
+
 ## APPENDIX A: Audit Script Analysis
 
 `docs/audit_tenant_isolation.py` was read and analysed. The script scans all

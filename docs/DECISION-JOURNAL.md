@@ -4,6 +4,45 @@
 
 ---
 
+## S318 — 18 April 2026 — Capstone-003: campaign retrospective synthesis
+
+**Context:** Safety + financial campaigns ran S293-S317 (~25 sessions, ~140
+code fixes, 146 RLS policies, 4 financial findings). Methodology, journal,
+and LLs captured in-stride. Capstone-003 PENDING-ACTIONS entry called for
+final synthesis pass.
+
+**Decision:** Produce 5 retrospective artifacts in one session:
+(1) Pattern tagging layered onto DEBT_REGISTER_v1 Section 6
+(2) Failure Mode Evidence Map in AGENT-METHODOLOGY Section 4
+(3) New LOOP-CALIBRATION.md with measured rates
+(4) LL-299 capturing planner/executor split value (S316 vs S317 evidence)
+(5) Archive _migration_backup_s309
+
+**Alternative considered:** Extend AGENT-METHODOLOGY with calibration numbers
+inline. Rejected — calibration is data with its own lifecycle (updated after
+each campaign), methodology is stable principles. Different lifecycles want
+different files.
+
+**Alternative considered:** Write one journal entry per artifact. Rejected —
+all five are part of one synthesis decision, not five independent ones.
+Over-atomisation of journal entries dilutes signal.
+
+**Almost-mistake caught:** Originally planned a sixth artifact cross-linking
+every journal entry to every WP in WP-REGISTER. Rejected during scoping —
+too granular, low retrieval value, negative maintenance value (breaks on
+any rename).
+
+**Key number from calibration:** 11 of 12 audit estimates in the campaign
+were under-counts. Median +40%. This is now a documented rate; future
+campaigns can budget against it.
+
+**LL-299** added: planner/executor split value. Grounded in S316 (integrated,
+clean but small) vs S317 (split, caught calendar-year bug outside register).
+
+**Fresh at close:** Yes.
+
+---
+
 ## S317 — 18 April 2026 — FIN-002: FY label + recalc period
 
 **Context:** Register flagged "hardcoded FY2026 in 4 locations." Disk

@@ -321,6 +321,13 @@ Session 262 · 15 April 2026
 ### CLOSED — SB-FIX-001 through SB-FIX-009, CC-01 through CC-04
 Session 261 · All fin packages, bank recons, IFRS fixes
 
+## CLOSED LOOPS — SESSION 318
+
+### CLOSED — CAPSTONE-003 (S316.5 → S318)
+Session 318 · Campaign retrospective synthesis. 5 artifacts:
+pattern tagging (DEBT_REGISTER Section 6), FM Evidence Map (AGENT-METHODOLOGY),
+LOOP-CALIBRATION.md (new), LL-299 (planner/executor split), _migration_backup_s309 archived.
+
 ---
 
 ## WATCH ITEMS
@@ -425,7 +432,4 @@ Logged: 15 April 2026 · Session 262
 GP-001 through GP-006 — see prior versions for detail.
 
 ### CAPSTONE-003 (S316.5) — Loop system retrospective + register pattern-tagging
-Status: PLANNED — after Tier 3 completion
-Scope: Final synthesis pass over DEBT_REGISTER_v1.md, DECISION-JOURNAL.md,
-and AGENT-METHODOLOGY.md. Tag register entries with methodology patterns.
-Verify all failure modes are documented. Archive S309 backup table.
+Status: **CLOSED — SESSION 318** · See CLOSED LOOPS — SESSION 318 above.

@@ -1989,4 +1989,33 @@ does NOT apply to the dispensary branch.
 
 ---
 
-*LL-297 + LL-298 added 18 April 2026 · Session 317*
+### LL-299 — PLANNER/EXECUTOR SEPARATION
+
+**Rule:** Planner/executor separation surfaces what integrated sessions miss.
+
+When one agent plans (read-only, produces spec) and another executes (reads spec,
+writes code), the planner must produce an artifact before anything ships. That
+artifact invites scrutiny in a way in-flight reasoning does not.
+
+Evidence:
+- S316 used integrated flow. FIN-001 shipped cleanly. One-liner, low-scope.
+- S317 used planner/executor split. FIN-002 ships AND HQTenants calendar-year
+  P&L-period bug (not in register, surfaced only during disk grounding in the
+  spec) fixed in same commit.
+- S316.5b.1-3 used split across three sessions. WP triage accuracy was
+  measurable (81%) precisely because the classification artifact existed to
+  be measured against.
+
+Cost: one extra turn of planning per finding.
+Return: specs catch register scope gaps before they become silent code
+landings. The gaps are real — campaign measured 11 of 12 audit estimates
+were under-counts (LOOP-CALIBRATION.md).
+
+Rule: prefer planner/executor split for any finding larger than a one-liner.
+For one-liners with fully-verified register scope, integrated is fine.
+
+See also: LOOP-CALIBRATION.md "Planner / executor split cost and benefit".
+
+---
+
+*LL-297 + LL-298 + LL-299 added 18 April 2026 · Sessions 317-318*

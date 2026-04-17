@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 317 close (FIN-002 + FIN-003 + FIN-006 — FINANCIAL DEBT COMPLETE)
+## Updated: 18 April 2026 — Session 318 close (Capstone-003 — campaign retrospective synthesis)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -148,7 +148,16 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (317) — 18 April 2026
+### CLOSED THIS SESSION (318) — 18 April 2026
+- **Capstone-003 — campaign retrospective synthesis.** 5 artifacts:
+  1. DEBT_REGISTER_v1 Section 6: pattern tagging (findings → methodology cross-ref)
+  2. AGENT-METHODOLOGY Section 4: Failure Mode Evidence Map (FM1-FM8 grounded)
+  3. LOOP-CALIBRATION.md (new): measured rates — 11/12 under-count, median +40%
+  4. LL-299: planner/executor split value (S317 caught calendar-year bug outside register)
+  5. Archived _migration_backup_s309 (174 rows, retention verified)
+- **Campaign arc closed.** S293-S317 safety + financial campaigns fully synthesized.
+
+### CLOSED SESSION 317 — 18 April 2026
 - **FIN-002 FIXED** — Computed FY label from tenant's financial_year_start.
   Also fixed HQTenants.recalcNetProfit calendar-year P&L period bug. LL-297.
 - **FIN-003 FIXED** — Per-tenant VAT divisor from tenant_config.vat_rate.

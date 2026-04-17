@@ -659,3 +659,19 @@ loop, inspect the underlying table's PRIMARY/UNIQUE key constraints
 — not the rendered tabs. Applied Session 293, 17 April 2026.
 
 *LL-290 added: Session 293 · 17 April 2026*
+
+---
+
+## LL-299 — Session 318 (18 April 2026)
+
+LL-299: Planner/executor separation surfaces what integrated sessions miss.
+When one agent plans (read-only, produces spec) and another executes
+(reads spec, writes code), the planner must produce an artifact before
+anything ships. That artifact invites scrutiny in a way in-flight reasoning
+does not. Prefer planner/executor split for any finding larger than a
+one-liner. For one-liners with fully-verified register scope, integrated
+is fine. Evidence: S317 split caught HQTenants calendar-year P&L-period
+bug not in register; S316 integrated missed nothing but was a one-liner.
+See LOOP-CALIBRATION.md for measured rates.
+
+*LL-299 added: Session 318 · 18 April 2026*

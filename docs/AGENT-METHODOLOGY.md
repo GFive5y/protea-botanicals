@@ -621,6 +621,34 @@ against the schema.
 arithmetic failed) and Q6 (closing_balance column doesn't exist, should be
 opening_balance). Both had been stale since before the safety campaign.
 
+### Evidence Map (added S318, Capstone-003)
+
+Each failure mode must be grounded — at least one Decision Journal entry where
+it manifested, and at least one register cluster it explains. A failure mode
+that can't be grounded is a hypothesis, not a pattern. This table was produced
+by Capstone-003 to verify groundedness.
+
+| FM | Name | Journal Evidence | Register Evidence |
+|---|---|---|---|
+| FM1 | Audit floor/ceiling | S297, S299, S314.1, S314.2a, S314.3a, S314.3c, S314.4, S316.5b.2 | WATCH-007 (original); RLS Bucket A (4 sweep rounds); HIGH with_check (2.2x); WP register (1.19x) |
+| FM2 | Bug-vs-design | S311 | SAFETY-082a (3 tables); LL-293 canon |
+| FM3 | Severity inflation | S305 | SAFETY-070 (initial CRITICAL → HIGH latent) |
+| FM4 | Tenant misattribution | S309, S312, S313.5 | 2B.2 (S309), 2B.4b (S312), SAFETY-080 execution (S313.5) |
+| FM5 | Stale snapshot drift | S303.5 | SESSION-START-PROMPT snapshot (pre-LL-292 era) |
+| FM6 | Code fix without data cleanup | S300 | SAFETY-030 (ScanResult hardcoded UUID) → WATCH-008 |
+| FM7 | LL query drift | S315 | LL-251 Q5/Q6 |
+| FM8 | Documentation under-classification | S316.5b.2 | WP-REGISTER triage (6 reclassifications, 81% accuracy) |
+
+Pattern: all eight failure modes have multiple-session evidence except FM3
+(single-session — SAFETY-070). FM3 is the thinnest; if another severity-
+inflation case surfaces in future, strengthen this row.
+
+Observation: FM1 and FM8 are directionally identical (both are "declared
+count understates actual"). FM8 was separated to distinguish doc-header
+drift from finding-count drift, but the underlying mechanism is shared:
+any self-description of the platform is a hypothesis until ground-verified.
+Treat the two as siblings, not duplicates.
+
 ---
 
 ## SECTION 5 — OPEN QUESTIONS AND GAPS
