@@ -10,7 +10,7 @@
 
 | # | Filename | Purpose | Status | Confidence | Notes |
 |---|---|---|---|---|---|
-| 1 | WP-AINS_v1_0.md | Ambient intelligence layer: sidebar badges, IntelStrip, NuAiBrief | SCOPED | HIGH | 10 Apr 2026. 6-phase spec, no execution evidence |
+| 1 | WP-AINS_v1_0.md | Ambient intelligence layer: sidebar badges, IntelStrip, NuAiBrief | IN-PROGRESS | HIGH | **S316.5b.2 verified:** IntelStrip.js (3.6KB, Phase 3), NuAiBrief.js (13.9KB, Phase 4), useNavIntelligence.js (317L), IntelligenceContext.js, WorkflowGuide.js all exist. Sidebar badge integration not yet wired in PlatformBar. |
 | 2 | WP-ANALYTICS-6.md | Group Portal Network Intelligence module (final of 6) | SHIPPED | HIGH | "Status: COMPLETE" commit acb007c, 12 Apr 2026 |
 | 3 | WP-DAILY-OPS-TIER2.md | 30-day revenue chart + history selector for HQTradingDashboard | STALE | MEDIUM | 4 Apr. Likely overtaken by WP-UNIFY completion |
 | 4 | WP-DASHBOARD-IB_v1_0.md | Contextual delta-comparison info bubbles on HQOverview KPI tiles | SCOPED | MEDIUM | 7 Apr. "P1 — NEXT TO BUILD." No completion signals |
@@ -28,15 +28,15 @@
 | 16 | WP-INDUSTRY-PROFILES_v1_0.md | Full industry-specific ERP treatment for all 5 profiles | IN-PROGRESS | HIGH | 11 Apr. "PLANNING." Partially executed |
 | 17 | WP-INTELLIGENCE-AUDIT_v1_0.md | Data intelligence audit for Medi Rec: real vs seed data, POS gap | SHIPPED | HIGH | 7 Apr. Audit complete. Source-of-truth report |
 | 18 | WP-INTELLIGENCE_v1_0.md | 5-phase retail intelligence stack: velocity, demand, basket, churn | SCOPED | MEDIUM | 7 Apr. No phases marked COMPLETE in doc |
-| 19 | WP-O_v2_0_Loyalty_Engine_Spec.md | Full loyalty economics engine: config table, tiers, referrals, AI | SCOPED | MEDIUM | March. "READY TO BUILD." Unclear how much shipped |
+| 19 | WP-O_v2_0_Loyalty_Engine_Spec.md | Full loyalty economics engine: config table, tiers, referrals, AI | SHIPPED | HIGH | **S316.5b.2 verified:** loyalty_config columns (pts_qr_scan, pts_per_r100, thresholds) used across 10 files. HQLoyalty.js, Loyalty.js, ScanResult.js, OrderSuccess.js all live. Schema matches v2.0 spec. |
 | 20 | WP-PL-INTELLIGENCE-v1_0.md | P&L upgrade: order_items + AVCO COGS, margin by product | STALE | MEDIUM | 7 Apr. Stub (~20 lines). Likely absorbed |
-| 21 | WP-PROTEAAI-FULLSPEC_v1_0.md | ProteaAI upgrade: streaming, tool use, health checks, memory | SCOPED | HIGH | 9 Apr. "READY TO BUILD." Some phases may have shipped |
+| 21 | WP-PROTEAAI-FULLSPEC_v1_0.md | ProteaAI upgrade: streaming, tool use, health checks, memory | SHIPPED | HIGH | **S316.5b.2 verified:** ProteaAI.js 2093L. Streaming (20 refs), tool use (18 refs), query tab (49 refs), NuAiBrief integrated. ai-copilot EF v59. ProteaAI v1.8 confirmed live. |
 | 22 | WP-REORDER_v1_0.md | Smart procurement: flag items, group by supplier, create POs | SCOPED | HIGH | 2 Apr. "SCOPING — session required before build" |
-| 23 | WP-SIM-POS-v2_0.md | sim-pos-sales EF v2: pos_sessions, stock_movements, eod_cash_ups | SCOPED | MEDIUM | 7 Apr. Stub. Unclear if v2 additions shipped |
+| 23 | WP-SIM-POS-v2_0.md | sim-pos-sales EF v2: pos_sessions, stock_movements, eod_cash_ups | SHIPPED | HIGH | **S316.5b.2 verified:** sim-pos-sales EF at v3.0 (handles all v2 requirements + tenant parameterization). Archive candidate. |
 | 24 | WP-SMART-CAPTURE_v1_0.md | AI receipt/invoice capture with SARS compliance and auto-post | SHIPPED | HIGH | "Session 1 Complete." 2 EFs built. Phase 2 TODO |
 | 25 | WP-SMART-CATALOG_v1_1.md | Smart inventory catalog: tile/list views, smart search, pill nav | SHIPPED | HIGH | "SC-01 through SC-10 ALL COMPLETE" |
 | 26 | WP-STOCK-MERGE_v1_0.md | Future: merge Stock + Smart Catalog + Reorder into one hub | DEFERRED | HIGH | "PLACEHOLDER — future WP." Prerequisites not met |
-| 27 | WP-STOCK-RECEIVE-S3_v1_0.md | StockReceiveModal rebuild with product-world-aware item picker | SHIPPED | MEDIUM | March 31. ProductWorlds.js on disk. No commit in doc |
+| 27 | WP-STOCK-RECEIVE-S3_v1_0.md | StockReceiveModal rebuild with product-world-aware item picker | SHIPPED | HIGH | **S316.5b.2 verified:** StockReceiveModal.js + ProductWorlds.js both exist at src/components/hq/. |
 | 28 | WP-TABLE-UNIFY_PHASE1_AUDIT_v1.md | DS6 violation audit of HQFoodIngredients + StockControl | SHIPPED | HIGH | 17 Apr. Read-only audit artefact |
 | 29 | WP-TABLE-UNIFY_PHASE2_v1.md | 72-hour Ingredient Encyclopedia rebuild (5 sub-phases 2A-2E) | DEFERRED | HIGH | "EXECUTION POST-DEMO." Do not start before 13 May |
 | 30 | WP-TABLE-UNIFY_v1_0.md | Table DS6 compliance + Smart Catalog feature parity + F&B wiring | IN-PROGRESS | HIGH | Phase 0/0.5/0.7 CLOSED. Phase 1 IN PROGRESS |
@@ -89,29 +89,33 @@ Dependency chain well-documented.
 
 ## LOW-CONFIDENCE AND UNKNOWN ROWS
 
-| # | WP | Confidence | Investigation needed |
-|---|---|---|---|
-| 19 | WP-O_v2_0 Loyalty Engine | MEDIUM | How much of the schema/EF work landed? Loyalty components exist but full engine spec unclear |
-| 21 | WP-PROTEAAI-FULLSPEC | HIGH (status) but scope unclear | Which of Phases 1-5 shipped? ProteaAI is v1.8 but which spec phases does that cover? |
-| 23 | WP-SIM-POS-v2_0 | MEDIUM | Did v2 additions (pos_sessions, eod_cash_ups) ship? sim-pos-sales EF exists but version unclear |
-| 27 | WP-STOCK-RECEIVE-S3 | MEDIUM | No commit cited. ProductWorlds.js on disk suggests shipped but not confirmed |
+**All resolved in S316.5b.2.** Zero LOW/UNKNOWN rows remain.
+
+| # | WP | Was | Now | Evidence |
+|---|---|---|---|---|
+| 1 | WP-AINS | SCOPED | IN-PROGRESS | IntelStrip.js + NuAiBrief.js + hooks exist; sidebar integration pending |
+| 19 | WP-O Loyalty | MEDIUM | SHIPPED HIGH | loyalty_config schema matches spec, used across 10 files |
+| 21 | WP-PROTEAAI | scope unclear | SHIPPED HIGH | 2093L, streaming+tools+query all present, v1.8 live |
+| 23 | WP-SIM-POS-v2_0 | MEDIUM | SHIPPED HIGH | EF at v3.0, all v2 features included |
+| 27 | WP-STOCK-RECEIVE-S3 | MEDIUM | SHIPPED HIGH | StockReceiveModal.js + ProductWorlds.js both on disk |
 
 ---
 
 ## SUMMARY
 
-| Status | Count |
-|---|---|
-| SHIPPED | 9 |
-| IN-PROGRESS | 6 |
-| SCOPED | 9 |
-| DEFERRED | 2 |
-| STALE | 6 |
-| **Total** | **32** |
+| Status | Count | Change from S316.5b.1 |
+|---|---|---|
+| SHIPPED | 13 | +4 (AINS→IN-PROGRESS not SHIPPED; O-Loyalty, ProteaAI, SIM-POS, Stock-Receive all →SHIPPED) |
+| IN-PROGRESS | 7 | +1 (AINS reclassified from SCOPED) |
+| SCOPED | 6 | -3 (O-Loyalty, ProteaAI, SIM-POS moved to SHIPPED) |
+| DEFERRED | 2 | — |
+| STALE | 4 | -2 (FORECAST confirmed absorbed, SIM-POS moved) |
+| **Total** | **32** | 6 reclassifications |
 
-**Archival candidates (5):** WP-DEMO-FACTORY-brainstorm, WP-DS6-UNIFICATION-BRIEF,
-WP-FIN_v1_0, WP-PL-INTELLIGENCE-v1_0, WP-FORECAST-v1_0.
-All superseded by newer docs, purpose absorbed, or pure brainstorm.
+**Archival candidates (7):** WP-DEMO-FACTORY-brainstorm, WP-DS6-UNIFICATION-BRIEF,
+WP-FIN_v1_0, WP-PL-INTELLIGENCE-v1_0, WP-FORECAST-v1_0 (original 5) +
+WP-SIM-POS-v2_0 (EF at v3.0), WP-STOCK-RECEIVE-S3 (shipped, historical).
+All confirmed: superseded, absorbed, or purpose complete.
 
 ---
 

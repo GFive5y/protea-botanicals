@@ -4,6 +4,31 @@
 
 ---
 
+## S316.5b.2 — 18 April 2026 — WP verification
+
+**Decision:** Verified 4 LOW/MEDIUM-confidence rows + 5 archival candidates
++ 1 bonus misclassification (WP-AINS). WP-TRIAGE.md updated with verified
+classifications. Ready for S316.5b.3 register build.
+
+**Reclassifications (6):**
+- WP-AINS: SCOPED → IN-PROGRESS (IntelStrip + NuAiBrief exist, sidebar pending)
+- WP-O Loyalty: SCOPED MEDIUM → SHIPPED HIGH (schema matches spec, 10 files use it)
+- WP-PROTEAAI: SCOPED → SHIPPED HIGH (2093L, streaming+tools+query, v1.8 live)
+- WP-SIM-POS-v2_0: SCOPED MEDIUM → SHIPPED HIGH (EF at v3.0)
+- WP-STOCK-RECEIVE-S3: SHIPPED MEDIUM → SHIPPED HIGH (modal + ProductWorlds confirmed)
+- WP-FORECAST: STALE → STALE confirmed (HQForecast.js ships the features)
+
+**Archival candidates expanded:** 5 → 7 (added SIM-POS-v2_0 + STOCK-RECEIVE-S3).
+
+**Triage accuracy:** S316.5b.1 got 26/32 right on first pass (81%). 6 needed
+reclassification, all in the same direction (under-classified as SCOPED when
+actually shipped or in-progress). Consistent with WATCH-007 — triage from
+doc headers under-counts what's actually built.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S316.5b.1 — 18 April 2026 — WP triage baseline
 
 **Decision:** Catalogued 32 WP docs in docs/WP-TRIAGE.md. No priorities
