@@ -204,6 +204,98 @@ portals. `tenantId` was passed as a parameter but not used on 21 queries.
 
 ---
 
+### 1.6 Edge Function Safety Findings (Session 304 — Tier 2 Workstream A)
+
+14 Edge Functions audited at HEAD `9fe86e8`. First EF-side tenant isolation
+audit. Prior safety campaign (S294-S303) was React-only.
+
+**Summary: 14 EFs audited, 8 findings across 6 EFs, 6 EFs CLEAN.**
+
+| # | EF Name | Risk | Findings | Key Issue |
+|---|---|---|---|---|
+| 1 | auto-post-capture | HIGH | 3 | No auth; initial fetch unfiltered |
+| 2 | process-document | **CRITICAL** | 2 | Cross-tenant data leak in duplicate guard |
+| 3 | seed-tenant | HIGH | 1 | No auth (mitigated by idempotency) |
+| 4 | sim-pos-sales | HIGH | 2 | No auth; latent SQL interpolation |
+| 5 | sign-qr | CLEAN | 0 | Pure crypto, no DB |
+| 6 | verify-qr | LOW | 1 | Products read not tenant-filtered |
+| 7 | payfast-itn | CLEAN | 0 | UUID-scoped, correct tenant_id |
+| 8 | invite-user | MEDIUM | 1 | Trusts caller-provided tenant_id |
+| 9 | send-notification | CLEAN | 0 | tenant_id included |
+| 10 | send-email | CLEAN | 0 | Authenticated, tenant-filtered |
+| 11 | generate-financial-statements | MEDIUM | 1 | No auth on sensitive financial PDFs |
+| 12 | ai-copilot | MEDIUM | 1 | tenantId from unverified request body |
+| 13 | payfast-checkout | CLEAN | 0 | Authenticated, tenant from profile |
+| 14 | get-fx-rate | CLEAN | 0 | Global data, no tenant scope needed |
+
+**DOMINANT PATTERN: Missing caller authorization, not missing tenant_id.**
+Most EFs correctly include tenant_id in their write payloads. The risk is
+that service-role clients bypass RLS, and most EFs accept tenant_id from
+the request body without verifying the caller has authority over that tenant.
+
+#### Finding Detail
+
+**CRITICAL:**
+
+| ID | EF | Line | Type | Table | Description | Size |
+|---|---|---|---|---|---|---|
+| SAFETY-070 | process-document | L908-911 | SELECT | document_log | Duplicate invoice guard queries ALL tenants' documents — leaks filenames + dates in API response. Missing `.eq("tenant_id", tenant_id)`. | S |
+
+**HIGH:**
+
+| ID | EF | Line | Type | Description | Size |
+|---|---|---|---|---|---|
+| SAFETY-071 | auto-post-capture | L48 | SELECT | Initial capture_queue fetch by ID only, no tenant_id filter. Any caller can trigger processing of any tenant's capture queue entry. | S |
+| SAFETY-072 | auto-post-capture | — | AUTH | No caller authorization. Service-role bypass + no JWT verification = any caller can auto-post for any tenant. | M |
+| SAFETY-073 | seed-tenant | — | AUTH | No caller authorization. Any caller can seed any tenant (mitigated by idempotency guard `seed_complete`). | M |
+| SAFETY-074 | sim-pos-sales | — | AUTH | No caller authorization. Any caller can flood any tenant with fake POS data. | M |
+| SAFETY-075 | sim-pos-sales | L323-328 | SQL | `wipe_sql` response interpolates tenant_id + SIM_TAG directly into SQL strings. Latent injection if strings are ever executed programmatically. | S |
+
+**MEDIUM:**
+
+| ID | EF | Line | Type | Description | Size |
+|---|---|---|---|---|---|
+| SAFETY-076 | invite-user | — | AUTH | No explicit auth check in code. Caller-provided tenant_id trusted without verification. | M |
+| SAFETY-077 | generate-financial-statements | — | AUTH | No auth check. Caller can generate financial PDFs (P&L, BS, trial balance, VAT numbers) for any tenant. All DB reads ARE correctly tenant-filtered. | M |
+| SAFETY-078 | ai-copilot | — | AUTH | No auth check. tenantId from unverified `userContext` in request body. Allows querying any tenant's data across 46 tables. | M |
+
+**LOW:**
+
+| ID | EF | Line | Type | Description | Size |
+|---|---|---|---|---|---|
+| SAFETY-079 | verify-qr | L83-102 | SELECT | Products table queried by qr_code without tenant_id. Theoretical cross-tenant if QR codes collide (unlikely with HMAC). | S |
+
+#### Auth Pattern Analysis
+
+| EF | Auth Status | Deployment |
+|---|---|---|
+| payfast-checkout | Authenticated (JWT verified) | Correct |
+| send-email | Authenticated (JWT verified) | Correct |
+| payfast-itn | N/A (server-to-server callback) | Correct |
+| sign-qr | N/A (no DB access) | Correct |
+| get-fx-rate | N/A (global data) | Correct |
+| auto-post-capture | **NO AUTH** | `--no-verify-jwt` likely |
+| process-document | **NO AUTH** | `--no-verify-jwt` likely |
+| seed-tenant | **NO AUTH** | Admin-only, but not enforced |
+| sim-pos-sales | **NO AUTH** | Admin-only, but not enforced |
+| invite-user | **NO AUTH** in code | Default JWT from gateway |
+| generate-financial-statements | **NO AUTH** | `--no-verify-jwt` |
+| ai-copilot | **NO AUTH** | `--no-verify-jwt` |
+| send-notification | **NO AUTH** | Low-risk audit table |
+| verify-qr | **NO AUTH** | Read-only, low risk |
+
+**Recommendation:** The auth gap is systemic. Rather than fixing each EF
+individually, consider:
+1. **Immediate (S305):** Fix SAFETY-070 (the CRITICAL cross-tenant data leak —
+   one-line `.eq("tenant_id", tenant_id)` on process-document L908).
+2. **Short-term:** Add JWT verification to generate-financial-statements and
+   ai-copilot (both expose sensitive tenant data).
+3. **Medium-term:** Establish a standard EF auth pattern (verify JWT, extract
+   tenant_id from token claims, validate against request tenant_id) and
+   retrofit across all EFs. This is an architectural task, not a per-EF fix.
+
+---
+
 ## SECTION 2: FINANCIAL DATA DEBT
 
 ### 2.1 Active Findings
