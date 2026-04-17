@@ -46,10 +46,13 @@ Deno.serve(async (req) => {
 
     const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
+    // SAFETY-071: Fetch by ID is intentionally unscoped — we need the record's tenant_id
+    // to verify auth. The auth check below (SAFETY-072) gates all subsequent processing.
+    // No data is returned to the caller if auth fails.
     const { data: cap, error: cErr } = await db.from("capture_queue").select("*").eq("id", capture_queue_id).single();
     if (cErr || !cap) throw new Error(`Not found: ${capture_queue_id}`);
 
-    // SAFETY-072: Verify caller is authorized for this tenant
+    // SAFETY-072: Verify caller is authorized for this tenant (defence-in-depth with SAFETY-071)
     const auth = await verifyTenantAuth(req, { mode: 'tenant', tenantId: cap.tenant_id });
     if (!auth.ok) return new Response(JSON.stringify({ error: auth.error }), { status: auth.status, headers: JSON_H });
     if (["approved","auto_posted"].includes(cap.status))

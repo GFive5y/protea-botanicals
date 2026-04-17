@@ -79,7 +79,13 @@ serve(async (req: Request) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Try full signed string first
+    // SAFETY-079: products query is intentionally NOT tenant-scoped.
+    // This EF is called by public QR scanners (no logged-in user, no JWT).
+    // QR codes are HMAC-signed with a shared secret, so collisions are
+    // cryptographically improbable. If a wrong product is returned (e.g.
+    // two tenants with same qr_code string), the HMAC verification step
+    // will fail because batch_id won't match, returning "invalid_signature".
+    // No sensitive data is leaked — response contains only valid/invalid.
     const { data: product } = await supabase
       .from("products")
       .select("id, qr_code, batch_id")
