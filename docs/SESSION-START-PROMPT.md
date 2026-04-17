@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 314.3c close (Tier 2C.3c — HQ bypass with_check)
+## Updated: 18 April 2026 — Session 314.3d close (Tier 2C.3d — stock_take legacy migration)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -148,12 +148,15 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (314.3c) — 18 April 2026
-- **65 HQ bypass with_check fixes** across ~50 tables. Mechanical: copy
-  using_clause to with_check. Brief estimated 57, live DB had 65 (WATCH-007).
-  8 DELETE-only policies recreated without WITH CHECK (PostgreSQL doesn't
-  support WITH CHECK on DELETE — correct behavior).
-- **Total RLS policies fixed S314.1-S314.3c: 130.**
+### CLOSED THIS SESSION (314.3d) — 18 April 2026
+- **3 stock_take_* legacy RLS policies migrated** from current_setting('app.tenant_id')
+  to standard user_tenant_id() + user_role() pattern. 3 legacy dropped, 6 new created
+  (3 tenant-admin + 3 HQ bypass). Zero rows, zero risk. Legacy pattern eliminated
+  from platform.
+- **Total RLS policies fixed S314.1-S314.3d: 136.**
+
+### CLOSED SESSION 314.3c — 18 April 2026
+- **65 HQ bypass with_check.** Total: 130 policies.
 
 ### CLOSED SESSION 314.3b — 18 April 2026
 - **24 HR cluster with_check fixes.** leave_types classified ACCEPTABLE.
@@ -515,8 +518,8 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **Remaining Tier 2C:** stock_take_* legacy (3 policies), message_templates
-   schema (1 table), duplicate + naming cleanup (~45 policies).
+1. **Remaining Tier 2C:** message_templates schema (S314.2c), duplicate +
+   naming cleanup (S314.4, ~45 policies).
 
 2. **Financial findings:** FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded FY2026),
    FIN-003 (VAT_RATE), FIN-006 (equity join filter).

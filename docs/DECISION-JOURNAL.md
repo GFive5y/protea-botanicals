@@ -4,6 +4,28 @@
 
 ---
 
+## S314.3d — 18 April 2026 — Stock_take legacy pattern migration
+
+**Decision:** Migrated 3 stock_take_* tables from `current_setting('app.tenant_id')`
+to standard `user_tenant_id() + user_role() = 'admin'` pattern. Added HQ bypass
+policies. Added with_check.
+
+**Approach A chosen** (migrate now) over B (drop and defer) and C (leave alone).
+Session cost: ~15 minutes. Consistency dividend: when stock-take feature gets
+built, RLS matches platform standard. Developer won't encounter or propagate
+the legacy pattern.
+
+**Evidence supporting "unused feature":** Zero rows in all 3 tables. Zero code
+references to `app.tenant_id` setting. No other policies on these tables.
+Feature likely unimplemented.
+
+**Legacy pattern eliminated:** `current_setting('app.tenant_id')` no longer
+exists anywhere in the platform's RLS policies.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S314.3c — 18 April 2026 — HQ bypass with_check (65 policies across ~50 tables)
 
 **Decision:** Fixed 65 HQ bypass policies by adding with_check mirroring

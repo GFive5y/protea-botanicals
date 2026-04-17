@@ -63,9 +63,7 @@ Trigger date: PENDING (depends on new demo date confirmation).
 ### S314.3a — CLOSED. 11 HIGH with_check fixes (tenant-scoped Tier A).
 ### S314.3b — CLOSED. 24 HR cluster with_check fixes (all mechanical, no rewrites).
 
-### stock_take_* legacy RLS migration (3 policies)
-RLS-051 to RLS-053. Use current_setting('app.tenant_id') instead of
-user_tenant_id(). Need migration to standard function pattern.
+### stock_take_* — CLOSED (S314.3d). Migrated to standard user_tenant_id() pattern.
 
 ### S314.2c — message_templates schema + seeding + RLS
 RLS-031. Table lacks tenant_id. Needs schema change + generic-default
