@@ -398,3 +398,9 @@ Logged: 15 April 2026 · Session 262
 
 ### BACKLOG-003 — WP-TENANT-GROUPS outstanding items (post-demo)
 GP-001 through GP-006 — see prior versions for detail.
+
+### CAPSTONE-003 (S316.5) — Loop system retrospective + register pattern-tagging
+Status: PLANNED — after Tier 3 completion
+Scope: Final synthesis pass over DEBT_REGISTER_v1.md, DECISION-JOURNAL.md,
+and AGENT-METHODOLOGY.md. Tag register entries with methodology patterns.
+Verify all failure modes are documented. Archive S309 backup table.

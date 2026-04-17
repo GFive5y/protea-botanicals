@@ -386,6 +386,23 @@ Tables with strict tenant_id RLS policies where every row has NULL:
 
 ---
 
+### 1.9 Loop System Architecture (S311.5 + S311.75)
+
+Capstone workstream addressing institutional memory beyond the safety campaign.
+
+| Session | Deliverable | Status |
+|---|---|---|
+| S311.5 | AGENT-METHODOLOGY.md — investigation procedures, patterns, failure modes | DONE |
+| S311.75 | LOOP-PRINCIPLES.md — philosophy of ambient capture | DONE |
+| S311.75 | DECISION-JOURNAL.md — seeded with 11 retrospective entries | DONE |
+| S311.75 | Session close Step 7 — reasoning capture mechanism | DONE |
+| S311.75 | AGENT-ORIENTATION.md — 8-item read list + Loop discipline | DONE |
+| S311.75 | LL-292 expanded — all-surface Loop discipline | DONE |
+| S311.75 | .claude/ memory audit — stale entries converted to pointers | DONE |
+| S316.5 | Capstone Part 3 — retrospective audit + register pattern-tagging | PLANNED |
+
+---
+
 ## SECTION 2: FINANCIAL DATA DEBT
 
 ### 2.1 Active Findings

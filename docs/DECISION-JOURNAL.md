@@ -1,0 +1,178 @@
+# NuAi Decision Journal
+## Living record of WHY decisions were made
+## Newest entries at top. Add at session close (Step 7).
+
+---
+
+## S311.75 — 18 April 2026 — Loop as formal system
+
+**Decision:** Treat the Loop as an explicit architectural system, not
+a collection of habits.
+
+**Alternatives:** (a) Continue ad-hoc — add docs as needed, no formal
+structure. (b) Formal Loop with principles, journal, and all-surface
+discipline.
+
+**Why this path:** The campaign (S293-S311) produced 80+ findings, 4
+procedures, 6 failure modes, and 3 new LLs — but the reasoning for
+many interim decisions was already fading. The owner articulated
+"capture at peak, reasoning decays, campaign never ends" as explicit
+beliefs. Formalising these as principles and building capture
+infrastructure prevents the next campaign from starting at zero.
+
+---
+
+## S311.5 — 18 April 2026 — AGENT-METHODOLOGY over expanded LLs
+
+**Decision:** Create a standalone methodology doc rather than expanding
+existing LLs with investigation procedures.
+
+**Alternatives:** (a) Add procedures as new LLs (LL-294, 295...) in the
+Bible. (b) Standalone doc with cross-references to LLs.
+
+**Why this path:** LLs are rules (do this / don't do that). Procedures
+are HOW to investigate before you know WHICH rule applies. They serve
+different cognitive functions. An agent facing a new finding needs a
+procedure first, then the relevant LL. Putting both in the Bible would
+make it harder to use.
+
+---
+
+## S311 — 18 April 2026 — Bug-vs-design reclassification (SAFETY-082 split)
+
+**Decision:** Split SAFETY-082 into 082a (design, closed) and 082b (bug,
+open) based on RLS policy evidence.
+
+**Alternatives:** (a) Treat all 9 tables as bugs and backfill. (b) Drop
+tenant_id column from the 3 design tables. (c) Split as done.
+
+**Why this path:** The RLS policies on public_holidays, product_formats,
+and product_strains explicitly use `(tenant_id IS NULL) OR (tenant_id =
+user_tenant_id())`. This is the shared-defaults-with-overrides pattern —
+NULL is by design. Backfilling would convert global defaults into
+single-tenant records, making them invisible to other tenants. The
+almost-mistake: treating absence-of-data as presence-of-bug.
+
+---
+
+## S310 — 18 April 2026 — Grep-before-drop on broken views
+
+**Decision:** Drop retailer_performance and scan_geo_summary views after
+confirming no functional code dependencies.
+
+**Alternatives:** (a) Fix the views (recreate with correct underlying
+tables). (b) Drop immediately without checking. (c) Grep first, then drop.
+
+**Why this path:** Option (a) would require knowing the original intent —
+no spec exists. Option (b) risks breaking code that silently depends on
+the views. Option (c) found one active code reference
+(GeoAnalyticsDashboard.js L485) which was already silently failing.
+Dropping changed nothing functionally. The grep step prevented a
+reckless DROP and documented the silent failure for future investigation.
+
+---
+
+## S309 — 18 April 2026 — Tenant attribution pivot (Medi Rec to Pure Premium)
+
+**Decision:** Backfill 16 NULL inventory_items to Pure Premium THC Vapes
+(f8ff8d07) rather than Medi Recreational.
+
+**Alternatives:** (a) Assign to Medi Rec (the planner agent's initial
+assumption based on name patterns). (b) Assign to Pure Premium (the DB
+evidence). (c) Leave NULL and skip backfill.
+
+**Why this path:** The planner agent initially assumed Medi Recreational
+ownership. DB investigation via supplier_id (AimVape 057e930b) and sibling
+stock_movement tenant_ids proved Pure Premium ownership. This is the
+canonical example of why tenant attribution requires evidence, not
+inference. Created the evidence-threshold requirement in
+AGENT-METHODOLOGY Section 2.2.
+
+---
+
+## S308 — 18 April 2026 — Scope 2B.1 to clean tables only
+
+**Decision:** Apply NOT NULL constraints only to the 25 tables with zero
+NULL rows, deferring the 17 others.
+
+**Alternatives:** (a) Constrain all 42 nullable tables in one session
+(requires data cleanup first). (b) Clean tables first, defer the rest.
+
+**Why this path:** The 25 clean tables are zero-risk — no data changes
+needed, just DDL. Combining data cleanup with schema changes in one
+session increases blast radius. Splitting into 2B.1 (clean) and 2B.2
+(cleanup) isolates risk. If 2B.2 goes wrong, 2B.1's constraints still
+stand.
+
+---
+
+## S306 — 18 April 2026 — Auth helper two-mode design
+
+**Decision:** Build verifyTenantAuth with two modes: 'tenant' (caller
+owns tenant OR is HQ operator) and 'operator-only' (HQ admin required).
+
+**Alternatives:** (a) Single mode that always checks tenant ownership.
+(b) Two modes as shipped. (c) Three modes adding 'public' for
+unauthenticated EFs like verify-qr.
+
+**Why this path:** seed-tenant and sim-pos-sales are admin-only tools
+that should never be callable by regular tenants. A single 'tenant'
+mode would require passing a tenant_id even for operations that aren't
+tenant-scoped. 'operator-only' captures the intent cleanly. The 'public'
+mode was considered but rejected — verify-qr is genuinely public and
+doesn't need the helper at all (HMAC is its auth).
+
+---
+
+## S306 — 18 April 2026 — No service-role bypass in auth helper
+
+**Decision:** The verifyTenantAuth helper does NOT accept service-role
+keys as a valid auth path. Only user JWTs.
+
+**Alternatives:** (a) Accept service-role key as "always authorised."
+(b) Reject service-role, require user JWT.
+
+**Why this path:** If the helper accepted service-role keys, any code
+calling an EF with the service-role key would bypass tenant auth — which
+is exactly the security gap the helper was built to close. Service-role
+should be used by the EF internally (for DB access), not as caller
+authentication. Callers must present a user JWT.
+
+---
+
+## S305 — 18 April 2026 — DB evidence before SAFETY-070 fix
+
+**Decision:** Investigate the actual data state before treating SAFETY-070
+as an active CRITICAL incident.
+
+**Alternatives:** (a) Fix immediately as CRITICAL (S304 audit's rating).
+(b) Investigate first, then fix with accurate severity.
+
+**Why this path:** The S304 audit flagged SAFETY-070 as CRITICAL based
+on the code pattern ("queries without tenant filter could leak data").
+DB investigation showed only 1 tenant (Medi Rec) had documents — no
+second tenant existed to leak TO. Reclassified to HIGH (latent). Fix
+still applied (defence-in-depth), but the incident response was
+proportional. This created the severity-grounding principle in
+AGENT-METHODOLOGY Section 4.3.
+
+---
+
+## S303.5 — 18 April 2026 — Retire project knowledge snapshot
+
+**Decision:** Replace the SESSION-START-PROMPT.md snapshot in project
+knowledge with a stable pointer file (AGENT-ORIENTATION.md).
+
+**Alternatives:** (a) Keep the snapshot pattern with better refresh
+discipline. (b) Automate the refresh. (c) Eliminate the snapshot.
+
+**Why this path:** The snapshot drifted regularly because Step 7 (manual
+refresh) was skipped. Option (a) failed repeatedly — it's a procedural
+fix for a structural problem. Option (b) isn't possible with current
+Anthropic tooling. Option (c) eliminates the drift source entirely.
+Project knowledge holds only stable pointers; all state is read live
+from the repo. Retired LL-287 and Step 7 in the same commit.
+
+---
+
+*DECISION-JOURNAL.md · NuAi · Newest first · Add entries at session close (Step 7)*

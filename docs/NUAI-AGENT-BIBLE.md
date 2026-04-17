@@ -1754,11 +1754,15 @@ usually right. Pattern A is for consumer flows.
 
 ## Session 303.5 — 18 April 2026 — Architecture: live-read replaces snapshots
 
-### LL-292 — READ LIVE STATE FROM REPO, NEVER TRUST SNAPSHOTS
+### LL-292 — ALL AGENT SURFACES FOLLOW LOOP DISCIPLINE
 
 **Rule:** At every session start, read all orientation docs live from the
-repo at HEAD via GitHub MCP. AGENT-ORIENTATION.md in project knowledge
-contains only pointers — never stateful content.
+repo at HEAD via GitHub MCP. All agent surfaces — project knowledge,
+project instructions, local agent config (.claude/) — hold only pointer
+content that references repo truth, OR stable content that by design
+never needs updating. They never hold stateful snapshots.
+
+See `docs/LOOP-PRINCIPLES.md` for the philosophy behind this rule.
 
 **Do not trust:**
 - Cached or remembered versions of docs from prior sessions

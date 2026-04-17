@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 311.5 close (Capstone Part 1 — AGENT-METHODOLOGY.md)
+## Updated: 18 April 2026 — Session 311.75 close (Capstone Part 2 — Loop System Architecture)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -148,11 +148,17 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (311.5) — 18 April 2026
-- **AGENT-METHODOLOGY.md created** — Capstone Part 1. Institutional memory
-  for platform agents. 5 sections: mental model, 4 investigation procedures,
-  4 design patterns, 6 failure modes, open questions. Draws from S293-S311
-  campaign experience. See docs/AGENT-METHODOLOGY.md.
+### CLOSED THIS SESSION (311.75) — 18 April 2026
+- **Loop System Architecture** — Capstone Part 2. Formalised the Loop as
+  an explicit system. LOOP-PRINCIPLES.md (6 principles), DECISION-JOURNAL.md
+  (11 retrospective entries), new Step 7 (reasoning capture), extended
+  AGENT-ORIENTATION.md (8-item read list + Loop discipline), expanded LL-292
+  (all-surface discipline), .claude/ memory audit (stale entries → pointers).
+- **New project instruction box text** provided for owner to paste.
+
+### CLOSED SESSION 311.5 — 18 April 2026
+- **AGENT-METHODOLOGY.md** — Capstone Part 1. 5 sections, 4 procedures,
+  4 patterns, 6 failure modes.
 
 ### CLOSED SESSION 311 — 18 April 2026
 - **SAFETY-082 SPLIT** — 082a CLOSED (3 shared-reference tables, LL-293).
@@ -515,10 +521,16 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
      git commit -m "docs(S###): update session docs in-place"
      git push origin main
 
-   Step 7 RETIRED S303.5 — project knowledge no longer contains
-   SESSION-START-PROMPT.md. See docs/AGENT-ORIENTATION.md in project
-   knowledge for the new architecture. Repo docs are read live every
-   session via GitHub MCP (LL-292). No manual refresh required.
+7. Capture session reasoning to docs/DECISION-JOURNAL.md:
+     - What substantive decisions were made this session?
+     - What alternatives were considered?
+     - What almost-mistakes did we catch or nearly make?
+     - Add entries while reasoning is still fresh (before close)
+     - One entry per substantive decision, not a summary
+   NOTE: This is NOT the retired Step 7 (S303.5). The old Step 7
+   manually refreshed project knowledge. This Step 7 captures session
+   reasoning to the Decision Journal per Loop Principle 1 (reasoning
+   has a half-life — capture at peak freshness).
 
 NEVER create NEXT-SESSION-PROMPT_vXXX.md. (LL-264)
 
