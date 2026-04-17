@@ -72,20 +72,24 @@ payload. The following 23 sites omit it.
 
 **All 4 fixed in Session 298 commit 0548979.**
 
-#### Cluster 5: Other Components (4 violations)
+#### Cluster 5: Other Components (4 violations — 1 FIXED S299, 3 remaining for S5b)
 
-| ID | File:Line | Table | Impact | Fix Sketch | Size |
-|---|---|---|---|---|---|
-| SAFETY-009 | HQMedical.js:1045 | stock_movements | Dispensing stock movement unattributed (dispensing_log at L1017 is correct) | Add `tenant_id: tenantId` | S |
-| SAFETY-020 | AdminProductionModule.js:468 | production_runs | Production run unattributed | Add `tenant_id: tenantId` | S |
-| SAFETY-021 | HQFraud.js:591 | audit_log | Audit log entry unattributed | Add `tenant_id: tenantId` | S |
-| SAFETY-022 | HQPricing.js:808 | product_pricing | Pricing record unattributed | Add `tenant_id: tenant?.id` | S |
+| ID | File:Line | Table | Status | Fix Applied |
+|---|---|---|---|---|
+| SAFETY-009 | HQMedical.js:1045 | stock_movements | OPEN | Stage 5b |
+| SAFETY-020 | AdminProductionModule.js:471 | production_runs | **FIXED** 9d2b9bc | `tenant_id: tenantId` + useTenant added to component |
+| SAFETY-021 | HQFraud.js:591 | audit_log | OPEN | Stage 5b |
+| SAFETY-022 | HQPricing.js:808 | product_pricing | OPEN | Stage 5b |
+| SAFETY-033 (NEW S299) | AdminProductionModule.js:488 | production_run_inputs | **FIXED** 9d2b9bc | `tenant_id: tenantId` (mapped array, WATCH-007 re-grep) |
+| SAFETY-034 (NEW S299) | AdminProductionModule.js:788 | stock_movements | **FIXED** 9d2b9bc | `tenant_id: tenantId` (production_out deduction, WATCH-007 re-grep) |
 
-#### Cluster 7: Hardcoded Tenant UUID (1 violation)
+#### Cluster 7: Hardcoded Tenant UUID (1 violation) — FIXED 9d2b9bc
 
-| ID | File:Line | Table | Impact | Fix Sketch | Size |
-|---|---|---|---|---|---|
-| SAFETY-030 | ScanResult.js:1285 | loyalty_transactions | Hardcoded tenant_id `"43b34c33-..."` — every scan path through this site writes to that tenant regardless of actual QR tenant. Misattribution, not orphan. | Replace with dynamic tenant source, mirror L1254 pattern (`tenantId \|\| null`) | S |
+| ID | File:Line | Table | Status | Fix Applied |
+|---|---|---|---|---|
+| SAFETY-030 | ScanResult.js:1285 | system_alerts | **FIXED** | Replaced hardcoded UUID `"43b34c33-..."` with `tenantId \|\| null` (pattern A — TRIGGER tenant) |
+
+**Note:** Register originally said loyalty_transactions; actual table is system_alerts. Corrected during S299 fix.**
 
 #### Cluster 6: Financial (1 violation)
 
@@ -104,11 +108,11 @@ prevent cross-tenant data appearing in per-tenant views.
 | ID | File:Line | Table | Impact | Fix Sketch | Size |
 |---|---|---|---|---|---|
 | SAFETY-024 | HQPurchaseOrders.js:369 | suppliers | ~~HQ sees all tenants' suppliers~~ | **FIXED** 0548979 (S298) | S |
-| SAFETY-025 | HQInvoices.js:762 | suppliers | HQ sees all tenants' suppliers in invoice dropdown | Add `.eq("tenant_id", tenantId)` | S |
-| SAFETY-026 | HQInvoices.js:763 | wholesale_partners | HQ sees all tenants' wholesale partners | Add `.eq("tenant_id", tenantId)` | S |
-| SAFETY-027 | AdminProductionModule.js:1311 | inventory_items | Admin loads all tenants' inventory | Add `.eq("tenant_id", tenantId)` | S |
-| SAFETY-028 | AdminProductionModule.js:1304 | production_runs | Admin loads all tenants' production runs | Add `.eq("tenant_id", tenantId)` | S |
-| SAFETY-029 | AdminProductionModule.js:1308 | batches | Admin loads all tenants' batches | Add `.eq("tenant_id", tenantId)` | S |
+| SAFETY-025 | HQInvoices.js:762 | suppliers | ~~HQ sees all tenants' suppliers~~ | **FIXED** 9d2b9bc (S299) | S |
+| SAFETY-026 | HQInvoices.js:763 | wholesale_partners | ~~HQ sees all tenants' partners~~ | **FIXED** 9d2b9bc (S299) | S |
+| SAFETY-027 | AdminProductionModule.js:1313 | inventory_items | ~~Admin loads all tenants' inventory~~ | **FIXED** 9d2b9bc (S299) | S |
+| SAFETY-028 | AdminProductionModule.js:1318 | production_runs | ~~Admin loads all tenants' runs~~ | **FIXED** 9d2b9bc (S299) | S |
+| SAFETY-029 | AdminProductionModule.js:1320 | batches | ~~Admin loads all tenants' batches~~ | **FIXED** 9d2b9bc (S299) | S |
 
 ---
 
@@ -260,7 +264,7 @@ recompute if items change after initial render.
 |---|---|---|---|---|---|---|
 | 1 | SAFETY-013 to 019 | Loyalty pipeline: 7 INSERTs missing tenant_id | ~~HIGH~~ | ~~HIGH~~ | S | **FIXED** 528d5c2 (S295) |
 | 2 | SAFETY-001 to 005 | StockControl.js: 5 INSERTs missing tenant_id | ~~HIGH~~ | ~~MEDIUM~~ | S | **FIXED** b869ad4 (S296) |
-| 3 | SAFETY-024 to 029 | 6 SELECTs missing tenant scoping | HIGH — cross-tenant data visible to HQ | MEDIUM — only affects HQ multi-tenant view | S (6 one-line fixes) | Fix in one commit |
+| 3 | SAFETY-024 to 029 | 6 SELECTs missing tenant scoping | ~~HIGH~~ | ~~MEDIUM~~ | S | **FIXED** 0548979+9d2b9bc (S298-299) |
 | 4 | SAFETY-006 to 008 | HQDocuments.js: 3+1 INSERTs missing tenant_id | ~~HIGH~~ | ~~MEDIUM~~ | S | **FIXED** 6c50eaf (S297) |
 | 5 | SAFETY-011, 012, 031, 032 | HQPurchaseOrders.js: 4 INSERTs + 1 SELECT | ~~HIGH~~ | ~~MEDIUM~~ | S | **FIXED** 0548979 (S298) |
 | 6 | WATCH-006 | HQStock FoodOverview KPIs count archived items | LOW — inflated counts, no data corruption | LOW — cosmetic only | M | Fix when touching HQStock |

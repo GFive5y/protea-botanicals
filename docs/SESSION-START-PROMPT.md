@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 17 April 2026 — Session 298 close (Stage 4 — HQPurchaseOrders Safety Cluster)
+## Updated: 17 April 2026 — Session 299 close (Stage 5A — File-Clustered Safety Fixes)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 0548979
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 9d2b9bc
 
 ---
 
@@ -148,7 +148,13 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (298) — 17 April 2026
+### CLOSED THIS SESSION (299) — 17 April 2026
+- **SAFETY-020, 025-030 + 033, 034 (NEW)** — Stage 5A: 9 fixes across 3 files.
+  HQInvoices (2 SELECT), AdminProductionModule (3 INSERT + 3 SELECT + useTenant
+  added), ScanResult (1 hardcoded UUID replaced). 2 new findings from WATCH-007
+  re-grep. Commit 9d2b9bc. Build verified.
+
+### CLOSED SESSION 298 — 17 April 2026
 - **LL-291** — Tenant-source taxonomy (TRIGGER/VIEWER/RECORD) added to Bible.
 - **WATCH-007** — Audit coverage floor note added to PENDING-ACTIONS.
 - **SAFETY-011, 012, 024 + 031, 032 (NEW)** — HQPurchaseOrders.js 4 INSERT +
@@ -417,8 +423,8 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **Stage 5: Remaining SAFETY fixes** — SAFETY-009 (HQMedical), 020-023,
-   025-026 (HQInvoices), 027-029 (AdminProductionModule), 030 (ScanResult).
+1. **Stage 5B: One-off SAFETY fixes** — SAFETY-009 (HQMedical), 021 (HQFraud),
+   022 (HQPricing), 023 (HQYearEnd). 4 remaining items across 4 files.
 
 2. **Financial findings** — FIN-001 to 003, FIN-006 (separate stage after safety).
 
