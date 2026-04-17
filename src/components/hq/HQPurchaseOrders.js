@@ -366,9 +366,9 @@ export default function HQPurchaseOrders({
   }, [tenantId]);
 
   const fetchSuppliers = useCallback(async () => {
-    const { data } = await supabase.from("suppliers").select("*").order("name");
+    const { data } = await supabase.from("suppliers").select("*").eq("tenant_id", tenantId).order("name");
     setSuppliers(data || []);
-  }, []);
+  }, [tenantId]);
 
   useEffect(() => {
     fetchPOs();
@@ -489,6 +489,7 @@ export default function HQPurchaseOrders({
       return;
     }
     const itemInserts = lineItems.map((item) => ({
+      tenant_id: tenantId,
       po_id: po.id,
       supplier_product_id: item.product_id,
       quantity_ordered: item.qty,
@@ -595,6 +596,7 @@ export default function HQPurchaseOrders({
             const { data: newItem, error: createErr } = await supabase
               .from("inventory_items")
               .insert({
+                tenant_id: tenantId,
                 sku: invSku,
                 name: productName,
                 category: invCategory,
@@ -626,6 +628,7 @@ export default function HQPurchaseOrders({
             const { error: moveErr } = await supabase
               .from("stock_movements")
               .insert({
+                tenant_id: tenantId,
                 item_id: inventoryItemId,
                 quantity: qty,
                 movement_type: "purchase_in",
@@ -699,6 +702,7 @@ export default function HQPurchaseOrders({
       return;
     }
     const lineInserts = zarLines.map((l) => ({
+      tenant_id: tenantId,
       po_id: po.id,
       item_id: l.item_id,
       quantity_ordered: l.qty,
