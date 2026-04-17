@@ -352,10 +352,9 @@ reference suppliers belonging to HQ, not the document's tenant). Requires
 architectural decision (per-tenant copies vs shared fixtures). See
 DEBT_REGISTER_v1.md Section 1.7. Not blocking safety or financial work.
 
-### WATCH-010 (NEW S308) — SAFETY-081: Recursive rules on 2 tables
-retailer_performance and scan_geo_summary throw "infinite recursion
-detected in rules" when queried. Cannot census tenant_id. Fix rules
-before constraining. See DEBT_REGISTER_v1.md Section 1.8 (2B.3).
+### WATCH-010 — CLOSED (Session 310, dd254af)
+SAFETY-081: retailer_performance and scan_geo_summary were broken self-
+referencing views, not tables. Dropped in S310. No data loss.
 
 ### WATCH-011 (NEW S308) — SAFETY-082: 9 tables with 100% NULL tenant_id
 customer_messages, notification_log, product_formats, product_strains,

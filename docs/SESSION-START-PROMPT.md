@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 309 close (Tier 2B.2 — Partial-NULL cleanup)
+## Updated: 18 April 2026 — Session 310 close (Tier 2B.3 — Drop broken views)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 85d42ef
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: dd254af
 
 ---
 
@@ -148,14 +148,16 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (309) — 18 April 2026
-- **Tier 2B.2 — Partial-NULL cleanup** — 3 tables cleaned and constrained.
-  Deleted 5 junk inventory_items + cascading dependents (4 batches, 4
-  production_runs, 1 qr_code, 2 POs, etc.). Backfilled 16 items + 146
-  stock_movements + 1 loyalty_transaction to Pure Premium THC Vapes
-  (evidence-backed). NOT NULL applied. Commit 85d42ef.
-- DB hardening progress: 83/97 tenant_id columns now NOT NULL (86%).
-- Backup table _migration_backup_s309 retained for recovery.
+### CLOSED THIS SESSION (310) — 18 April 2026
+- **SAFETY-081 FIXED** — Dropped 2 broken self-referencing views
+  (retailer_performance, scan_geo_summary). Views not tables, non-queryable
+  since creation. 1 code reference (GeoAnalyticsDashboard.js L485) was
+  always silently failing. Commit dd254af.
+- DB hardening: 83 NOT NULL + 2 broken views removed = 95 actual tables,
+  83 constrained (87%).
+
+### CLOSED SESSION 309 — 18 April 2026
+- **Tier 2B.2** — 3 tables cleaned + constrained. Commit 85d42ef.
 
 ### CLOSED SESSION 308 — 18 April 2026
 - **Tier 2B.1** — 25 tables constrained. Commit 30b41ef.
@@ -472,8 +474,8 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **SAFETY-081: Recursive rules** — retailer_performance, scan_geo_summary. Fix rules
-   to enable census + constraint.
+1. **SAFETY-082: 9 all-NULL tenant_id tables** — architectural decision needed.
+   Some may be cross-tenant reference data, others data integrity findings.
 
 2. **Financial findings:** FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded FY2026),
    FIN-003 (VAT_RATE), FIN-006 (equity join filter).

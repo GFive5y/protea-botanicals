@@ -350,9 +350,11 @@ Backup: `_migration_backup_s309` table retained (174 rows).
 
 #### 2B.3 — SAFETY-081 (NEW S308): Recursive rules on 2 tables
 
-`retailer_performance` and `scan_geo_summary` throw "infinite recursion
-detected in rules" when queried. Cannot census tenant_id NULL counts until
-rules are fixed. Logged for dedicated session.
+`retailer_performance` and `scan_geo_summary` were self-referencing VIEWS
+(not tables) with no underlying base tables. Non-queryable since creation.
+**FIXED** dd254af (S310) — both views dropped. GeoAnalyticsDashboard.js L485
+references retailer_performance but the query always failed (|| [] fallback,
+same behaviour post-drop). No DB object dependencies found.
 
 #### 2B.4 — SAFETY-082 (NEW S308): 100% NULL tenant_id on 9 tables
 
