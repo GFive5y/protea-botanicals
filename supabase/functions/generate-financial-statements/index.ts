@@ -465,16 +465,26 @@ Deno.serve(async (req: Request) => {
     row(p4, s4, "Net cash from financing activities", safe(cf.netFinancing ?? 0), { bold: true, shade: true }, freg, fbold);
     s4.y -= 6;
 
+    // GAP-002: Opening → Net movement → Closing reconciliation
+    const opening = safe(cf.openingCashBalance);
     const nc = safe(cf.netCash);
-    // Same precision contract as netRow — rect top = s4.y+15, hr = s4.y+16
-    rect(p4, ML, s4.y - 8, CW, 16, nc >= 0 ? C.hlGreen : C.hlRed);
-    hr(p4, s4.y + 8, ML, PW - MR, nc >= 0 ? rgb(0, 0.65, 0.4) : C.danger, 1.5);
-    dt(p4, "Net increase / (decrease) in cash and cash equivalents", ML + 4, s4.y - 1, 10, fbold, C.ink900);
-    dtr(p4, fmtR(nc), PW - MR - 80, s4.y - 1, 10, fbold, nc >= 0 ? C.success : C.danger);
+    const closing = safe(cf.closingCashBalance);
+
+    secBar(p4, s4, "CASH BALANCE RECONCILIATION", fbold);
+    row(p4, s4, "Cash at beginning of period", opening, { bold: true, shade: true, sub: "From bank accounts opening balance" }, freg, fbold);
+    s4.y -= 2;
+    row(p4, s4, "Net increase / (decrease) in cash and cash equivalents", nc, { bold: true }, freg, fbold);
+    s4.y -= 2;
+
+    // Closing balance — terminal highlighted row
+    rect(p4, ML, s4.y - 8, CW, 16, closing >= 0 ? C.hlGreen : C.hlRed);
+    hr(p4, s4.y + 8, ML, PW - MR, closing >= 0 ? rgb(0, 0.65, 0.4) : C.danger, 1.5);
+    dt(p4, "Cash at end of period", ML + 4, s4.y - 1, 10, fbold, C.ink900);
+    dtr(p4, fmtR(closing), PW - MR - 80, s4.y - 1, 10, fbold, closing >= 0 ? C.success : C.danger);
     dtr(p4, "\u2014", PW - MR, s4.y - 1, 8.5, freg, C.ink300);
     s4.y -= 24;
 
-    noteBox(p4, s4, "Simplified indirect method: net profit adjusted for non-cash depreciation. Working capital movements require prior-period snapshots and are not included. Financing activities identified from bank statement keyword matching.", freg);
+    noteBox(p4, s4, "Simplified indirect method: net profit adjusted for non-cash depreciation. Working capital movements (inventory, receivables, payables) are not included \u2014 these require prior-period snapshots. Opening cash balance sourced from bank_accounts. For tenants opened mid-period, opening represents the seed balance at entity setup, not 1 January. Closing = opening + net period movement.", freg);
     stmtClose(p4, freg);
     footer(p4, 4, freg);
 
