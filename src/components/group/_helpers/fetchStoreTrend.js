@@ -21,7 +21,7 @@
 
 import { supabase } from "../../../services/supabaseClient";
 
-const VAT_RATE = 1.15;
+// LL-298: VAT_RATE removed — per-tenant divisor read from tenant_config.vat_rate
 
 /**
  * fetchStoreTrend
@@ -54,6 +54,14 @@ export async function fetchStoreTrend(tenantId, industryProfile, windowDays = 30
   };
 
   const startISO = new Date(Date.now() - windowDays * 86400 * 1000).toISOString();
+
+  // LL-298: Read vat_rate per tenant. Fallback 0.15 for NULL or missing rows.
+  let divisor = 1.15;
+  try {
+    const { data: cfg } = await supabase.from("tenant_config").select("vat_rate").eq("tenant_id", tenantId).maybeSingle();
+    const r = parseFloat(cfg?.vat_rate);
+    if (Number.isFinite(r)) divisor = 1 + r;
+  } catch (_) { /* divisor stays 1.15 */ }
 
   try {
     if (industryProfile === "cannabis_dispensary") {
@@ -103,7 +111,7 @@ export async function fetchStoreTrend(tenantId, industryProfile, windowDays = 30
           date: o.created_at.slice(0, 10),
           hour: ts.getHours(),
           dayOfWeek: ts.getDay(),
-          revenue: (parseFloat(o.total) || 0) / VAT_RATE,
+          revenue: (parseFloat(o.total) || 0) / divisor,
         };
       });
     }

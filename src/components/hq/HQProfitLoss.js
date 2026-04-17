@@ -456,9 +456,8 @@ const pctColour = (pct, profile = "general_retail") => {
   return pct >= 35 ? "#2E7D32" : pct >= 20 ? "#E65100" : "#c62828";
 };
 
-// GAP-01 fix — SA VAT is 15%. All orders.total values are VAT-inclusive.
-// Divide by VAT_RATE at every revenue aggregation point.
-const VAT_RATE = 1.15;
+// GAP-01 fix — VAT_RATE derived per-tenant inside the component (LL-298).
+// See useTenant().tenantConfig.vat_rate.
 
 // ─── WP-FIN S1: Periods — quarters + custom added ────────────────────────────
 const PERIODS = [
@@ -839,7 +838,13 @@ function DataBadge({ label, ok, count }) {
 export default function HQProfitLoss() {
   const { fxRate, fxLoading } = useFxRate();
   const usdZar = fxRate?.usd_zar || 18.5;
-  const { tenant, tenantId, industryProfile } = useTenant();
+  const { tenant, tenantId, industryProfile, tenantConfig } = useTenant();
+
+  // LL-298: VAT_RATE derived per-tenant from tenant_config.vat_rate.
+  // tenant_config.vat_rate stores the rate as a decimal (e.g. 0.15 = 15%).
+  // The divisor used at revenue aggregation is (1 + vat_rate).
+  const vatRate = parseFloat(tenantConfig?.vat_rate ?? 0.15);
+  const VAT_RATE = 1 + (Number.isFinite(vatRate) ? vatRate : 0.15);
 
   const ctx = usePageContext("pl", null);
 

@@ -97,7 +97,7 @@ export function TenantProvider({ children }) {
           const { data: cfgData } = await supabase
             .from("tenant_config")
             .select(
-              "feature_hq,feature_ai_basic,feature_ai_full,feature_medical,feature_white_label,feature_wholesale,feature_hr,ai_queries_daily,staff_seats,tier",
+              "feature_hq,feature_ai_basic,feature_ai_full,feature_medical,feature_white_label,feature_wholesale,feature_hr,ai_queries_daily,staff_seats,tier,vat_rate",
             )
             .eq("tenant_id", profile.tenant_id)
             .single();
@@ -151,7 +151,7 @@ export function TenantProvider({ children }) {
         const { data: cfgData } = await supabase
           .from("tenant_config")
           .select(
-            "feature_hq,feature_ai_basic,feature_ai_full,feature_medical,feature_white_label,feature_wholesale,feature_hr,ai_queries_daily,staff_seats,tier",
+            "feature_hq,feature_ai_basic,feature_ai_full,feature_medical,feature_white_label,feature_wholesale,feature_hr,ai_queries_daily,staff_seats,tier,vat_rate",
           )
           .eq("tenant_id", tenantObj.id)
           .single();

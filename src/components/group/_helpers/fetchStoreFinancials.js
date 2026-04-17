@@ -37,7 +37,7 @@
 
 import { supabase } from "../../../services/supabaseClient";
 
-const VAT_RATE = 1.15;
+// LL-298: VAT_RATE removed — per-tenant divisor read from tenant_config.vat_rate
 const OPEX_CATEGORIES = ["opex", "wages", "tax", "other"];
 
 export async function fetchStoreFinancials(
@@ -46,6 +46,14 @@ export async function fetchStoreFinancials(
   startISO,
   endISO,
 ) {
+  // LL-298: per-tenant VAT divisor
+  let divisor = 1.15;
+  try {
+    const { data: cfg } = await supabase.from("tenant_config").select("vat_rate").eq("tenant_id", tenantId).maybeSingle();
+    const r = parseFloat(cfg?.vat_rate);
+    if (Number.isFinite(r)) divisor = 1 + r;
+  } catch (_) { /* divisor stays 1.15 */ }
+
   const result = {
     tenantId,
     revenue: 0,
@@ -121,7 +129,7 @@ export async function fetchStoreFinancials(
             const lineTotal = parseFloat(oi.line_total) || 0;
             const avco =
               parseFloat(oi.product_metadata?.weighted_avg_cost) || 0;
-            result.revenue += lineTotal / VAT_RATE;
+            result.revenue += lineTotal / divisor;
             result.cogs += qty * avco;
           }
           result.cogsSource = "order_items";
@@ -129,7 +137,7 @@ export async function fetchStoreFinancials(
           // Fallback: orders exist but no order_items rows. Use orders.total
           // for revenue (still ex-VAT). COGS stays 0; cogsSource unavailable.
           for (const o of orderRows) {
-            result.revenue += (parseFloat(o.total) || 0) / VAT_RATE;
+            result.revenue += (parseFloat(o.total) || 0) / divisor;
           }
           result.cogsSource = "unavailable";
         }
