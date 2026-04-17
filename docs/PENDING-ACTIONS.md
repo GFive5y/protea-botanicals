@@ -7,7 +7,7 @@
 ---
 
 ## MEETING DATE
-**Current CA demo date: PENDING CONFIRMATION** (was 12 May 2026)
+**Current CA demo date: NOT CONFIRMED**
 When this changes:
 1. Update this file (meeting date line above)
 2. Recalculate sim-pos-sales trigger date (= demo date MINUS 1 day)
@@ -28,13 +28,13 @@ When this changes:
 
 ## OUTSTANDING — MUST COMPLETE BEFORE DEMO
 
-### DEBT-REGISTER REVIEW
-Status: OPEN — Owner reads docs/DEBT_REGISTER_v1.md Section 4 and picks
-top 3 items for Stage 1 fix sprint. No code work until owner confirms priorities.
+### DEBT-REGISTER REVIEW — CLOSED (S294-S316)
+Owner reviewed DEBT_REGISTER_v1.md Section 4 during S294.5 through S316.
+All safety debt items addressed. Financial items now in progress.
 
 ### sim-pos-sales
 Status: STANDING ALERT — must run the day BEFORE demo.
-Trigger date: PENDING (depends on new demo date confirmation).
+Trigger date: PENDING (depends on demo date confirmation).
 
 ---
 
@@ -69,8 +69,16 @@ Trigger date: PENDING (depends on new demo date confirmation).
 ### S314.2c-b — Owner writes real content for 9 generic default templates (at own pace).
 ### FOLLOW-UP: {{business_name}} not supported in send-notification/send-email EFs.
 
-### S314.4 — LOW: Bucket C naming + duplicate cleanup (~98 policies)
-Audit hygiene. No security impact.
+### S314.3c — CLOSED. 65 HQ bypass with_check additions.
+### S314.3d — CLOSED. 6 stock_take_* policies (legacy migration).
+### S314.4 — CLOSED. 8 final Bucket A escapes + audit script hardening.
+  Tier 2C declared COMPLETE after S314.4. 146 policies fixed across 11 sessions.
+### S315 — CLOSED. LL-251 Q5 + Q6 audit query fixes + Failure Mode 7.
+### S316 — CLOSED. FIN-001 fix (HQYearEnd FY filter) + LL-296.
+
+### DEFERRED — RLS policy consolidation (~100 pairs)
+~100 duplicate/redundant policy pairs identified during S314 campaign.
+Not fixed (out of scope). Hygiene work, no security impact. Future workstream.
 
 ---
 

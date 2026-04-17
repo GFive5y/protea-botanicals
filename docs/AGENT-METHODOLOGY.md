@@ -365,6 +365,41 @@ clean 3 tables (174 rows backed up, 5 junk deleted with FK cascade,
 required discovering dependencies in stock_reservations and
 purchase_order_items that weren't in the original plan.
 
+### Procedure 5: Financial finding investigation (S316)
+
+Financial findings (FIN-001 through FIN-006) are mechanically similar to
+safety findings on this platform. Same discipline, different domain.
+
+1. **Read the register entry in full.** Register entries cite file:line but
+   code may have shifted since. Verify at current HEAD.
+
+2. **Ground the code at live HEAD.** Fetch the file. Confirm the line number,
+   the surrounding logic, and whether the fix is a one-liner or requires more
+   context.
+
+3. **Verify the schema supports the fix.** A fix that adds
+   `.eq("financial_year", ...)` requires financial_year to exist as a column.
+   Query `information_schema.columns` before writing the fix.
+
+4. **Census data for severity assessment.** How many rows exist? Which tenants
+   have data? Is the bug currently manifesting or latent? A bug that only fires
+   under conditions that don't exist yet (no multi-year tenants) is still a bug
+   but has different urgency than one corrupting active data.
+
+5. **Apply the fix with generalising LL.** Most financial fixes teach a
+   pattern: "add FY filter to UPDATE statements", "read from tenant_config not
+   constants", etc. Write the LL that generalises to other tables with similar
+   shape.
+
+6. **Flag parallel-schema debt separately.** Financial work often surfaces
+   secondary issues (duplicate fields, stale columns). These deserve logging
+   but usually not same-session fixing.
+
+Historical example: S316 fixed FIN-001 with a one-line addition
+(`.eq("financial_year", fyLabel)` on HQYearEnd.js:230). LL-296 generalises
+the fix to any financial_year-scoped UPDATE. Parallel-schema debt
+(year_end_closed vs year_closed duplicate fields) was flagged but not fixed.
+
 ---
 
 ## SECTION 3 — DESIGN PATTERNS REGISTRY
@@ -432,19 +467,37 @@ don't use tenant_id for isolation.
 ### Failure 1: Audit coverage is floor, not ceiling (WATCH-007)
 
 **Symptom:** Manual grep audit or script finds N findings. The actual
-number is N + 15-20%.
+number differs by 10% to 220% in either direction.
 
-**Why it happens:** Context-window limitations in the audit script
-(checks +-18 lines), tables missing from the TENANT_SCOPED set,
-INSERT payloads that build tenant_id in a separate variable outside
-the detection window.
+**Why it happens:** Audit scripts use shortcuts (classification filters,
+context windows, table exclusions) that create blind spots. Pre-
+investigation pattern-matching can also over-estimate by anticipating
+findings that don't materialise at session start.
 
-**Corrective:** After fixing each file, re-grep that specific file for
-ALL `.insert(` and `.select(` calls. Expect 1-3 additional findings.
+**Campaign evidence (S294-S316.5a):**
+- S301 script audit vs manual grep: +45% (script found more)
+- S314.1 sweep: +17% (the original WATCH-007 estimate)
+- S314.2a second sweep: +10 additional findings
+- S314.2c templates escape: 1 finding missed by 2 prior sweeps
+- S314.3a HIGH pre-investigation: +120% (83 actual vs 37 registered)
+- S314.3b HR cluster: -25% (over-estimate: 32 predicted, 24 actual)
+- S314.3c Tier C pre-investigation: +40%
+- S314.4 final sweep: +8 CRITICAL escapes
 
-**Evidence:** WATCH-007 validated 6+ times during S295-S303. The S301
-script audit found 30 findings that 6 sessions of manual grep missed.
-S298/S299/S300/S303 each caught additional findings during re-grep.
+**Corrective:**
+1. Treat any audit count as a hypothesis, not a fact. Claude Code's
+   session-start live-DB query is the ground truth.
+2. After fixing each file or table category, sweep once more for the
+   same pattern. Expect 1-3 additional findings.
+3. Pre-investigation scope predictions from Claude.ai may differ from
+   session-start reality in either direction. Claude Code should adapt
+   scope based on live DB state without treating the brief's numbers
+   as fixed.
+
+**Principle:** Every "done" declaration warrants one more sweep. Four
+rounds of Bucket A escape discoveries during S314 proved systematic
+under-counting is real. The S314.3b over-estimate proved it can go
+the other way too.
 
 ### Failure 2: Bug-vs-design misclassification
 
@@ -551,37 +604,33 @@ opening_balance). Both had been stale since before the safety campaign.
 
 ## SECTION 5 — OPEN QUESTIONS AND GAPS
 
-This methodology does NOT yet cover:
+This methodology does NOT yet cover (updated S316.5a):
 
-1. **RLS policy correctness audit** — Tier 2C, not yet started. The S308
-   census counted tables with tenant_id. But: are the RLS policies on each
-   table correct? Do they use the right function (user_tenant_id vs
-   auth.uid)? Are there tables that SHOULD have RLS but don't?
+1. ~~RLS policy correctness audit~~ — **DONE.** Tier 2C completed S314-S314.4.
+   146 policies fixed across 11 sessions. Zero using='true' bugs remain.
 
-2. **CI integration** — Tier 2D. The audit_tenant_isolation.py script
-   runs manually. It should be a pre-commit hook or CI check that blocks
-   merges introducing new unscoped queries.
+2. **CI integration** — Tier 2D, planned. Audit scripts (audit_tenant_isolation.py,
+   audit_rls_policies.py) run manually. Should be GitHub Actions checks that
+   block merges introducing new unscoped queries or broken RLS policies. Path
+   is clear; execution is a dedicated session.
 
-3. **Historical data cleanup** — Tier 3. Beyond S309's targeted cleanup,
-   there may be other historical damage from the pre-campaign era. WATCH-008
-   is one known example.
+3. **Historical data cleanup** — Known gap. WATCH-008 (system_alerts
+   misattribution) is the canonical example. S309/S312/S313.5 cleaned specific
+   tables but no comprehensive historical sweep has been done.
 
-4. **Performance implications of RLS at scale** — Not tested. With 7,000+
-   orders and 15,000+ stock_movements, RLS is fine. At 100K+ rows per
-   table, policy evaluation cost may become relevant.
+4. **Performance implications of RLS at scale** — Not tested. Current data
+   volumes (7K orders, 15K stock_movements) are fine. At 100K+ rows per table,
+   policy evaluation cost may become relevant.
 
-5. **Disaster recovery procedures** — Not documented. If a migration
-   corrupts data, the backup table pattern (S309) provides per-session
-   recovery. But there's no platform-wide DR procedure.
+5. **Disaster recovery procedures** — Not documented. The backup table pattern
+   (S309, S312, S313.5) provides per-session recovery. No platform-wide DR.
 
-6. **Phase 2 (AI ingest) methodology** — The WP-TABLE-UNIFY Phase 2
-   scope doc exists but the feature hasn't been built. When it is, the
-   methodology for AI-extracted data validation, confidence thresholds,
-   and tenant attribution of AI-generated records will need to be captured.
+6. **Phase 2 (AI ingest) methodology** — Feature not yet built. When it is,
+   AI-extracted data validation, confidence thresholds, and tenant attribution
+   of AI-generated records will need their own procedure.
 
-7. **Financial findings methodology** — FIN-001 to 006 are logged but
-   not yet addressed. When the financial stage starts, the investigation
-   and fix procedures will need their own section here.
+7. ~~Financial findings methodology~~ — **CAPTURED** as Procedure 5 (Section 2).
+   FIN-001 fixed S316. Pattern documented.
 
 This section gets updated as each gap is addressed. It's the "frontier
 list" — what we know we don't know.

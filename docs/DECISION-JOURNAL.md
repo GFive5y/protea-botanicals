@@ -4,6 +4,28 @@
 
 ---
 
+## S316.5a — 18 April 2026 — Loop integrity audit
+
+**Decision:** Refreshed Class B institutional-memory gaps across
+AGENT-METHODOLOGY, PENDING-ACTIONS, DECISION-JOURNAL. No new LLs added.
+
+**6 gaps closed:**
+- Gap 1: Failure Mode 1 expanded with campaign evidence (10-220% variance)
+- Gap 2: Section 5 Open Questions refreshed (items 1+7 marked done)
+- Gap 3: Pre-investigation over-estimate insight in Failure Mode 1
+- Gap 4: Procedure 5 (Financial finding investigation) added to Section 2
+- Gap 5: PENDING-ACTIONS refreshed (stale entries, missing closed-loops)
+- Gap 6: DECISION-JOURNAL verified — all S314.3a-S316 entries present
+
+**Campaign insight:** Loop health better than feared. All LLs landed
+correctly. Failure Modes 1-7 present. Platform mental model intact. Gaps
+were subtle (magnitude updates, stale text, missing procedure) rather
+than catastrophic.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S316 — 18 April 2026 — FIN-001 fix: HQYearEnd equity_ledger FY filter
 
 **Decision:** Added `.eq("financial_year", fyLabel)` to the equity_ledger

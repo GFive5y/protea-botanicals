@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 316 close (FIN-001 fixed)
+## Updated: 18 April 2026 — Session 316.5a close (Loop integrity audit)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -148,12 +148,14 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (316) — 18 April 2026
-- **FIN-001 FIXED** — Added `.eq("financial_year", fyLabel)` to HQYearEnd.js
-  equity_ledger update. Latent cross-year contamination bug closed. LL-296
-  documents the generalised pattern. Build verified.
-- **Parallel-schema noted** — equity_ledger has duplicate year-close fields.
-  Logged as tech debt, not fixed.
+### CLOSED THIS SESSION (316.5a) — 18 April 2026
+- **Loop integrity audit** — 6 Class B gaps closed. Failure Mode 1 expanded
+  (10-220% variance with campaign evidence). Procedure 5 (financial methodology)
+  added. Section 5 Open Questions refreshed (items 1+7 done). PENDING-ACTIONS
+  stale state cleaned. Decision Journal verified complete for S314.3a-S316.
+
+### CLOSED SESSION 316 — 18 April 2026
+- **FIN-001 FIXED** — HQYearEnd equity_ledger FY filter + LL-296.
 
 ### CLOSED SESSION 315 — 18 April 2026
 - **LL-251 audit maintenance.** Q5+Q6 fixed. Failure Mode 7 documented.
