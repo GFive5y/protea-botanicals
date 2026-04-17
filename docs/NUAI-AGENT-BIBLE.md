@@ -1912,3 +1912,33 @@ The `admin_write_qr` policy with `using_clause='true'` on ALL WAS a bug
 ---
 
 *LL-295 added 18 April 2026 · Session 314.2a*
+
+---
+
+## Session 316 — 18 April 2026 — Financial fix: cross-year contamination
+
+### LL-296 — CROSS-YEAR CONTAMINATION IN UPDATE STATEMENTS
+
+**Rule:** When updating tables with `financial_year` scoping (equity_ledger,
+journal_entries, financial_statement_status), always include
+`.eq("financial_year", fyLabel)` alongside `.eq("tenant_id", tenantId)`.
+
+A missing FY filter applies the update to ALL of the tenant's historical
+years, corrupting closure metadata on past periods. The bug is subtle
+because single-year test data masks it — the wrong behaviour only
+manifests when a tenant has equity_ledger rows across multiple FYs.
+
+**Detection via grep:**
+```
+grep -rn 'equity_ledger\|financial_statement_status' src/ |
+  grep -A 2 'update(' | grep tenant_id
+```
+Every match should also have `.eq("financial_year")` within a few lines.
+
+**Discovery:** FIN-001 (S294 audit). The journal_entries update in
+HQYearEnd.js correctly scoped by tenant_id + financial_year; the
+equity_ledger update on the next line did not. Fixed S316.
+
+---
+
+*LL-296 added 18 April 2026 · Session 316*

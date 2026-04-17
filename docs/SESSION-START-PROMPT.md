@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 315 close (LL-251 audit maintenance)
+## Updated: 18 April 2026 — Session 316 close (FIN-001 fixed)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -148,12 +148,15 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (315) — 18 April 2026
-- **LL-251 audit maintenance** — Fixed Q5 (period_month text→count) and Q6
-  (closing_balance→opening_balance). Full 8-query audit run clean.
-- **Failure Mode 7 documented** — LL query drift: LLs with runnable SQL go stale
-  silently on schema changes. Added to AGENT-METHODOLOGY Section 4.
-- Audit baseline established for financial fix verification.
+### CLOSED THIS SESSION (316) — 18 April 2026
+- **FIN-001 FIXED** — Added `.eq("financial_year", fyLabel)` to HQYearEnd.js
+  equity_ledger update. Latent cross-year contamination bug closed. LL-296
+  documents the generalised pattern. Build verified.
+- **Parallel-schema noted** — equity_ledger has duplicate year-close fields.
+  Logged as tech debt, not fixed.
+
+### CLOSED SESSION 315 — 18 April 2026
+- **LL-251 audit maintenance.** Q5+Q6 fixed. Failure Mode 7 documented.
 
 ### CLOSED SESSION 314.4 — 18 April 2026
 - **TIER 2C COMPLETE.** 146 policies fixed across 11 sessions. Zero bugs remain.
@@ -527,8 +530,8 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **Financial findings:** FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded FY2026),
-   FIN-003 (VAT_RATE), FIN-006 (equity join filter). All Size S except FIN-001 (M).
+1. **S317: FIN-002 + FIN-003 + FIN-006** — hardcoded FY2026 (3 files), hardcoded
+   VAT_RATE 1.15 (3 files), equity join missing FY filter (1 file). All Size S.
 
 2. **Financial findings:** FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded FY2026),
    FIN-003 (VAT_RATE), FIN-006 (equity join filter).

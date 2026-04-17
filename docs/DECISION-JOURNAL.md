@@ -4,6 +4,27 @@
 
 ---
 
+## S316 — 18 April 2026 — FIN-001 fix: HQYearEnd equity_ledger FY filter
+
+**Decision:** Added `.eq("financial_year", fyLabel)` to the equity_ledger
+update in HQYearEnd.js. One-line fix. Closes latent cross-year contamination.
+
+**Grounding:** Code verified at HEAD (L228-230). Schema verified (financial_year
+column exists, NOT NULL). Data verified (single-year state means bug currently
+harmless — would corrupt on first multi-year tenant).
+
+**LL-296:** Cross-year contamination pattern. Generalises FIN-001 to any table
+with financial_year scoping. The journal_entries update on the adjacent line
+already had the correct filter — the equity_ledger update was the only miss.
+
+**Parallel-schema noted:** equity_ledger has both `year_end_closed`+`year_end_date`
+AND `year_closed`+`closed_at`. Duplicate fields tracking the same concept. Logged
+as technical debt, not fixed here.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S315 — 18 April 2026 — LL-251 audit maintenance + Failure Mode 7
 
 **Decision:** Fixed 2 stale queries in LL-251 (Q5 period_month text→count,

@@ -224,10 +224,11 @@ export default function HQYearEnd() {
         .eq("financial_year", fyLabel)
         .eq("is_year_end_closing", false);
 
-      // 5. Mark equity_ledger year_closed (if financial_year column exists)
+      // 5. Mark equity_ledger year_closed for this FY
       await supabase.from("equity_ledger")
         .update({ year_closed: true, closed_at: new Date().toISOString() })
-        .eq("tenant_id", tenantId);
+        .eq("tenant_id", tenantId)
+        .eq("financial_year", fyLabel);
 
       setArchiveRow(archive);
       setStep(3);
