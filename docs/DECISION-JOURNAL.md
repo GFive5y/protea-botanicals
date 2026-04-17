@@ -4,6 +4,35 @@
 
 ---
 
+## S313.5 — 18 April 2026 — SAFETY-080 execution: move suppliers to real owners
+
+**Decision:** Move HQ-owned suppliers to Pure Premium (their real owner),
+move mis-attributed Medi Rec documents to Pure Premium with them, backfill
+Metro Hardware's fixture suppliers, move Facility A to Medi Rec (not
+delete — FK from stock_receipts discovered during execution).
+
+**Alternatives considered:**
+- Per-supplier cloning between Medi Rec and Pure Premium (S313 initial
+  plan) — rejected when owner clarified all cannabis activity belongs
+  to Pure Premium. Documents attributed to Medi Rec were mis-attributed.
+- Delete Facility A as orphan (brief's recommendation) — couldn't
+  execute, stock_receipts FK blocked it. Adapted to move-to-real-owner
+  pattern using FK evidence (stock_receipt belongs to Medi Rec).
+- Leave supplier_products on HQ (Option 3 from S313) — rejected because
+  tenants need access to their supplier catalogs for procurement.
+
+**Why this path:** Owner clarified that Medi Rec's document history
+referencing cannabis suppliers was mis-attribution, not real Medi Rec
+business. Fix is attribution correction (~140 ops), not cloning (~300
+ops). The Facility A FK discovery (Phase 4) is an example of WATCH-007
+(audit floor, not ceiling) — the pre-investigation missed the
+stock_receipts reference. Adapted in-session using the same principle:
+follow FK evidence to true owner.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S313 — 18 April 2026 — SAFETY-080 supplier architecture: per-tenant copies
 
 **Decision:** Suppliers are per-tenant. Each tenant owns its own supplier

@@ -310,7 +310,12 @@ tenant has documents.
 **Decision (S313, owner confirmed S312.5):** Option A — per-tenant copies.
 Architecture: LL-294. Each tenant owns its own supplier records. No sharing.
 
-**Status:** DECIDED. Execution planned for S313.5.
+**Execution (S313.5):** FIXED. Migration `20260417164513_tier2b5_safety080_supplier_migration.sql`.
+4 HQ suppliers → Pure Premium, 8 document_log rows repointed, 123 supplier_products
+moved, Facility A → Medi Rec (FK evidence from stock_receipts), 4 NULL → Metro Hardware.
+NOT NULL applied. Final: Pure Premium 4, Metro Hardware 4, Medi Rec 1. Zero cross-tenant refs.
+
+**Status:** FIXED (S313.5).
 
 #### S313.5 Migration Plan
 

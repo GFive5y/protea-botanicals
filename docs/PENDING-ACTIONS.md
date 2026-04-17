@@ -345,10 +345,10 @@ If count is non-trivial, the historical rows are misattributed and
 may need data correction (not code). Log findings, decide on cleanup
 separately. Not blocking Stage 5b, 5.5, or financial.
 
-### WATCH-009 — SAFETY-080 DECIDED (S313), execution S313.5
-Decision: per-tenant copies (LL-294). Migration plan in DEBT_REGISTER_v1.md
-Section 1.7. Open question: supplier_products handling (123 HQ-owned rows).
-Owner to decide Option 1/2/3 before S313.5 starts.
+### WATCH-009 — CLOSED (S313.5)
+SAFETY-080 executed. Per-tenant copies (LL-294). 4 suppliers → Pure Premium,
+123 supplier_products moved, 8 docs repointed, Facility A → Medi Rec,
+4 NULL → Metro Hardware. NOT NULL applied. Zero cross-tenant refs.
 
 ### WATCH-010 — CLOSED (Session 310, dd254af)
 SAFETY-081: retailer_performance and scan_geo_summary were broken self-

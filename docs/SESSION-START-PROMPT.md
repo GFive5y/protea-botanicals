@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 313 close (SAFETY-080 architectural decision)
+## Updated: 18 April 2026 — Session 313.5 close (SAFETY-080 execution — TIER 2B COMPLETE)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 5460d2a
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 684ad18
 
 ---
 
@@ -148,13 +148,16 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (313) — 18 April 2026
-- **SAFETY-080 DECIDED** — Per-tenant copies (LL-294). No shared suppliers.
-  Migration plan documented in DEBT_REGISTER_v1.md Section 1.7.
-  Open question: supplier_products (123 HQ rows) — owner to decide before S313.5.
-- **LL-294 added** — Suppliers per-tenant, no sharing, no cross-tenant visibility.
-- **LL-293 disambiguated** — Scope boundary: shared-reference for platform
-  taxonomy only, NOT business entities.
+### CLOSED THIS SESSION (313.5) — 18 April 2026
+- **SAFETY-080 FIXED** — Supplier tenancy migration executed. 4 HQ suppliers →
+  Pure Premium, 8 docs repointed, 123 supplier_products moved, Facility A →
+  Medi Rec (FK evidence), 4 NULL → Metro Hardware. NOT NULL applied. Zero
+  cross-tenant refs. Longest-running register finding closed (opened S304.5).
+- **TIER 2B COMPLETE.** DB hardening: 90/97 NOT NULL (93%). Remaining 3 are
+  intentional shared-reference tables (LL-293) + 4 other nullable-by-schema.
+
+### CLOSED SESSION 313 — 18 April 2026
+- **SAFETY-080 DECIDED** — Per-tenant copies (LL-294). LL-293 disambiguated.
 
 ### CLOSED SESSION 312 — 18 April 2026
 - **SAFETY-082b CLOSED** — 6 tables cleaned + constrained. 89/97 NOT NULL (92%).
@@ -492,9 +495,8 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **SAFETY-080 execution (S313.5)** — Per-tenant supplier migration. Backfill 4
-   NULL, clone 3 HQ suppliers to tenant copies, repoint FKs, delete orphans,
-   apply NOT NULL. Needs owner decision on supplier_products first.
+1. **Tier 2C: RLS policy audit** — Systematic audit of RLS policies across all
+   tenant-scoped tables. Verify correctness, coverage, naming conventions.
 
 2. **Financial findings:** FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded FY2026),
    FIN-003 (VAT_RATE), FIN-006 (equity join filter).
