@@ -147,11 +147,11 @@ column names (`destination_tenant_id` in ShopOverview).
 
 ### 1.5 NEW Findings from Script Verification (Stage 6 input)
 
-#### Cluster 8: usePageContext.js (21 violations — CRITICAL)
+#### Cluster 8: usePageContext.js (21 violations — CRITICAL) — FIXED c3f2dc8
 
 The CONTEXT_QUERIES engine powers the WorkflowGuide AI assistant across all
-portals. `tenantId` is passed as a parameter to every query function but used
-on fewer than half of them. Cross-tenant data leaks into AI context.
+portals. `tenantId` was passed as a parameter but not used on 21 queries.
+**All 21 fixed in Session 302 commit c3f2dc8.**
 
 | ID | File:Line | Table | Impact | Size |
 |---|---|---|---|---|

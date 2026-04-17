@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 17 April 2026 — Session 301 close (Stage 5.5 — Audit Script Verification)
+## Updated: 18 April 2026 — Session 302 close (Stage 6A — CRITICAL AI Context Isolation)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: edcc72a
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: c3f2dc8
 
 ---
 
@@ -148,14 +148,16 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (301) — 17 April 2026
+### CLOSED THIS SESSION (302) — 18 April 2026
+- **SAFETY-036 to 056 (21 sites)** — CRITICAL: usePageContext.js AI context
+  engine tenant isolation. All 21 queries now scoped with .eq("tenant_id",
+  tenantId). 10 query functions fixed. Commit c3f2dc8. Build verified.
+  Audit script re-run: zero usePageContext.js findings remaining.
+
+### CLOSED SESSION 301 — 17 April 2026
 - **Stage 5.5: Audit script verification** — audit_tenant_isolation.py extended
-  to 50+ tables, detection logic enhanced. Run produced 62 raw BLEEDs, triaged
-  to 24 TRUE BLEEDs (38 false positives). 30 new SAFETY findings logged
-  (SAFETY-036 to 065). Stage 6 required.
-- **CRITICAL FINDING**: usePageContext.js (21 sites) — the CONTEXT_QUERIES
-  engine powering the AI assistant leaks cross-tenant data. tenantId param
-  available but unused on most query functions.
+  to 50+ tables. 62 raw BLEEDs → 24 TRUE (38 false positives). 30 new SAFETY
+  findings logged (SAFETY-036 to 065). Stage 6 required.
 
 ### CLOSED SESSION 300 — 17 April 2026
 - **SAFETY-009, 021, 022, 023 + 035 (NEW)** — Stage 5B: 5 fixes across 4 files.
@@ -438,10 +440,8 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **Stage 6: Fix 30 new SAFETY findings** — SAFETY-036 to 065. Critical cluster:
-   usePageContext.js (21 sites, AI context cross-tenant leak). See register
-   Section 1.5. Also: HQProduction (4), HQSuppliers (2), AdminHRPanel (1),
-   ExpenseManager (1), HQAnalytics (2).
+1. **Stage 6B: Remaining 9 SAFETY findings** — SAFETY-057 to 065. HQProduction (4),
+   HQSuppliers (2), AdminHRPanel (1), ExpenseManager (1), HQAnalytics (2).
 
 2. **Financial findings** — FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded
    FY2026), FIN-003 (VAT_RATE), FIN-006 (equity join filter).
