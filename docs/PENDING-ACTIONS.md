@@ -445,3 +445,48 @@ GP-001 through GP-006 — see prior versions for detail.
 
 ### CAPSTONE-003 (S316.5) — Loop system retrospective + register pattern-tagging
 Status: **CLOSED — SESSION 318** · See CLOSED LOOPS — SESSION 318 above.
+
+### WP-HQ-GRANULARITY — Platform vs Tenant HQ access separation
+Status: BACKLOG · Do not execute until triggered
+Source: S320 architecture decision (docs/PLATFORM-OVERVIEW_v1_0.md addendum)
+Trigger: **Before `hq_access=true` is ever granted to any non-platform-operator user**
+
+**Why this is parked, not done:**
+Today `user_profiles.hq_access` is a single boolean and `is_hq_user()` returns
+that boolean. Only platform operators (currently the owner, two accounts) have
+it. 8+ tables use `hq_all_*` policies that trust `is_hq_user()`. The ambiguity
+between "Platform HQ" and "Tenant HQ" is latent. Doing the split now is
+premature optimisation — no real user needs tenant-HQ distinction yet.
+
+**What fires the trigger:**
+Any decision to grant `hq_access=true` to a tenant admin, franchise owner,
+regional manager, auditor, or any other non-platform-operator role. The
+moment that decision is made, this WP must ship BEFORE the grant, or
+every `hq_all_*` table silently exposes cross-tenant data.
+
+**Scope when executed:**
+1. Add `user_profiles.access_level` enum: `platform_operator | tenant_hq | null`
+2. Backfill: everyone with `hq_access=true` today → `platform_operator`
+3. Rewrite `is_hq_user()` body:
+   ```sql
+   SELECT access_level = 'platform_operator'
+   FROM user_profiles WHERE id = auth.uid();
+   ```
+4. Add new helper `is_tenant_hq()` for the tenant-HQ level
+5. Audit every `hq_all_*` policy — does each table need Platform HQ only,
+   or also Tenant HQ visibility?
+6. Preserve `hq_access` column (or drop — decide at execution)
+7. Update LL-205 guidance to reference the two-level model
+8. Update AGENT-METHODOLOGY.md Section 1 (Platform Mental Model) to match
+
+**Effort estimate:** 1 focused session (~4h) if no table bypasses need
+widening; 2 sessions if several tables need tenant-HQ visibility added.
+
+**Supersedes nothing.** The existing `tenant_groups` + `tenant_group_members`
+(/group-portal) remains the franchise/multi-store mechanism. This WP is
+about platform-level access control, not multi-store visibility for
+franchise owners.
+
+**Reference:** PLATFORM-OVERVIEW_v1_0.md S320 addendum ("Two-HQ architecture
+clarification") contains the full architectural rationale. Read that first
+when this WP is picked up.

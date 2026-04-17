@@ -561,3 +561,99 @@ phantom record. Cancel it. Never let phantom records reach a demo screen.
 
 **RULE-COH-003:** Revenue coherence check — today's revenue must not
 exceed total stock value at cost. If it does, the data is synthetic.
+
+---
+
+## UPDATE — 18 April 2026 (S320) — Two-HQ architecture clarification
+
+### The distinction that was never written down (and must be preserved)
+
+Every tenant on NuAi eventually gets the full stack:
+- **Consumer website** (shop, loyalty, account)
+- **Admin portal** (store manager / front-of-house)
+- **Tenant HQ portal** (owner's command centre for *their* business)
+- **Wholesale portal** (B2B)
+
+**"Tenant HQ" is the top of that tenant's world.** It sees everything inside
+their tenant boundary — all their stores, all their stock, all their staff,
+all their financials. It never sees across tenants.
+
+**"Platform HQ" (Nu Ai (Pty) Ltd — currently the owner, admin@protea.dev
+and fivazg@gmail.com) sits above all of them.** It is NOT "Tenant HQ scaled
+up." It is a different kind of thing:
+- Multi-tenant visibility (cross-store analytics, platform-wide operational view)
+- Platform management (tenant lifecycle, billing, feature flags, demo seeding)
+- Executive suite applications (WP-AINS, cross-tenant intelligence,
+  platform health dashboards)
+
+The Exec Suite apps we are currently building are **Platform HQ** tools,
+not Tenant HQ tools. They need cross-tenant visibility by design.
+
+### Current implementation vs. long-term intent
+
+**Today (dev / pre-launch):**
+- `user_profiles.hq_access` is a single boolean
+- `is_hq_user()` is a single SECURITY DEFINER function returning that boolean
+- Only two accounts carry `hq_access=true`, both are the platform owner
+- Every tenant-scoped table with a `hq_all_*` bypass policy trusts that flag
+- The single flag conflates "Platform HQ" and "Tenant HQ" because no tenants
+  have been granted it yet. The semantic ambiguity is latent, not active.
+
+**Planned migration (when Tenant HQ portals ship to real customers):**
+- `user_profiles.access_level` enum replaces the boolean:
+  `platform_operator | tenant_hq | null`
+- `is_hq_user()` function body is rewritten to check for `platform_operator`
+- New helper `is_tenant_hq()` added for within-tenant HQ scope
+- Every existing `hq_all_*` policy keeps working unchanged — they call the
+  function, not the column. One-point abstraction.
+- New/modified tables decide case-by-case: does Tenant HQ need to see this?
+  (Example: `food_ingredients` — no. Each tenant's recipe IP is theirs.)
+
+### Why this matters for every future agent
+
+1. When designing a new table, the LL-205 `hq_all_*` bypass question has two
+   dimensions, not one:
+   - Does Platform HQ need to see it? (almost always yes)
+   - Does Tenant HQ need to see it across their stores? (case-by-case)
+2. The boolean flag's current meaning is a dev shortcut with a migration
+   path. Do not treat it as the final architecture.
+3. When `hq_access=true` is ever granted to a non-operator user (franchise
+   owner, regional manager, auditor), every existing `hq_all_*` policy
+   must be audited first. See BACKLOG item WP-HQ-GRANULARITY in
+   PENDING-ACTIONS.md.
+
+### Scope boundary against WP-TENANT-GROUPS
+
+Multi-store visibility for a franchise owner is *not* what `hq_access`
+handles. That's `tenant_groups` + `tenant_group_members` (shipped,
+`/group-portal`). A franchisor's cross-store view comes from being a
+member of a group, not from carrying HQ access. The two mechanisms
+solve different problems:
+- `tenant_groups` — "I own three stores, show me all of them"
+- `hq_access` — "I am the platform operator, show me all tenants"
+
+The migration above adds `tenant_hq` between these two: "I am the top of
+one tenant, within that tenant I see everything." Today, tenant admins
+see their tenant by virtue of standard RLS (`tenant_id = user_tenant_id()`).
+No HQ bypass needed. The `tenant_hq` level becomes relevant only if a
+future feature creates per-tenant resources with sub-scopes that need
+tenant-HQ-level visibility that exceeds normal tenant RLS.
+
+### S320 decision applied to `food_ingredients`
+
+For WP-TABLE-UNIFY Phase 2, Option A was chosen: add `hq_all_food_ingredients`
+using `is_hq_user()`, matching the existing pattern on 8+ other tables. When
+the migration above happens, `is_hq_user()` will tighten to
+`platform_operator` only, and `food_ingredients` correctly stays
+platform-HQ-only (tenant IP shouldn't cross tenant boundaries, including
+for a franchisor).
+
+### Capture rationale
+
+This distinction was clear in the owner's head but not in any doc until
+S320. The risk was that future agents (or future owner) would assume
+`hq_access=true` was safe to grant to a sophisticated tenant admin,
+silently exposing 8+ tables of cross-tenant data. Writing it down here
+converts a latent architecture assumption into explicit, auditable intent.
+
+*Appended: 18 April 2026 · Session 320 · Two-HQ architecture captured*

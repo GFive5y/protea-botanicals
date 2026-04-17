@@ -518,6 +518,9 @@ Read once. Used throughout this Bible and BUILD-LOG.md.
     bank_accounts · bank_statement_lines · expenses
   SYMPTOM: HQ tab shows 0 rows / empty state despite data confirmed in DB. Always check LL-205 first.
   CHECK: Before shipping any new table, verify it has both the tenant isolation policy AND hq_all_ policy.
+  NOTE (S320): `is_hq_user()` currently conflates Platform HQ and Tenant HQ. See PLATFORM-OVERVIEW_v1_0.md
+  S320 addendum ("Two-HQ architecture clarification") and WP-HQ-GRANULARITY in PENDING-ACTIONS.md.
+  When `hq_access=true` is ever granted to a non-operator user, audit all `hq_all_*` policies first.
 
 - **LL-206 — useTenant HOOK — CORRECT PATTERN (CODEBASE-CONFIRMED 11 Apr 2026)**:
   Import:  import { useTenant } from '../../services/tenantService';
