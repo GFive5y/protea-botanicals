@@ -82,7 +82,7 @@ const CONTEXT_QUERIES = {
         .from("local_inputs")
         .select("name, cost_zar, category")
         .eq("is_active", true),
-      sb.from("product_cogs").select("product_name, sku").eq("is_active", true),
+      sb.from("product_cogs").select("product_name, sku").eq("tenant_id", tenantId).eq("is_active", true),
     ]);
 
     const inputs = safeData(inputsRes);
@@ -152,12 +152,14 @@ const CONTEXT_QUERIES = {
           .select(
             "id, batch_number, product_name, lifecycle_status, coa_url, expiry_date, production_date",
           )
+          .eq("tenant_id", tenantId)
           .eq("is_archived", false)
           .order("production_date", { ascending: false }),
         // Products with no sell price → invisible in storefront (Allocate Stock concern)
         sb
           .from("inventory_items")
           .select("name")
+          .eq("tenant_id", tenantId)
           .eq("category", "finished_product")
           .eq("is_active", true)
           .eq("sell_price", 0),
@@ -165,11 +167,12 @@ const CONTEXT_QUERIES = {
         sb
           .from("inventory_items")
           .select("name, quantity_on_hand, reorder_level")
+          .eq("tenant_id", tenantId)
           .eq("category", "finished_product")
           .eq("is_active", true)
           .gt("sell_price", 0),
         // Production runs → find batches with no logged run (History concern)
-        sb.from("production_runs").select("batch_id, status"),
+        sb.from("production_runs").select("batch_id, status").eq("tenant_id", tenantId),
       ]);
 
     const batches = safeData(batchesRes);
@@ -397,6 +400,7 @@ const CONTEXT_QUERIES = {
       sb
         .from("inventory_items")
         .select("name, quantity_on_hand, reorder_level, category, is_active")
+        .eq("tenant_id", tenantId)
         .eq("is_active", true),
     ]);
 
@@ -439,6 +443,7 @@ const CONTEXT_QUERIES = {
       sb
         .from("qr_codes")
         .select("is_active, claimed, scan_count")
+        .eq("tenant_id", tenantId)
         .eq("is_active", true),
     ]);
 
@@ -498,11 +503,13 @@ const CONTEXT_QUERIES = {
       sb
         .from("inventory_items")
         .select("name, quantity_on_hand")
+        .eq("tenant_id", tenantId)
         .eq("is_active", true)
         .lte("quantity_on_hand", 0),
       sb
         .from("support_tickets")
         .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
         .eq("status", "open"),
     ]);
 
@@ -576,10 +583,12 @@ const CONTEXT_QUERIES = {
       sb
         .from("orders")
         .select("total, created_at")
+        .eq("tenant_id", tenantId)
         .gte("created_at", thisMonthIso),
       sb
         .from("loyalty_transactions")
         .select("points, created_at")
+        .eq("tenant_id", tenantId)
         .in("transaction_type", ["REDEEMED", "redeemed", "REDEEMED_POINTS"])
         .gte("created_at", thisMonthIso),
     ]);
@@ -712,14 +721,17 @@ const CONTEXT_QUERIES = {
       sb
         .from("document_log")
         .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
         .eq("status", "pending_review"),
       sb
         .from("document_log")
         .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
         .eq("status", "confirmed"),
       sb
         .from("document_log")
         .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
         .eq("status", "rejected"),
     ]);
 
@@ -784,10 +796,11 @@ const CONTEXT_QUERIES = {
   // Warn if any active SKU has no retail price — product invisible in shop.
   pricing: async (sb, tenantId) => {
     const [recipesRes, pricingRes] = await Promise.allSettled([
-      sb.from("product_cogs").select("id").eq("is_active", true),
+      sb.from("product_cogs").select("id").eq("tenant_id", tenantId).eq("is_active", true),
       sb
         .from("product_pricing")
         .select("product_cogs_id, channel, sell_price_zar")
+        .eq("tenant_id", tenantId)
         .eq("channel", "retail"),
     ]);
 
@@ -866,6 +879,7 @@ const CONTEXT_QUERIES = {
       sb
         .from("batches")
         .select("id, batch_number, product_name, expiry_date, coa_url")
+        .eq("tenant_id", tenantId)
         .eq("is_archived", false),
     ]);
 
@@ -967,10 +981,12 @@ const CONTEXT_QUERIES = {
       sb
         .from("customer_messages")
         .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
         .is("read_at", null),
       sb
         .from("support_tickets")
         .select("id, status")
+        .eq("tenant_id", tenantId)
         .not("status", "in", '("closed","resolved")'),
     ]);
 
@@ -1145,10 +1161,12 @@ const CONTEXT_QUERIES = {
         sb
           .from("shipments")
           .select("id, shipment_number, status, estimated_arrival")
+          .eq("tenant_id", tenantId)
           .not("status", "in", '("delivered","confirmed","cancelled")'),
         sb
           .from("production_runs")
           .select("id, status")
+          .eq("tenant_id", tenantId)
           .eq("status", "in_progress"),
       ]);
 
