@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 311 close (Tier 2B.4a — Shared-reference docs)
+## Updated: 18 April 2026 — Session 311.5 close (Capstone Part 1 — AGENT-METHODOLOGY.md)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -148,13 +148,15 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (311) — 18 April 2026
-- **SAFETY-082 SPLIT** — 3 tables (public_holidays, product_formats,
-  product_strains) reclassified as intentional shared-reference-data
-  (LL-293). NULL tenant_id is design, not bug. RLS handles isolation.
-  082a CLOSED. 082b OPEN (6 tables × 23 rows, S312).
-- **LL-293 added** — Shared-reference-data pattern documented in Bible.
-- **Audit script updated** — SHARED_REFERENCE_TABLES exclusion added.
+### CLOSED THIS SESSION (311.5) — 18 April 2026
+- **AGENT-METHODOLOGY.md created** — Capstone Part 1. Institutional memory
+  for platform agents. 5 sections: mental model, 4 investigation procedures,
+  4 design patterns, 6 failure modes, open questions. Draws from S293-S311
+  campaign experience. See docs/AGENT-METHODOLOGY.md.
+
+### CLOSED SESSION 311 — 18 April 2026
+- **SAFETY-082 SPLIT** — 082a CLOSED (3 shared-reference tables, LL-293).
+  082b OPEN (6 tables × 23 rows). Audit script updated.
 
 ### CLOSED SESSION 310 — 18 April 2026
 - **SAFETY-081 FIXED** — 2 broken views dropped. Commit dd254af.
