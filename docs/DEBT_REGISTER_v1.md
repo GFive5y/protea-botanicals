@@ -177,27 +177,30 @@ portals. `tenantId` was passed as a parameter but not used on 21 queries.
 | SAFETY-055 | usePageContext.js:1146 | shipments | AI context cross-tenant | S |
 | SAFETY-056 | usePageContext.js:1150 | production_runs | AI context cross-tenant | S |
 
-#### Cluster 9: HQProduction.js (4 violations)
+#### Cluster 9: HQProduction.js (4+4 violations) — FIXED 37cc3d3
 
-| ID | File:Line | Table | Impact | Size |
+| ID | File:Line | Table | Status | Fix Applied |
 |---|---|---|---|---|
-| SAFETY-057 | HQProduction.js:1906 | wholesale_partners | Cross-tenant read | S |
-| SAFETY-058 | HQProduction.js:1910 | product_formats | Cross-tenant read | S |
-| SAFETY-059 | HQProduction.js:1920 | product_format_bom | Cross-tenant read | S |
-| SAFETY-060 | HQProduction.js:4774 | production_runs | INSERT missing tenant_id | S |
+| SAFETY-057 | HQProduction.js:1908 | wholesale_partners | **FIXED** | `.eq("tenant_id", tenantId)` |
+| SAFETY-058 | HQProduction.js:1913 | product_formats | **FIXED** | `.eq("tenant_id", tenantId)` |
+| SAFETY-059 | HQProduction.js:1925 | product_format_bom | **FIXED** | `.eq("tenant_id", tenantId)` |
+| SAFETY-060 | HQProduction.js:4780 | production_runs | **FIXED** | `tenant_id: tenantId` |
+| SAFETY-066 (NEW S303) | HQProduction.js:4821 | production_run_inputs | **FIXED** | `tenant_id: tenantId` (single-chamber vape) |
+| SAFETY-067 (NEW S303) | HQProduction.js:4985 | production_run_inputs | **FIXED** | `tenant_id: tenantId` (BOM lines) |
+| SAFETY-068 (NEW S303) | HQProduction.js:4898 | production_run_inputs | **FIXED** | `tenant_id: tenantId` (multi-chamber medium+terpene) |
+| SAFETY-069 (NEW S303) | HQProduction.js:4940 | production_run_inputs | **FIXED** | `tenant_id: tenantId` (multi-chamber hardware) |
 
-#### Cluster 10: Other files (5 violations)
+#### Cluster 10: Other files (5 violations — 4 FIXED, 1 FALSE POSITIVE) — FIXED 37cc3d3
 
-| ID | File:Line | Table | Impact | Size |
+| ID | File:Line | Table | Status | Fix Applied |
 |---|---|---|---|---|
-| SAFETY-061 | HQSuppliers.js:514 | suppliers | INSERT no tenant_id (no useTenant in component) | S |
-| SAFETY-062 | HQSuppliers.js:1274 | suppliers | SELECT cross-tenant (no useTenant in component) | M |
-| SAFETY-063 | AdminHRPanel.js:57,60 | staff_profiles, leave_requests | fetchSummary cross-tenant | S |
-| SAFETY-064 | ExpenseManager.js:307 | expenses | INSERT missing tenant_id in payload | S |
-| SAFETY-065 | HQAnalytics.js:194,340 | shipments, production_runs | SELECT cross-tenant | S |
+| SAFETY-061 | HQSuppliers.js:517 | suppliers | **FIXED** | `tenant_id: tenantId` + useTenant added |
+| SAFETY-062 | HQSuppliers.js:1279 | suppliers | **FIXED** | `.eq("tenant_id", tenantId)` |
+| SAFETY-063 | AdminHRPanel.js:58,62,70 | staff/leave/timesheets | **FIXED** | `.eq("tenant_id", tenantId)` on all 3 queries |
+| SAFETY-064 | ExpenseManager.js:307 | expenses | **FALSE POSITIVE** | tenant_id already in payload at L282 (script context window too small) |
+| SAFETY-065 | HQAnalytics.js:197,345 | shipments, production_runs | **FIXED** | `.eq("tenant_id", tenantId)` on both |
 
-**Total new findings: 30 (SAFETY-036 to 065)**
-**Stage 6 required: YES**
+**All Stage 6 findings resolved. Total: 30 original + 4 re-grep = 34 findings, 33 fixed + 1 FP.**
 
 ---
 

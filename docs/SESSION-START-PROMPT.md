@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 302 close (Stage 6A — CRITICAL AI Context Isolation)
+## Updated: 18 April 2026 — Session 303 close (Stage 6B — SAFETY TIER 1 COMPLETE)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: c3f2dc8
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 37cc3d3
 
 ---
 
@@ -148,11 +148,19 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (302) — 18 April 2026
+### CLOSED THIS SESSION (303) — 18 April 2026
+- **SAFETY-057 to 065 + 066-069 (NEW)** — Stage 6B: 15+ fixes across 4 files.
+  HQProduction (4 SELECT + 1 INSERT + 4 re-grep production_run_inputs),
+  HQSuppliers (1 INSERT + 1 SELECT + useTenant added), AdminHRPanel (3 SELECT),
+  HQAnalytics (2 SELECT). SAFETY-064 confirmed FALSE POSITIVE.
+  Commit 37cc3d3. Build verified.
+- **SAFETY TIER 1 COMPLETE.** 70 total findings identified across S294-S303.
+  66 fixed in code, 1 false positive, 3 intentional cross-tenant (fraud/customers
+  user_profiles). Zero known tenant isolation issues remain in React/src code.
+
+### CLOSED SESSION 302 — 18 April 2026
 - **SAFETY-036 to 056 (21 sites)** — CRITICAL: usePageContext.js AI context
-  engine tenant isolation. All 21 queries now scoped with .eq("tenant_id",
-  tenantId). 10 query functions fixed. Commit c3f2dc8. Build verified.
-  Audit script re-run: zero usePageContext.js findings remaining.
+  engine tenant isolation. Commit c3f2dc8.
 
 ### CLOSED SESSION 301 — 17 April 2026
 - **Stage 5.5: Audit script verification** — audit_tenant_isolation.py extended
@@ -440,8 +448,8 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **Stage 6B: Remaining 9 SAFETY findings** — SAFETY-057 to 065. HQProduction (4),
-   HQSuppliers (2), AdminHRPanel (1), ExpenseManager (1), HQAnalytics (2).
+1. **Tier 2 Workstream A: Edge Function safety audit** — 10 deployed EFs have not
+   been audited for tenant scoping. Next session (S304).
 
 2. **Financial findings** — FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded
    FY2026), FIN-003 (VAT_RATE), FIN-006 (equity join filter).
