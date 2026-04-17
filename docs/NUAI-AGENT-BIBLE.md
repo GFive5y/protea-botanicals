@@ -1942,3 +1942,51 @@ equity_ledger update on the next line did not. Fixed S316.
 ---
 
 *LL-296 added 18 April 2026 · Session 316*
+
+---
+
+## Session 317 — 18 April 2026 — Financial debt cluster
+
+### LL-297 — FY LABEL ALGORITHM: COMPUTE FROM financial_year_start
+
+**Rule:** FY labels must be computed from the tenant's `financial_year_start`
++ current date, never hardcoded. Canonical algorithm:
+```js
+const mo = parseInt((fyStart || "03-01").split("-")[0], 10);
+const yr = (new Date().getMonth() + 1) >= mo
+  ? new Date().getFullYear()
+  : new Date().getFullYear() - 1;
+const fyLabel = `FY${yr}`;
+```
+
+Any time code needs to write, read, or filter `equity_ledger` by
+`financial_year`, compute the label this way. Garden Bistro (Mar-Feb FY)
+is the canary — if your code works for it, it works for all of them.
+
+When writing the P&L period for a recalc, `p_since = ${yr}-${fyStart}`
+(FY start date), not the calendar-year Jan 1.
+
+---
+
+### LL-298 — TENANT-RATE-AWARE VAT DIVISOR
+
+**Rule:** SA VAT is 15% but the platform is multi-tenant and multi-rate-
+capable. `tenant_config.vat_rate` stores the rate as a decimal (0.15 = 15%).
+The divisor to convert VAT-inclusive totals to ex-VAT is `1 + vat_rate`,
+NOT a hardcoded constant.
+
+Consumer pattern (HQProfitLoss via useTenant().tenantConfig):
+```js
+const vatRate = parseFloat(tenantConfig?.vat_rate ?? 0.15);
+const VAT_RATE = 1 + (Number.isFinite(vatRate) ? vatRate : 0.15);
+```
+
+Group helpers read per-tenant via `.from("tenant_config").select("vat_rate")
+.eq("tenant_id", tid).maybeSingle()`. Fallback: 0.15.
+
+Dispensing revenue is NOT VAT-inclusive (Schedule 6, LL-231) — the divisor
+does NOT apply to the dispensary branch.
+
+---
+
+*LL-297 + LL-298 added 18 April 2026 · Session 317*

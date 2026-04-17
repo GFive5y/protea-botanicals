@@ -4,6 +4,47 @@
 
 ---
 
+## S317 — 18 April 2026 — FIN-002: FY label + recalc period
+
+**Context:** Register flagged "hardcoded FY2026 in 4 locations." Disk
+inspection found 5 (register missed the readonly display input). Also
+found HQTenants.recalcNetProfit used calendar-year P&L period — for
+Mar-Feb FY tenants (Garden Bistro) the net_profit written was garbage.
+
+**Alternative:** Fix only the hardcode, leave the calendar-year P&L-period
+bug for later. Rejected — fixing one without the other produces a file
+with correct string and still-wrong arithmetic.
+
+**LL-297** added: canonical fyLabel algorithm.
+
+---
+
+## S317 — 18 April 2026 — FIN-003: Tenant-rate-aware VAT divisor
+
+**Context:** 3 module-level `const VAT_RATE = 1.15` encoding both the `1+`
+math and the SA-only assumption. tenant_config.vat_rate already stores the
+rate as 0.15.
+
+**Alternative:** Pass vatRate as function argument to Group helpers.
+Rejected — callers don't fetch vat_rate; each helper doing one extra
+tenant_config lookup is cheaper to implement.
+
+**Named divisor not vatRate** to prevent off-by-1 confusion (0.15 vs 1.15).
+
+**LL-298** added: per-tenant VAT pattern.
+
+---
+
+## S317 — 18 April 2026 — FIN-006: Sort embedded equity_ledger join
+
+**Context:** PostgREST embedded join took `[0]` without specifying order.
+Harmless today (1 row per tenant). Becomes wrong Jan 2027.
+
+**Alternative:** Split into separate filtered query. Rejected — one-line
+`.order()` with `foreignTable` is minimum-surface fix.
+
+---
+
 ## S316.5b.3 — 18 April 2026 — WP-REGISTER.md created
 
 **Decision:** Built docs/WP-REGISTER.md from verified triage. Integrated

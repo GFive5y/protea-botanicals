@@ -454,9 +454,9 @@ Capstone workstream addressing institutional memory beyond the safety campaign.
 | ID | Severity | Affected Tenants | Symptom | Root Cause | Blast Radius | Size |
 |---|---|---|---|---|---|---|
 | FIN-001 | **FIXED** S316 | All 5 | ~~Year-end close marks ALL equity_ledger rows~~ | Added `.eq("financial_year", fyLabel)`. LL-296 documents the cross-year contamination pattern. | — | S |
-| FIN-002 | Low (time bomb) | All 5 | After Jan 2027, fin setup/recalc writes to FY2026 instead of FY2027 | Hardcoded `"FY2026"` in: HQTenantFinancialSetup.js:164,194 · HQTenants.js:999 · HQTenantProfiles.js:311 | All equity_ledger writes from setup/recalc flows | S |
-| FIN-003 | Low | All 5 | If SA VAT rate changes, revenue ex-VAT calculations wrong | `const VAT_RATE = 1.15` defined independently in: HQProfitLoss.js:461 · fetchStoreTrend.js:24 · fetchStoreFinancials.js:40 (should read from tenant_config.vat_rate) | All ex-VAT revenue figures across HQ P&L and Group Portal | S |
-| FIN-006 | Low | All 5 (if multi-FY rows exist) | Tenant profile health check could show wrong year's equity data | HQTenantProfiles.js:238 — embedded join `equity_ledger(...)` fetches ALL FY rows, takes `[0]` by default ordering | Tenant profile cards, detectBugs function | S |
+| FIN-002 | **FIXED** S317 | All 5 | ~~Hardcoded FY2026~~ | Computed from tenant's financial_year_start. Also fixed HQTenants calendar-year P&L period bug. LL-297. | — | S |
+| FIN-003 | **FIXED** S317 | All 5 | ~~Hardcoded VAT_RATE 1.15~~ | Per-tenant from tenant_config.vat_rate. tenantService hydrates vat_rate. LL-298. | — | S |
+| FIN-006 | **FIXED** S317 | All 5 | ~~equity_ledger join unsorted~~ | Added .order("financial_year", desc, foreignTable) to embedded join. | — | S |
 
 ### 2.2 Confirmed Clean
 

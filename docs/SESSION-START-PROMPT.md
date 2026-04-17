@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 316.5b.3 close (WP-REGISTER.md created)
+## Updated: 18 April 2026 — Session 317 close (FIN-002 + FIN-003 + FIN-006 — FINANCIAL DEBT COMPLETE)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -148,11 +148,16 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (316.5b.3) — 18 April 2026
-- **WP-REGISTER.md created** — 32 WPs placed in PRIMARY (empty, owner picks) /
-  SECONDARY (7) / SCOPED (6) / DEFERRED (2) / BACKLOG / CLOSED (13) / ARCHIVED (7).
-  Integrated into AGENT-ORIENTATION at position 2. Failure Mode 8 (documentation
-  under-classification) added to AGENT-METHODOLOGY.
+### CLOSED THIS SESSION (317) — 18 April 2026
+- **FIN-002 FIXED** — Computed FY label from tenant's financial_year_start.
+  Also fixed HQTenants.recalcNetProfit calendar-year P&L period bug. LL-297.
+- **FIN-003 FIXED** — Per-tenant VAT divisor from tenant_config.vat_rate.
+  tenantService hydrates vat_rate. 3 module constants removed. LL-298.
+- **FIN-006 FIXED** — Embedded equity_ledger join sorted by financial_year desc.
+- **FINANCIAL DEBT COMPLETE.** FIN-001 (S316) + FIN-002/003/006 (S317). All 4 fixed.
+
+### CLOSED SESSION 316.5b.3 — 18 April 2026
+- **WP-REGISTER.md created** — 32 WPs. Failure Mode 8 added.
 
 ### CLOSED SESSION 316.5b.2 — 18 April 2026
 - **WP verification** — 6 reclassifications. 81% triage accuracy.
@@ -526,6 +531,10 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
          statement tabs. Actual financial_statement_status table has UNIQUE
          (tenant_id, financial_year) → one workflow row per tenant covers all
          4 statements. Real scope: 5. Always query schema before estimating work.
+LL-297 (NEW S317): FY labels computed from tenant's financial_year_start + current
+         date. Never hardcode "FY2026". Garden Bistro (Mar-Feb FY) is the canary.
+LL-298 (NEW S317): VAT divisor from tenant_config.vat_rate (decimal 0.15), not
+         hardcoded 1.15. Dispensary revenue is NOT VAT-inclusive (LL-231).
 
 ---
 
@@ -541,8 +550,8 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **S317: FIN-002 + FIN-003 + FIN-006** — hardcoded FY2026 (3 files), hardcoded
-   VAT_RATE 1.15 (3 files), equity join missing FY filter (1 file). All Size S.
+1. **Owner picks PRIMARY WP** — see docs/WP-REGISTER.md. Financial debt complete.
+   Candidates: WP-AINS completion, WP-TABLE-UNIFY Phase 1 close-out, any SCOPED WP.
 
 2. **Financial findings:** FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded FY2026),
    FIN-003 (VAT_RATE), FIN-006 (equity join filter).

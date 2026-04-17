@@ -2,7 +2,7 @@
 ## Active work packages, ranked by priority
 ## READ THIS AT SESSION START to pick primary workstream
 ## UPDATE THIS FILE when: WP status changes, new WP scoped, priority reassessed
-## HEAD at last update: 9b4bccd
+## HEAD at last update: e77e783
 ## Last reviewed: 18 April 2026 (S316.5b.3)
 ## Total active WPs: 15 (7 IN-PROGRESS + 6 SCOPED + 2 DEFERRED)
 
@@ -135,6 +135,7 @@ Exit criteria: Phase 1 all PRs shipped
 | WP-TENANT-GROUPS | docs/WP-TENANT-GROUPS.md | 11 Apr | GroupPortal.js + all components |
 | WP-UNIFY | docs/WP-UNIFY_v1_0.md | 13 Apr | 8 UNIFY rules, all P1+P2 COMPLETE |
 | Safety campaign | DEBT_REGISTER_v1.md | S293-S314.4 | 31 sessions, 146 RLS policies, 70 React fixes |
+| Financial debt | DEBT_REGISTER_v1.md | S316-S317 | FIN-001/002/003/006 fixed. LL-296/297/298 added |
 
 ---
 
