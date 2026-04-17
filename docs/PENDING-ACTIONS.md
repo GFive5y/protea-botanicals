@@ -333,6 +333,18 @@ on tenant-scoped tables before commit. Permanent audit coverage
 fix lives in: extending audit_tenant_isolation.py TENANT_SCOPED
 set per Section 1.3 of the register.
 
+### WATCH-008 (NEW S300) — Historical system_alerts misattribution check
+SAFETY-030 replaced a hardcoded tenant UUID "43b34c33-..." in
+ScanResult.js:1285. Every scan that triggered this path before the
+S299 fix wrote system_alerts rows to that hardcoded tenant regardless
+of actual QR tenant. Before calling safety debt fully resolved, run:
+  SELECT tenant_id, COUNT(*) FROM system_alerts
+  WHERE tenant_id = '43b34c33-6864-4f02-98dd-df1d340475c3'
+  GROUP BY tenant_id;
+If count is non-trivial, the historical rows are misattributed and
+may need data correction (not code). Log findings, decide on cleanup
+separately. Not blocking Stage 5b, 5.5, or financial.
+
 ---
 
 ## BACKLOG — FUTURE BUILD ITEMS (post-demo, no date constraint)
