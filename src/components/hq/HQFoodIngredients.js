@@ -66,6 +66,9 @@ import { useTenant } from "../../services/tenantService";
 import WorkflowGuide from "../WorkflowGuide";
 import InfoTooltip from "../InfoTooltip";
 import { T } from "../../styles/tokens";
+import ViewToggle from "./food/ViewToggle";
+import FoodTileView from "./food/FoodTileView";
+import FoodListView from "./food/FoodListView";
 
 // WP-UNIFY: F&B local palette mapped to tokens.js T where equivalent
 const C = {
@@ -3206,6 +3209,7 @@ export default function HQFoodIngredients() {
   const [filterTemp, setFilterTemp] = useState("");
   const [selectedIngredient, setSelectedIngredient] = useState(null);
   const [compareList, setCompareList] = useState([]);
+  const [viewMode, setViewMode] = useState("tile"); // WP-TABLE-UNIFY 2A.1
   const [toast, setToast] = useState(null);
 
   // New ingredient form
@@ -3812,230 +3816,29 @@ export default function HQFoodIngredients() {
             </div>
           )}
 
-          {/* Ingredient table */}
-          {filtered.length > 0 && (
-            <div
-              style={{
-                background: C.surface,
-                border: `1px solid ${C.border}`,
-                borderRadius: T.radius.mdPlus,
-                overflow: "hidden",
-              }}
-            >
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ background: C.bg }}>
-                    {[
-                      "Ingredient",
-                      "Category",
-                      "Allergens",
-                      "HACCP",
-                      "Temp",
-                      "Shelf Life",
-                      "Nutrition (per 100g)",
-                      "",
-                    ].map((h) => (
-                      <th
-                        key={h}
-                        style={{
-                          padding: "10px 14px",
-                          textAlign: "left",
-                          fontSize: T.text.xs,
-                          color: C.inkLight,
-                          fontWeight: T.weight.bold,
-                          letterSpacing: "0.06em",
-                          textTransform: "uppercase",
-                          borderBottom: `1px solid ${C.border}`,
-                        }}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((ing, idx) => {
-                    const cat = getCategory(ing.category);
-                    const allergenList = getAllergenList(ing.allergen_flags);
-                    const inCompare = compareList.some((c) => c.id === ing.id);
-                    return (
-                      <tr
-                        key={ing.id}
-                        style={{
-                          borderTop: `1px solid ${C.border}`,
-                          background: idx % 2 === 0 ? C.surface : "#FCFCFB",
-                          cursor: "pointer",
-                        }}
-                        onClick={() => setSelectedIngredient(ing)}
-                      >
-                        <td style={{ padding: "12px 14px" }}>
-                          <div
-                            style={{
-                              fontWeight: T.weight.semibold,
-                              fontSize: T.text.smPlus,
-                              color: C.ink,
-                            }}
-                          >
-                            {ing.name}
-                          </div>
-                          {ing.common_name && (
-                            <div
-                              style={{
-                                fontSize: T.text.xs,
-                                color: C.inkLight,
-                                marginTop: 2,
-                              }}
-                            >
-                              {ing.common_name}
-                            </div>
-                          )}
-                          {ing.e_number && (
-                            <div
-                              style={{
-                                fontSize: T.text.xxs,
-                                color: C.inkLight,
-                                marginTop: 1,
-                                fontFamily: "monospace",
-                              }}
-                            >
-                              {ing.e_number}
-                            </div>
-                          )}
-                          {ing.is_seeded && (
-                            <span
-                              style={{
-                                fontSize: T.text.xxs,
-                                color: C.accent,
-                                fontWeight: T.weight.bold,
-                                marginTop: 2,
-                                display: "block",
-                              }}
-                            >
-                              📚 LIBRARY
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ padding: "12px 14px" }}>
-                          <span
-                            style={{
-                              background: cat.color + "15",
-                              color: cat.color,
-                              border: `1px solid ${cat.color}25`,
-                              borderRadius: T.radius.sm,
-                              padding: "2px 8px",
-                              fontSize: T.text.xs,
-                              fontWeight: T.weight.semibold,
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {cat.icon} {cat.label}
-                          </span>
-                        </td>
-                        <td style={{ padding: "12px 14px", maxWidth: 160 }}>
-                          {allergenList.length > 0 ? (
-                            <div
-                              style={{
-                                display: "flex",
-                                gap: T.gap.xs,
-                                flexWrap: "wrap",
-                              }}
-                            >
-                              {allergenList.slice(0, 3).map((a) => (
-                                <span
-                                  key={a.key}
-                                  title={a.label}
-                                  style={{
-                                    background: C.amberBg,
-                                    color: C.amber,
-                                    border: `1px solid ${T.warningBd}`,
-                                    borderRadius: T.radius.sm,
-                                    padding: "1px 5px",
-                                    fontSize: T.text.xxs,
-                                    fontWeight: T.weight.bold,
-                                  }}
-                                >
-                                  {a.icon}
-                                </span>
-                              ))}
-                              {allergenList.length > 3 && (
-                                <span
-                                  style={{
-                                    fontSize: T.text.xxs,
-                                    color: C.amber,
-                                    fontWeight: T.weight.bold,
-                                  }}
-                                >
-                                  +{allergenList.length - 3}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span style={{ fontSize: T.text.xs, color: C.inkLight }}>
-                              —
-                            </span>
-                          )}
-                        </td>
-                        <td
-                          style={{ padding: "12px 14px" }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <HaccpBadge level={ing.haccp_risk_level} />
-                        </td>
-                        <td
-                          style={{ padding: "12px 14px" }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <TempBadge zone={ing.temperature_zone} />
-                        </td>
-                        <td
-                          style={{
-                            padding: "12px 14px",
-                            fontSize: T.text.sm,
-                            color: C.inkMid,
-                          }}
-                        >
-                          {ing.shelf_life_days
-                            ? `${ing.shelf_life_days}d`
-                            : "∞"}
-                        </td>
-                        <td style={{ padding: "12px 14px" }}>
-                          <NutritionMini n={ing.nutrition_per_100g} />
-                        </td>
-                        <td
-                          style={{ padding: "12px 14px" }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <button
-                            onClick={() =>
-                              setCompareList(
-                                inCompare
-                                  ? compareList.filter((c) => c.id !== ing.id)
-                                  : compareList.length < 5
-                                    ? [...compareList, ing]
-                                    : compareList,
-                              )
-                            }
-                            style={{
-                              padding: "4px 10px",
-                              fontSize: T.text.xs,
-                              fontFamily: "inherit",
-                              background: inCompare ? C.accent : C.bg,
-                              color: inCompare ? T.surface : C.inkMid,
-                              border: `1px solid ${inCompare ? C.accent : C.border}`,
-                              borderRadius: T.radius.smPlus,
-                              cursor: "pointer",
-                              fontWeight: T.weight.semibold,
-                            }}
-                          >
-                            {inCompare ? "✓ Added" : "+ Compare"}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+          {/* View toggle + ingredient grid — PR 2A.1 */}
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: T.gap.md }}>
+            <ViewToggle value={viewMode} onChange={setViewMode} />
+          </div>
+
+          {viewMode === "tile" ? (
+            <FoodTileView
+              items={filtered}
+              compareList={compareList}
+              onSelect={setSelectedIngredient}
+              HaccpBadge={HaccpBadge}
+            />
+          ) : (
+            <FoodListView
+              items={filtered}
+              compareList={compareList}
+              onSelect={setSelectedIngredient}
+              getCategory={getCategory}
+              getAllergenList={getAllergenList}
+              AllergenBadge={AllergenBadge}
+              HaccpBadge={HaccpBadge}
+              TempBadge={TempBadge}
+            />
           )}
         </div>
       )}
