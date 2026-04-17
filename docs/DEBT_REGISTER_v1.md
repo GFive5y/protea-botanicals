@@ -246,11 +246,11 @@ the request body without verifying the caller has authority over that tenant.
 
 | ID | EF | Line | Type | Description | Size |
 |---|---|---|---|---|---|
-| SAFETY-071 | auto-post-capture | L48 | SELECT | Initial capture_queue fetch by ID only, no tenant_id filter. Any caller can trigger processing of any tenant's capture queue entry. | S |
+| SAFETY-071 | auto-post-capture | L49 | SELECT | **DOCUMENTED** 54412c0 (S307). Unscoped fetch is intentional — record's tenant_id needed for auth check (SAFETY-072). Auth gates all processing. Inline comment added. | S |
 | SAFETY-072 | auto-post-capture | — | AUTH | **FIXED** 90be33c (S306). verifyTenantAuth('tenant', cap.tenant_id) after record fetch. | M |
 | SAFETY-073 | seed-tenant | — | AUTH | **FIXED** 90be33c (S306). verifyTenantAuth('operator-only'). | M |
 | SAFETY-074 | sim-pos-sales | — | AUTH | **FIXED** 90be33c (S306). verifyTenantAuth('operator-only'). | M |
-| SAFETY-075 | sim-pos-sales | L323-328 | SQL | `wipe_sql` response interpolates tenant_id + SIM_TAG directly into SQL strings. Latent injection if strings are ever executed programmatically. | S |
+| SAFETY-075 | sim-pos-sales | L323-328 | SQL | **FALSE POSITIVE** (S307). Interpolated SQL strings are returned in response body for human copy-paste only — never executed by the EF. SIM_TAG is a hardcoded constant, TENANT_ID is operator-gated UUID. No injection surface. | S |
 
 **MEDIUM:**
 
@@ -264,7 +264,7 @@ the request body without verifying the caller has authority over that tenant.
 
 | ID | EF | Line | Type | Description | Size |
 |---|---|---|---|---|---|
-| SAFETY-079 | verify-qr | L83-102 | SELECT | Products table queried by qr_code without tenant_id. Theoretical cross-tenant if QR codes collide (unlikely with HMAC). | S |
+| SAFETY-079 | verify-qr | L83-102 | SELECT | **DOCUMENTED** 54412c0 (S307). Unscoped query is intentional — public QR scanner, no JWT. HMAC verification is the security gate (wrong product = invalid_signature). No sensitive data in response. Inline comment added. | S |
 
 #### Auth Pattern Analysis
 

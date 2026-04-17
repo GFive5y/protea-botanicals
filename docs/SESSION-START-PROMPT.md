@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 306 close (EF Auth Helper + 6-EF Rollout)
+## Updated: 18 April 2026 — Session 307 close (TIER 2 WORKSTREAM A COMPLETE)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 90be33c
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 54412c0
 
 ---
 
@@ -148,13 +148,19 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (306) — 18 April 2026
-- **verifyTenantAuth.ts** — Shared EF auth helper built at supabase/functions/_shared/.
-  Two modes: 'tenant' (same-tenant OR HQ operator) and 'operator-only' (HQ admin).
-  Commit e63bc96.
-- **SAFETY-072, 073, 074, 076, 077, 078 FIXED** — 6 EFs now use verifyTenantAuth.
-  auto-post-capture, invite-user, generate-financial-statements, ai-copilot (tenant),
-  seed-tenant, sim-pos-sales (operator-only). All 6 deployed. Commit 90be33c.
+### CLOSED THIS SESSION (307) — 18 April 2026
+- **SAFETY-071, 075, 079 resolved** — Final 3 EF findings.
+  SAFETY-071 (auto-post-capture unscoped fetch): documented as intentional,
+  guarded by SAFETY-072 auth check. SAFETY-075 (sim-pos-sales SQL): FALSE
+  POSITIVE (display-only strings, never executed). SAFETY-079 (verify-qr
+  unscoped products): documented as intentional (public QR, HMAC is gate).
+  Commit 54412c0. Both EFs deployed.
+- **TIER 2 WORKSTREAM A COMPLETE.** All 10 EF findings resolved:
+  8 code fixes, 1 false positive, 1 documented intentional.
+
+### CLOSED SESSION 306 — 18 April 2026
+- **verifyTenantAuth.ts** — Shared EF auth helper. Commit e63bc96.
+- **SAFETY-072, 073, 074, 076, 077, 078 FIXED** — 6 EFs hardened. Commit 90be33c.
 
 ### CLOSED SESSION 305 — 18 April 2026
 - **SAFETY-070 FIXED** — process-document dedup guard tenant-scoped. Commit 5404b74.
@@ -461,12 +467,12 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **EF data-scoping fixes (S307):** SAFETY-071 (auto-post-capture initial fetch),
-   075 (sim-pos-sales SQL interpolation), 079 (verify-qr products read). 3 remaining.
+1. **Financial findings:** FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded FY2026),
+   FIN-003 (VAT_RATE), FIN-006 (equity join filter). All Size S except FIN-001 (M).
 
-2. **Financial findings:** FIN-001 to 003, FIN-006.
+2. **SAFETY-080:** Supplier tenancy architectural debt — dedicated session.
 
-3. **SAFETY-080:** Supplier tenancy architectural debt — dedicated session.
+3. **DS6 cosmetic sweep:** 642 violations across 4 files. Not blocking.
 
 2. **Financial findings** — FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded
    FY2026), FIN-003 (VAT_RATE), FIN-006 (equity join filter).
