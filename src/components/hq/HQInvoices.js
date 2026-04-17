@@ -759,8 +759,8 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
           .eq("tenant_id", tenantId)
           .order("created_at", { ascending: false })
           .limit(300),
-        supabase.from("suppliers").select("id,name,country").order("name"),
-        supabase.from("wholesale_partners").select("id,business_name"),
+        supabase.from("suppliers").select("id,name,country").eq("tenant_id", tenantId).order("name"),
+        supabase.from("wholesale_partners").select("id,business_name").eq("tenant_id", tenantId),
         supabase
           .from("purchase_orders")
           .select("id,po_number,po_status,status,currency,subtotal,supplier_id")

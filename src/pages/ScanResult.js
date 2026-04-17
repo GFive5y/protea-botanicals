@@ -1282,7 +1282,7 @@ export default function ScanResult() {
     async (alertType, severity, title, body, sourceId) => {
       try {
         await supabase.from("system_alerts").insert({
-          tenant_id: "43b34c33-6864-4f02-98dd-df1d340475c3",
+          tenant_id: tenantId || null,
           alert_type: alertType,
           severity,
           status: "open",

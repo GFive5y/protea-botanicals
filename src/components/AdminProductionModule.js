@@ -12,6 +12,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
+import { useTenant } from "../services/tenantService";
 import { T } from "../styles/tokens";
 
 // Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
@@ -424,6 +425,7 @@ function CreateRunForm({
   batches,
   inventoryItems,
   existingRuns,
+  tenantId,
   onSave,
   onCancel,
 }) {
@@ -466,6 +468,7 @@ function CreateRunForm({
       const { data: run, error: runErr } = await supabase
         .from("production_runs")
         .insert({
+          tenant_id: tenantId,
           batch_id: form.batch_id || null,
           run_number: form.run_number,
           planned_units: parseInt(form.planned_units),
@@ -482,6 +485,7 @@ function CreateRunForm({
           .from("production_run_inputs")
           .insert(
             validInputs.map((i) => ({
+              tenant_id: tenantId,
               run_id: run.id,
               item_id: i.item_id,
               quantity_planned: parseFloat(i.quantity_planned),
@@ -732,6 +736,7 @@ function CompleteRunModal({
   run,
   runInputs,
   inventoryItems,
+  tenantId,
   onConfirm,
   onCancel,
 }) {
@@ -780,6 +785,7 @@ function CompleteRunModal({
         const { error: moveErr } = await supabase
           .from("stock_movements")
           .insert({
+            tenant_id: tenantId,
             item_id: inp.item_id,
             quantity: -Math.abs(parseFloat(qty)),
             movement_type: "production_out",
@@ -1280,6 +1286,7 @@ function DetailsModal({ run, batches, runInputs, inventoryItems, onClose }) {
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function AdminProductionModule() {
+  const { tenantId } = useTenant();
   const [runs, setRuns] = useState([]);
   const [batches, setBatches] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
@@ -1303,12 +1310,14 @@ export default function AdminProductionModule() {
         supabase
           .from("production_runs")
           .select("*")
+          .eq("tenant_id", tenantId)
           .order("created_at", { ascending: false }),
         supabase
           .from("batches")
           .select("id, batch_number, product_name, strain, is_archived")
+          .eq("tenant_id", tenantId)
           .order("batch_number"),
-        supabase.from("inventory_items").select("*").eq("is_active", true),
+        supabase.from("inventory_items").select("*").eq("tenant_id", tenantId).eq("is_active", true),
       ]);
       const runList = runsRes.data || [];
       setRuns(runList);
@@ -1336,7 +1345,7 @@ export default function AdminProductionModule() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tenantId]);
 
   useEffect(() => {
     fetchAll();
@@ -1646,6 +1655,7 @@ export default function AdminProductionModule() {
             batches={batches}
             inventoryItems={inventoryItems}
             existingRuns={runs}
+            tenantId={tenantId}
             onSave={handleSaveNew}
             onCancel={() => setShowCreate(false)}
           />
@@ -1658,6 +1668,7 @@ export default function AdminProductionModule() {
           run={completeTarget}
           runInputs={runInputsMap[completeTarget.id] || []}
           inventoryItems={inventoryItems}
+          tenantId={tenantId}
           onConfirm={handleComplete}
           onCancel={() => setCompleteTarget(null)}
         />
