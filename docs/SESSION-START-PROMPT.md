@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 17 April 2026 — Session 299 close (Stage 5A — File-Clustered Safety Fixes)
+## Updated: 17 April 2026 — Session 300 close (Stage 5B — One-Off Safety Fixes — SAFETY CLEAN)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 9d2b9bc
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 5fe88a3
 
 ---
 
@@ -148,7 +148,18 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (299) — 17 April 2026
+### CLOSED THIS SESSION (300) — 17 April 2026
+- **SAFETY-009, 021, 022, 023 + 035 (NEW)** — Stage 5B: 5 fixes across 4 files.
+  HQMedical (1 INSERT), HQFraud (1 INSERT + 1 hardcoded UUID — useTenant added),
+  HQPricing (1 INSERT), HQYearEnd (3 journal_lines push sites). 1 new finding
+  from WATCH-007 re-grep (SAFETY-035 HQFraud system_alerts hardcoded UUID).
+  Commit 5fe88a3. Build verified.
+- **ALL SAFETY DEBT RESOLVED.** 36 of 36 register findings FIXED + 7 new
+  discoveries found and fixed during re-grep (SAFETY-031 to 035 + S297 HQDocs
+  inventory_items). Total: 36 original + 7 new = 43 fixes shipped across
+  Sessions 295-300.
+
+### CLOSED SESSION 299 — 17 April 2026
 - **SAFETY-020, 025-030 + 033, 034 (NEW)** — Stage 5A: 9 fixes across 3 files.
   HQInvoices (2 SELECT), AdminProductionModule (3 INSERT + 3 SELECT + useTenant
   added), ScanResult (1 hardcoded UUID replaced). 2 new findings from WATCH-007
@@ -423,10 +434,11 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **Stage 5B: One-off SAFETY fixes** — SAFETY-009 (HQMedical), 021 (HQFraud),
-   022 (HQPricing), 023 (HQYearEnd). 4 remaining items across 4 files.
+1. **Stage 5.5: audit_tenant_isolation.py fix + run** — extend TENANT_SCOPED
+   table list (Section 1.3 of register), run script, verify no remaining gaps.
 
-2. **Financial findings** — FIN-001 to 003, FIN-006 (separate stage after safety).
+2. **Financial findings** — FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded
+   FY2026), FIN-003 (VAT_RATE), FIN-006 (equity join filter).
 
 3. **sim-pos-sales** — STANDING ALERT. Trigger date depends on new demo date
    (PENDING CONFIRMATION). Must run the day BEFORE demo.

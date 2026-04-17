@@ -72,16 +72,17 @@ payload. The following 23 sites omit it.
 
 **All 4 fixed in Session 298 commit 0548979.**
 
-#### Cluster 5: Other Components (4 violations — 1 FIXED S299, 3 remaining for S5b)
+#### Cluster 5: Other Components (4+2 violations — ALL FIXED)
 
 | ID | File:Line | Table | Status | Fix Applied |
 |---|---|---|---|---|
-| SAFETY-009 | HQMedical.js:1045 | stock_movements | OPEN | Stage 5b |
-| SAFETY-020 | AdminProductionModule.js:471 | production_runs | **FIXED** 9d2b9bc | `tenant_id: tenantId` + useTenant added to component |
-| SAFETY-021 | HQFraud.js:591 | audit_log | OPEN | Stage 5b |
-| SAFETY-022 | HQPricing.js:808 | product_pricing | OPEN | Stage 5b |
-| SAFETY-033 (NEW S299) | AdminProductionModule.js:488 | production_run_inputs | **FIXED** 9d2b9bc | `tenant_id: tenantId` (mapped array, WATCH-007 re-grep) |
-| SAFETY-034 (NEW S299) | AdminProductionModule.js:788 | stock_movements | **FIXED** 9d2b9bc | `tenant_id: tenantId` (production_out deduction, WATCH-007 re-grep) |
+| SAFETY-009 | HQMedical.js:1045 | stock_movements | **FIXED** 5fe88a3 (S300) | `tenant_id: tenantId` (mirrors L1020 dispensing_log) |
+| SAFETY-020 | AdminProductionModule.js:471 | production_runs | **FIXED** 9d2b9bc (S299) | `tenant_id: tenantId` + useTenant added |
+| SAFETY-021 | HQFraud.js:592 | audit_log | **FIXED** 5fe88a3 (S300) | `tenant_id: tenantId \|\| null` + useTenant added |
+| SAFETY-022 | HQPricing.js:808 | product_pricing | **FIXED** 5fe88a3 (S300) | `tenant_id: tenant?.id` |
+| SAFETY-033 (NEW S299) | AdminProductionModule.js:488 | production_run_inputs | **FIXED** 9d2b9bc (S299) | `tenant_id: tenantId` (WATCH-007 re-grep) |
+| SAFETY-034 (NEW S299) | AdminProductionModule.js:788 | stock_movements | **FIXED** 9d2b9bc (S299) | `tenant_id: tenantId` (WATCH-007 re-grep) |
+| SAFETY-035 (NEW S300) | HQFraud.js:609 | system_alerts | **FIXED** 5fe88a3 (S300) | Replaced hardcoded UUID with `tenantId \|\| null` (WATCH-007 re-grep) |
 
 #### Cluster 7: Hardcoded Tenant UUID (1 violation) — FIXED 9d2b9bc
 
@@ -93,9 +94,9 @@ payload. The following 23 sites omit it.
 
 #### Cluster 6: Financial (1 violation)
 
-| ID | File:Line | Table | Impact | Fix Sketch | Size |
-|---|---|---|---|---|---|
-| SAFETY-023 | HQYearEnd.js:203 | journal_lines | Year-end closing journal lines lack tenant_id (parent journal_entries at L182 has it) | Add `tenant_id: tenantId` to each journal_lines entry | S |
+| ID | File:Line | Table | Status | Fix Applied |
+|---|---|---|---|---|
+| SAFETY-023 | HQYearEnd.js:196-201 | journal_lines | **FIXED** 5fe88a3 (S300) | `tenant_id: tenantId` on all 3 jLines.push sites (matches parent journal_entries at L183) |
 
 ---
 
