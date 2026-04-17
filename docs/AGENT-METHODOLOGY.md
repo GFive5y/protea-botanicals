@@ -581,6 +581,27 @@ before the fix?" If yes, log a data-cleanup item.
 is the canonical example — the code fix shipped in S299, but historical
 rows remain misattributed.
 
+### Failure 8: Documentation under-classification (S316.5b)
+
+**Symptom:** WP status headers under-count what's actually built. Docs say
+"SCOPED" or "READY TO BUILD" but the code is live.
+
+**Evidence (S316.5b.2):** 6 of 32 WPs reclassified at verification (81%
+triage accuracy). All 6 reclassifications moved WPs from SCOPED/STALE toward
+SHIPPED/IN-PROGRESS. Zero reclassifications moved the other direction.
+
+**Why it happens:** WP docs are written at scoping time with "READY TO BUILD"
+or "PLANNED" status. When execution ships, the WP doc rarely gets updated to
+"COMPLETE." The code advances; the doc sits.
+
+**Corrective:** Triage-based WP classification requires code verification,
+not header reading. When building a WP register, confirm shipped status by
+grepping for named components/EFs/schemas, not by trusting the doc's status.
+
+**This generalises Failure 1 (WATCH-007).** Audit under-counts are systemic
+across the platform's self-description — in findings, in scope estimates,
+and now in WP status. Treat any declared status as a hypothesis until verified.
+
 ### Failure 7: LL query drift (S315)
 
 **Symptom:** An LL in the Bible that encodes runnable SQL fails or returns

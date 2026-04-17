@@ -37,13 +37,14 @@ general_retail). Live platform, paying clients, real financial data.
 ## Session Start — Read These Live (every session, in order)
 
 1. `docs/SESSION-START-PROMPT.md` — current priorities, state, open loops
-2. `docs/PLATFORM-OVERVIEW_v1_0.md` — what NuAi is, portal map, stack
-3. `docs/NUAI-AGENT-BIBLE.md` — all rules (LL-001 through LL-293+)
-4. `docs/DECISION-JOURNAL.md` — recent reasoning (newest first)
-5. `docs/AGENT-METHODOLOGY.md` — how to investigate, classify, fix
-6. `docs/PENDING-ACTIONS.md` — open loops, watch items, backlog
-7. `docs/DEBT_REGISTER_v1.md` — safety + financial debt status
-8. `docs/VIOLATION_LOG_v1_1.md` — what broke before
+2. `docs/WP-REGISTER.md` — which WP is PRIMARY this session
+3. `docs/PLATFORM-OVERVIEW_v1_0.md` — what NuAi is, portal map, stack
+4. `docs/NUAI-AGENT-BIBLE.md` — all rules (LL-001 through LL-296+)
+5. `docs/DECISION-JOURNAL.md` — recent reasoning (newest first)
+6. `docs/AGENT-METHODOLOGY.md` — how to investigate, classify, fix
+7. `docs/PENDING-ACTIONS.md` — open loops, watch items, backlog
+8. `docs/DEBT_REGISTER_v1.md` — safety + financial debt status
+9. `docs/VIOLATION_LOG_v1_1.md` — what broke before
 
 Read these from the repo at HEAD using GitHub MCP. Do NOT rely on
 cached or remembered versions. After reading, confirm:

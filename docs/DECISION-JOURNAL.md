@@ -4,6 +4,27 @@
 
 ---
 
+## S316.5b.3 — 18 April 2026 — WP-REGISTER.md created
+
+**Decision:** Built docs/WP-REGISTER.md from verified triage. Integrated
+into AGENT-ORIENTATION read list at position 2. Added Failure 8
+(documentation under-classification) to AGENT-METHODOLOGY.
+
+**PRIMARY left empty** pending owner decision at next session start.
+Candidates: financial cluster (FIN-002/003/006), WP-AINS completion,
+WP-TABLE-UNIFY Phase 1 close-out.
+
+**Campaign arc (S316.5b.1 → .2 → .3):**
+- .b.1: Triage — 32 WPs catalogued
+- .b.2: Verify — 81% accuracy, 6 reclassifications
+- .b.3: Register — this session, structured + integrated
+
+The gap the owner named is now closed. WP visibility is a Loop doc.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S316.5b.2 — 18 April 2026 — WP verification
 
 **Decision:** Verified 4 LOW/MEDIUM-confidence rows + 5 archival candidates

@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 316.5b.2 close (WP verification)
+## Updated: 18 April 2026 — Session 316.5b.3 close (WP-REGISTER.md created)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -148,11 +148,14 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (316.5b.2) — 18 April 2026
-- **WP verification** — 6 reclassifications, all LOW/MEDIUM→HIGH confidence.
-  Updated totals: 13 SHIPPED, 7 IN-PROGRESS, 6 SCOPED, 2 DEFERRED, 4 STALE.
-  7 archival candidates confirmed. Zero ambiguous rows remain.
-  Ready for S316.5b.3 register build.
+### CLOSED THIS SESSION (316.5b.3) — 18 April 2026
+- **WP-REGISTER.md created** — 32 WPs placed in PRIMARY (empty, owner picks) /
+  SECONDARY (7) / SCOPED (6) / DEFERRED (2) / BACKLOG / CLOSED (13) / ARCHIVED (7).
+  Integrated into AGENT-ORIENTATION at position 2. Failure Mode 8 (documentation
+  under-classification) added to AGENT-METHODOLOGY.
+
+### CLOSED SESSION 316.5b.2 — 18 April 2026
+- **WP verification** — 6 reclassifications. 81% triage accuracy.
 
 ### CLOSED SESSION 316.5b.1 — 18 April 2026
 - **WP triage** — 32 WP docs catalogued. Initial: 9/6/9/2/6.
