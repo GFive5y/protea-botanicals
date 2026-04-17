@@ -2,9 +2,9 @@
 ## Active work packages, ranked by priority
 ## READ THIS AT SESSION START to pick primary workstream
 ## UPDATE THIS FILE when: WP status changes, new WP scoped, priority reassessed
-## HEAD at last update: e77e783
-## Last reviewed: 18 April 2026 (S316.5b.3)
-## Total active WPs: 15 (7 IN-PROGRESS + 6 SCOPED + 2 DEFERRED)
+## HEAD at last update: 6451151
+## Last reviewed: 18 April 2026 (S320)
+## Total active WPs: 15 (8 IN-PROGRESS + 6 SCOPED + 1 DEFERRED)
 
 ---
 
@@ -83,6 +83,13 @@ Goal: Table DS6 compliance + Smart Catalog feature parity + F&B wiring
 Next action: Phase 1 PR2 (READY), PR3 (POST-DEMO). Phase 2 → separate WP.
 Exit criteria: Phase 1 all PRs shipped
 
+### WP-TABLE-UNIFY-PHASE2
+Status: IN-PROGRESS (2A → 2D, ~57h)
+Doc: docs/WP-TABLE-UNIFY_PHASE2_v1.md
+Goal: Ingredient Encyclopedia Rebuild — SmartInventory parity + AI ingest + recipe linkage + compliance view
+Next action: Phase 2A (SmartInventory feature parity). Execution unlocked S320.
+Exit criteria: 2A-2D gates green. 2E deferred.
+
 ---
 
 ## SCOPED (ready to start when prioritized)
@@ -103,7 +110,6 @@ Exit criteria: Phase 1 all PRs shipped
 | WP | Doc | Reason | Unlock |
 |---|---|---|---|
 | WP-STOCK-MERGE | docs/WP-STOCK-MERGE_v1_0.md | Placeholder — future consolidation | WP-SMART-CATALOG + WP-REORDER Phase 1 complete |
-| WP-TABLE-UNIFY-PHASE2 | docs/WP-TABLE-UNIFY_PHASE2_v1.md | Post-demo (72h ingredient encyclopedia) | Do not start before 13 May 2026 |
 
 ---
 
@@ -194,7 +200,7 @@ Exit criteria: Phase 1 all PRs shipped
 | WP-STOCK-MERGE_v1_0.md | DEFERRED |
 | WP-STOCK-RECEIVE-S3_v1_0.md | ARCHIVED |
 | WP-TABLE-UNIFY_PHASE1_AUDIT_v1.md | CLOSED |
-| WP-TABLE-UNIFY_PHASE2_v1.md | DEFERRED |
+| WP-TABLE-UNIFY_PHASE2_v1.md | SECONDARY |
 | WP-TABLE-UNIFY_v1_0.md | SECONDARY |
 | WP-TENANT-GROUPS.md | CLOSED |
 | WP-UNIFY_v1_0.md | CLOSED |
