@@ -4,6 +4,32 @@
 
 ---
 
+## S314.3b — 18 April 2026 — HR cluster RLS fixes (24 policies across 15 tables)
+
+**Decision:** Fixed 24 HR policies with missing with_check. All were already
+correctly tenant-scoped — purely mechanical with_check addition. 1
+classification (public_holidays confirmed LL-293 design, with_check added).
+
+**Scope correction from brief:** Brief estimated 32 policies with 3
+architectural rewrites (Pattern 3). Live DB found 25 policies, ALL already
+tenant-scoped. Zero cross-tenant HR bugs — the architectural rewrite
+concern was a planning overestimate.
+
+**Classification outcomes:**
+- leave_types.lt_tenant_read: Census showed all rows have non-NULL tenant_id.
+  The `(tenant_id IS NULL)` clause is a forward-compatible safety net for
+  future platform-default leave types (Annual, Sick, etc.). No change needed.
+  NOT LL-293 pattern (no shared defaults currently exist). Classified ACCEPTABLE.
+- public_holidays.hr_holidays_all: Confirmed LL-293 design. with_check
+  added to match using_clause (preserves NULL-or-tenant pattern).
+
+**Zero-HR-user state:** No users have role='hr'. Breakage risk: zero.
+Session is pure hardening against future HR feature usage.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S314.3a — 18 April 2026 — Tenant-scoped HIGH RLS with_check fixes
 
 **Decision:** Fixed 11 tenant-scoped policies with missing with_check.

@@ -61,10 +61,7 @@ Trigger date: PENDING (depends on new demo date confirmation).
 ### S314.2a — CLOSED. 9 sweep residual policies fixed + LL-295.
 ### S314.2b — CLOSED. 11 MEDIUM is_admin() policies fixed.
 ### S314.3a — CLOSED. 11 HIGH with_check fixes (tenant-scoped Tier A).
-
-### S314.3b — HR cluster RLS rewrite (~24 policies)
-is_hr_user() without tenant scope. Need scope change, not just with_check.
-Owner classified HR functions as tenant-scoped (S314.2b.5).
+### S314.3b — CLOSED. 24 HR cluster with_check fixes (all mechanical, no rewrites).
 
 ### stock_take_* legacy RLS migration (3 policies)
 RLS-051 to RLS-053. Use current_setting('app.tenant_id') instead of
