@@ -4,6 +4,36 @@
 
 ---
 
+## S312 — 18 April 2026 — SAFETY-082b backfill + NOT NULL on 6 tables
+
+**Decision:** 7-phase migration matching S309 pattern. Delete 4 junk
+notification_log rows, backfill 19 real rows via FK evidence, apply
+NOT NULL on all 6 tables.
+
+**Alternatives considered:**
+- Delete all 7 notification_log rows (owner rejected — 3 had real system
+  events: a low-stock alert, an OTP verification, a tier upgrade)
+- Attribute the low-stock alert (D9 Distillate) to Pure Premium based on
+  product context rather than phone owner (owner chose consistent
+  phone-owner rule — the notification was SENT TO the HQ admin, so the
+  notification belongs to HQ regardless of which tenant's product triggered it)
+- Skip the backfill and just add NOT NULL with a default (rejected —
+  a default tenant_id is worse than NULL because it's silently wrong)
+
+**Why this path:** Same FK-evidence methodology as S309, which proved
+reliable. Attribution verified at each phase against the S311.75
+pre-investigation. Zero drift detected — every row matched expected
+tenant. The phone-owner attribution rule for notification_log avoids
+per-row justification and creates a consistent precedent.
+
+**Near-misses:** The notification_log ambiguity (product context vs phone
+owner) could have split the 3 rows across two tenants if applied
+inconsistently. The owner's "consistent rule" decision prevented this.
+
+**Fresh at close:** Yes — written immediately after Phase 7 verification.
+
+---
+
 ## S311.75 — 18 April 2026 — Loop as formal system
 
 **Decision:** Treat the Loop as an explicit architectural system, not

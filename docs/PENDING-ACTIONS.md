@@ -359,8 +359,8 @@ referencing views, not tables. Dropped in S310. No data loss.
 ### WATCH-011 — SAFETY-082 SPLIT (Session 311)
 082a CLOSED: public_holidays, product_formats, product_strains — intentional
 shared-reference-data pattern (LL-293). NULL tenant_id is design, not bug.
-082b OPEN: 6 tables × 23 rows backfill needed (customer_messages, notification_log,
-products, production_runs, scans, support_tickets). Target: S312.
+082b CLOSED (S312): 6 tables cleaned + constrained. 4 junk deleted, 19 backfilled,
+6 NOT NULL applied. See DEBT_REGISTER_v1.md Section 1.8 (2B.4b).
 
 ---
 

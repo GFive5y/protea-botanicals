@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 311.75 close (Capstone Part 2 — Loop System Architecture)
+## Updated: 18 April 2026 — Session 312 close (Tier 2B.4b — SAFETY-082b backfill)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: e81611a
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: c31ba6e
 
 ---
 
@@ -148,13 +148,17 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (311.75) — 18 April 2026
-- **Loop System Architecture** — Capstone Part 2. Formalised the Loop as
-  an explicit system. LOOP-PRINCIPLES.md (6 principles), DECISION-JOURNAL.md
-  (11 retrospective entries), new Step 7 (reasoning capture), extended
-  AGENT-ORIENTATION.md (8-item read list + Loop discipline), expanded LL-292
-  (all-surface discipline), .claude/ memory audit (stale entries → pointers).
-- **New project instruction box text** provided for owner to paste.
+### CLOSED THIS SESSION (312) — 18 April 2026
+- **SAFETY-082b CLOSED** — 6 tables cleaned + constrained. 4 junk
+  notification_log deleted, 19 rows backfilled via FK evidence (9→HQ,
+  10→Pure Premium). NOT NULL applied to all 6. Zero attribution drift.
+  First live test of Step 7 (Decision Journal entry written at close).
+- DB hardening: 89/97 NOT NULL (92%). Only suppliers (SAFETY-080) +
+  3 intentional reference-data tables remain nullable.
+
+### CLOSED SESSION 311.75 — 18 April 2026
+- **Loop System Architecture** — Capstone Part 2. LOOP-PRINCIPLES.md,
+  DECISION-JOURNAL.md, Step 7, expanded AGENT-ORIENTATION.md + LL-292.
 
 ### CLOSED SESSION 311.5 — 18 April 2026
 - **AGENT-METHODOLOGY.md** — Capstone Part 1. 5 sections, 4 procedures,
@@ -485,8 +489,8 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **SAFETY-082b: 6 tables × 23 rows backfill** — customer_messages, notification_log,
-   products, production_runs, scans, support_tickets. S312 target.
+1. **SAFETY-080: Supplier tenancy** — 4 NULL + 5 HQ-tenant rows. Architectural
+   decision needed (per-tenant copies vs shared fixtures). S313 target.
 
 2. **Financial findings:** FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded FY2026),
    FIN-003 (VAT_RATE), FIN-006 (equity join filter).

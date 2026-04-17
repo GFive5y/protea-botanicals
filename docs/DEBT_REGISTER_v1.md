@@ -369,20 +369,21 @@ overrides yet — the feature is dormant, not broken. See LL-293.
 Verified: S310.5 pg_policies query. Audit script updated to exclude
 these tables from tenant-scoping checks (SHARED_REFERENCE_TABLES).
 
-#### 2B.4b — SAFETY-082b: Tenant-scoped tables with 100% NULL tenant_id — OPEN
+#### 2B.4b — SAFETY-082b: Backfill + NOT NULL on 6 tables (S312) — COMPLETE
 
-Tables with strict tenant_id RLS policies where every row has NULL:
+Migration: `20260417160107_tier2b4b_backfill_not_null_6_tables.sql`
+Backup: `_migration_backup_s312` retained (23 rows).
 
-| Table | Rows | Notes |
-|---|---|---|
-| customer_messages | 7 | FK to user_id — recoverable |
-| notification_log | 7 | FK to user_id — recoverable |
-| products | 2 | FK to batch_id — recoverable |
-| production_runs | 4 | FK to batch_id — recoverable (note: 4 junk runs deleted S309, remaining are real) |
-| scans | 2 | Legacy table, may be deprecated |
-| support_tickets | 1 | FK to user_id — recoverable |
+| Table | Before | Action | After |
+|---|---|---|---|
+| customer_messages | 7 NULL | Backfilled 4→Pure Premium + 3→HQ (via user_profiles) | NOT NULL |
+| notification_log | 7 NULL | Deleted 4 junk (+2700000), backfilled 3→HQ (phone owner) | NOT NULL |
+| products | 2 NULL | Backfilled 2→Pure Premium (via batches) | NOT NULL |
+| production_runs | 4 NULL | Backfilled 4→Pure Premium (via batches) | NOT NULL |
+| scans | 2 NULL | Backfilled 2→HQ (via user_profiles) | NOT NULL |
+| support_tickets | 1 NULL | Backfilled 1→HQ (via user_profiles) | NOT NULL |
 
-**Status:** OPEN — S312 backfill. Total: 23 rows across 6 tables.
+Attribution verified at each phase — zero drift from S311.75 evidence.
 
 ---
 
