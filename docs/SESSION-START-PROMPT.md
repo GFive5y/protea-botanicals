@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 316.5a close (Loop integrity audit)
+## Updated: 18 April 2026 — Session 316.5b.1 close (WP triage baseline)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -148,11 +148,14 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (316.5a) — 18 April 2026
-- **Loop integrity audit** — 6 Class B gaps closed. Failure Mode 1 expanded
-  (10-220% variance with campaign evidence). Procedure 5 (financial methodology)
-  added. Section 5 Open Questions refreshed (items 1+7 done). PENDING-ACTIONS
-  stale state cleaned. Decision Journal verified complete for S314.3a-S316.
+### CLOSED THIS SESSION (316.5b.1) — 18 April 2026
+- **WP triage baseline** — 32 WP docs catalogued in docs/WP-TRIAGE.md.
+  9 SHIPPED, 6 IN-PROGRESS, 9 SCOPED, 2 DEFERRED, 6 STALE.
+  5 archival candidates. 4 LOW/MEDIUM confidence rows need investigation.
+  5 duplication concern groups identified. No priorities assigned.
+
+### CLOSED SESSION 316.5a — 18 April 2026
+- **Loop integrity audit** — 6 Class B gaps closed.
 
 ### CLOSED SESSION 316 — 18 April 2026
 - **FIN-001 FIXED** — HQYearEnd equity_ledger FY filter + LL-296.

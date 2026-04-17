@@ -4,6 +4,25 @@
 
 ---
 
+## S316.5b.1 — 18 April 2026 — WP triage baseline
+
+**Decision:** Catalogued 32 WP docs in docs/WP-TRIAGE.md. No priorities
+assigned. Triage produces classification baseline for S316.5b.2 verification
+and S316.5b.3 register build.
+
+**Key observation:** Most WPs cluster into 5 groups (design system, financial,
+demo, table unification, inventory). 9 SHIPPED, 6 IN-PROGRESS, 9 SCOPED,
+2 DEFERRED, 6 STALE. 5 docs are archival candidates (superseded brainstorms
+or stubs absorbed into newer WPs).
+
+**Campaign shape confirmed:** 3-4 sessions needed. Single-session attempt
+would have produced unreliable classifications. The 4 LOW/MEDIUM confidence
+rows need code/EF investigation before the register can be built.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S316.5a — 18 April 2026 — Loop integrity audit
 
 **Decision:** Refreshed Class B institutional-memory gaps across
