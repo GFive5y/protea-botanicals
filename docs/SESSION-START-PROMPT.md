@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 314.2c close (message_templates schema + RLS)
+## Updated: 18 April 2026 — Session 314.4 close (TIER 2C COMPLETE)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -148,13 +148,18 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (314.2c) — 18 April 2026
-- **message_templates schema + RLS** — tenant_id column added, 9 rows → Pure Premium,
-  9 placeholder defaults seeded (NULL, is_active=false). LL-293 pattern RLS with
-  asymmetric WITH CHECK (tenants read shared, only HQ writes shared).
-- **CRITICAL escape closed** — templates_public_read (using='true') missed by S314
-  audit + both sweeps. Second audit escape of campaign.
-- **Total RLS policies fixed S314.1-S314.2c: 138.**
+### CLOSED THIS SESSION (314.4) — 18 April 2026
+- **8 final CRITICAL escapes fixed** — brand_image_library (2), double_points_campaigns,
+  fx_rates, qr_banners, redemptions (2), stock_receipt_lines. All HQ-only, user-scoped,
+  or FK-based (no tenant_id on any table). tenants policy tightened.
+- **TIER 2C COMPLETE.** Zero using='true' bugs remain. Only LL-293 (public_holidays)
+  and LL-295 (qr_codes) remain as documented design. 146 total policies fixed
+  across S314.1-S314.4 (11 sessions).
+- **4 rounds of Bucket A escapes:** S314 audit found 6, total actual was ~28.
+  Audit under-count: 79%. WATCH-007 at campaign scale.
+
+### CLOSED SESSION 314.2c — 18 April 2026
+- **message_templates schema + RLS.** CRITICAL escape closed. Total: 138.
 
 ### CLOSED SESSION 314.3d — 18 April 2026
 - **stock_take_* legacy migration.** 3 policies → standard pattern. Total: 136.
@@ -522,7 +527,8 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **S314.4: Duplicate + naming cleanup** (~45 policies). Last Tier 2C session.
+1. **Financial findings:** FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded FY2026),
+   FIN-003 (VAT_RATE), FIN-006 (equity join filter). All Size S except FIN-001 (M).
 
 2. **Financial findings:** FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded FY2026),
    FIN-003 (VAT_RATE), FIN-006 (equity join filter).

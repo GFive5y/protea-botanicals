@@ -4,6 +4,30 @@
 
 ---
 
+## S314.4 — 18 April 2026 — Final Bucket A sweep + audit hardening
+
+**Decision:** Fixed 8 remaining CRITICAL using='true' escapes across 7 tables.
+Tightened tenants.tenants_read_authenticated. None of the 8 tables had tenant_id —
+all fixed via HQ-only, user-scoped, or FK-based patterns.
+
+**Classifications:**
+- tenants.tenants_read_authenticated: DESIGN (tenant directory for auth context +
+  HQ switcher) but tightened from `true` to `(is_active = true) OR is_hq_user()`
+  to hide deactivated tenants. Not a new LL — the tightened form is correct behavior.
+- public_holidays.ph_read_all: confirmed LL-293 design. No change.
+
+**Campaign-level insight:** 4 rounds of Bucket A escapes across Tier 2C campaign
+(S314.1, S314.2a, S314.2c, S314.4). Total: ~28 using='true' policies fixed across
+these 4 rounds. The S314 audit's original 6 Bucket A findings were 21% of the
+actual total. Audits systematically under-count; magnitude varies 17-220% by category.
+
+**Final state:** Only `public_holidays.ph_read_all` (LL-293) and `qr_codes.public_read_qr`
+(LL-295) remain as documented design patterns with using='true'. Zero CRITICAL bugs.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S314.2c — 18 April 2026 — message_templates schema + RLS migration
 
 **Decision:** Added tenant_id to message_templates. Migrated 9 existing
