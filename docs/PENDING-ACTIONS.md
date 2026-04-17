@@ -345,6 +345,13 @@ If count is non-trivial, the historical rows are misattributed and
 may need data correction (not code). Log findings, decide on cleanup
 separately. Not blocking Stage 5b, 5.5, or financial.
 
+### WATCH-009 (NEW S305) — Supplier tenancy data integrity (SAFETY-080)
+suppliers table has 4 NULL-tenant + 5 HQ-tenant rows, 0 demo-tenant rows.
+Cross-tenant data relationships exist at data layer (document_log rows
+reference suppliers belonging to HQ, not the document's tenant). Requires
+architectural decision (per-tenant copies vs shared fixtures). See
+DEBT_REGISTER_v1.md Section 1.7. Not blocking safety or financial work.
+
 ---
 
 ## BACKLOG — FUTURE BUILD ITEMS (post-demo, no date constraint)

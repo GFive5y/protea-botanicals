@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 304 close (Tier 2 Workstream A — EF Safety Audit)
+## Updated: 18 April 2026 — Session 305 close (SAFETY-070 fixed + SAFETY-080 logged)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 9fe86e8
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 5404b74
 
 ---
 
@@ -148,13 +148,18 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (304) — 18 April 2026
-- **Tier 2 Workstream A: EF Safety Audit** — All 14 Edge Functions audited.
-  10 findings logged (SAFETY-070 to 079). 1 CRITICAL (process-document
-  cross-tenant data leak), 5 HIGH (auth gaps), 3 MEDIUM (auth gaps on
-  sensitive data), 1 LOW. 6 EFs confirmed CLEAN.
-  Dominant pattern: missing caller authorization, not missing tenant_id.
-  No code fixes — audit only. Findings in DEBT_REGISTER_v1.md Section 1.6.
+### CLOSED THIS SESSION (305) — 18 April 2026
+- **SAFETY-070 FIXED** — process-document duplicate invoice guard now tenant-
+  scoped. Added `.eq("tenant_id", tenant_id)` + tightened guard to require
+  tenant_id. EF deployed. Commit 5404b74.
+- **SAFETY-070 reclassified** CRITICAL → HIGH (latent, not active per S304.5 DB evidence).
+- **SAFETY-080 logged** — Supplier tenancy architectural data debt. 4 NULL-tenant
+  + 5 HQ-tenant suppliers, 0 demo-tenant suppliers. Parked for later stage.
+- **SAFETY-030 annotated** — Hardcoded UUID identified as Nu Ai HQ operator tenant.
+
+### CLOSED SESSION 304 — 18 April 2026
+- **Tier 2 Workstream A: EF Safety Audit** — 14 EFs audited, 10 findings
+  (SAFETY-070 to 079). 6 EFs CLEAN.
 
 ### CLOSED SESSION 303.5 — 18 April 2026
 - Architecture: AGENT-ORIENTATION.md, LL-287 retired, LL-292 added, Step 7 retired.
@@ -453,11 +458,11 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **SAFETY-070 (CRITICAL):** Fix process-document duplicate invoice guard
-   (one-line `.eq("tenant_id", tenant_id)` at L908). Cross-tenant data leak.
+1. **EF auth hardening (S306):** SAFETY-071 to 078 — 8 EFs lack caller authorization.
+   Systemic JWT verification pattern needed. Priority: generate-financial-statements
+   + ai-copilot (both expose sensitive tenant data).
 
-2. **EF auth hardening:** Add JWT verification to generate-financial-statements
-   and ai-copilot (both expose sensitive tenant data without auth).
+2. **SAFETY-080:** Supplier tenancy architectural debt — dedicated session, data migration.
 
 2. **Financial findings** — FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded
    FY2026), FIN-003 (VAT_RATE), FIN-006 (equity join filter).

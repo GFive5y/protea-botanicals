@@ -240,7 +240,7 @@ the request body without verifying the caller has authority over that tenant.
 
 | ID | EF | Line | Type | Table | Description | Size |
 |---|---|---|---|---|---|---|
-| SAFETY-070 | process-document | L908-911 | SELECT | document_log | Duplicate invoice guard (LL-084 block) queries document_log filtered by supplier_id + reference number but NOT by tenant_id. LATENT cross-tenant leak — would fire if two tenants shared a supplier_id + reference number. S304.5 DB evidence: only 1 tenant (Medi Rec) has documents; no active leak. Defence-in-depth fix. | S |
+| SAFETY-070 | process-document | L907 | SELECT | document_log | **FIXED** 5404b74 (S305). Added `.eq("tenant_id", tenant_id)` + tightened guard to require tenant_id (skip dedup if null). Defence-in-depth — latent leak closed before activation. | S |
 
 **HIGH:**
 
