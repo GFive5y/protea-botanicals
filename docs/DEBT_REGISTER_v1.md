@@ -307,12 +307,50 @@ individually, consider:
 tenant uploads documents. Current dedup and access patterns work only because one
 tenant has documents.
 
-**Fix approach (architectural decision required):**
-- A. Migrate HQ-tenant suppliers into per-tenant copies
-- B. Introduce "shared fixtures" as a first-class concept in RLS
-- C. Re-seed demo tenants with their own supplier records
+**Decision (S313, owner confirmed S312.5):** Option A — per-tenant copies.
+Architecture: LL-294. Each tenant owns its own supplier records. No sharing.
 
-**Status:** OPEN. Not a code fix. Parked for dedicated supplier-tenancy session.
+**Status:** DECIDED. Execution planned for S313.5.
+
+#### S313.5 Migration Plan
+
+**A. Metro Hardware's 4 NULL suppliers**
+Simple backfill: `UPDATE suppliers SET tenant_id = '57156762-deb8-4721-a1f3-0c6d7c2a67d8' WHERE tenant_id IS NULL`
+Names: Excel-Tools SA, Leroy Merlin, Makro, Toolcraft Distributors.
+Referenced only by Metro Hardware purchase_orders. No cloning needed.
+
+**B. Eybna Technologies (HQ-owned, 2-tenant usage)**
+- Create Medi Rec copy (tenant_id = b1bad266)
+- Create Pure Premium copy (tenant_id = f8ff8d07)
+- Repoint: 5 document_log rows → Medi-Rec-Eybna
+- Repoint: 1 PO + 23 inventory_items → Pure-Premium-Eybna
+- supplier_products (94 rows): decision needed before S313.5
+- Delete original HQ Eybna after all references repointed
+
+**C. Steamups Technology (HQ-owned, 2-tenant usage)**
+Same pattern as Eybna:
+- Medi Rec copy + Pure Premium copy
+- Repoint: 2 docs → Medi Rec, 1 PO + 10 inventory_items → Pure Premium
+- supplier_products (21 rows): decision needed
+- Delete HQ Steamups
+
+**D. Ecogreen Analytics (HQ-owned, 1-tenant usage)**
+- Create Medi Rec copy, repoint 1 document_log row
+- Delete HQ Ecogreen
+
+**E. Cannalytics Africa (HQ-owned, orphan)**
+8 orphan supplier_products. No demo tenant usage. Recommendation: leave as-is.
+
+**F. Facility A (HQ-owned, zero references)**
+Fully orphan. Recommendation: delete.
+
+**G. Final step:** Apply NOT NULL on suppliers. DB hardening → 90/97 (93%).
+
+**Open question for owner before S313.5:**
+supplier_products (94 Eybna + 21 Steamups + 8 Cannalytics = 123 rows):
+  Option 1: Clone per-tenant copies (most correct, effort ~M)
+  Option 2: Re-parent to tenant suppliers (simpler, may break supplier_id FK)
+  Option 3: Leave as HQ-owned (inaccessible to tenants via RLS, no bugs but dead data)
 
 ---
 

@@ -4,6 +4,41 @@
 
 ---
 
+## S313 — 18 April 2026 — SAFETY-080 supplier architecture: per-tenant copies
+
+**Decision:** Suppliers are per-tenant. Each tenant owns its own supplier
+records. No sharing, no cross-tenant visibility. Codified as LL-294.
+
+**Alternatives considered:**
+- Shared-reference pattern (LL-293 style with NULL tenant_id = global):
+  rejected — supplier data contains private commercial info (pricing,
+  terms, contacts). Sharing leaks business intelligence between tenants.
+- Junction table (master_suppliers + tenant_supplier_links): rejected —
+  too complex, supplier_products table already creates a second level of
+  indirection. Adding a third layer would make the data model fragile.
+- Master catalog with push-down (HQ creates master, copies pushed to
+  tenants): rejected — premature. If onboarding pain materialises (many
+  tenants sharing common suppliers), can revisit. Current 5 demo tenants
+  don't justify the complexity.
+
+**Key moment:** Owner's response "I don't want those suppliers in every
+tenant" reframed the discussion from "how do we share suppliers?" to
+"why would we share suppliers?" The answer — we shouldn't. Each tenant's
+relationship with a supplier is private even when the supplier is the
+same real-world company.
+
+**Scope boundary added to LL-293:** Explicitly states shared-reference
+pattern is for platform taxonomy only (holidays, strains, formats), NOT
+for business entities. This prevents future agents from accidentally
+extending LL-293 to suppliers, customers, or inventory.
+
+**Open question deferred:** supplier_products (123 HQ-owned rows) needs
+owner decision before S313.5 execution. Three options documented.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S312 — 18 April 2026 — SAFETY-082b backfill + NOT NULL on 6 tables
 
 **Decision:** 7-phase migration matching S309 pattern. Delete 4 junk

@@ -1825,6 +1825,50 @@ seed default rows with NULL tenant_id, add RLS policy matching the
 `(tenant_id IS NULL) OR (tenant_id = user_tenant_id())` pattern.
 Document in this LL.
 
+**Scope boundary:** This pattern is for PLATFORM-WIDE reference data only
+(SA public holidays, cannabis strain taxonomy, product format taxonomy).
+It does NOT apply to business entities like suppliers, customers, or
+inventory items. Business entities contain private commercial relationships
+and must be strictly per-tenant. See LL-294 for supplier architecture.
+
 ---
 
 *LL-293 added 18 April 2026 · Session 311*
+*Scope boundary added S313*
+
+---
+
+## Session 313 — 18 April 2026 — SAFETY-080 supplier architecture decision
+
+### LL-294 — SUPPLIERS ARE PER-TENANT, NO SHARING
+
+**Rule:** Suppliers are strictly per-tenant. No cross-tenant visibility.
+If two tenants buy from the same real-world company, each tenant has
+its own independent supplier record. RLS must strictly scope suppliers
+by `tenant_id = user_tenant_id()` with NO `IS NULL` fallback.
+
+**Rationale:** Supplier data contains private commercial relationships —
+pricing agreements, contact details, payment terms, credit limits, VAT
+numbers. Sharing supplier records across tenants would leak business
+intelligence even when the real-world supplier is the same entity.
+
+**Onboarding pattern:** When onboarding a new tenant that will use
+common suppliers (e.g., a new dispensary ordering from Eybna), create
+a tenant-owned copy of the supplier during onboarding. Do NOT share
+or reference another tenant's supplier record.
+
+**Alternatives rejected (S312.5 / S313 decision):**
+- Shared-reference pattern (LL-293 style): rejected — leaks commercial info
+- Junction table (tenant_suppliers linking to master catalog): rejected —
+  too complex for current need, supplier_products complicates further
+- Master catalog with push-down: rejected — premature optimization,
+  can add later if onboarding pain materialises
+
+**Key distinction from LL-293:** public_holidays are identical across
+tenants (SA law). Suppliers are NOT — each tenant has its own pricing,
+terms, and relationship with the real-world entity. Different data
+model, different isolation rule.
+
+---
+
+*LL-294 added 18 April 2026 · Session 313*

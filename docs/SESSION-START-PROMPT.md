@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 312 close (Tier 2B.4b — SAFETY-082b backfill)
+## Updated: 18 April 2026 — Session 313 close (SAFETY-080 architectural decision)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: c31ba6e
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 5460d2a
 
 ---
 
@@ -148,13 +148,16 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (312) — 18 April 2026
-- **SAFETY-082b CLOSED** — 6 tables cleaned + constrained. 4 junk
-  notification_log deleted, 19 rows backfilled via FK evidence (9→HQ,
-  10→Pure Premium). NOT NULL applied to all 6. Zero attribution drift.
-  First live test of Step 7 (Decision Journal entry written at close).
-- DB hardening: 89/97 NOT NULL (92%). Only suppliers (SAFETY-080) +
-  3 intentional reference-data tables remain nullable.
+### CLOSED THIS SESSION (313) — 18 April 2026
+- **SAFETY-080 DECIDED** — Per-tenant copies (LL-294). No shared suppliers.
+  Migration plan documented in DEBT_REGISTER_v1.md Section 1.7.
+  Open question: supplier_products (123 HQ rows) — owner to decide before S313.5.
+- **LL-294 added** — Suppliers per-tenant, no sharing, no cross-tenant visibility.
+- **LL-293 disambiguated** — Scope boundary: shared-reference for platform
+  taxonomy only, NOT business entities.
+
+### CLOSED SESSION 312 — 18 April 2026
+- **SAFETY-082b CLOSED** — 6 tables cleaned + constrained. 89/97 NOT NULL (92%).
 
 ### CLOSED SESSION 311.75 — 18 April 2026
 - **Loop System Architecture** — Capstone Part 2. LOOP-PRINCIPLES.md,
@@ -489,8 +492,9 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **SAFETY-080: Supplier tenancy** — 4 NULL + 5 HQ-tenant rows. Architectural
-   decision needed (per-tenant copies vs shared fixtures). S313 target.
+1. **SAFETY-080 execution (S313.5)** — Per-tenant supplier migration. Backfill 4
+   NULL, clone 3 HQ suppliers to tenant copies, repoint FKs, delete orphans,
+   apply NOT NULL. Needs owner decision on supplier_products first.
 
 2. **Financial findings:** FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded FY2026),
    FIN-003 (VAT_RATE), FIN-006 (equity join filter).
