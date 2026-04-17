@@ -90,7 +90,8 @@ payload. The following 23 sites omit it.
 |---|---|---|---|---|
 | SAFETY-030 | ScanResult.js:1285 | system_alerts | **FIXED** | Replaced hardcoded UUID `"43b34c33-..."` with `tenantId \|\| null` (pattern A — TRIGGER tenant) |
 
-**Note:** Register originally said loyalty_transactions; actual table is system_alerts. Corrected during S299 fix.**
+**Note:** Register originally said loyalty_transactions; actual table is system_alerts. Corrected during S299 fix.
+**S304.5 annotation:** Hardcoded UUID `43b34c33-6864-4f02-98dd-df1d340475c3` identified as Nu Ai HQ operator tenant (industry_profile='operator'). The misattribution bug was writing system_alerts to the platform operator, not a random unrelated tenant. Also found in HQFraud.js (SAFETY-035, fixed S300).**
 
 #### Cluster 6: Financial (1 violation)
 
@@ -214,7 +215,7 @@ audit. Prior safety campaign (S294-S303) was React-only.
 | # | EF Name | Risk | Findings | Key Issue |
 |---|---|---|---|---|
 | 1 | auto-post-capture | HIGH | 3 | No auth; initial fetch unfiltered |
-| 2 | process-document | **CRITICAL** | 2 | Cross-tenant data leak in duplicate guard |
+| 2 | process-document | **HIGH** (was CRITICAL, reclassified S305 — latent, not active) | 2 | Latent cross-tenant leak in duplicate guard |
 | 3 | seed-tenant | HIGH | 1 | No auth (mitigated by idempotency) |
 | 4 | sim-pos-sales | HIGH | 2 | No auth; latent SQL interpolation |
 | 5 | sign-qr | CLEAN | 0 | Pure crypto, no DB |
@@ -239,7 +240,7 @@ the request body without verifying the caller has authority over that tenant.
 
 | ID | EF | Line | Type | Table | Description | Size |
 |---|---|---|---|---|---|---|
-| SAFETY-070 | process-document | L908-911 | SELECT | document_log | Duplicate invoice guard queries ALL tenants' documents — leaks filenames + dates in API response. Missing `.eq("tenant_id", tenant_id)`. | S |
+| SAFETY-070 | process-document | L908-911 | SELECT | document_log | Duplicate invoice guard (LL-084 block) queries document_log filtered by supplier_id + reference number but NOT by tenant_id. LATENT cross-tenant leak — would fire if two tenants shared a supplier_id + reference number. S304.5 DB evidence: only 1 tenant (Medi Rec) has documents; no active leak. Defence-in-depth fix. | S |
 
 **HIGH:**
 
@@ -293,6 +294,25 @@ individually, consider:
 3. **Medium-term:** Establish a standard EF auth pattern (verify JWT, extract
    tenant_id from token claims, validate against request tenant_id) and
    retrofit across all EFs. This is an architectural task, not a per-EF fix.
+
+---
+
+### 1.7 Supplier Tenancy Data Integrity (S305)
+
+| ID | Table | Type | Description | Size |
+|---|---|---|---|---|
+| SAFETY-080 | suppliers | DATA | Architectural data debt: 4 suppliers with NULL tenant_id (Metro Hardware fixtures: Excel-Tools SA, Leroy Merlin, Makro, Toolcraft Distributors), 5 suppliers with tenant_id = 43b34c33 (Nu Ai HQ operator). 0 suppliers owned by any of 5 demo tenants. 8 of 19 document_log rows reference suppliers belonging to HQ tenant, not the document's tenant (Medi Rec). Cross-tenant data relationships already exist at data layer. | L |
+
+**Impact:** Supplier-driven joins will break tenant isolation as soon as a second
+tenant uploads documents. Current dedup and access patterns work only because one
+tenant has documents.
+
+**Fix approach (architectural decision required):**
+- A. Migrate HQ-tenant suppliers into per-tenant copies
+- B. Introduce "shared fixtures" as a first-class concept in RLS
+- C. Re-seed demo tenants with their own supplier records
+
+**Status:** OPEN. Not a code fix. Parked for dedicated supplier-tenancy session.
 
 ---
 
