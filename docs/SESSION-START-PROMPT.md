@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 17 April 2026 — Session 295 close (Stage 1 — Loyalty Pipeline Tenant Scoping)
+## Updated: 17 April 2026 — Session 296 close (Stage 2 — StockControl Safety Cluster)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 528d5c2
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: b869ad4
 
 ---
 
@@ -148,7 +148,13 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (295) — 17 April 2026
+### CLOSED THIS SESSION (296) — 17 April 2026
+- **SAFETY-001 to 005** — StockControl.js 5 INSERT sites fixed. tenant_id
+  threaded to MovementsView, OrdersView, SuppliersView sub-components.
+  Commit b869ad4. Build verified. WATCH-005 superseded and closed.
+- **SAFETY-030** — Added to register (ScanResult.js:1285 hardcoded tenant UUID).
+
+### CLOSED SESSION 295 — 17 April 2026
 - **SAFETY-013 to 019** — Loyalty pipeline tenant_id fixes. 7 INSERT sites
   across 4 files (OrderSuccess.js, Account.js, SurveyWidget.js, ScanResult.js)
   now include tenant_id. Commit 528d5c2. Build verified.
@@ -398,11 +404,10 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **Stage 2: StockControl.js SAFETY fixes** — SAFETY-001 to 005 (5 INSERT
-   sites missing tenant_id). All Size S. See DEBT_REGISTER_v1.md Cluster 1.
-
-2. **Stage 3: HQDocuments.js SAFETY fixes** — SAFETY-006 to 008 (3 INSERT
+1. **Stage 3: HQDocuments.js SAFETY fixes** — SAFETY-006 to 008 (3 INSERT
    sites). See DEBT_REGISTER_v1.md Cluster 3.
+
+2. **Stage 4: HQPurchaseOrders SAFETY fixes** — SAFETY-011, 012, 024.
 
 3. **sim-pos-sales** — STANDING ALERT. Trigger date depends on new demo date
    (PENDING CONFIRMATION). Must run the day BEFORE demo.

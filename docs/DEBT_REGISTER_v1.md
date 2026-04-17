@@ -24,17 +24,17 @@ and picks items for the next stage. No fixes were made in Session 294.
 Every INSERT into a tenant-scoped table MUST include `tenant_id` in the
 payload. The following 23 sites omit it.
 
-#### Cluster 1: StockControl.js (5 violations)
+#### Cluster 1: StockControl.js (5 violations) — FIXED b869ad4
 
-| ID | File:Line | Table | Impact | Fix Sketch | Size |
-|---|---|---|---|---|---|
-| SAFETY-001 | StockControl.js:3041 | stock_movements | Stock movement orphaned / cross-tenant visible to HQ | Add `tenant_id: tenantId` to INSERT payload | S |
-| SAFETY-002 | StockControl.js:3357 | purchase_orders | PO created without tenant ownership | Add `tenant_id: tenantId` to INSERT payload | S |
-| SAFETY-003 | StockControl.js:3369 | purchase_order_items | PO line items linked to orphaned PO | Add `tenant_id: tenantId` to mapped line items | S |
-| SAFETY-004 | StockControl.js:3413 | stock_movements | Auto-recorded stock movement from PO receive lacks tenant | Add `tenant_id: tenantId` to INSERT payload | S |
-| SAFETY-005 | StockControl.js:4538 | suppliers | Supplier cross-tenant visible via hq_all_ policy | Add `tenant_id: tenantId` to supplier payload | S |
+| ID | File:Line | Table | Status | Fix Applied |
+|---|---|---|---|---|
+| SAFETY-001 | StockControl.js:3044 | stock_movements | FIXED | `tenant_id: tenantId` + threaded tenantId prop to MovementsView |
+| SAFETY-002 | StockControl.js:3361 | purchase_orders | FIXED | `tenant_id: tenantId` + threaded tenantId prop to OrdersView |
+| SAFETY-003 | StockControl.js:3375 | purchase_order_items | FIXED | `tenant_id: tenantId` in mapped array |
+| SAFETY-004 | StockControl.js:3419 | stock_movements | FIXED | `tenant_id: tenantId` (PO receive flow) |
+| SAFETY-005 | StockControl.js:4544 | suppliers | FIXED | `{ ...data, tenant_id: tenantId }` + threaded tenantId prop to SuppliersView |
 
-**Status:** SAFETY-001 and SAFETY-004 known as WATCH-005 (S293). SAFETY-002/003/005 are NEW findings.
+**All 5 fixed in Session 296 commit b869ad4. WATCH-005 (S291) superseded and closed.**
 
 #### Cluster 2: Loyalty Pipeline (7 violations) — FIXED 528d5c2
 
@@ -73,6 +73,12 @@ payload. The following 23 sites omit it.
 | SAFETY-020 | AdminProductionModule.js:468 | production_runs | Production run unattributed | Add `tenant_id: tenantId` | S |
 | SAFETY-021 | HQFraud.js:591 | audit_log | Audit log entry unattributed | Add `tenant_id: tenantId` | S |
 | SAFETY-022 | HQPricing.js:808 | product_pricing | Pricing record unattributed | Add `tenant_id: tenant?.id` | S |
+
+#### Cluster 7: Hardcoded Tenant UUID (1 violation)
+
+| ID | File:Line | Table | Impact | Fix Sketch | Size |
+|---|---|---|---|---|---|
+| SAFETY-030 | ScanResult.js:1285 | loyalty_transactions | Hardcoded tenant_id `"43b34c33-..."` — every scan path through this site writes to that tenant regardless of actual QR tenant. Misattribution, not orphan. | Replace with dynamic tenant source, mirror L1254 pattern (`tenantId \|\| null`) | S |
 
 #### Cluster 6: Financial (1 violation)
 
@@ -246,7 +252,7 @@ recompute if items change after initial render.
 | Rank | ID(s) | Description | Impact | Urgency | Effort | Recommendation |
 |---|---|---|---|---|---|---|
 | 1 | SAFETY-013 to 019 | Loyalty pipeline: 7 INSERTs missing tenant_id | ~~HIGH~~ | ~~HIGH~~ | S | **FIXED** 528d5c2 (S295) |
-| 2 | SAFETY-001 to 005 | StockControl.js: 5 INSERTs missing tenant_id | HIGH — stock movements orphaned | MEDIUM — demo uses HQ Stock not Admin Stock | S (5 one-line fixes) | Fix in one commit |
+| 2 | SAFETY-001 to 005 | StockControl.js: 5 INSERTs missing tenant_id | ~~HIGH~~ | ~~MEDIUM~~ | S | **FIXED** b869ad4 (S296) |
 | 3 | SAFETY-024 to 029 | 6 SELECTs missing tenant scoping | HIGH — cross-tenant data visible to HQ | MEDIUM — only affects HQ multi-tenant view | S (6 one-line fixes) | Fix in one commit |
 | 4 | SAFETY-006 to 008 | HQDocuments.js: 3 INSERTs missing tenant_id | HIGH — doc ingestion creates orphans | MEDIUM — Smart Capture is secondary demo path | S (3 one-line fixes) | Fix in one commit |
 | 5 | SAFETY-011, 012 | HQPurchaseOrders.js: 2 INSERTs missing tenant_id | HIGH — PO receive creates orphaned items | MEDIUM — PO flow is demo path | S (2 one-line fixes) | Fix in one commit |

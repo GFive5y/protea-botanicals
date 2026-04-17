@@ -313,13 +313,11 @@ Named future build item. Not blocking demo.
 HC-0002, BB-LYCHEE-0002, 6-PH-0002 still no sell price.
 Action: Admin Stock → set sell prices for these 3 items.
 
-### WATCH-005 (NEW S293) — StockControl.js RULE 0F violations carried from S291
-2 stock_movements INSERT sites at L2985 and L3351 don't carry tenant_id in
-their payload. Session 291 remediation caught the SELECT leaks (fixed in
-38e96da + 10d9d39) but these 2 INSERT sites were explicitly deferred as
-not demo-blocking. Address in a dedicated StockControl hardening session
-post-demo, alongside the full StockControl DS6 finish-up (which was also
-flagged POST-DEMO due to all-tenant blast radius).
+### WATCH-005 — CLOSED (Session 296, b869ad4)
+Superseded by SAFETY-001 to 005 in DEBT_REGISTER_v1.md.
+All 5 StockControl INSERT sites (stock_movements ×2, purchase_orders,
+purchase_order_items, suppliers) now include tenant_id: tenantId.
+tenantId prop threaded to MovementsView, OrdersView, SuppliersView.
 
 ### WATCH-006 (NEW S293) — HQStock Overview sub-tab derived counts
 NO EXPIRY and COLD CHAIN aggregate over `items` not `activeItems`. Means
