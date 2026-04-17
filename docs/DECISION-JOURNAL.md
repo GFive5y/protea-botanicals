@@ -4,6 +4,24 @@
 
 ---
 
+## S314.3c — 18 April 2026 — HQ bypass with_check (65 policies across ~50 tables)
+
+**Decision:** Fixed 65 HQ bypass policies by adding with_check mirroring
+using_clause. Mechanical defense-in-depth. Brief estimated 57; live DB
+had 65 (WATCH-007 ~14% under-count).
+
+**DELETE policy learning:** 8 DELETE-only policies don't support WITH CHECK
+in PostgreSQL. Recreated without WITH CHECK — this is correct. Post-fix
+verification initially showed "8 remaining" which was a false positive
+from the query including DELETE policies in the count.
+
+**Scope:** Largest single-session policy count in the campaign (65). Total
+RLS policies fixed across S314.1-S314.3c: 130.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S314.3b — 18 April 2026 — HR cluster RLS fixes (24 policies across 15 tables)
 
 **Decision:** Fixed 24 HR policies with missing with_check. All were already

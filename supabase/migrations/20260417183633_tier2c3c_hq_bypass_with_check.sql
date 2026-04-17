@@ -1,0 +1,15 @@
+-- Tier 2C.3c — HQ bypass with_check additions (S314.3c)
+-- 65 HQ bypass policies with missing with_check. Mechanical fix:
+-- copy using_clause to with_check on ALL/UPDATE/INSERT policies.
+-- DELETE policies left as-is (PostgreSQL doesn't support WITH CHECK on DELETE).
+-- Applied via Supabase MCP apply_migration.
+--
+-- Sub-patterns:
+--   A: Pure is_hq_user() — 53 policies
+--   B: (is_hq_user() = true) syntax variation — 8 policies
+--   C: Compound tenant_groups/member logic — 2 policies
+--   DELETE-only (no with_check applicable) — 8 policies recreated without WITH CHECK
+--
+-- Scope: 65 policies across ~50 tables. Brief estimated 57, live DB had 65.
+-- WATCH-007 validated again (~14% under-count).
+-- See full SQL applied via MCP in session transcript.
