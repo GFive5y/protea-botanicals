@@ -50,13 +50,16 @@ payload. The following 23 sites omit it.
 
 **All 7 fixed in Session 295 commit 528d5c2.**
 
-#### Cluster 3: HQDocuments.js (3 violations)
+#### Cluster 3: HQDocuments.js (3+1 violations) — FIXED 6c50eaf
 
-| ID | File:Line | Table | Impact | Fix Sketch | Size |
-|---|---|---|---|---|---|
-| SAFETY-006 | HQDocuments.js:2081 | suppliers | Supplier from doc ingestion unattributed | Add `tenant_id: tenantId \|\| selectedDoc.tenant_id` | S |
-| SAFETY-007 | HQDocuments.js:2382 | stock_movements | Stock movement from create_supplier_product orphaned | Add `tenant_id: tenantId \|\| selectedDoc.tenant_id` | S |
-| SAFETY-008 | HQDocuments.js:2502 | stock_movements | Stock movement from create_stock_movement orphaned | Add `tenant_id: tenantId \|\| selectedDoc.tenant_id` | S |
+| ID | File:Line | Table | Status | Fix Applied |
+|---|---|---|---|---|
+| SAFETY-006 | HQDocuments.js:2082 | suppliers | FIXED | `tenant_id: selectedDoc?.tenant_id ?? null` |
+| SAFETY-007 | HQDocuments.js:2385 | stock_movements | FIXED | `tenant_id: selectedDoc.tenant_id ?? null` |
+| SAFETY-008 | HQDocuments.js:2506 | stock_movements | FIXED | `tenant_id: selectedDoc.tenant_id ?? null` |
+| NEW (S297) | HQDocuments.js:2361 | inventory_items | FIXED | `tenant_id: selectedDoc.tenant_id ?? null` (create_supplier_product flow, unflagged in original audit) |
+
+**All 4 fixed in Session 297 commit 6c50eaf. Source: selectedDoc.tenant_id (document owner, not HQ operator).**
 
 #### Cluster 4: HQ Purchase Orders (2 violations)
 
@@ -254,7 +257,7 @@ recompute if items change after initial render.
 | 1 | SAFETY-013 to 019 | Loyalty pipeline: 7 INSERTs missing tenant_id | ~~HIGH~~ | ~~HIGH~~ | S | **FIXED** 528d5c2 (S295) |
 | 2 | SAFETY-001 to 005 | StockControl.js: 5 INSERTs missing tenant_id | ~~HIGH~~ | ~~MEDIUM~~ | S | **FIXED** b869ad4 (S296) |
 | 3 | SAFETY-024 to 029 | 6 SELECTs missing tenant scoping | HIGH — cross-tenant data visible to HQ | MEDIUM — only affects HQ multi-tenant view | S (6 one-line fixes) | Fix in one commit |
-| 4 | SAFETY-006 to 008 | HQDocuments.js: 3 INSERTs missing tenant_id | HIGH — doc ingestion creates orphans | MEDIUM — Smart Capture is secondary demo path | S (3 one-line fixes) | Fix in one commit |
+| 4 | SAFETY-006 to 008 | HQDocuments.js: 3+1 INSERTs missing tenant_id | ~~HIGH~~ | ~~MEDIUM~~ | S | **FIXED** 6c50eaf (S297) |
 | 5 | SAFETY-011, 012 | HQPurchaseOrders.js: 2 INSERTs missing tenant_id | HIGH — PO receive creates orphaned items | MEDIUM — PO flow is demo path | S (2 one-line fixes) | Fix in one commit |
 | 6 | WATCH-006 | HQStock FoodOverview KPIs count archived items | LOW — inflated counts, no data corruption | LOW — cosmetic only | M | Fix when touching HQStock |
 | 7 | FIN-001 | HQYearEnd equity_ledger update missing FY filter | HIGH — would corrupt multi-year equity | LOW — year-end close not in demo flow | M | Fix before any year-end close |
