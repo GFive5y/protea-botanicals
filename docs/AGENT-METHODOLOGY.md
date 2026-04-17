@@ -7,7 +7,128 @@
 
 ## SECTION 1 — PLATFORM MENTAL MODEL
 
-### What NuAi is
+### The tenant scoping model — read this first
+
+Before any detail about isolation layers or RLS patterns, understand
+what "tenant" means on this platform. A wrong mental model here
+cascades into every downstream classification error.
+
+**NuAi is Architecture A: one shared database, RLS-isolated multi-tenant.**
+
+One Supabase project (`uvicrqapgzcdvozxrreo`). One set of tables. Every
+tenant's data lives in the same physical rows. Row-Level Security is the
+only thing separating them.
+
+This is NOT Architecture B (per-tenant databases). If an agent ever
+finds themselves assuming "each tenant gets their own database" —
+stop. That model does not exist here. A real customer gets a login,
+not a database. Their entire business experience is an RLS-scoped
+view of the shared platform. They never know (and never need to know)
+that other tenants exist on the same infrastructure.
+
+**The selling model makes this existential:**
+
+When a dispensary owner signs up to NuAi, here's what happens:
+
+1. A row gets created in `tenants` with their company details
+2. A user profile is created with `tenant_id = their-uuid`,
+   `role = admin`, `hq_access = false`
+3. They log in. RLS filters everything they see to their `tenant_id`
+4. From their perspective, they have a complete business system.
+   From the database's perspective, they have one row in a shared table
+
+Because every real customer lives in the same database, a broken RLS
+policy doesn't leak "within a single install." It leaks across the
+entire customer base simultaneously. This is why `using_clause = 'true'`
+on a tenant-scoped table is a CRITICAL finding, not a HIGH — it
+exposes every paying customer's data to every other paying customer's
+users at once.
+
+### The scoping tree (the russian doll)
+
+Think of NuAi as nested scopes, not a flat database:
+
+```
+[ Platform DB — holds everything ]
+│
+├── [ Tenant: Pure Premium THC Vapes ]
+│     ├── Admin scope — all of Pure Premium's data
+│     │     ├── Staff scope — operational subset
+│     │     └── Customer scope — per-user slice (auth.uid())
+│     └── RLS boundary: tenant_id = Pure Premium's UUID
+│
+├── [ Tenant: Medi Recreational ]
+│     └── (same nested pattern, isolated by tenant_id)
+│
+├── [ Tenant: Metro Hardware ]
+│     └── (same)
+│
+└── [ NuAi HQ — platform oversight ]
+      └── is_hq_user() bypasses tenant boundary
+          Sees across all tenants for platform management
+```
+
+Every RLS policy walks this tree. `tenant_id = user_tenant_id()`
+restricts to the caller's branch. `is_hq_user()` bypasses to the
+root. `user_id = auth.uid()` restricts to a single leaf.
+
+**The tree has three kinds of rows:**
+
+1. **Tenant rows** — belong to exactly one tenant (orders, suppliers,
+   staff). The vast majority. Isolated by `tenant_id`.
+
+2. **Platform rows** — belong to NuAi itself (audit_log, tenants table,
+   deletion_requests). No tenant_id, or tenant_id IS NULL meaning "ours."
+   Only HQ operators can access.
+
+3. **Shared-default rows** — platform-provided defaults visible to all
+   (public_holidays, product_formats, product_strains). Nullable
+   tenant_id; NULL means shared. See LL-293.
+
+When working with any table, FIRST identify which kind of row it
+holds. The isolation strategy follows from that.
+
+### Delete semantics by scope
+
+This catches people. Under Architecture A with RLS, "delete" means
+something different at each scope:
+
+| Scope | Can delete within scope | Cannot delete |
+|---|---|---|
+| Customer | Own records only (own orders, messages) | Anything else |
+| Staff | Operational records scoped by role | Admin data, other tenants |
+| Tenant admin | ANY row in their tenant (fire staff, remove suppliers, delete products) | Other tenants' rows (RLS hides them); NuAi platform data |
+| HQ operator | Anything, via is_hq_user() bypass | Nothing by RLS — only by explicit app-layer guards |
+
+Tenant admins SHOULD be able to delete things within their tenant.
+That's normal business operation — removing a supplier, firing staff,
+deactivating products. What they must NOT be able to do is reach
+across the tenant boundary or touch platform-level tables.
+
+A common confusion: "tenant admins can't delete anything" (intended
+to mean "can't delete NuAi platform data") is ambiguous. Under
+Architecture A it breaks if applied literally — the tenant portal's
+"remove this supplier" button stops working because RLS blocks the
+DELETE. The correct framing is: tenant admins delete WITHIN their
+scope, never ACROSS or ABOVE it.
+
+### What this means for classification
+
+Every RLS finding must be classified against this model:
+
+- Does the table hold tenant rows? → tenant-scoped policy required,
+  plus HQ bypass if HQ operators need platform-wide views
+- Does the table hold platform rows? → HQ-only policy, no tenant scoping
+- Does the table hold shared-default rows? → LL-293 pattern (NULL or
+  tenant-match)
+
+If the answer isn't obvious, check existing policies on similar tables
+and the classify-before-fix procedure (Section 2.1). A wrong
+classification at this layer produces either a policy that breaks
+legitimate access (too restrictive) or one that exposes data across
+scopes (too permissive).
+
+### Technical overview
 
 NuAi is a multi-tenant SaaS ERP. Every table, every query, every write
 happens in the context of a tenant. Understanding the isolation model is
