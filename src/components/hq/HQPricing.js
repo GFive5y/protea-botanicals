@@ -805,7 +805,7 @@ export default function HQPricing() {
     } else {
       ({ error } = await supabase
         .from("product_pricing")
-        .insert({ product_cogs_id: cogsId, channel: channelId, ...values }));
+        .insert({ tenant_id: tenant?.id, product_cogs_id: cogsId, channel: channelId, ...values }));
     }
     if (error) {
       console.error("Pricing save error:", error);

@@ -30,6 +30,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { supabase } from "../../services/supabaseClient";
+import { useTenant } from "../../services/tenantService";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import { ChartCard, ChartTooltip } from "../viz";
@@ -558,6 +559,7 @@ function EraseModal({ customer, onClose, onConfirm }) {
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function HQFraud() {
+  const { tenantId } = useTenant();
   const ctx = usePageContext("fraud", null);
   const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
@@ -589,6 +591,7 @@ export default function HQFraud() {
           data: { user },
         } = await supabase.auth.getUser();
         await supabase.from("audit_log").insert({
+          tenant_id: tenantId || null,
           admin_id: user?.id || null,
           action,
           target_type: targetType,
@@ -605,7 +608,7 @@ export default function HQFraud() {
   const writeAlert = useCallback(async (alertType, severity, title, body) => {
     try {
       await supabase.from("system_alerts").insert({
-        tenant_id: "43b34c33-6864-4f02-98dd-df1d340475c3",
+        tenant_id: tenantId || null,
         alert_type: alertType,
         severity,
         status: "open",

@@ -193,12 +193,12 @@ export default function HQYearEnd() {
       // 2. Post closing journal lines
       const jLines = [];
       if (pnl.revenue > 0) {
-        jLines.push({ journal_id: je.id, account_code: "4000", description: "Close revenue to income summary", debit_amount: pnl.revenue, credit_amount: 0 });
+        jLines.push({ tenant_id: tenantId, journal_id: je.id, account_code: "4000", description: "Close revenue to income summary", debit_amount: pnl.revenue, credit_amount: 0 });
       }
       if (pnl.netProfit >= 0) {
-        jLines.push({ journal_id: je.id, account_code: "3200", description: "Transfer net profit to retained earnings", debit_amount: 0, credit_amount: pnl.netProfit });
+        jLines.push({ tenant_id: tenantId, journal_id: je.id, account_code: "3200", description: "Transfer net profit to retained earnings", debit_amount: 0, credit_amount: pnl.netProfit });
       } else {
-        jLines.push({ journal_id: je.id, account_code: "3300", description: "Accumulated loss from operations", debit_amount: Math.abs(pnl.netProfit), credit_amount: 0 });
+        jLines.push({ tenant_id: tenantId, journal_id: je.id, account_code: "3300", description: "Accumulated loss from operations", debit_amount: Math.abs(pnl.netProfit), credit_amount: 0 });
       }
       if (jLines.length > 0) await supabase.from("journal_lines").insert(jLines);
 

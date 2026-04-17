@@ -1043,6 +1043,7 @@ function DispensingTab({
 
       // 4. Record stock movement
       await supabase.from("stock_movements").insert({
+        tenant_id: tenantId,
         item_id: form.inventory_item_id,
         quantity: -qty,
         movement_type: "sale_out",
