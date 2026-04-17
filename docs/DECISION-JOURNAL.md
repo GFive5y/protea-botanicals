@@ -4,6 +4,45 @@
 
 ---
 
+## S314 — 18 April 2026 — RLS policy audit: 155 findings across 120 tables
+
+**Decision:** Audit-only session, no fixes. Follow Tier 1 pattern (S294).
+Classification applied to 401 policies. Findings registered as RLS-001
+through RLS-057 (numbered) + 98 batch items (Bucket C naming + LOW dupes).
+Fix campaign scoped as 4 sessions (S314.1-S314.4).
+
+**Critical findings (require immediate attention):**
+- 6 policies with `using_clause = true` on tenant-scoped tables (Bucket A)
+- 3 policies with `auth_is_admin()` without tenant scope (Bucket B)
+- These 9 are live cross-tenant data exposures TODAY
+
+**Patterns observed:**
+- `hq_all` naming without `is_hq_user()` function is the root cause of
+  Bucket A — someone named policies "hq_all" but set `true` instead of
+  the proper function
+- HR module is the epicentre of missing `with_check` (20 of 37 HIGH findings)
+- `is_admin()` function (without "hq" prefix) is NOT tenant-aware — used
+  in 4 MEDIUM findings. Different from `is_hq_user()` which IS correct
+
+**Alternatives considered:**
+- Audit + fix CRITICAL in same session: rejected — scope discipline.
+  The 9 CRITICAL fixes are straightforward but the audit had to complete
+  first to ensure no surprises
+- Manual review without classification script: rejected — 401 policies
+  is too many for reliable manual classification
+
+**Why this path:** Tier 1 pattern proven (S294 audit → S295-S303 fixes).
+Script becomes permanent toolchain alongside audit_tenant_isolation.py.
+
+**Near-misses:** Bucket C (53 findings) initially looked CRITICAL by
+naming convention, but functional analysis showed they all use `is_hq_user()`
+correctly. Without functional analysis, would have over-counted CRITICAL
+by 6x. Confirms severity-grounding principle from AGENT-METHODOLOGY.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S313.5 — 18 April 2026 — SAFETY-080 execution: move suppliers to real owners
 
 **Decision:** Move HQ-owned suppliers to Pure Premium (their real owner),

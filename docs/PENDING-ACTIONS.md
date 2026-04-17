@@ -55,6 +55,23 @@ Trigger date: PENDING (depends on new demo date confirmation).
 
 ---
 
+## OUTSTANDING — RLS FIX CAMPAIGN (S314.1-S314.4)
+
+### S314.1 — CRITICAL: 9 policies with true/auth_is_admin using_clause
+RLS-001 to RLS-009. Live cross-tenant exposure. 6 Bucket A (true) + 3 Bucket B
+(auth_is_admin). Fix: DROP + CREATE with is_hq_user(). IMMEDIATE priority.
+
+### S314.2 — MEDIUM: 7 is_admin() policies without tenant scope
+RLS-049 to RLS-054 + RLS-050. Admin can access any tenant's data.
+
+### S314.3 — HIGH: 37 missing with_check on HR/stock-take write ops
+RLS-010 to RLS-046. Add WITH CHECK matching using_clause.
+
+### S314.4 — LOW: 53 naming convention + 45 duplicate cleanup
+Bucket C renames + duplicate consolidation. Audit hygiene.
+
+---
+
 ## CLOSED LOOPS — SESSION 294 (17 April 2026)
 
 ### CLOSED — LOOP-011: All 5 tenants IFRS Auditor Signed Off

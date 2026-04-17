@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 313.5 close (SAFETY-080 execution — TIER 2B COMPLETE)
+## Updated: 18 April 2026 — Session 314 close (Tier 2C RLS Policy Audit)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -148,13 +148,15 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (313.5) — 18 April 2026
-- **SAFETY-080 FIXED** — Supplier tenancy migration executed. 4 HQ suppliers →
-  Pure Premium, 8 docs repointed, 123 supplier_products moved, Facility A →
-  Medi Rec (FK evidence), 4 NULL → Metro Hardware. NOT NULL applied. Zero
-  cross-tenant refs. Longest-running register finding closed (opened S304.5).
-- **TIER 2B COMPLETE.** DB hardening: 90/97 NOT NULL (93%). Remaining 3 are
-  intentional shared-reference tables (LL-293) + 4 other nullable-by-schema.
+### CLOSED THIS SESSION (314) — 18 April 2026
+- **Tier 2C RLS Policy Audit** — 401 policies across 120 tables audited.
+  155 findings: 9 CRITICAL (live cross-tenant exposure), 37 HIGH (missing
+  with_check), 11 MEDIUM (is_admin without tenant scope), 53 naming convention,
+  45 duplicate cleanups. Fix campaign: 4 sessions (S314.1-S314.4).
+  See docs/RLS-FINDINGS_v1.md.
+
+### CLOSED SESSION 313.5 — 18 April 2026
+- **SAFETY-080 FIXED + TIER 2B COMPLETE.** 90/97 NOT NULL (93%).
 
 ### CLOSED SESSION 313 — 18 April 2026
 - **SAFETY-080 DECIDED** — Per-tenant copies (LL-294). LL-293 disambiguated.
@@ -495,8 +497,8 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **Tier 2C: RLS policy audit** — Systematic audit of RLS policies across all
-   tenant-scoped tables. Verify correctness, coverage, naming conventions.
+1. **S314.1: CRITICAL RLS fixes** — 9 policies with `true` or `auth_is_admin()`
+   using_clause. Live cross-tenant exposure. See RLS-FINDINGS_v1.md.
 
 2. **Financial findings:** FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded FY2026),
    FIN-003 (VAT_RATE), FIN-006 (equity join filter).
