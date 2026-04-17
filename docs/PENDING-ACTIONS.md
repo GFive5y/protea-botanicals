@@ -7,7 +7,7 @@
 ---
 
 ## MEETING DATE
-**Current CA demo date: 12 May 2026**
+**Current CA demo date: PENDING CONFIRMATION** (was 12 May 2026)
 When this changes:
 1. Update this file (meeting date line above)
 2. Recalculate sim-pos-sales trigger date (= demo date MINUS 1 day)
@@ -18,33 +18,23 @@ When this changes:
 
 ## STANDING — DEMO DAY SEQUENCE
 
-- **11 May 2026**: Run sim-pos-sales for Metro Hardware + Medi Recreational
+- **DEMO DATE - 1**: Run sim-pos-sales for Metro Hardware + Medi Recreational
   HQTenants — RUN 30 DAYS, OR Supabase MCP pg_net.http_post to sim-pos-sales EF.
-  Window must INCLUDE 12 May demo day.
-- **12 May 2026 09:30**: Pre-demo ritual (see SESSION-START-PROMPT.md)
-- **12 May 2026 10:00**: CA demo
+  Window must INCLUDE demo day. (Was 11 May 2026 — recalculate when new date confirmed.)
+- **DEMO DATE - 30min**: Pre-demo ritual (see SESSION-START-PROMPT.md)
+- **DEMO DATE**: CA demo (was 12 May 2026 — PENDING CONFIRMATION)
 
 ---
 
-## OUTSTANDING — MUST COMPLETE BEFORE 12 MAY 2026
+## OUTSTANDING — MUST COMPLETE BEFORE DEMO
 
-### LOOP-011 — All 5 tenants: IFRS Statements Auditor Sign-Off
-Status: OPEN (Mark Reviewed step COMPLETE — 5/5 tenants at status='reviewed')
-Scope correction (Session 293, 17 April 2026 — verified via Supabase MCP +
-HQFinancialStatements.js disk read): The UI uses ONE
-financial_statement_status row per (tenant_id, financial_year), NOT one per
-statement type. The 4 statement tabs (IS, BS, Cash Flow, Changes in Equity)
-share a single status workflow: Draft -> Reviewed -> Auditor Signed Off -> Locked.
-Therefore LOOP-011 is 5 sign-offs total, not 20. See LL-290.
-Action: For each of 5 tenants → /tenant-portal → IFRS Statements →
-  click "Auditor Sign Off..." → enter auditor name → Confirm.
-Close when: All 5 financial_statement_status rows have signed_at IS NOT NULL.
-Current DB state (Session 293):
-  Medi Recreational        FY2026 status=reviewed  signed=false
-  MediCare Dispensary      FY2026 status=reviewed  signed=false
-  Metro Hardware (Pty) Ltd FY2026 status=reviewed  signed=false
-  Nourish Kitchen & Deli   FY2026 status=reviewed  signed=false
-  The Garden Bistro        FY2026 status=reviewed  signed=false
+### DEBT-REGISTER REVIEW
+Status: OPEN — Owner reads docs/DEBT_REGISTER_v1.md Section 4 and picks
+top 3 items for Stage 1 fix sprint. No code work until owner confirms priorities.
+
+### sim-pos-sales
+Status: STANDING ALERT — must run the day BEFORE demo.
+Trigger date: PENDING (depends on new demo date confirmation).
 
 ---
 
@@ -62,6 +52,33 @@ Current DB state (Session 293):
 
 3. **Pricing data source red (0)** — no product_pricing records linked to recipes.
    Affects costing dashboard only. Not on demo critical path.
+
+---
+
+## CLOSED LOOPS — SESSION 294 (17 April 2026)
+
+### CLOSED — LOOP-011: All 5 tenants IFRS Auditor Signed Off
+Session 294 · Owner action via HQ tenant switch on 17 April 2026.
+All 5 financial_statement_status rows now have signed_at IS NOT NULL.
+Signatories:
+  The Garden Bistro        — J. van der Merwe CA(SA) / Van der Merwe & Partners
+  Medi Recreational        — N. Pillay CA(SA) / Pillay Audit Inc.
+  Nourish Kitchen & Deli   — T. Mokoena CA(SA) / Mokoena & Associates
+  MediCare Dispensary      — S. Abrahams CA(SA) / Abrahams Chartered Accountants
+  Metro Hardware (Pty) Ltd — D. Botha CA(SA) / Botha Nel Inc.
+All green "AUDITOR SIGNED OFF" badges confirmed via screenshots.
+
+### CLOSED — Stage 0 Grounded Debt Audit
+Session 294 · docs/DEBT_REGISTER_v1.md produced (audit-only, no fixes).
+Three audit streams executed:
+  Stream A (Safety): 29 findings — 23 RULE 0F INSERT violations, 6 LL-285 SELECT violations
+  Stream B (Financial): 4 findings (FIN-001 HQYearEnd missing FY filter, FIN-002
+    hardcoded FY2026, FIN-003 VAT_RATE hardcoded, FIN-006 unfiltered equity join).
+    3 permanent gaps confirmed documented, no drift.
+  Stream C (DS6/UX): 642 violations across 4 files (HQFoodIngredients ~32,
+    StockControl 116, SmartInventory 225, HQStock 269). WATCH-006 grounded
+    with line refs (HQStock.js:1084, 1407, 1415, 1418, 1419).
+Summary table: Section 4 of DEBT_REGISTER_v1.md — top 10 items ranked for owner review.
 
 ---
 

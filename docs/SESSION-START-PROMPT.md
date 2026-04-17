@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 17 April 2026 — Session 293 close (WP-TABLE-UNIFY Phase 1 complete · Phase 2 scoped)
+## Updated: 17 April 2026 — Session 294 close (Stage 0 Grounded Debt Audit)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -9,11 +9,11 @@
 
 You are the AI development partner for **NuAi** — a production multi-tenant
 SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
-4 industry profiles. CA demo date: **12 May 2026.**
+4 industry profiles. CA demo date: **PENDING CONFIRMATION** (was 12 May 2026).
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 759c321
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 921f31c
 
 ---
 
@@ -146,12 +146,20 @@ All bank recons at 0 unmatched lines.
 NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
-- **LOOP-011**: All 5 tenants — IFRS Auditor Sign-Off (5 UI clicks, ~15 min owner action)
-  SCOPE CORRECTED in Session 293: 5 sign-offs total, not 20. UI uses ONE
-  financial_statement_status row per (tenant_id, FY), not one per statement type.
-  All 5 tenants currently at status='reviewed'.
+- No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (293) — 17 April 2026
+### CLOSED THIS SESSION (294) — 17 April 2026
+- **LOOP-011** — All 5 tenants IFRS Auditor Signed Off. Signatories:
+  Garden Bistro (J. van der Merwe CA(SA) / Van der Merwe & Partners),
+  Medi Recreational (N. Pillay CA(SA) / Pillay Audit Inc.),
+  Nourish Kitchen & Deli (T. Mokoena CA(SA) / Mokoena & Associates),
+  MediCare Dispensary (S. Abrahams CA(SA) / Abrahams Chartered Accountants),
+  Metro Hardware (D. Botha CA(SA) / Botha Nel Inc.).
+- **Stage 0 Debt Audit** — docs/DEBT_REGISTER_v1.md produced.
+  29 SAFETY findings (23 RULE 0F + 6 LL-285), 4 FIN findings,
+  642 DS6 violations across 4 files. WATCH-006 grounded with line refs.
+
+### CLOSED SESSION 293 — 17 April 2026
 - **WP-TABLE-UNIFY Phase 1** — HQFoodIngredients DS6 migration (6 PRs, 85% cleared)
 - **LL-250-BREACH-01** — Duplicate VAT numbers on active tenants (Supabase MCP fix,
   Medi Can 4067891234→4100200300, Metro 4987654321→4200300400)
@@ -385,28 +393,23 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **EXPLORE WP-TABLE-UNIFY Phase 2** — `docs/WP-TABLE-UNIFY_PHASE2_v1.md`
-   authored Session 293. 12 sections, 645 lines. 5 sub-phases (2A-2E)
-   totalling ~72hrs. POST-DEMO execution (do not start before 13 May 2026).
-   Next agent: READ THE SCOPE DOC IN FULL before planning. It is the work
-   package's single source of truth — supersedes the one-line Phase 2
-   description in WP-TABLE-UNIFY_v1_0.md. Key sections:
-   - Section 1: Asset inventory (what's built, what's weak, what's missing)
-   - Section 3: Product thesis — 5 AI features to build, 5 to explicitly skip
-   - Section 4.4: New DB tables/columns required (ingredient_ingest_queue +
-     4 additional inventory_items columns)
-   - Section 8: Execution order with per-sub-phase gates
-   - Section 9: Risk register (8 risks, allergen liability flagged)
-   - Section 10: Draft LLs 291-294 for post-execution adoption
+1. **Owner reads DEBT_REGISTER_v1.md** — Section 4 summary table has
+   the top 10 items ranked by (impact x urgency) / effort. Owner picks
+   top 3 items for Stage 1 fix sprint.
 
-2. **LOOP-011** — All 5 tenants: IFRS Auditor Sign-Off (~15 min owner action,
-   5 UI clicks, 1 per tenant). Scope corrected in Session 293 (was "20", is 5).
+2. **Stage 1: Fix top SAFETY items** — 29 RULE 0F / LL-285 violations found.
+   Loyalty pipeline cluster (7 items) is highest priority — affects live
+   consumer flows. All fixes are Size S (one-line each). Total ~2-3 hours.
 
-3. **11 May sim-pos-sales** — STANDING ALERT, cannot miss
+3. **sim-pos-sales** — STANDING ALERT. Trigger date depends on new demo date
+   (PENDING CONFIRMATION). Must run the day BEFORE demo.
 
-4. **Optional DS6 mop-up** — 7 remaining Admin tab components. Not blocking demo.
+4. **WP-TABLE-UNIFY Phase 2** — `docs/WP-TABLE-UNIFY_PHASE2_v1.md` (645 lines).
+   Deferred to post-demo. Next agent reads scope doc in full before planning.
 
-5. **LOOP-FIN-004** — Trial Balance Excel export (2hrs, SheetJS) — nice-to-have
+5. **Optional DS6 mop-up** — 642 violations across 4 files. Not blocking demo.
+
+6. **LOOP-FIN-004** — Trial Balance Excel export (2hrs, SheetJS) — nice-to-have
 
 ---
 
