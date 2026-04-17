@@ -902,11 +902,12 @@ CRITICAL REMINDERS:
       ?.number as string | null;
     const supplierId = (extraction.supplier as Record<string, unknown>)
       ?.matched_id as string | null;
-    if (refNumber && supplierId) {
+    if (refNumber && supplierId && tenant_id) {
       const { data: existingConfirmed } = await db
         .from("document_log")
         .select("id, file_name, confirmed_at")
         .eq("status", "confirmed")
+        .eq("tenant_id", tenant_id)
         .eq("supplier_id", supplierId)
         .filter("extracted_data->reference->>number", "eq", refNumber)
         .limit(1);
