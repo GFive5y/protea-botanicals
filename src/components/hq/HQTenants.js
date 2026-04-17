@@ -988,15 +988,23 @@ export default function HQTenants() {
   async function recalcNetProfit(tid) {
     setRecalcStatus(s => ({ ...s, [tid]: "loading" }));
     try {
-      const yr = new Date().getFullYear();
+      // LL-297: P&L period and FY label must come from the tenant's
+      // financial_year_start, not the calendar year.
+      const fyStart = configs[tid]?.financial_year_start || "03-01";
+      const mo = parseInt(fyStart.split("-")[0], 10);
+      const now = new Date();
+      const yr = (now.getMonth() + 1) >= mo ? now.getFullYear() : now.getFullYear() - 1;
+      const fyLabel = `FY${yr}`;
+      const fyStartISO = `${yr}-${fyStart}T00:00:00+00:00`;
+
       const { data: plData } = await supabase.rpc("tenant_financial_period", {
         p_tenant_id: tid,
-        p_since: `${yr}-01-01T00:00:00+00:00`,
-        p_until: `${yr}-12-31T23:59:59+00:00`,
+        p_since: fyStartISO,
+        p_until: now.toISOString(),
       });
       if (plData) {
         const net = (plData.revenue?.ex_vat || 0) - (plData.cogs?.actual || 0) - (plData.opex?.total || plData.opex?.paid || 0);
-        await supabase.from("equity_ledger").update({ net_profit_for_year: net }).eq("tenant_id", tid).eq("financial_year", "FY2026");
+        await supabase.from("equity_ledger").update({ net_profit_for_year: net }).eq("tenant_id", tid).eq("financial_year", fyLabel);
         setRecalcStatus(s => ({ ...s, [tid]: "done" }));
         showToast(`Net profit updated: R${Math.round(net).toLocaleString()}`);
       }

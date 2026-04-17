@@ -6,6 +6,15 @@ import React, { useState } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { T } from "../../styles/tokens";
 
+// LL-297: FY labels must be computed from the tenant's financial_year_start
+// + current date, never hardcoded.
+function fyLabelFromStart(financialYearStart) {
+  const mo = parseInt((financialYearStart || "03-01").split("-")[0], 10);
+  const now = new Date();
+  const yr = (now.getMonth() + 1) >= mo ? now.getFullYear() : now.getFullYear() - 1;
+  return `FY${yr}`;
+}
+
 const NOURISH_DEFAULTS = {
   trading_name: "Nourish Kitchen & Deli (Pty) Ltd",
   company_reg_number: "2023/198745/07",
@@ -124,6 +133,7 @@ export default function HQTenantFinancialSetup({ tenantId, tenantName, onComplet
     setSaveError(null);
 
     const fyEndVal = fyEnd(form.financial_year_start);
+    const fyLabel = fyLabelFromStart(form.financial_year_start);
 
     // Write 1: Update tenant_config
     const { error: configError } = await supabase
@@ -161,7 +171,7 @@ export default function HQTenantFinancialSetup({ tenantId, tenantName, onComplet
       .upsert(
         {
           tenant_id: tenantId,
-          financial_year: "FY2026",
+          financial_year: fyLabel,
           share_capital: form.share_capital,
           opening_retained_earnings: form.opening_retained_earnings || 0,
           net_profit_for_year: null,
@@ -191,7 +201,7 @@ export default function HQTenantFinancialSetup({ tenantId, tenantName, onComplet
       });
       if (plData) {
         const netProfit = (plData.revenue?.ex_vat || 0) - (plData.cogs?.actual || 0) - (plData.opex?.total || plData.opex?.paid || 0);
-        await supabase.from("equity_ledger").update({ net_profit_for_year: netProfit }).eq("tenant_id", tenantId).eq("financial_year", "FY2026");
+        await supabase.from("equity_ledger").update({ net_profit_for_year: netProfit }).eq("tenant_id", tenantId).eq("financial_year", fyLabel);
       }
     } catch (_) {
       console.error("[HQFinSetup] net_profit calc failed — continuing with NULL");
@@ -326,7 +336,7 @@ export default function HQTenantFinancialSetup({ tenantId, tenantName, onComplet
             </div>
             <div>
               <label style={labelStyle}>Financial Year</label>
-              <input style={{ ...inputStyle, background: "#f9f9f9" }} value="FY2026" readOnly />
+              <input style={{ ...inputStyle, background: "#f9f9f9" }} value={fyLabelFromStart(form.financial_year_start)} readOnly />
             </div>
           </div>
         </div>

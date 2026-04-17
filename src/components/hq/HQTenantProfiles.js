@@ -308,7 +308,7 @@ export default function HQTenantProfiles() {
       });
       if (plData) {
         const net = (plData.revenue?.ex_vat || 0) - (plData.cogs?.actual || 0) - (plData.opex?.paid || 0);
-        await supabase.from("equity_ledger").update({ net_profit_for_year: net }).eq("tenant_id", tid).eq("financial_year", "FY2026");
+        await supabase.from("equity_ledger").update({ net_profit_for_year: net }).eq("tenant_id", tid).eq("financial_year", `FY${yr}`);
         setRecalcStatus(s => ({ ...s, [tid]: "done" }));
         loadData();
       }
