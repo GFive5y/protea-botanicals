@@ -36,19 +36,19 @@ payload. The following 23 sites omit it.
 
 **Status:** SAFETY-001 and SAFETY-004 known as WATCH-005 (S293). SAFETY-002/003/005 are NEW findings.
 
-#### Cluster 2: Loyalty Pipeline (7 violations)
+#### Cluster 2: Loyalty Pipeline (7 violations) — FIXED 528d5c2
 
-| ID | File:Line | Table | Impact | Fix Sketch | Size |
-|---|---|---|---|---|---|
-| SAFETY-013 | OrderSuccess.js:217 | loyalty_transactions | Purchase reward unattributed to tenant | Add `tenant_id: storefrontTenantId` | S |
-| SAFETY-014 | OrderSuccess.js:254 | loyalty_transactions | Referral bonus (referee) unattributed | Add `tenant_id: storefrontTenantId` | S |
-| SAFETY-015 | OrderSuccess.js:282 | loyalty_transactions | Referral bonus (referrer) unattributed | Add `tenant_id: storefrontTenantId` | S |
-| SAFETY-016 | Account.js:549 | loyalty_transactions | Phone verification bonus unattributed | Add `tenant_id` from tenant context | S |
-| SAFETY-017 | Account.js:1448 | loyalty_transactions | Profile completion bonus unattributed | Add `tenant_id` from tenant context | S |
-| SAFETY-018 | SurveyWidget.js:75 | loyalty_transactions | Survey bonus unattributed | Add `tenant_id` prop or derive from context | S |
-| SAFETY-019 | ScanResult.js:1744 | loyalty_transactions | Streak bonus unattributed (note: scan TX at L1241 is correct) | Add `tenant_id` from QR tenant | S |
+| ID | File:Line | Table | Status | Fix Applied |
+|---|---|---|---|---|
+| SAFETY-013 | OrderSuccess.js:219 | loyalty_transactions | FIXED | `tenant_id: storefrontTenantId` |
+| SAFETY-014 | OrderSuccess.js:257 | loyalty_transactions | FIXED | `tenant_id: storefrontTenantId` |
+| SAFETY-015 | OrderSuccess.js:286 | loyalty_transactions | FIXED | `tenant_id: storefrontTenantId` |
+| SAFETY-016 | Account.js:553 | loyalty_transactions | FIXED | `tenant_id: storefrontTenantId` (added useStorefront to OTPPanel) |
+| SAFETY-017 | Account.js:1454 | loyalty_transactions | FIXED | `tenant_id: storefrontTenantId` (added useStorefront to AccountView) |
+| SAFETY-018 | SurveyWidget.js:77 | loyalty_transactions | FIXED | `tenant_id: tenantId \|\| null` (added tenantId prop, passed from ScanResult.js) |
+| SAFETY-019 | ScanResult.js:1746 | loyalty_transactions | FIXED | `tenant_id: tenantId \|\| null` (mirrors L1254 pattern) |
 
-**Note:** The loyalty_transactions table likely has RLS — but orphaned rows without tenant_id would be invisible to tenant queries, silently losing loyalty points.
+**All 7 fixed in Session 295 commit 528d5c2.**
 
 #### Cluster 3: HQDocuments.js (3 violations)
 
@@ -245,7 +245,7 @@ recompute if items change after initial render.
 
 | Rank | ID(s) | Description | Impact | Urgency | Effort | Recommendation |
 |---|---|---|---|---|---|---|
-| 1 | SAFETY-013 to 019 | Loyalty pipeline: 7 INSERTs missing tenant_id | HIGH — loyalty points silently lost | HIGH — affects live consumer flow | S (7 one-line fixes) | Fix in one commit |
+| 1 | SAFETY-013 to 019 | Loyalty pipeline: 7 INSERTs missing tenant_id | ~~HIGH~~ | ~~HIGH~~ | S | **FIXED** 528d5c2 (S295) |
 | 2 | SAFETY-001 to 005 | StockControl.js: 5 INSERTs missing tenant_id | HIGH — stock movements orphaned | MEDIUM — demo uses HQ Stock not Admin Stock | S (5 one-line fixes) | Fix in one commit |
 | 3 | SAFETY-024 to 029 | 6 SELECTs missing tenant scoping | HIGH — cross-tenant data visible to HQ | MEDIUM — only affects HQ multi-tenant view | S (6 one-line fixes) | Fix in one commit |
 | 4 | SAFETY-006 to 008 | HQDocuments.js: 3 INSERTs missing tenant_id | HIGH — doc ingestion creates orphans | MEDIUM — Smart Capture is secondary demo path | S (3 one-line fixes) | Fix in one commit |
