@@ -61,12 +61,16 @@ payload. The following 23 sites omit it.
 
 **All 4 fixed in Session 297 commit 6c50eaf. Source: selectedDoc.tenant_id (document owner, not HQ operator).**
 
-#### Cluster 4: HQ Purchase Orders (2 violations)
+#### Cluster 4: HQ Purchase Orders (2+2 violations) — FIXED 0548979
 
-| ID | File:Line | Table | Impact | Fix Sketch | Size |
-|---|---|---|---|---|---|
-| SAFETY-011 | HQPurchaseOrders.js:597 | inventory_items | New item from PO receive invisible to tenant | Add `tenant_id: tenantId` | S |
-| SAFETY-012 | HQPurchaseOrders.js:628 | stock_movements | Stock movement from PO receive orphaned | Add `tenant_id: tenantId` | S |
+| ID | File:Line | Table | Status | Fix Applied |
+|---|---|---|---|---|
+| SAFETY-011 | HQPurchaseOrders.js:599 | inventory_items | FIXED | `tenant_id: tenantId` (pattern B) |
+| SAFETY-012 | HQPurchaseOrders.js:631 | stock_movements | FIXED | `tenant_id: tenantId` (pattern B) |
+| SAFETY-031 (NEW S298) | HQPurchaseOrders.js:492 | purchase_order_items | FIXED | `tenant_id: tenantId` (USD PO lines, found via WATCH-007 re-grep) |
+| SAFETY-032 (NEW S298) | HQPurchaseOrders.js:705 | purchase_order_items | FIXED | `tenant_id: tenantId` (ZAR PO lines, found via WATCH-007 re-grep) |
+
+**All 4 fixed in Session 298 commit 0548979.**
 
 #### Cluster 5: Other Components (4 violations)
 
@@ -99,7 +103,7 @@ prevent cross-tenant data appearing in per-tenant views.
 
 | ID | File:Line | Table | Impact | Fix Sketch | Size |
 |---|---|---|---|---|---|
-| SAFETY-024 | HQPurchaseOrders.js:369 | suppliers | HQ sees all tenants' suppliers in PO dropdown | Add `.eq("tenant_id", tenantId)` | S |
+| SAFETY-024 | HQPurchaseOrders.js:369 | suppliers | ~~HQ sees all tenants' suppliers~~ | **FIXED** 0548979 (S298) | S |
 | SAFETY-025 | HQInvoices.js:762 | suppliers | HQ sees all tenants' suppliers in invoice dropdown | Add `.eq("tenant_id", tenantId)` | S |
 | SAFETY-026 | HQInvoices.js:763 | wholesale_partners | HQ sees all tenants' wholesale partners | Add `.eq("tenant_id", tenantId)` | S |
 | SAFETY-027 | AdminProductionModule.js:1311 | inventory_items | Admin loads all tenants' inventory | Add `.eq("tenant_id", tenantId)` | S |
@@ -258,7 +262,7 @@ recompute if items change after initial render.
 | 2 | SAFETY-001 to 005 | StockControl.js: 5 INSERTs missing tenant_id | ~~HIGH~~ | ~~MEDIUM~~ | S | **FIXED** b869ad4 (S296) |
 | 3 | SAFETY-024 to 029 | 6 SELECTs missing tenant scoping | HIGH — cross-tenant data visible to HQ | MEDIUM — only affects HQ multi-tenant view | S (6 one-line fixes) | Fix in one commit |
 | 4 | SAFETY-006 to 008 | HQDocuments.js: 3+1 INSERTs missing tenant_id | ~~HIGH~~ | ~~MEDIUM~~ | S | **FIXED** 6c50eaf (S297) |
-| 5 | SAFETY-011, 012 | HQPurchaseOrders.js: 2 INSERTs missing tenant_id | HIGH — PO receive creates orphaned items | MEDIUM — PO flow is demo path | S (2 one-line fixes) | Fix in one commit |
+| 5 | SAFETY-011, 012, 031, 032 | HQPurchaseOrders.js: 4 INSERTs + 1 SELECT | ~~HIGH~~ | ~~MEDIUM~~ | S | **FIXED** 0548979 (S298) |
 | 6 | WATCH-006 | HQStock FoodOverview KPIs count archived items | LOW — inflated counts, no data corruption | LOW — cosmetic only | M | Fix when touching HQStock |
 | 7 | FIN-001 | HQYearEnd equity_ledger update missing FY filter | HIGH — would corrupt multi-year equity | LOW — year-end close not in demo flow | M | Fix before any year-end close |
 | 8 | FIN-002 | Hardcoded "FY2026" in 3 write paths | MEDIUM — time bomb for Jan 2027 | LOW — safe until 2027 | S | Fix post-demo |

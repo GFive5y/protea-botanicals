@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 17 April 2026 — Session 297 close (Stage 3 — HQDocuments Safety Cluster)
+## Updated: 17 April 2026 — Session 298 close (Stage 4 — HQPurchaseOrders Safety Cluster)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 6c50eaf
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 0548979
 
 ---
 
@@ -148,7 +148,14 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (297) — 17 April 2026
+### CLOSED THIS SESSION (298) — 17 April 2026
+- **LL-291** — Tenant-source taxonomy (TRIGGER/VIEWER/RECORD) added to Bible.
+- **WATCH-007** — Audit coverage floor note added to PENDING-ACTIONS.
+- **SAFETY-011, 012, 024 + 031, 032 (NEW)** — HQPurchaseOrders.js 4 INSERT +
+  1 SELECT sites fixed. 2 new findings from WATCH-007 re-grep (purchase_order_items
+  mapped arrays at L492 and L705). Commit 0548979. Build verified.
+
+### CLOSED SESSION 297 — 17 April 2026
 - **SAFETY-006 to 008 + 1 NEW** — HQDocuments.js 4 INSERT sites fixed.
   Source: selectedDoc.tenant_id (document owner, not HQ operator).
   Also fixed unflagged inventory_items INSERT in create_supplier_product.
@@ -410,9 +417,10 @@ LL-290 (NEW S293): PENDING-ACTIONS loop scope must be verified against DB schema
 
 ## NEXT PRIORITIES (choose with owner at session start)
 
-1. **Stage 4: HQPurchaseOrders SAFETY fixes** — SAFETY-011, 012 (INSERT) + 024 (SELECT).
+1. **Stage 5: Remaining SAFETY fixes** — SAFETY-009 (HQMedical), 020-023,
+   025-026 (HQInvoices), 027-029 (AdminProductionModule), 030 (ScanResult).
 
-2. **Stage 5: Remaining SAFETY fixes** — SAFETY-009 (HQMedical), 020-023, 025-029, 030.
+2. **Financial findings** — FIN-001 to 003, FIN-006 (separate stage after safety).
 
 3. **sim-pos-sales** — STANDING ALERT. Trigger date depends on new demo date
    (PENDING CONFIRMATION). Must run the day BEFORE demo.
