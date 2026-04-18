@@ -344,6 +344,14 @@ LOOP-CALIBRATION.md (new), LL-299 (planner/executor split), _migration_backup_s3
 
 ## WATCH ITEMS
 
+### WATCH-EF-DEPLOY — Procedure 7 mandatory re-read before ANY EF work
+Status: PERMANENT
+After LL-303, ALL agents must read Procedure 7 in AGENT-METHODOLOGY.md
+before touching any Edge Function. The v62/v63 incident proved that
+assuming tool capability is how production breaks. If you are the agent
+reading this: the first time you want to deploy an EF, stop and re-read
+Procedure 7 even if you already read the Bible at session start.
+
 ### WATCH-001 — SAHPRA export CSV format
 Implemented — not yet tested against real SAHPRA submission requirements.
 
@@ -423,14 +431,20 @@ Original plan was 4 PRs (~20h). Shipped 6 PRs. Under-scoped CRUD + audit + DS6.
 ### LOOP-WTU-003 — Phase 2B: AI Document Ingest (in execution)
 Status: IN EXECUTION
 Source: docs/WP-TABLE-UNIFY_PHASE2B-SPLIT_v1.md
-  [x] 2B.1 migration applied (ingredient_ingest_queue, 5 RLS policies)
-  [x] 2B.1 scoping doc committed (this PR)
-  [ ] 2B.2 process-document v62 — F&B branch + queue write (~5h, highest risk)
+  [x] 2B.1 migration applied (ingredient_ingest_queue, 5 policies) — 73f8135
+  [x] 2B.1 scoping doc committed — 73f8135
+  [x] 2B.2 v62 spec captured (docs/WP-TABLE-UNIFY_PHASE2B-2_V62-SPEC_v1.md)
+  [ ] 2B.2 v62 source regeneration + deploy (NEXT — per Procedure 7)
+  [ ] 2B.2 regression matrix (5 tenants)
+  [ ] 2B.2 commit v62 to supabase/functions/process-document/index.ts
   [ ] 2B.3 HQ "+ Add from Document" modal (with Phase 2F placemarker) (~3h)
   [ ] 2B.4 Review-and-approve UI (~3.5h)
   [ ] 2B.5 Gate PR — 5-tenant end-to-end walkthrough (~1h)
 Architectural pivot: extends process-document v61 -> v62 (Option 1)
   instead of building a new ingest-ingredient EF (parent doc Option B).
+**INCIDENT NOTE:** v62/v63 EF deploys via Supabase MCP were truncated stubs.
+  Rolled back to v61 (Supabase v64). LL-303 + Procedure 7 now govern all
+  EF deploys. Next 2B.2 attempt via Claude Code npx deploy.
 
 ### Phase 2F — Mobile Smart Capture for Ingredients
 Status: BACKLOG · opens when (a) a client requests it OR (b) bandwidth after 2C/2D

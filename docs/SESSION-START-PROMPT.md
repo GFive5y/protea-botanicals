@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Read live from the repo at every session start (LL-292).
-## Updated: 18 April 2026 — Session 320 close (architecture docs + PR 2A.1 + RLS incident + fix)
+## Updated: 19 April 2026 — Session post-2B.1-incident close (LL-303 + v62 spec + handoff)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -588,9 +588,37 @@ LL-302 (NEW S320): Run Audit 1 (self-ref) + Audit 2 (inline user_profiles) any s
 
 ## NEXT PRIORITIES (session start, choose with owner)
 
-1. **PR 2A.2** — Pill Nav + KPI Strip + Smart Search (~6h).
-   Planner runs Procedure 6 Step 1 at fresh HEAD.
-   Spec: docs/WP-TABLE-UNIFY_PHASE2_2A-SPLIT_v1.md
+1. **PR 2B.2 — process-document EF v62 deployment** (HIGHEST PRIORITY)
+   Under LL-303 / Procedure 7 — the revised EF deploy loop.
+
+   The v62 source file was produced in session 18 April 2026 and
+   captured as specification in docs/WP-TABLE-UNIFY_PHASE2B-2_V62-SPEC_v1.md.
+   The source file itself was not committed (planner scratch didn't
+   survive; LL-303 Layer 1 forbids planner-side commits anyway).
+
+   **Next planner's job:**
+   1. Read Procedure 7 in AGENT-METHODOLOGY.md (MANDATORY — exists
+      because of the v62/v63 incident)
+   2. Read v62-SPEC doc — 7 deltas + verification markers
+   3. Read v61 source: supabase/functions/process-document/index.ts
+   4. Produce full v62 source applying all 7 deltas from spec
+   5. Verify structural sanity (braces/parens/size) before proceeding
+   6. Write Claude Code instruction block per Procedure 7 Step 2
+   7. Hand off to Claude Code for commit + deploy
+   8. Verify via get_edge_function markers:
+      classifyIngredientSourceType, ingredient_ingest_queue,
+      queued_ingredient_ids
+   9. Run 5-tenant regression matrix per v62-SPEC
+   10. Clean: Claude Code pushes. Dirty: git revert + redeploy v61.
+
+   Do NOT deploy from planner side. See DECISION-JOURNAL entry
+   S-post-2B.1-incident for the incident that created LL-303.
+
+   **Mandatory reading before 2B.2:**
+   - docs/AGENT-METHODOLOGY.md (Procedure 7)
+   - docs/WP-TABLE-UNIFY_PHASE2B-SPLIT_v1.md (5-PR Phase 2B plan)
+   - docs/WP-TABLE-UNIFY_PHASE2B-2_V62-SPEC_v1.md (v62 deltas)
+   - LL-303 in NUAI-AGENT-BIBLE.md
 
 2. **sim-pos-sales** — STANDING ALERT. Trigger date pending demo
    date confirmation. Must run day BEFORE demo.
@@ -599,9 +627,6 @@ LL-302 (NEW S320): Run Audit 1 (self-ref) + Audit 2 (inline user_profiles) any s
    subqueries → user_tenant_id() helper. See PENDING-ACTIONS.
 
 4. **LOOP-FIN-004** — Trial Balance Excel export (~2h, SheetJS)
-
-5. **fivazg@gmail.com account** — pending decision (unsuspend
-   vs leave; see S320 decision journal)
 
 ---
 

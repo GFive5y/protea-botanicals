@@ -4,6 +4,57 @@
 
 ---
 
+## S-close-post-2B.1-incident — 19 April 2026 — Session closure + handoff
+
+### Session outcome
+Phase 2B.1 shipped clean at `73f8135` (migration live, split plan committed,
+LOOP-WTU-003 opened).
+
+Phase 2B.2 attempted and rolled back. Two EF deploys (v62, v63) failed
+because Claude.ai planner cannot reliably pass 56KB content through Supabase
+MCP `deploy_edge_function` — the tool accepts whatever string the planner
+provides, and planner's response format forced truncation to a placeholder
+comment. Cannabis tenants could not ingest documents until rollback.
+
+Rollback: Claude Code ran `npx supabase functions deploy process-document`
+from local on-disk v61 source. Production restored at Supabase version 64.
+
+### Guardrail landed
+LL-303 + Procedure 7 shipped at `c7a0efb`. Three layers:
+  L1 — Claude.ai never deploys EFs; Claude Code owns the deploy command
+  L2 — Every EF deploy verified post-hoc via get_edge_function marker/SHA
+  L3 — Failed EF deploy -> rollback + escalate, NEVER retry
+
+### This commit (session close)
+Four docs updated for clean handoff to next session planner:
+  - WP-TABLE-UNIFY_PHASE2B-2_V62-SPEC_v1.md (NEW) — 7 deltas from v61 to
+    v62, so next planner reconstructs v62 from spec not memory
+  - PENDING-ACTIONS.md — LOOP-WTU-003 sub-items refreshed, WATCH-EF-DEPLOY
+  - SESSION-START-PROMPT.md — next priority = 2B.2 under Procedure 7,
+    mandatory reading list includes Procedure 7 + v62-SPEC
+  - DECISION-JOURNAL.md — this entry
+
+### Process lessons for future agents
+1. Validate tool capability before committing to a workflow. If a tool
+   accepts a string parameter and you're about to pass it >10KB, test
+   with 10KB first. Don't assume MCP tools have unbounded content capacity.
+2. The split plan specified "Deployment via Supabase MCP by planner" — the
+   wrong architectural choice. Architecture decisions in split plans need
+   to consider who physically can execute them.
+3. After the first failed deploy, correct response was STOP + ESCALATE.
+   Instead the planner retried with v63 and made it worse. Now LL-303
+   Layer 3.
+
+### Handoff state
+Open loops: LOOP-WTU-003 (Phase 2B), WP-AUDIT-UNIFY, WP-ROLE-TAXONOMY,
+  WP-REALTIME-PUB, WP-EF-MODULES, WP-EF-LL120-RECONCILE, WP-IMAGE-HASH-REAL
+Next priority: 2B.2 per SESSION-START-PROMPT.md
+Production: process-document v64 (v61 content), ingredient_ingest_queue live
+
+**Fresh at close:** Yes.
+
+---
+
 ## S-post-2B.1-incident — 19 April 2026 — EF deploy guardrail LL-303
 
 ### Incident
