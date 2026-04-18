@@ -52,6 +52,7 @@ import FoodSmartSearch, { matchesSmartSearch } from "./food/FoodSmartSearch";
 import FoodBulkActionBar from "./food/FoodBulkActionBar";
 import FoodColumnPicker, { DEFAULT_COL_VISIBILITY } from "./food/FoodColumnPicker";
 import FoodIngestModal from "./food/FoodIngestModal";
+import FoodIngestQueuePanel from "./food/FoodIngestQueuePanel";
 import { useIsTenantHq } from "../../hooks/useIsTenantHq";
 import { logAudit } from "../../services/auditPlacemarker";
 
@@ -3295,6 +3296,19 @@ export default function HQFoodIngredients() {
   const [colVisibility, setColVisibility] = useState(DEFAULT_COL_VISIBILITY); // WTU 2A.3
   const [toast, setToast] = useState(null);
   const [showIngestModal, setShowIngestModal] = useState(false); // WTU 2B.3
+  const [pendingQueueCount, setPendingQueueCount] = useState(0); // WTU 2B.4
+
+  const fetchPendingQueueCount = useCallback(async () => {
+    if (!tenantId || industryProfile !== "food_beverage") return;
+    const { count } = await supabase
+      .from("ingredient_ingest_queue")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .eq("status", "pending");
+    setPendingQueueCount(count || 0);
+  }, [tenantId, industryProfile]);
+
+  useEffect(() => { fetchPendingQueueCount(); }, [fetchPendingQueueCount]);
 
   // New ingredient form
   const emptyForm = {
@@ -3831,6 +3845,7 @@ export default function HQFoodIngredients() {
   // ─── RENDER ───────────────────────────────────────────────────────────────
   const TABS = [
     { id: "library", label: `Library (${filtered.length})` },
+    { id: "ingest_queue", label: `Ingest Queue${pendingQueueCount > 0 ? ` (${pendingQueueCount})` : ""}` }, // WTU 2B.4
     { id: "add", label: "+ Add Ingredient" },
     {
       id: "compare",
@@ -3838,6 +3853,10 @@ export default function HQFoodIngredients() {
     },
     { id: "regulatory", label: "Regulatory Register" },
   ];
+
+  const visibleTabs = industryProfile === "food_beverage"
+    ? TABS
+    : TABS.filter((t) => t.id !== "ingest_queue");
 
   const sBase = { fontFamily: "Inter, sans-serif", color: C.ink };
 
@@ -3958,7 +3977,7 @@ export default function HQFoodIngredients() {
           marginBottom: 24,
         }}
       >
-        {TABS.map((tab) => (
+        {visibleTabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
@@ -4936,6 +4955,18 @@ export default function HQFoodIngredients() {
         </div>
       )}
 
+      {/* ── INGEST QUEUE TAB ─── WTU 2B.4 ──────────────────────────────── */}
+      {!loading && activeTab === "ingest_queue" && (
+        <FoodIngestQueuePanel
+          tenantId={tenantId}
+          industryProfile={industryProfile}
+          onApproved={() => {
+            fetchIngredients();
+            fetchPendingQueueCount();
+          }}
+        />
+      )}
+
       {/* ── REGULATORY REGISTER TAB ──────────────────────────────────────── */}
       {!loading && activeTab === "regulatory" && (
         <div>
@@ -5273,13 +5304,13 @@ export default function HQFoodIngredients() {
           onClose={() => setShowIngestModal(false)}
           onSuccess={({ documentLogId, queuedCount }) => {
             setShowIngestModal(false);
-            showToast(
-              queuedCount > 0
-                ? `✅ ${queuedCount} ingredient${queuedCount === 1 ? "" : "s"} extracted with allergens, HACCP risk, and nutrition. Ingest Queue tab coming in PR 2B.4.`
-                : "Document processed — no ingredients detected. Try a clearer invoice or spec sheet."
-            );
-            // Phase 2B.4 will add an "Ingest Queue" tab and switch to it here.
-            // For 2B.3, no tab switch yet. The toast is the confirmation.
+            if (queuedCount > 0) {
+              showToast(`✅ ${queuedCount} ingredient${queuedCount === 1 ? "" : "s"} extracted. Review them in the Ingest Queue.`);
+              setActiveTab("ingest_queue"); // WTU 2B.4 — switch to review tab
+              fetchPendingQueueCount();      // update badge
+            } else {
+              showToast("Document processed — no ingredients detected. Try a clearer invoice or spec sheet.");
+            }
             fetchIngredients();
           }}
           tenantId={tenantId}

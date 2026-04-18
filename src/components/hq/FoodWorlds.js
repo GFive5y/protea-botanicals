@@ -715,6 +715,44 @@ export const FNB_SUBCATEGORY_LABELS = Object.fromEntries(
   Object.entries(FNB_SUBCATEGORIES).map(([k, v]) => [k, v.label])
 );
 
+// ═══════════════════════════════════════════════════════════════════════════
+// WTU 2B.4 — sub_category → food_ingredients.category mapping
+// Used by: fn_approve_ingested_ingredient RPC, future Library manual-create form
+// Derives the NOT-NULL category column from the AI-extracted sub_category.
+// ═══════════════════════════════════════════════════════════════════════════
+
+export const FNB_SUBCATEGORY_TO_CATEGORY = {
+  // Proteins → meat_fish
+  protein_red_meat: "meat_fish", protein_poultry: "meat_fish",
+  protein_fish: "meat_fish",     protein_seafood: "meat_fish",
+  protein_charcuterie: "meat_fish",
+  // Dairy → dairy
+  dairy_butter: "dairy", dairy_cream: "dairy", dairy_cheese: "dairy",
+  dairy_eggs: "dairy",   dairy_milk: "dairy",  dairy_yoghurt: "dairy",
+  // Produce → fruit_vegetable
+  produce_vegetables: "fruit_vegetable", produce_leaves: "fruit_vegetable",
+  produce_aromatics: "fruit_vegetable",  produce_fruit: "fruit_vegetable",
+  // Dry goods → grain_cereal / sweetener / spice_herb
+  dry_goods_grains: "grain_cereal", dry_goods_flour: "grain_cereal",
+  dry_goods_sugar: "sweetener",     dry_goods_spices: "spice_herb",
+  dry_goods_canned: "other",
+  // Oils → fat_oil / flavouring
+  oils_condiments: "fat_oil", stocks_bases: "flavouring",
+  flavourings_aromatics: "flavouring",
+  // Bakery → grain_cereal
+  bakery_bread: "grain_cereal",
+  // Beverages → water / flavouring
+  beverages_hot: "flavouring", beverages_cold: "water",
+  // Packaging → packaging_contact / other
+  packaging_disposables: "packaging_contact",
+  cleaning_chemicals: "other",
+};
+
+export function categoryForSubcategory(sub) {
+  if (!sub) return "other";
+  return FNB_SUBCATEGORY_TO_CATEGORY[sub] || "other";
+}
+
 // LL-278: This file is the single source of truth for F&B ingredient worlds.
 // Import from here — never redefine FoodWorlds locally in any component.
 // When adding a new subcategory: add to FNB_SUBCATEGORIES, FOOD_WORLDS.subs,
