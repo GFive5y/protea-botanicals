@@ -15,6 +15,16 @@ const C = {
   accent: T.accentMid,
 };
 
+// WTU 2A.5 — column rhythm. minWidth per column for consistent breathing.
+const COLUMN_WIDTHS = {
+  ingredient: 260,
+  category:   180,
+  allergens:  160,
+  haccp:      110,
+  zone:       130,
+  shelf:      80,
+};
+
 const HEADER_MAP = [
   { key: "ingredient", label: "Ingredient" },
   { key: "category",   label: "Category" },
@@ -120,7 +130,8 @@ export default function FoodListView({
                   key={h.key}
                   style={{
                     textAlign: "left",
-                    padding: "10px 14px",
+                    padding: "12px 16px",
+                    minWidth: COLUMN_WIDTHS[h.key] || "auto",
                     fontSize: T.text.xs,
                     fontWeight: T.weight.bold,
                     color: C.inkLight,
@@ -171,8 +182,17 @@ export default function FoodListView({
                       ? C.surface
                       : "#FCFCFB",
                   cursor: "pointer",
+                  transition: "background 120ms",
                 }}
                 onClick={() => onSelect(ing)}
+                onMouseEnter={(e) => {
+                  if (!checked) e.currentTarget.style.background = "#F5F3EE";
+                }}
+                onMouseLeave={(e) => {
+                  if (!checked) {
+                    e.currentTarget.style.background = idx % 2 === 0 ? C.surface : "#FCFCFB";
+                  }
+                }}
               >
                 {/* Checkbox cell */}
                 <td
@@ -187,7 +207,7 @@ export default function FoodListView({
                   />
                 </td>
                 {/* Ingredient — always visible */}
-                <td style={{ padding: "12px 14px" }}>
+                <td style={{ padding: "12px 16px", minWidth: COLUMN_WIDTHS.ingredient }}>
                   <div
                     style={{
                       fontWeight: T.weight.semibold,
@@ -219,29 +239,30 @@ export default function FoodListView({
                   )}
                 </td>
                 {vis.category !== false && (
-                  <td style={{ padding: "12px 14px", fontSize: T.text.sm }}>
+                  <td style={{ padding: "12px 16px", fontSize: T.text.sm, minWidth: COLUMN_WIDTHS.category }}>
                     <span>{cat.icon} {cat.label}</span>
                   </td>
                 )}
                 {vis.allergens !== false && (
-                  <td style={{ padding: "12px 14px" }}>
+                  <td style={{ padding: "12px 16px", minWidth: COLUMN_WIDTHS.allergens }}>
                     <AllergenBadge flags={ing.allergen_flags} compact />
                   </td>
                 )}
                 {vis.haccp !== false && (
-                  <td style={{ padding: "12px 14px" }}>
+                  <td style={{ padding: "12px 16px", minWidth: COLUMN_WIDTHS.haccp }}>
                     <HaccpBadge level={ing.haccp_risk_level} />
                   </td>
                 )}
                 {vis.zone !== false && (
-                  <td style={{ padding: "12px 14px" }}>
+                  <td style={{ padding: "12px 16px", minWidth: COLUMN_WIDTHS.zone }}>
                     <TempBadge zone={ing.temperature_zone} />
                   </td>
                 )}
                 {vis.shelf !== false && (
                   <td
                     style={{
-                      padding: "12px 14px",
+                      padding: "12px 16px",
+                      minWidth: COLUMN_WIDTHS.shelf,
                       fontSize: T.text.sm,
                       color: C.inkLight,
                     }}

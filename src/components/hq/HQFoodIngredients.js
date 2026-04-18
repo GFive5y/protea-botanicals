@@ -51,6 +51,8 @@ import FoodKPIStrip from "./food/FoodKPIStrip";
 import FoodSmartSearch, { matchesSmartSearch } from "./food/FoodSmartSearch";
 import FoodBulkActionBar from "./food/FoodBulkActionBar";
 import FoodColumnPicker, { DEFAULT_COL_VISIBILITY } from "./food/FoodColumnPicker";
+import { useIsTenantHq } from "../../hooks/useIsTenantHq";
+import { logAudit } from "../../services/auditPlacemarker";
 
 // WP-UNIFY: F&B local palette mapped to tokens.js T where equivalent
 const C = {
@@ -2624,7 +2626,7 @@ function NutritionMini({ n }) {
 }
 
 // ─── Ingredient detail drawer ─────────────────────────────────────────────────
-function IngredientDrawer({ ingredient, onClose }) {
+function IngredientDrawer({ ingredient, onClose, isTenantHq, onEdit, onArchive, onDelete }) {
   if (!ingredient) return null;
   const cat = getCategory(ingredient.category);
   const n = ingredient.nutrition_per_100g || {};
@@ -2806,6 +2808,87 @@ function IngredientDrawer({ ingredient, onClose }) {
           </button>
         </div>
       </div>
+
+      {/* WTU 2A.5 — action row (tenant HQ only, non-library rows only) */}
+      {isTenantHq && !ingredient.is_seeded && (
+        <div
+          style={{
+            padding: "12px 28px",
+            borderBottom: `1px solid ${C.border}`,
+            display: "flex",
+            gap: T.gap.sm,
+            background: "#FAFAF9",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => onEdit && onEdit(ingredient)}
+            style={{
+              padding: "8px 14px",
+              background: T.accent,
+              color: T.surface,
+              border: "none",
+              borderRadius: T.radius.smPlus,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: T.text.sm,
+              fontWeight: T.weight.semibold,
+            }}
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => onArchive && onArchive(ingredient)}
+            style={{
+              padding: "8px 14px",
+              background: "#FFF",
+              color: T.warning,
+              border: `1px solid ${T.warningBd}`,
+              borderRadius: T.radius.smPlus,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: T.text.sm,
+              fontWeight: T.weight.semibold,
+            }}
+          >
+            Archive
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete && onDelete(ingredient)}
+            style={{
+              padding: "8px 14px",
+              background: "#FFF",
+              color: T.danger,
+              border: `1px solid ${T.dangerBd}`,
+              borderRadius: T.radius.smPlus,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: T.text.sm,
+              fontWeight: T.weight.semibold,
+            }}
+          >
+            Delete
+          </button>
+        </div>
+      )}
+
+      {/* WTU 2A.5 — audit placemarker banner */}
+      {isTenantHq && (
+        <div
+          style={{
+            padding: "8px 28px",
+            background: T.infoLight,
+            borderBottom: `1px solid ${C.border}`,
+            fontSize: T.text.xs,
+            color: T.info,
+            fontStyle: "italic",
+          }}
+        >
+          Activity history coming soon - unified audit trail in WP-AUDIT-UNIFY
+        </div>
+      )}
 
       <div style={{ padding: "20px 28px", flex: 1 }}>
         {/* Identifiers */}
@@ -3191,6 +3274,7 @@ function IngredientDrawer({ ingredient, onClose }) {
 // ═════════════════════════════════════════════════════════════════════════════
 export default function HQFoodIngredients() {
   const { tenantId } = useTenant(); // RULE 0G — inside component
+  const isTenantHq = useIsTenantHq(); // WTU 2A.5 — gates edit/delete UI
 
   const [activeTab, setActiveTab] = useState("library");
   const [ingredients, setIngredients] = useState([]);
@@ -3240,6 +3324,7 @@ export default function HQFoodIngredients() {
   };
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState(null); // WTU 2A.5 — null = add mode, UUID = edit mode
 
   function showToast(msg, type = "success") {
     setToast({ msg, type });
@@ -3373,16 +3458,119 @@ export default function HQFoodIngredients() {
             .map(([k, v]) => [k, parseFloat(v)]),
         ),
       };
-      const { error } = await supabase.from("food_ingredients").insert(payload);
-      if (error) throw error;
-      showToast(form.name + " added to your library");
+      if (editingId) {
+        // WTU 2A.5 — edit mode
+        const { error } = await supabase
+          .from("food_ingredients")
+          .update(payload)
+          .eq("id", editingId)
+          .eq("tenant_id", tenantId)      // LL-285
+          .eq("is_seeded", false);         // defence-in-depth
+        if (error) throw error;
+        logAudit({ action: "ingredient.edit", targetType: "food_ingredient", targetId: editingId, tenantId, diff: { after: payload } });
+        showToast(form.name + " updated");
+      } else {
+        // Add mode (existing behaviour)
+        const { data, error } = await supabase
+          .from("food_ingredients")
+          .insert(payload)
+          .select("id")
+          .single();
+        if (error) throw error;
+        logAudit({ action: "ingredient.create", targetType: "food_ingredient", targetId: data?.id, tenantId, diff: { after: payload } });
+        showToast(form.name + " added to your library");
+      }
       setForm(emptyForm);
+      setEditingId(null);
       setActiveTab("library");
       fetchIngredients();
     } catch (err) {
       showToast("Save failed: " + err.message, "error");
     } finally {
       setSaving(false);
+    }
+  }
+
+  // WTU 2A.5 — open +Add tab in edit mode, pre-populated from the drawer
+  function handleEditFromDrawer(ing) {
+    if (!isTenantHq) return;
+    if (ing.is_seeded) {
+      showToast("Library rows cannot be edited. Create a tenant copy instead.", "error");
+      return;
+    }
+    setForm({
+      name: ing.name || "",
+      common_name: ing.common_name || "",
+      category: ing.category || "grain_cereal",
+      sub_category: ing.sub_category || "",
+      default_unit: ing.default_unit || "kg",
+      temperature_zone: ing.temperature_zone || "ambient",
+      shelf_life_days: ing.shelf_life_days != null ? String(ing.shelf_life_days) : "",
+      haccp_risk_level: ing.haccp_risk_level || "low",
+      storage_notes: ing.storage_notes || "",
+      handling_notes: ing.handling_notes || "",
+      requires_fsca_approval: !!ing.requires_fsca_approval,
+      is_controlled: !!ing.is_controlled,
+      allergen_flags: Object.fromEntries(
+        ALLERGENS.map((a) => [a.key, !!(ing.allergen_flags || {})[a.key]]),
+      ),
+      nutrition_per_100g: Object.fromEntries(
+        Object.entries(emptyForm.nutrition_per_100g).map(([k]) => [
+          k,
+          (ing.nutrition_per_100g || {})[k] != null ? String(ing.nutrition_per_100g[k]) : "",
+        ]),
+      ),
+    });
+    setEditingId(ing.id);
+    setActiveTab("add");
+    setSelectedIngredient(null);
+  }
+
+  // WTU 2A.5 — single-row archive (soft delete)
+  async function handleSingleArchive(ing) {
+    if (!isTenantHq || ing.is_seeded) return;
+    if (!window.confirm(`Archive ${ing.name}? It will disappear from the list but remain recoverable.`)) return;
+    try {
+      const { error } = await supabase
+        .from("food_ingredients")
+        .update({ is_active: false })
+        .eq("id", ing.id)
+        .eq("tenant_id", tenantId)
+        .eq("is_seeded", false);
+      if (error) throw error;
+      logAudit({ action: "ingredient.archive", targetType: "food_ingredient", targetId: ing.id, tenantId });
+      showToast(`${ing.name} archived`);
+      setSelectedIngredient(null);
+      fetchIngredients();
+    } catch (err) {
+      showToast("Archive failed: " + err.message, "error");
+    }
+  }
+
+  // WTU 2A.5 — single-row hard delete (tenant HQ + super admin only)
+  async function handleSingleDelete(ing) {
+    if (!isTenantHq || ing.is_seeded) return;
+    const typed = window.prompt(
+      `Hard-delete "${ing.name}"?\n\nThis cannot be undone. Type the ingredient name to confirm:`,
+    );
+    if (typed !== ing.name) {
+      if (typed != null) showToast("Name did not match. Deletion cancelled.", "error");
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from("food_ingredients")
+        .delete()
+        .eq("id", ing.id)
+        .eq("tenant_id", tenantId)
+        .eq("is_seeded", false);
+      if (error) throw error;
+      logAudit({ action: "ingredient.delete", targetType: "food_ingredient", targetId: ing.id, tenantId, diff: { deleted: { name: ing.name, category: ing.category } } });
+      showToast(`${ing.name} deleted permanently`);
+      setSelectedIngredient(null);
+      fetchIngredients();
+    } catch (err) {
+      showToast("Delete failed: " + err.message, "error");
     }
   }
 
@@ -3491,6 +3679,7 @@ export default function HQFoodIngredients() {
       if (error) throw error;
       const updated = (data || []).length;
       const skipped = ids.length - updated;
+      logAudit({ action: "ingredient.bulk_zone", targetType: "food_ingredient", tenantId, diff: { zone, updated_ids: (data || []).map((r) => r.id) } });
       showToast(
         `Updated ${updated} to ${zone}` + (skipped > 0 ? ` \u00B7 ${skipped} skipped (library items)` : ""),
         skipped > 0 ? "warning" : "success",
@@ -3518,6 +3707,7 @@ export default function HQFoodIngredients() {
       if (error) throw error;
       const archived = (data || []).length;
       const skipped = ids.length - archived;
+      logAudit({ action: "ingredient.bulk_archive", targetType: "food_ingredient", tenantId, diff: { archived_ids: (data || []).map((r) => r.id) } });
       showToast(
         `Archived ${archived}` + (skipped > 0 ? ` \u00B7 ${skipped} skipped (library items)` : ""),
         skipped > 0 ? "warning" : "success",
@@ -3946,7 +4136,7 @@ export default function HQFoodIngredients() {
             }}
           >
             <h3 style={{ margin: "0 0 24px", fontSize: T.text.lg, fontWeight: T.weight.bold }}>
-              Add Custom Ingredient
+              {editingId ? "Edit Ingredient" : "Add Custom Ingredient"}
             </h3>
 
             {/* Basic info */}
@@ -4460,7 +4650,7 @@ export default function HQFoodIngredients() {
               style={{ display: "flex", gap: T.gap.md, justifyContent: "flex-end" }}
             >
               <button
-                onClick={() => setForm(emptyForm)}
+                onClick={() => { setForm(emptyForm); setEditingId(null); }}
                 style={{
                   padding: "10px 20px",
                   background: C.bg,
@@ -4472,7 +4662,7 @@ export default function HQFoodIngredients() {
                   color: C.inkMid,
                 }}
               >
-                Clear
+                {editingId ? "Cancel edit" : "Clear"}
               </button>
               <button
                 onClick={handleSaveIngredient}
@@ -4489,7 +4679,7 @@ export default function HQFoodIngredients() {
                   fontFamily: "inherit",
                 }}
               >
-                {saving ? "Saving…" : "Add to Library"}
+                {saving ? "Saving…" : (editingId ? "Save changes" : "Add to Library")}
               </button>
             </div>
           </div>
@@ -5045,6 +5235,10 @@ export default function HQFoodIngredients() {
           <IngredientDrawer
             ingredient={selectedIngredient}
             onClose={() => setSelectedIngredient(null)}
+            isTenantHq={isTenantHq}
+            onEdit={handleEditFromDrawer}
+            onArchive={handleSingleArchive}
+            onDelete={handleSingleDelete}
           />
         </>
       )}
