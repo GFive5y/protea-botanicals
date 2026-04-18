@@ -597,12 +597,47 @@ export function foodItemMatchesWorld(item, world) {
   return false;
 }
 
+// WTU 2A.4 — maps food_ingredients.category values to world ids.
+// Used as fallback when sub_category doesn't match FOOD_WORLDS.subs.
+export const FNB_CATEGORY_TO_WORLD = {
+  grain_cereal:       "dry_goods",
+  dairy:              "dairy",
+  meat_fish:          "proteins",
+  fruit_vegetable:    "produce",
+  fat_oil:            "oils",
+  sweetener:          "dry_goods",
+  flavouring:         "dry_goods",
+  spice_herb:         "dry_goods",
+  salt_mineral:       "dry_goods",
+  preservative:       "dry_goods",
+  colour_additive:    "dry_goods",
+  emulsifier:         "dry_goods",
+  acid_base:          "dry_goods",
+  enzyme:             "dry_goods",
+  vitamin_supplement: "dry_goods",
+  packaging_contact:  "packaging",
+  water:              "beverages",
+  other:              "all",
+};
+
 /** Get the food world for a given item */
 export function foodWorldForItem(item) {
-  const bySub = FOOD_WORLDS.find(
-    (w) => w.subs && w.subs.includes(item.subcategory),
-  );
-  return bySub || FOOD_WORLDS[0];
+  // 1. Polymorphic sub-field: inventory_items uses `subcategory`,
+  //    food_ingredients uses `sub_category`.
+  const sub = item.sub_category || item.subcategory;
+  const bySub = sub ? FOOD_WORLDS.find((w) => w.subs && w.subs.includes(sub)) : null;
+  if (bySub) return bySub;
+
+  // 2. WTU 2A.4 — category fallback for food_ingredients rows whose
+  //    sub_category values predate the FOOD_WORLDS taxonomy
+  if (item.category) {
+    const worldId = FNB_CATEGORY_TO_WORLD[item.category];
+    if (worldId) {
+      const byCat = FOOD_WORLDS.find((w) => w.id === worldId);
+      if (byCat) return byCat;
+    }
+  }
+  return FOOD_WORLDS[0]; // "all" — final fallback
 }
 
 /** Get default category/subcategory/zone when adding item in a world */
@@ -625,6 +660,8 @@ export const FNB_FIELD_MAP = {
   shelf: "shelf_life_days",
   sub: "subcategory",
   subcategory: "subcategory",
+  category: "category",          // WTU 2A.4
+  haccp: "haccp_risk_level",     // WTU 2A.4
   allergen: "_allergen",
   portions: "_portions",
 };

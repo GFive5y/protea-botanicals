@@ -26,7 +26,10 @@ const C = {
   inkLight: T.ink500,
 };
 
-export default function FoodTileView({ items, compareList, onSelect, HaccpBadge }) {
+const TILE_MIN_WIDTHS = { sm: 180, md: 220, lg: 280 };
+
+export default function FoodTileView({ items, compareList, onSelect, HaccpBadge, tileSize }) {
+  const minWidth = TILE_MIN_WIDTHS[tileSize || "md"];
   if (!items || items.length === 0) {
     return (
       <div
@@ -49,7 +52,7 @@ export default function FoodTileView({ items, compareList, onSelect, HaccpBadge 
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+        gridTemplateColumns: `repeat(auto-fill, minmax(${minWidth}px, 1fr))`,
         gap: T.gap.md,
       }}
     >

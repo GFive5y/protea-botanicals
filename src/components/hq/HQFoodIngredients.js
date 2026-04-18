@@ -4,60 +4,37 @@
 // Rules: RULE 0F (tenant_id), RULE 0G (useTenant inside component),
 //        WorkflowGuide first element, InfoTooltip on key fields
 /* ═══════════════════════════════════════════════════════════════════
- * COMPONENT MAP — HQFoodIngredients.js — WP-TABLE-UNIFY Phase 0 (17 Apr 2026)
+ * COMPONENT MAP — HQFoodIngredients.js — WP-TABLE-UNIFY Phase 2A COMPLETE (18 Apr 2026)
  * ═══════════════════════════════════════════════════════════════════
  * LOCATION           src/components/hq/HQFoodIngredients.js
- * LINES              ~5,083
  * CONSUMED IN        HQ Command Centre → hq-ingredients tab (F&B only)
- * TENANT CONTEXT     useTenant() at L3128 inside component body (RULE 0G)
- *                    destructure: { tenantId }
+ * TENANT CONTEXT     useTenant() inside component body (RULE 0G)
  *
- * STATE VARIABLES    15 useState hooks — SEED_INGREDIENTS frozen (WTU-007)
- *   searchQ              — plain text search (no tokens yet)
- *   filterCat            — category filter string
- *   filterAllergen       — allergen filter string
- *   filterHaccp          — HACCP risk level filter
- *   filterTemp           — temperature zone filter
- *   selectedIngredient   — detail panel open state
- *   compareList          — ingredient comparison array
- *   activeTab            — 'library' | 'my-ingredients' | 'create'
- *   (MISSING: sortField, sortDir, viewMode, tileSize, groupFilter,
- *    subFilter, pillExpanded, selectMode, selectedIds, colPickerOpen)
+ * STATE VARIABLES    (post-2A.4 cleanup)
+ *   activeTab · ingredients · loading · seeded · seedProgress
+ *   searchQ (smart-search tokens + plain) · pillFilter · viewMode · tileSize
+ *   selectedIngredient · compareList · toast
+ *   sortField · sortDir · selectedIds · colVisibility
+ *   form · saving
  *
- * SUPABASE CALLS     (3 total — all on food_ingredients, NOT inventory_items)
- *   L3185  food_ingredients SELECT  .or("is_seeded.eq.true,tenant_id.eq."+tenantId)
- *   L3228  food_ingredients UPDATE  (by id)
- *   L3273  food_ingredients INSERT  tenant_id: tenantId (RULE 0F)
+ * PHASE 2A COMPLETE  Shipped across 4 PRs:
+ *   2A.1 (31e93d3)  Scaffolding: food/TileView, ListView, ViewToggle
+ *   2A.2 (7f42ad8)  PillNav, KPIStrip, SmartSearch, FNB_FIELD_MAP wiring
+ *   2A.3 (a14f84d)  Sort, bulk select, CSV, realtime, col picker
+ *   2A.4 (TBD)      Banner fix, tile size, dedup, legacy filter removal
  *
- * RENDER SECTIONS (return anchors)
- *   L2419  primary component return
- *   L2436/2442/2463/2488/2510/2538 — sub-component returns
- *   L2614  large card-grid block
- *   L3355  main ingredient grid return
+ * SUPABASE CALLS
+ *   fetchIngredients  food_ingredients SELECT  .or(is_seeded OR tenant_id.eq)
+ *   handleSaveIngredient                 INSERT tenant_id: tenantId (RULE 0F)
+ *   handleSeedLibrary                    UPSERT tenant_id: tenantId
+ *   bulk actions (Change zone, Archive)  UPDATE with LL-285 + is_seeded guards
  *
- * DS6 VIOLATIONS (per WP-TABLE-UNIFY_v1_0.md DS6 map — confirmed)
- *   L15-34   Local `C` palette (partial WP-UNIFY done — still raw hex:
- *            #D4CFC4, #1D4ED8, #5B21B6, #245C43, #F5F3FF)
- *   L37-106  Local CATEGORIES array with per-category raw hex — should
- *            migrate to FOOD_WORLDS from FoodWorlds.js (LL-278)
- *   L126-132 HACCP_COLORS: #F0FDF4/#166534, #FEF3C7/#92400E,
- *            #FFF7ED/#C2410C, #FEF2F2/#991B1B
- *            → T.successLight/Text, warningLight/Text, dangerLight/Text
- *   L3484,3707,3754,3983,4546  borderRadius: 10 (integer) → T.radius.lg
- *   L3641-3645 (per gospel) borderRadius: 6 → T.radius.md
- *   Row heights: target 44px single-line, 56px two-line (LL-284)
- *
- * WP-TABLE-UNIFY PLANNED ADDITIONS
- *   Phase 1  DS6 compliance pass · T import exists at L12 · Remove `C`,
- *            migrate HACCP_COLORS + TEMP_COLORS to token-derived map
- *   Phase 2  Ingredient Encyclopedia rebuild — FoodWorld banner icons
- *            (SC-17), FNB_PILL_HIERARCHY drill-down (SC-06),
- *            FNB_SUBCATEGORY_ICONS[item.subcategory] in CATEGORY column
- *            (LL-283)
- *   Phase 3  SmartInventory feature parity — tile view, bulk actions,
- *            smart search with FNB tokens (expiry<7, zone:frozen,
- *            allergen:dairy, portions>10)
- *   Phase 4  Column resize + advanced filters (post-demo)
+ * CARRIED DEBT (for post-demo WP follow-up)
+ *   - `C` palette still live alongside T tokens (cleanup sweep)
+ *   - FOOD_WORLDS sub_category taxonomy doesn't match seed data; current
+ *     category→world mapping is coarse. Proper taxonomy = separate WP.
+ *   - HACCP_COLORS and TEMP_COLORS intentional content colours (S293 decision)
+ *   - Some borderRadius integer literals remain
  * ═══════════════════════════════════════════════════════════════════ */
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
@@ -3221,13 +3198,11 @@ export default function HQFoodIngredients() {
   const [seeded, setSeeded] = useState(false);
   const [seedProgress, setSeedProgress] = useState(0);
   const [searchQ, setSearchQ] = useState("");
-  const [filterCat, setFilterCat] = useState("");
-  const [filterAllergen, setFilterAllergen] = useState("");
-  const [filterHaccp, setFilterHaccp] = useState("");
-  const [filterTemp, setFilterTemp] = useState("");
+  // WTU 2A.4 — legacy filterCat/Allergen/Haccp/Temp removed; pill nav + smart search cover these
   const [selectedIngredient, setSelectedIngredient] = useState(null);
   const [compareList, setCompareList] = useState([]);
   const [viewMode, setViewMode] = useState("tile"); // WP-TABLE-UNIFY 2A.1
+  const [tileSize, setTileSize] = useState("md"); // WTU 2A.4 — "sm" | "md" | "lg"
   const [pillFilter, setPillFilter] = useState({ worldId: null, groupId: null, subId: null }); // WP-TABLE-UNIFY 2A.2
   const [sortField, setSortField] = useState("name");            // WTU 2A.3
   const [sortDir, setSortDir] = useState("asc");                 // "asc" | "desc"
@@ -3302,6 +3277,15 @@ export default function HQFoodIngredients() {
     try {
       const raw = localStorage.getItem(`nuai.food-ingredients.cols.${tenantId}`);
       if (raw) setColVisibility({ ...DEFAULT_COL_VISIBILITY, ...JSON.parse(raw) });
+    } catch (_) { /* localStorage unavailable */ }
+  }, [tenantId]);
+
+  // WTU 2A.4 — load tile size per tenant
+  useEffect(() => {
+    if (!tenantId) return;
+    try {
+      const raw = localStorage.getItem(`nuai.food-ingredients.tile-size.${tenantId}`);
+      if (raw && ["sm", "md", "lg"].includes(raw)) setTileSize(raw);
     } catch (_) { /* localStorage unavailable */ }
   }, [tenantId]);
 
@@ -3404,22 +3388,29 @@ export default function HQFoodIngredients() {
 
   // ── Filtered ingredients ───────────────────────────────────────────────────
   const filtered = useMemo(() => {
-    let list = ingredients.filter((i) => i.is_active !== false);
+    // WTU 2A.4 — dedup by lowercase name, prefer tenant-owned over library
+    const map = new Map();
+    ingredients.forEach((i) => {
+      if (i.is_active === false) return;
+      const key = (i.name || "").toLowerCase().trim();
+      if (!key) return;
+      if (!map.has(key)) {
+        map.set(key, i);
+      } else if (!i.is_seeded && map.get(key).is_seeded) {
+        map.set(key, i);
+      }
+    });
+    let list = Array.from(map.values());
+
     // Smart-search: plain words + FNB tokens (allergen:x, zone:y, expiry<N, etc.)
     if (searchQ) list = list.filter((i) => matchesSmartSearch(i, searchQ));
+
     // Pill nav drill-down
     if (pillFilter.worldId)
       list = list.filter((i) =>
         pillMatches(i, pillFilter.worldId, pillFilter.groupId, pillFilter.subId),
       );
-    // Legacy selects (kept live until PR 2A.4 cleanup)
-    if (filterCat) list = list.filter((i) => i.category === filterCat);
-    if (filterAllergen)
-      list = list.filter((i) => i.allergen_flags?.[filterAllergen]);
-    if (filterHaccp)
-      list = list.filter((i) => i.haccp_risk_level === filterHaccp);
-    if (filterTemp)
-      list = list.filter((i) => i.temperature_zone === filterTemp);
+
     // Sort (WTU 2A.3)
     list = [...list].sort((a, b) => {
       const av = getSortValue(a, sortField);
@@ -3432,42 +3423,14 @@ export default function HQFoodIngredients() {
       return 0;
     });
     return list;
-  }, [
-    ingredients,
-    searchQ,
-    pillFilter,
-    filterCat,
-    filterAllergen,
-    filterHaccp,
-    filterTemp,
-    sortField,
-    sortDir,
-  ]);
+  }, [ingredients, searchQ, pillFilter, sortField, sortDir]);
 
   // ── KPIs ──────────────────────────────────────────────────────────────────
+  // WTU 2A.4 — trimmed to used fields only (KPI strip handles the rest)
   const kpis = useMemo(() => {
     const total = ingredients.length;
-    const allergenCount = ingredients.filter((i) =>
-      Object.values(i.allergen_flags || {}).some(Boolean),
-    ).length;
-    const criticalHaccp = ingredients.filter(
-      (i) => i.haccp_risk_level === "critical",
-    ).length;
-    const refrigerated = ingredients.filter(
-      (i) => i.temperature_zone !== "ambient",
-    ).length;
-    const controlled = ingredients.filter(
-      (i) => i.is_controlled || i.requires_fsca_approval,
-    ).length;
     const categories = new Set(ingredients.map((i) => i.category)).size;
-    return {
-      total,
-      allergenCount,
-      criticalHaccp,
-      refrigerated,
-      controlled,
-      categories,
-    };
+    return { total, categories };
   }, [ingredients]);
 
   // ── WTU 2A.3 — sort handler ──────────────────────────────────────────────
@@ -3633,6 +3596,46 @@ export default function HQFoodIngredients() {
     downloadCSV(rowsToCSV(rows), `ingredients-${ts}.csv`);
   }
 
+  // WTU 2A.4 — tile size handler
+  function handleTileSizeChange(size) {
+    setTileSize(size);
+    try {
+      localStorage.setItem(`nuai.food-ingredients.tile-size.${tenantId}`, size);
+    } catch (_) { /* localStorage unavailable */ }
+  }
+
+  // WTU 2A.4 — inline tile size picker (single consumer, single use site)
+  function TileSizePicker({ value, onChange }) {
+    const sizes = [
+      { id: "sm", label: "S" },
+      { id: "md", label: "M" },
+      { id: "lg", label: "L" },
+    ];
+    return (
+      <div style={{ display: "inline-flex", border: `1px solid ${T.border}`, borderRadius: T.radius.smPlus, overflow: "hidden" }}>
+        {sizes.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => onChange(s.id)}
+            style={{
+              padding: "6px 10px",
+              background: value === s.id ? T.accent : T.surface,
+              color: value === s.id ? T.surface : T.ink700,
+              border: "none",
+              fontSize: T.text.sm,
+              fontWeight: value === s.id ? T.weight.semibold : T.weight.normal,
+              fontFamily: "inherit",
+              cursor: "pointer",
+            }}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
   // ─── RENDER ───────────────────────────────────────────────────────────────
   const TABS = [
     { id: "library", label: `Library (${filtered.length})` },
@@ -3794,7 +3797,7 @@ export default function HQFoodIngredients() {
             />
           </div>
 
-          {/* Filters row — smart search replaces plain input; selects retained */}
+          {/* Filters row — WTU 2A.4 — pill nav + smart search only */}
           <div
             style={{
               display: "flex",
@@ -3805,96 +3808,10 @@ export default function HQFoodIngredients() {
             }}
           >
             <FoodSmartSearch value={searchQ} onChange={setSearchQ} />
-            <select
-              value={filterCat}
-              onChange={(e) => setFilterCat(e.target.value)}
-              style={{
-                padding: "9px 12px",
-                border: `1px solid ${C.border}`,
-                borderRadius: T.radius.smPlus,
-                fontSize: T.text.smPlus,
-                fontFamily: "inherit",
-                background: C.surface,
-                flex: 1,
-                minWidth: 160,
-              }}
-            >
-              <option value="">All Categories</option>
-              {CATEGORIES.map((c) => (
-                <option key={c.key} value={c.key}>
-                  {c.icon} {c.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={filterAllergen}
-              onChange={(e) => setFilterAllergen(e.target.value)}
-              style={{
-                padding: "9px 12px",
-                border: `1px solid ${C.border}`,
-                borderRadius: T.radius.smPlus,
-                fontSize: T.text.smPlus,
-                fontFamily: "inherit",
-                background: C.surface,
-                flex: 1,
-                minWidth: 140,
-              }}
-            >
-              <option value="">All Allergens</option>
-              {ALLERGENS.map((a) => (
-                <option key={a.key} value={a.key}>
-                  {a.icon} Contains {a.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={filterHaccp}
-              onChange={(e) => setFilterHaccp(e.target.value)}
-              style={{
-                padding: "9px 12px",
-                border: `1px solid ${C.border}`,
-                borderRadius: T.radius.smPlus,
-                fontSize: T.text.smPlus,
-                fontFamily: "inherit",
-                background: C.surface,
-              }}
-            >
-              <option value="">All HACCP</option>
-              <option value="low">Low Risk</option>
-              <option value="medium">Medium Risk</option>
-              <option value="high">High Risk</option>
-              <option value="critical">Critical CCP</option>
-            </select>
-            <select
-              value={filterTemp}
-              onChange={(e) => setFilterTemp(e.target.value)}
-              style={{
-                padding: "9px 12px",
-                border: `1px solid ${C.border}`,
-                borderRadius: T.radius.smPlus,
-                fontSize: T.text.smPlus,
-                fontFamily: "inherit",
-                background: C.surface,
-              }}
-            >
-              <option value="">All Temperatures</option>
-              <option value="ambient">☀️ Ambient</option>
-              <option value="refrigerated">❄️ Refrigerated</option>
-              <option value="frozen">🧊 Frozen</option>
-            </select>
-            {(searchQ ||
-              filterCat ||
-              filterAllergen ||
-              filterHaccp ||
-              filterTemp ||
-              pillFilter.worldId) && (
+            {(searchQ || pillFilter.worldId) && (
               <button
                 onClick={() => {
                   setSearchQ("");
-                  setFilterCat("");
-                  setFilterAllergen("");
-                  setFilterHaccp("");
-                  setFilterTemp("");
                   setPillFilter({ worldId: null, groupId: null, subId: null });
                 }}
                 style={{
@@ -3960,7 +3877,7 @@ export default function HQFoodIngredients() {
             </div>
           )}
 
-          {/* View toggle + export + column picker — PR 2A.1 + 2A.3 */}
+          {/* View toggle + export + tile size + column picker — 2A.1-2A.4 */}
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: T.gap.md, gap: T.gap.sm, alignItems: "center" }}>
             <button
               type="button"
@@ -3978,6 +3895,9 @@ export default function HQFoodIngredients() {
             >
               Export CSV
             </button>
+            {viewMode === "tile" && (
+              <TileSizePicker value={tileSize} onChange={handleTileSizeChange} />
+            )}
             {viewMode === "list" && (
               <FoodColumnPicker value={colVisibility} onChange={handleColVisibilityChange} />
             )}
@@ -3990,6 +3910,7 @@ export default function HQFoodIngredients() {
               compareList={compareList}
               onSelect={setSelectedIngredient}
               HaccpBadge={HaccpBadge}
+              tileSize={tileSize}
             />
           ) : (
             <FoodListView
