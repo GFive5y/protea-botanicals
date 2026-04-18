@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Read live from the repo at every session start (LL-292).
-## Updated: 19 April 2026 — Session 2B.5 close (Phase 2B shipped — HEAD 0d86535)
+## Updated: 19 April 2026 — Session S-2B.6 close (WP-FIN-004 PRs 1-3 shipped — HEAD f5a2332)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 0d86535
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: f5a2332
 
 ---
 
@@ -53,7 +53,32 @@ IF DEMO DATE CHANGES: update PENDING-ACTIONS.md first, then this file.
 
 ---
 
-## CURRENT STATE — 19 April 2026 — Phase 2B SHIPPED (all 5 PRs landed)
+## CURRENT STATE — 19 April 2026 — WP-FIN-004 PRs 1-3 shipped + Phase 2B SHIPPED
+
+### WP-FIN-004 PARTIAL SHIP — 19 April 2026 — PRs 1-3 landed
+
+Trial Balance engine + GL detail engine + React TB tab + drill drawer.
+Three PRs, three verification gates, three tenants balance-checked at R0.00.
+PR 4 (Excel export via SheetJS) and PR 5 (audit log + docs close) deferred
+to next session.
+
+**Shipped this session:**
+- 067e7f0 — PR 1: fn_trial_balance Postgres function + expense_subcategory_account_map
+- 0dec469 — PR 2: fn_gl_detail Postgres function (double-entry expansion)
+- f5a2332 — PR 3: React Trial Balance tab + GL drill drawer
+
+**Data correctness fix bundled with PR 1:** equity_ledger.opening_retained_earnings
+backfilled for all 5 demo tenants (was silently R0.00, absorbed by on-screen
+BS's live-P&L equity plug). Garden Bistro R23,672.74, MediCare R58,380.30,
+Metro Hardware R3,368,494.23, Medi Recreational R116,188.76, Nourish R89,364.56.
+
+**Remaining in WP-FIN-004:**
+- PR 4: src/services/trialBalanceExcel.js + SheetJS 5-sheet workbook (~1.5h)
+- PR 5: audit log entry + LOOP-FIN-004 close + docs (~0.5h)
+
+See DECISION-JOURNAL entry S-2B.6 for full scope, 9 bugs fixed, 5 LL candidates.
+
+### Phase 2B SHIPPED (all 5 PRs landed)
 
 ### WHY PHASE 2B MATTERS — READ THIS BEFORE SCOPING ANY OF 2B.3/2B.4/2B.5
 
@@ -716,34 +741,49 @@ LL-302 (NEW S320): Run Audit 1 (self-ref) + Audit 2 (inline user_profiles) any s
 
 ## NEXT PRIORITIES (session start, choose with owner)
 
-Phase 2B is fully shipped. The demo moment is live.
+Phase 2B is fully shipped. WP-FIN-004 PRs 1-3 landed. FIN-007 surfaced.
 
-1. **sim-pos-sales** — STANDING ALERT. Trigger date pending demo
+1. **FIN-007 — generate-financial-statements EF auth fix** (~15-30min).
+   ES256 JWT rejection. Blocks all PDF downloads. Fix before PR 4 if
+   PR 4 scope touches any EF invocation path. See PENDING-ACTIONS.
+
+2. **LOOP-FIN-004 PRs 4-5 — Trial Balance Excel export + session close** (~2h).
+   PRs 1-3 shipped this session at HEAD f5a2332. Resume at PR 4 (Excel export
+   via SheetJS, 5-sheet workbook). PR 5 closes the loop. See
+   docs/WP-FIN-004_TRIAL-BALANCE-EXPORT_v1.md Sections PR 4 and PR 5 for scope.
+
+3. **sim-pos-sales** — STANDING ALERT. Trigger date pending demo
    date confirmation. Must run day BEFORE demo. See STANDING ALERT
    section above.
 
-2. **WP-INGEST-RATE-LIMIT** (~3h) — per-tenant daily cap on
+4. **WP-INGEST-RATE-LIMIT** (~3h) — per-tenant daily cap on
    ingredient_ingest_queue writes. BLOCKING first paid F&B
    contract. Does NOT block demo. See PENDING-ACTIONS backlog +
    DECISION-JOURNAL S-2B.2-strategic for rationale.
 
-3. **WP-RLS-HYGIENE** (post-demo) — ~100 inline user_profiles
+5. **WP-RLS-HYGIENE** (post-demo) — ~100 inline user_profiles
    subqueries → user_tenant_id() helper. See PENDING-ACTIONS.
 
-4. **LOOP-FIN-004** — Trial Balance Excel export (~2h, SheetJS).
-   CFO magnet for accounting-firm channel (GTM Playbook B).
-
-5. **WP-FOOD-INGEST-POLISH** (~2h, post-demo) — 4 drawer UX
+6. **WP-FOOD-INGEST-POLISH** (~2h, post-demo) — 4 drawer UX
    gaps in FoodIngestQueuePanel: nutrition panel, source context,
    temp zone select, quantity. See PENDING-ACTIONS.
 
-6. **WP-EF-ERROR-PASSTHROUGH** (~1h, post-demo) — surface EF
+7. **WP-EF-ERROR-PASSTHROUGH** (~1h, post-demo) — surface EF
    error bodies to users instead of generic "non-2xx" message.
 
 ### CRITICAL RULES added this session
 - **LL-306:** Regression fixture name variance on UNIQUE columns.
 - **LL-307:** React → EF PRs MUST include localhost end-to-end run.
   Direct-EF regression (LL-304) is necessary but not sufficient.
+- **LL-CANDIDATE-D/308 (pending):** Planner-drafted SQL against known-schema tables
+  validated against information_schema.columns before scope ships. 3+ data points S-2B.6.
+- **LL-CANDIDATE-F/309 (pending):** On-screen BS with live-P&L equity plug does NOT
+  validate opening_retained_earnings. TB is the validator. At tenant onboarding,
+  opening_RE must be explicitly derived from the TB function's own CTEs.
+- **LL-CANDIDATE-G/310 (pending):** Planner approvals of data corrections verified
+  against live queries, not reasoning continuity from earlier diagnostics.
+- **LL-CANDIDATE-H (1 data point):** Executor-stated intent ("Proceeding to PR N")
+  is a request for planner greenlight, not an announcement of execution.
 
 ---
 

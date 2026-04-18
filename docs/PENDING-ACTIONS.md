@@ -603,11 +603,16 @@ apply. Not code. Possibly needs legal review (R2-5k cost).
 **Reference:** DECISION-JOURNAL S-2B.2-strategic entry.
 
 ### LOOP-FIN-004 — Trial Balance Excel Export (CA working papers format)
-Status: OPEN · Nice-to-have for demo
+Status: IN PROGRESS · PRs 1-3 shipped S-2B.6 (19 April 2026) · PRs 4-5 remaining
 Priority: MEDIUM — CAs import TB into Sage/MYOB for working papers
-Fix: Add .xlsx export using existing chart_of_accounts data + journal_lines
-     Ref: WP-FINANCIALS-v1_1.md Section 7 Excel Export spec
-Effort: ~2 hours (use SheetJS in HQFinancialStatements.js)
+Progress:
+  [x] PR 1: fn_trial_balance Postgres function (067e7f0)
+  [x] PR 2: fn_gl_detail Postgres function (0dec469)
+  [x] PR 3: React tab + GL drill drawer (f5a2332)
+  [ ] PR 4: Excel export via SheetJS (~1.5h)
+  [ ] PR 5: audit log + docs close (~0.5h)
+Scope: docs/WP-FIN-004_TRIAL-BALANCE-EXPORT_v1.md
+Journal: docs/DECISION-JOURNAL.md entry S-2B.6
 
 ### LOOP-FIN-005 — Provisional Tax + Compliance Calendar display
 Status: OPEN · Post-demo backlog
@@ -704,6 +709,59 @@ pair. Reversible per-policy if anything regresses.
 
 **Reference:** LL-300 (incident), LL-301 (audit lesson), LL-302 (session-start
 audit queries).
+
+### FIN-007 — generate-financial-statements EF auth broken (ES256 unsupported)
+Status: OPEN · CRITICAL · Surfaced S-2B.6 (19 April 2026)
+Source: Owner observation during PR 3 LL-307 verification
+Symptom: "Download PDF" button on HQFinancialStatements returns 401:
+  code: UNAUTHORIZED_UNSUPPORTED_TOKEN_ALGORITHM
+  message: "Unsupported JWT algorithm ES256"
+Affects: ALL 4 IFRS statements PDF download, Email Statement feature
+NOT caused by WP-FIN-004 — EF shipped S287 at commit 95782e5, predates TB work
+Likely cause: Supabase auth gateway JWT algorithm policy migration
+Fix estimate: 15-30min (most likely supabase.functions.invoke() config)
+Blocks: any EF invocation path in PR 4 IF that path is chosen (unlikely —
+  SheetJS runs client-side). Worth verifying before PR 4 scopes.
+
+### WP-TB-PDF-APPENDIX — TB sheet in audit PDF (post-demo)
+Status: BACKLOG
+Source: WP-FIN-004 PR 1 unlocked this
+Scope: generate-financial-statements EF calls fn_trial_balance, embeds TB as page 5+
+Effort: ~2h
+
+### WP-CASEWARE-EXPORT — CaseWare-compatible CSV export (post-demo)
+Status: BACKLOG
+Source: WP-FIN-004 PRs 1-2 unlocked this
+Scope: New EF or service reusing fn_trial_balance + fn_gl_detail
+Effort: ~3h
+
+### WP-COA-MAP-UNIFY — HQProfitLoss.js reads from expense_subcategory_account_map
+Status: BACKLOG
+Source: WP-FIN-004 PR 1 (mapping table created; P&L still hardcoded)
+Scope: Migrate HQProfitLoss.js lines 43-70 to query the table
+Effort: ~1h
+
+### WP-FIN-FY-BOUNDS-UNIFY — Fix LL-297 Jan-Dec hardcode platform-wide
+Status: BACKLOG
+Source: WP-FIN-004 PR 1 diagnostic
+Scope: fn_trial_balance + HQFinancialStatements.js fyBounds() both hardcode
+  calendar year. Garden Bistro (Mar-Feb FY) is canary. Fix both consistently.
+Effort: ~2h
+
+### WP-TB-SNAPSHOT-EMPTY-STATE — Friendlier empty drawer for snapshot accounts
+Status: BACKLOG (micro)
+Source: WP-FIN-004 PR 3 LL-307 verification
+Scope: GLDrillDrawer shows "No transactions" for 12000/15000/30000/30100.
+  Replace with "Snapshot balance — see Balance Sheet for breakdown."
+Effort: ~15min (pair with PR 4)
+
+### WP-DOC-DRIFT-SWEEP — Refresh SYSTEM-GROUND-TRUTH.md
+Status: BACKLOG
+Source: WP-FIN-004 PR 1 diagnostic
+Scope: SYSTEM-GROUND-TRUTH.md claimed equity_ledger.net_profit_for_year NULL
+  for all tenants; MediCare was populated per S288 LL-273. Audit doc for
+  other stale claims.
+Effort: ~1h
 
 ### WATCH-012 — financial_statement_notes legacy hq_all_ policy
 Status: OPEN · LOW priority
