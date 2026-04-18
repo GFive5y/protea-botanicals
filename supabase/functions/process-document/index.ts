@@ -1,8 +1,15 @@
 // supabase/functions/process-document/index.ts
+// v2.3 — WTU 2B: food_beverage ingredient extraction + ingredient_ingest_queue write
+//   NEW: industry_profile === 'food_beverage' adds F&B ingredient extraction to prompt
+//   NEW: proposed_updates action 'create_food_ingredient' writes to ingredient_ingest_queue
+//   NEW: classifyIngredientSourceType() maps capture_type -> queue source_type
+//   NEW: response includes queued_ingredient_ids[] + queued_ingredient_count
+//   PRESERVED: all v61 behavior for cannabis_retail, cannabis_dispensary, general_retail
+//   PRESERVED: 7-point SA bank fingerprint, SARS compliance, dedup, lump-sum, expense classifier
 // v2.2 — P3-C: VAT auto-fill — vat_amount/amount_excl_vat extraction + supplier VAT override
 // v2.1 — WP-SMART-CAPTURE: Anti-fraud — SA bank identifier extraction + 6-level document fingerprinting
 //   extractUniqueIdentifiers(): UTI/TRN REF/TXN ID (all SA banks), Auth Code, Receipt No, ECHO, Merchant
-//   buildDocumentFingerprint(): 6-level: UTI → Auth+Date → ECHO+Merchant → Receipt+Merchant+Date → Receipt+Date → Composite
+//   buildDocumentFingerprint(): 6-level: UTI — Auth+Date — ECHO+Merchant — Receipt+Merchant+Date — Receipt+Date — Composite
 //   checkDuplicateDocument(): image hash + fingerprint match against document_log
 // v2.0 — WP-SMART-CAPTURE: SARS tax invoice compliance check + capture type classifier
 // v1.9 — WP-FIN S3: Expense document detection + create_expense action
@@ -31,7 +38,7 @@ const JSON_HEADERS = {
   "Content-Type": "application/json",
 };
 
-// ── WP-FIN S0: Lump-sum invoice cost allocation ───────────────────────────────
+// —— WP-FIN S0: Lump-sum invoice cost allocation ————————————————————————————
 function allocateLumpSumCosts(
   ext: Record<string, unknown>,
   pos: Array<Record<string, unknown>>,
@@ -119,31 +126,18 @@ function allocateLumpSumCosts(
   };
 }
 
-// ── WP-FIN S3: Expense document classifier ────────────────────────────────────
-// Detects non-stock invoices and adds create_expense to proposed_updates.
-// Runs AFTER Claude parse and lump-sum allocation.
-//
-// CAPEX keywords: lab equipment, machinery, hardware assets, tools
-// OPEX keywords: services, freight, rent, utilities, subscriptions, professional fees
-//
-// Does NOT create expense if:
-//   - Document already has receive_delivery_item (it's a stock invoice)
-//   - proposed_updates already contains create_expense (Claude already classified it)
-//   - No total_amount extracted
+// —— WP-FIN S3: Expense document classifier ——————————————————————————————————
 function classifyExpenseDocument(
   ext: Record<string, unknown>,
   usdZarRate: number,
 ): Record<string, unknown> {
   const updates =
     (ext.proposed_updates as Array<Record<string, unknown>>) || [];
-  const docType = String(ext.document_type || "unknown").toLowerCase();
   const totalAmount = Number(ext.total_amount ?? 0);
 
-  // Skip if no amount or already has expense action
   if (!totalAmount) return ext;
   if (updates.some((u) => u.action === "create_expense")) return ext;
 
-  // Skip if this is a stock-receiving document
   const hasStockActions = updates.some((u) =>
     ["receive_delivery_item", "create_inventory_item"].includes(
       String(u.action),
@@ -151,17 +145,14 @@ function classifyExpenseDocument(
   );
   if (hasStockActions) return ext;
 
-  // Skip if it's a PO for stock items (has create_purchase_order with items that have supplier_product_id)
   const poAction = updates.find((u) => u.action === "create_purchase_order");
   if (poAction) {
     const poData = (poAction.data as Record<string, unknown>) || {};
     const items = (poData.items as Array<Record<string, unknown>>) || [];
-    // If PO has supplier products (terpenes, hardware) — it's a stock PO, not an expense
     if (items.length > 0 && items.some((i) => i.supplier_product_id))
       return ext;
   }
 
-  // ── Classify expense type from line items + document content ──────────────
   const lineItems = (ext.line_items as Array<Record<string, unknown>>) || [];
   const allText = [
     ...lineItems.map((l) => String(l.description || l.name || "")),
@@ -171,110 +162,33 @@ function classifyExpenseDocument(
     .join(" ")
     .toLowerCase();
 
-  // CAPEX indicators — lab equipment, machinery, tools, assets
   const capexKeywords = [
-    "stirrer",
-    "hot plate",
-    "pipette",
-    "beaker",
-    "flask",
-    "centrifuge",
-    "microscope",
-    "balance",
-    "scale",
-    "filtration",
-    "extraction equipment",
-    "lab equipment",
-    "laboratory equipment",
-    "heating",
-    "cooling",
-    "pump",
-    "reactor",
-    "rotary evaporator",
-    "spectrophotometer",
-    "ph meter",
-    "autoclave",
-    "incubator",
-    "refrigerator",
-    "freezer",
-    "oven",
-    "magnetic",
-    "heating block",
-    "distillation",
-    "vacuum pump",
-    "computer",
-    "laptop",
-    "printer",
-    "scanner",
-    "camera",
-    "server",
-    "vehicle",
-    "machinery",
-    "equipment",
-    "apparatus",
-    "instrument",
-    "tool",
-    "fixture",
-    "furniture",
-    "shelving",
-    "racking",
-    "storage unit",
-    "air conditioner",
-    "generator",
-    "solar",
-    "inverter",
-    "ups",
+    "stirrer", "hot plate", "pipette", "beaker", "flask", "centrifuge",
+    "microscope", "balance", "scale", "filtration", "extraction equipment",
+    "lab equipment", "laboratory equipment", "heating", "cooling", "pump",
+    "reactor", "rotary evaporator", "spectrophotometer", "ph meter",
+    "autoclave", "incubator", "refrigerator", "freezer", "oven", "magnetic",
+    "heating block", "distillation", "vacuum pump", "computer", "laptop",
+    "printer", "scanner", "camera", "server", "vehicle", "machinery",
+    "equipment", "apparatus", "instrument", "tool", "fixture", "furniture",
+    "shelving", "racking", "storage unit", "air conditioner", "generator",
+    "solar", "inverter", "ups",
   ];
 
-  // OPEX indicators — services, running costs
   const opexKeywords = [
-    "freight",
-    "logistics",
-    "shipping",
-    "courier",
-    "transport",
-    "delivery fee",
-    "rent",
-    "rental",
-    "lease",
-    "utilities",
-    "electricity",
-    "water",
-    "internet",
-    "hosting",
-    "subscription",
-    "software",
-    "licence",
-    "license",
-    "saas",
-    "accounting",
-    "audit",
-    "legal",
-    "attorney",
-    "consulting",
-    "marketing",
-    "advertising",
-    "printing",
-    "cleaning",
-    "security",
-    "insurance",
-    "bank charges",
-    "transaction fee",
-    "payment processing",
-    "travel",
-    "accommodation",
-    "fuel",
-    "国际物流",
-    "物流",
-    "freight",
-    "logistic",
-    "shenzhen",
+    "freight", "logistics", "shipping", "courier", "transport", "delivery fee",
+    "rent", "rental", "lease", "utilities", "electricity", "water", "internet",
+    "hosting", "subscription", "software", "licence", "license", "saas",
+    "accounting", "audit", "legal", "attorney", "consulting", "marketing",
+    "advertising", "printing", "cleaning", "security", "insurance",
+    "bank charges", "transaction fee", "payment processing", "travel",
+    "accommodation", "fuel",
+    "\u56fd\u9645\u7269\u6d41", "\u7269\u6d41", "freight", "logistic", "shenzhen",
   ];
 
   let category = "opex";
   let subcategory = "Other";
 
-  // Score capex vs opex
   const capexScore = capexKeywords.filter((k) => allText.includes(k)).length;
   const opexScore = opexKeywords.filter((k) => allText.includes(k)).length;
 
@@ -296,13 +210,8 @@ function classifyExpenseDocument(
       opexKeywords.filter(
         (k) =>
           [
-            "freight",
-            "logistics",
-            "shipping",
-            "courier",
-            "transport",
-            "物流",
-            "shenzhen",
+            "freight", "logistics", "shipping", "courier", "transport",
+            "\u7269\u6d41", "shenzhen",
           ].includes(k) && allText.includes(k),
       ).length > 0
     )
@@ -338,7 +247,6 @@ function classifyExpenseDocument(
       subcategory = "Shipping";
   }
 
-  // Convert to ZAR
   const currency = String(ext.currency || "ZAR").toUpperCase();
   let amountZar = totalAmount;
   let amountForeign: number | null = null;
@@ -350,15 +258,14 @@ function classifyExpenseDocument(
     amountZar = Math.round(totalAmount * usdZarRate * 100) / 100;
   } else if (currency === "EUR") {
     amountForeign = totalAmount;
-    fxRateUsed = usdZarRate * 1.08; // rough EUR/ZAR
+    fxRateUsed = usdZarRate * 1.08;
     amountZar = Math.round(totalAmount * fxRateUsed * 100) / 100;
   } else if (currency === "CNY") {
     amountForeign = totalAmount;
-    fxRateUsed = usdZarRate / 7.2; // rough CNY/ZAR
+    fxRateUsed = usdZarRate / 7.2;
     amountZar = Math.round(totalAmount * fxRateUsed * 100) / 100;
   }
 
-  // Build description from line items or supplier name
   let description =
     lineItems.length > 0
       ? lineItems
@@ -369,7 +276,7 @@ function classifyExpenseDocument(
       : String((ext.supplier as Record<string, unknown>)?.name || "Expense");
 
   if (!description || description.length < 3) {
-    description = `${category === "capex" ? "Equipment purchase" : "Business expense"} — ${String((ext.supplier as Record<string, unknown>)?.name || "supplier")}`;
+    description = `${category === "capex" ? "Equipment purchase" : "Business expense"} \u2014 ${String((ext.supplier as Record<string, unknown>)?.name || "supplier")}`;
   }
 
   const expenseDate = String(
@@ -397,8 +304,7 @@ function classifyExpenseDocument(
     confidence: Math.min(Number(ext.confidence ?? 0.8), 0.85),
   };
 
-  // Note added to extraction
-  const expenseNote = `Expense detected: ${category.toUpperCase()} — ${description.slice(0, 60)} — R${amountZar.toFixed(2)}${currency !== "ZAR" ? ` (${currency} ${totalAmount})` : ""}`;
+  const expenseNote = `Expense detected: ${category.toUpperCase()} \u2014 ${description.slice(0, 60)} \u2014 R${amountZar.toFixed(2)}${currency !== "ZAR" ? ` (${currency} ${totalAmount})` : ""}`;
 
   return {
     ...ext,
@@ -411,17 +317,15 @@ function classifyExpenseDocument(
   };
 }
 
-// ── WP-SMART-CAPTURE v2.1: SA Bank Identifier Extractor ──────────────────────
+// —— WP-SMART-CAPTURE v2.1: SA Bank Identifier Extractor ——————————————————————
 function extractUniqueIdentifiers(rawText: string, _ext: Record<string,unknown>): Record<string,string|null> {
   const ids: Record<string,string|null> = {};
   const t = (rawText||"").replace(/\r?\n/g," ");
-  // UTI — standard hyphenated + FNB TRN REF + StdBank TXN ID
   const utiStd = t.match(/\bUTI\s*[:\-]?\s*([A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{12,20})\b/i);
   const utiFNB = t.match(/\bTRN\s+REF\s*[:\-]?\s*([A-Z0-9]{12,40})\b/i)||t.match(/\bTRANSACTION\s+REF(?:ERENCE)?\s*[:\-]?\s*([A-Z0-9]{12,40})\b/i);
   const utiStdB = t.match(/\bTXN\s+(?:ID|REF)\s*[:\-]?\s*([A-Z0-9]{12,40})\b/i);
   const utiRaw = utiStd?.[1]||utiFNB?.[1]||utiStdB?.[1]||null;
   if (utiRaw) ids.uti = utiRaw.toUpperCase().trim();
-  // Auth Code — all SA banks
   for (const p of [/\bAuth(?:or(?:is|iz)ation)?\s+Code\s*[:\-]?\s*([A-Z0-9]{6})\b/i,/\bAUTH\s*[:\-]?\s*([A-Z0-9]{6})\b/i,/\bApproval\s+Code\s*[:\-]?\s*([A-Z0-9]{6})\b/i]) {
     const m = t.match(p); if (m) { ids.auth_code = m[1].toUpperCase(); break; }
   }
@@ -446,7 +350,7 @@ function extractUniqueIdentifiers(rawText: string, _ext: Record<string,unknown>)
   return ids;
 }
 
-// ── WP-SMART-CAPTURE v2.1: 6-Level Document Fingerprint ──────────────────────
+// —— WP-SMART-CAPTURE v2.1: 6-Level Document Fingerprint ——————————————————————
 function buildDocumentFingerprint(ext: Record<string,unknown>, ids: Record<string,string|null>, _ct: string): {fingerprint:string;confidence:number;level:number} {
   const vendor = String((ext.supplier as Record<string,unknown>)?.name||"").toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,30);
   const date = String((ext.reference as Record<string,unknown>)?.date||"").trim();
@@ -461,7 +365,7 @@ function buildDocumentFingerprint(ext: Record<string,unknown>, ids: Record<strin
   return {fingerprint:"",confidence:0,level:0};
 }
 
-// ── WP-SMART-CAPTURE v2.1: Duplicate Document Checker ────────────────────────
+// —— WP-SMART-CAPTURE v2.1: Duplicate Document Checker ————————————————————————
 async function checkDuplicateDocument(
   db: ReturnType<typeof createClient>, tenantId: string|null, fingerprint: string, fpLevel: number, imageHash: string, currentDocId: string
 ): Promise<{isDuplicate:boolean;duplicateOf:string|null;duplicateConfidence:number;matchType:string;duplicateDetails:Record<string,unknown>}> {
@@ -485,7 +389,7 @@ async function checkDuplicateDocument(
   return empty;
 }
 
-// ── WP-SMART-CAPTURE v2.0: SARS Tax Invoice Compliance Checker ───────────────
+// —— WP-SMART-CAPTURE v2.0: SARS Tax Invoice Compliance Checker ———————————————
 function checkSarsCompliance(ext: Record<string, unknown>): {
   sars_compliant: boolean; sars_flags: Array<{ code: string; message: string; severity: string }>;
   input_vat_claimable: boolean; input_vat_amount: number; sars_vat_number: string | null;
@@ -508,13 +412,12 @@ function checkSarsCompliance(ext: Record<string, unknown>): {
   if (!hasDesc)flags.push({code:"NO_DESCRIPTION",message:"No line items found.",severity:"warning"});
   if (vat<=0&&total>0) flags.push({code:"NO_VAT_AMOUNT",message:"VAT not separately stated.",severity:"info"});
   const ok = vatOk && hasDate && hasDesc;
-  // Prefer explicit vat_amount from extraction; only fallback to 15/115 if none provided
   const explicitVat = Number((ext as Record<string,unknown>).vat_amount || 0);
   const amt = ok ? (explicitVat > 0 ? explicitVat : (vat > 0 ? vat : Math.round((total*15/115)*100)/100)) : 0;
   return { sars_compliant:ok, sars_flags:flags, input_vat_claimable:ok&&amt>0, input_vat_amount:amt, sars_vat_number:vatOk?raw:null };
 }
 
-// ── WP-SMART-CAPTURE v2.0: Capture type classifier ───────────────────────────
+// —— WP-SMART-CAPTURE v2.0: Capture type classifier ——————————————————————————
 function classifyCaptureType(ext: Record<string, unknown>): string {
   const dt = String(ext.document_type||"unknown").toLowerCase();
   const sn = String((ext.supplier as Record<string,unknown>)?.name||"").toLowerCase();
@@ -531,7 +434,27 @@ function classifyCaptureType(ext: Record<string, unknown>): string {
   return ta>0&&ta<2000 ? "expense_receipt" : "supplier_invoice";
 }
 
-// ── System prompt ─────────────────────────────────────────────────────────────
+// —— WTU 2B v2.3: F&B ingredient source type classifier ——————————————————————
+// Maps the capture_type (from classifyCaptureType) + document_type hint to the
+// ingredient_ingest_queue.source_type enum values.
+function classifyIngredientSourceType(
+  ext: Record<string, unknown>,
+  captureType: string,
+): string {
+  if (captureType === "lab_report") return "coa";
+  if (captureType === "delivery_note") return "invoice";
+  const docType = String(ext.document_type || "").toLowerCase();
+  if (docType === "invoice") return "invoice";
+  if (docType === "spec_sheet") return "spec_sheet";
+  if (docType === "label_photo") return "label_photo";
+  if (docType === "recipe_pdf" || docType === "recipe") return "recipe_pdf";
+  const fileName = String(ext.file_name || "").toLowerCase();
+  if (fileName.startsWith("manual_paste:")) return "manual_paste";
+  if (fileName.startsWith("url:")) return "url";
+  return "invoice"; // conservative default
+}
+
+// —— System prompt —————————————————————————————————————————————————————————————
 function buildSystemPrompt(
   existingSuppliers: unknown[],
   existingProducts: unknown[],
@@ -546,12 +469,134 @@ function buildSystemPrompt(
         ? "general retail business (finished goods, accessories, packaging)"
         : "cannabis extract company (terpenes, hardware, distillate, packaging)";
 
+  // WTU 2B v2.3: F&B ingredient extraction context — only emitted for food_beverage tenants
+  const foodIngredientContext =
+    industryProfile !== "food_beverage"
+      ? ""
+      : `
+
+=======================================================
+FOOD & BEVERAGE INGREDIENT EXTRACTION (industry_profile=food_beverage)
+=======================================================
+When processing documents for food_beverage tenants, emit create_food_ingredient
+actions IN ADDITION TO (never instead of) any create_purchase_order, receive_delivery_item,
+or create_expense actions. A 12-item Premier Foods invoice produces 12
+create_food_ingredient actions PLUS a single create_purchase_order. The ingredient
+actions describe the physical product; the PO describes the commercial transaction.
+
+SA REGULATORY CONTEXT:
+Regulation R638 of 2018 (Foodstuffs, Cosmetics and Disinfectants Act) mandates
+allergen disclosure for 14 controlled allergens. Emit allergen_flags as a map
+keyed by: gluten, crustaceans, eggs, fish, peanuts, soybeans, milk, nuts,
+celery, mustard, sesame, sulphites, lupin, molluscs. Set each key to true if
+EITHER the document declares it OR the category intrinsically contains it:
+wheat/rye/barley products = gluten=true; any cheese/butter/milk product = milk=true;
+any nut product = nuts=true; eggs and egg powders = eggs=true; any fish or
+seafood = fish=true (with crustaceans/molluscs=true as appropriate).
+
+TYPICAL SA F&B SUPPLIERS (for name matching):
+Premier Foods, Pioneer Foods, Tiger Brands, RCL Foods, Clover, Parmalat, Spekko,
+Tastic, I&J, Sea Harvest, Rainbow Chickens, Woolworths Wholesale, Makro Commercial,
+Bidvest, Vector Logistics.
+
+REQUIRED sub_category values (MUST be one of these 28 exactly):
+  protein_red_meat       - beef, lamb, pork, venison, offal
+  protein_poultry        - chicken, turkey, duck, poultry offal
+  protein_fish           - fresh/frozen finfish (hake, salmon, kingklip)
+  protein_seafood        - prawns, calamari, mussels, shellfish
+  protein_charcuterie    - ham, salami, bacon, cured meats
+  dairy_butter           - butter, ghee, clarified butter
+  dairy_cream            - fresh cream, sour cream, creme fraiche
+  dairy_cheese           - hard/soft cheeses, cheese powders
+  dairy_eggs             - whole eggs, egg whites, egg powders
+  dairy_milk             - fresh milk, UHT, milk powder
+  dairy_yoghurt          - plain/flavoured yoghurts, kefir
+  produce_vegetables     - onions, potatoes, carrots, root + allium veg
+  produce_leaves         - lettuce, spinach, rocket, herbs, micro-greens
+  produce_aromatics      - garlic, ginger, chilli, lemongrass
+  produce_fruit          - apples, citrus, berries, stone fruit
+  dry_goods_grains       - rice, pasta, quinoa, polenta, couscous
+  dry_goods_flour        - wheat flour, cake flour, bread flour, semolina
+  dry_goods_sugar        - white, brown, icing, castor, syrups, honey
+  dry_goods_spices       - salt, pepper, curry mixes, whole + ground spice
+  dry_goods_canned       - canned tomatoes, beans, legumes, preserves
+  oils_condiments        - sunflower, olive, vinegars, sauces, mustards
+  stocks_bases           - stock cubes, pastes, bouillon, demi-glace
+  flavourings_aromatics  - vanilla, extracts, essences, liquid smoke
+  bakery_bread           - pre-made breads, buns, wraps, crumbs
+  beverages_hot          - coffee, tea, cocoa, hot chocolate mixes
+  beverages_cold         - juices, softs, cordials, mixers, sparkling
+  packaging_disposables  - takeaway containers, cutlery, napkins, foil
+  cleaning_chemicals     - sanitiser, degreaser, dishwash, floor cleaner
+
+ENUM CONSTRAINTS:
+  temperature_zone   - ambient | refrigerated | frozen | hot
+  shelf_life_days    - integer or null. Defaults:
+                        refrigerated proteins 3, refrigerated produce 7,
+                        frozen 90, dry ambient 180, canned 365
+  haccp_risk_level   - low | medium | high | critical
+                        Heuristic: raw meat/poultry/seafood = high or critical;
+                        dairy = medium; dry goods ambient = low;
+                        ready-to-eat cooked items = high
+  default_unit       - kg | g | L | ml | each
+  country_of_origin  - ISO alpha-2 code; default "ZA" unless document says otherwise
+
+FULL create_food_ingredient EXAMPLE (Sasko cake flour):
+{
+  "action": "create_food_ingredient",
+  "table": "ingredient_ingest_queue",
+  "record_id": null,
+  "description": "Stage food ingredient: Sasko cake flour 12.5 kg",
+  "data": {
+    "name": "Cake flour",
+    "brand": "Sasko",
+    "sub_category": "dry_goods_flour",
+    "pack_size": "12.5 kg",
+    "supplier_name": "Premier Foods",
+    "cost": 189.50,
+    "default_unit": "kg",
+    "temperature_zone": "ambient",
+    "shelf_life_days": 365,
+    "haccp_risk_level": "low",
+    "allergen_flags": {
+      "gluten": true, "crustaceans": false, "eggs": false, "fish": false,
+      "peanuts": false, "soybeans": false, "milk": false, "nuts": false,
+      "celery": false, "mustard": false, "sesame": false, "sulphites": false,
+      "lupin": false, "molluscs": false
+    },
+    "nutrition_per_100g": {
+      "energy_kj": 1480, "protein_g": 10.2, "carbs_g": 72.4, "sugar_g": 0.3,
+      "fat_g": 1.2, "saturated_fat_g": 0.2, "fibre_g": 3.1, "sodium_mg": 2,
+      "salt_g": 0.005
+    },
+    "country_of_origin": "ZA",
+    "coa_reference_number": null,
+    "field_confidence": {
+      "name": 0.98, "brand": 0.96, "sub_category": 0.94, "pack_size": 0.95,
+      "cost": 0.92, "allergen_flags": 0.88, "haccp_risk_level": 0.80,
+      "nutrition_per_100g": 0.70
+    }
+  },
+  "confidence": 0.88
+}
+
+EXTRACTION RULES:
+1. Emit ONE create_food_ingredient per distinct ingredient on the document.
+2. The same invoice CAN produce BOTH ingredient actions AND create_purchase_order - they are additive, not mutually exclusive.
+3. OMIT nutrition_per_100g entirely if the nutrition panel is not visible. Do NOT guess nutrition values.
+4. Emit allergen_flags based on intrinsic containment even when no allergen panel is printed (wheat flour = gluten=true without needing a declaration).
+5. Per-field confidence must be 0.0-1.0 and honest - a value you guessed should be 0.3-0.5, a value printed clearly should be 0.90+.
+6. sub_category MUST be one of the 28 enum values above - exact string match, lowercase, underscores as shown.
+7. If sub_category is genuinely unclear from the document, emit null and set field_confidence.sub_category = 0.3.
+8. NEVER set is_seeded, is_active, or tenant_id in the data payload - the backend populates these on queue write.
+`;
+
   return `You are a document extraction engine for a ${industryContext} in South Africa.
 Extract ALL structured data from business documents and propose specific database updates.
 You MUST respond with ONLY valid JSON - no markdown, no code fences, no explanation, no preamble.
 
 DOCUMENT TYPES (detect from content):
-invoice | quote | proof_of_payment | delivery_note | coa | price_list | stock_sheet | contract | unknown
+invoice | quote | proof_of_payment | delivery_note | coa | price_list | stock_sheet | contract | spec_sheet | label_photo | recipe_pdf | unknown
 
 EXISTING SUPPLIERS IN SYSTEM:
 ${JSON.stringify(existingSuppliers, null, 2)}
@@ -586,12 +631,12 @@ RESPOND EXACTLY in this JSON structure:
 VAT EXTRACTION RULES
 =======================================================
 If the document explicitly states a VAT amount (e.g. "VAT: R228.26"):
-  → set "vat_amount" to that exact figure
-  → set "amount_excl_vat" to total_amount minus vat_amount
+  - set "vat_amount" to that exact figure
+  - set "amount_excl_vat" to total_amount minus vat_amount
 If VAT is NOT explicitly stated on the document:
-  → set "vat_amount" to 0
-  → set "amount_excl_vat" to 0
-Do NOT calculate VAT yourself — only extract what the document shows.
+  - set "vat_amount" to 0
+  - set "amount_excl_vat" to 0
+Do NOT calculate VAT yourself - only extract what the document shows.
 The backend will apply the 15/115 formula when needed.
 
 =======================================================
@@ -601,20 +646,20 @@ If the document contains ANY line items, suppliers, payments, or quantities,
 you MUST produce at least one proposed_update.
 
 =======================================================
-EXPENSE DOCUMENT DETECTION — WP-FIN S3
+EXPENSE DOCUMENT DETECTION - WP-FIN S3
 =======================================================
 When the document is an invoice or payment for NON-STOCK items
 (equipment, services, rent, utilities, freight, professional fees),
 propose create_expense action.
 
-CAPEX (capital expenditure — assets owned by the business):
+CAPEX (capital expenditure - assets owned by the business):
   - Lab equipment: stirrers, pipettes, beakers, centrifuges, balances
   - Machinery: extraction equipment, pumps, reactors, filtration units
   - Electronics: computers, servers, printers, cameras
   - Furniture, shelving, racking, storage units
   - Vehicles, air conditioners, generators, solar/inverter systems
 
-OPEX (operating expenses — recurring business costs):
+OPEX (operating expenses - recurring business costs):
   - Freight, logistics, shipping, courier, transport fees
   - Rent, lease, utilities, electricity, water, internet
   - Software subscriptions, hosting, SaaS tools
@@ -626,7 +671,7 @@ RULE: If the invoice contains BOTH stock items (terpenes, hardware) AND
   create_purchase_order (for stock) AND create_expense (for freight separately).
 
 RULE: Payment confirmations (Stripe, AliPay, bank transfer screenshots) for
-  non-stock payments → create_expense. For stock payments → skip (PO flow handles it).
+  non-stock payments - create_expense. For stock payments - skip (PO flow handles it).
 
 =======================================================
 create_expense EXAMPLE:
@@ -640,7 +685,7 @@ create_expense EXAMPLE:
     "expense_date": "2026-02-09",
     "category": "capex",
     "subcategory": "Equipment",
-    "description": "SH-2 Magnetic Stirrer Hot Plate with Stand (Heating & Stirring) — Takealot",
+    "description": "SH-2 Magnetic Stirrer Hot Plate with Stand (Heating & Stirring) - Takealot",
     "amount_zar": 1750.00,
     "currency": "ZAR",
     "amount_foreign": null,
@@ -655,12 +700,12 @@ create_expense for foreign currency (AliPay/Stripe freight):
   "action": "create_expense",
   "table": "expenses",
   "record_id": null,
-  "description": "Create opex expense: Freight — Shenzhen logistics CNY 742.63",
+  "description": "Create opex expense: Freight - Shenzhen logistics CNY 742.63",
   "data": {
     "expense_date": "2026-02-03",
     "category": "opex",
     "subcategory": "Shipping",
-    "description": "International freight — 深圳市东方鸿国际物流有限公司",
+    "description": "International freight",
     "amount_zar": 1543.00,
     "currency": "CNY",
     "amount_foreign": 742.63,
@@ -674,15 +719,15 @@ create_expense for foreign currency (AliPay/Stripe freight):
 FOR EVERY DOCUMENT TYPE:
 =======================================================
 
-INVOICE / QUOTE — STOCK ITEMS (terpenes, hardware, raw materials):
+INVOICE / QUOTE - STOCK ITEMS (terpenes, hardware, raw materials):
   1. create_purchase_order
   2. update_product_price (matched products, price > 0)
   3. create_supplier_product (unmatched products)
 
-INVOICE / QUOTE — EXPENSE ITEMS (equipment, services, freight):
+INVOICE / QUOTE - EXPENSE ITEMS (equipment, services, freight):
   1. create_expense (category: capex or opex based on item type)
 
-INVOICE — MIXED (stock + freight charge on same invoice):
+INVOICE - MIXED (stock + freight charge on same invoice):
   1. create_purchase_order (for stock items)
   2. create_expense (for freight/delivery charge line)
 
@@ -700,12 +745,12 @@ COA / LAB REPORT:
 =======================================================
 PRODUCT MATCHING RULES
 =======================================================
-STEP 1 — Search existing_products by name similarity.
-STEP 2 — If MATCHED: update_product_price (not free sample). No create_supplier_product.
-STEP 3 — If NOT MATCHED: create_supplier_product.
+STEP 1 - Search existing_products by name similarity.
+STEP 2 - If MATCHED: update_product_price (not free sample). No create_supplier_product.
+STEP 3 - If NOT MATCHED: create_supplier_product.
 
 =======================================================
-GENERAL RETAIL — create_inventory_item + create_stock_movement
+GENERAL RETAIL - create_inventory_item + create_stock_movement
 =======================================================
 For non-cannabis supplier invoices where no PO exists and items not in inventory:
   create_inventory_item + create_stock_movement as a PAIR per new SKU.
@@ -715,20 +760,20 @@ SUPPLIER MATCHING
 =======================================================
 Match suppliers by name similarity to EXISTING SUPPLIERS list.
 Non-English documents: translate extracted data to English.
-Currencies: R/ZAR = ZAR, $ = USD, ¥/CNY = CNY, € = EUR.
+Currencies: R/ZAR = ZAR, $ = USD, CNY = CNY, EUR = EUR.
 
 EXAMPLES:
-create_purchase_order — same as before (invoice/quote for stock items)
-receive_delivery_item — same as before (delivery note)
-update_po_status — same as before (delivery note)
-update_product_price — same as before (matched product, price > 0)
-create_supplier_product — same as before (unmatched product)
-create_inventory_item + create_stock_movement — same as before (general retail)
+create_purchase_order - same as before (invoice/quote for stock items)
+receive_delivery_item - same as before (delivery note)
+update_po_status - same as before (delivery note)
+update_product_price - same as before (matched product, price > 0)
+create_supplier_product - same as before (unmatched product)
+create_inventory_item + create_stock_movement - same as before (general retail)
 
-supplier_products.category must be: hardware OR terpene (lowercase, no plural)`;
+supplier_products.category must be: hardware OR terpene (lowercase, no plural)${foodIngredientContext}`;
 }
 
-// ── Main handler ──────────────────────────────────────────────────────────────
+// —— Main handler ——————————————————————————————————————————————————————————————
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });
@@ -835,13 +880,14 @@ CRITICAL REMINDERS:
 2. For stock invoices/quotes: ALWAYS create create_purchase_order.
 3. For expense invoices (equipment, services, freight, rent): propose create_expense.
 4. For MIXED invoices (stock + freight charge): create BOTH create_purchase_order AND create_expense.
-5. Payment confirmations (Stripe, AliPay, bank transfer) for non-stock → create_expense.
+5. Payment confirmations (Stripe, AliPay, bank transfer) for non-stock - create_expense.
 6. For delivery notes: use receive_delivery_item + update_po_status.
 7. For COA/lab reports: use update_batch_coa.
 8. For general retail invoices (no PO): use create_inventory_item + create_stock_movement pairs.
-9. Detect currency correctly: R/ZAR=ZAR, $=USD, ¥=CNY, €=EUR.
+9. Detect currency correctly: R/ZAR=ZAR, $=USD, CNY=CNY, EUR=EUR.
 10. Non-English documents (Chinese, etc.): translate extracted data to English.
-11. Extract vat_amount and amount_excl_vat ONLY if explicitly stated on the document. If not shown, set both to 0.`,
+11. Extract vat_amount and amount_excl_vat ONLY if explicitly stated on the document. If not shown, set both to 0.
+12. FOR FOOD & BEVERAGE TENANTS: if the document contains food ingredient spec data, emit create_food_ingredient actions (see system prompt for sub_category enum and allergen rules). One action per distinct ingredient. These are ADDITIVE to create_purchase_order, not replacements.`,
       },
     ];
 
@@ -915,9 +961,9 @@ CRITICAL REMINDERS:
         const dup = existingConfirmed[0];
         const dupDate = new Date(dup.confirmed_at).toLocaleDateString("en-ZA");
         const dupWarning =
-          `⚠ DUPLICATE INVOICE DETECTED: Reference "${refNumber}" was already ` +
+          `\u26A0 DUPLICATE INVOICE DETECTED: Reference "${refNumber}" was already ` +
           `confirmed on ${dupDate} (file: ${dup.file_name}). ` +
-          `Do NOT confirm any stock movement actions — this will create duplicate inventory entries.`;
+          `Do NOT confirm any stock movement actions \u2014 this will create duplicate inventory entries.`;
         (extraction.warnings as string[]).push(dupWarning);
         extraction.potential_duplicate = true;
         extraction.confidence = Math.min(
@@ -940,7 +986,7 @@ CRITICAL REMINDERS:
       capture_type:        captureType,
     };
 
-    // P3-C: Supplier VAT override — if matched supplier is explicitly not VAT-registered, block input VAT
+    // P3-C: Supplier VAT override
     const matchedSupplierId = (extraction.supplier as Record<string,unknown>)?.matched_id;
     if (matchedSupplierId) {
       const matchedSupplier = existingSuppliers.find((s: Record<string,unknown>) => s.id === matchedSupplierId);
@@ -1021,6 +1067,48 @@ CRITICAL REMINDERS:
       extraction.confidence = Math.min(Number(extraction.confidence??1), 0.15);
     }
 
+    // WTU 2B v2.3: F&B ingredient queue write
+    let queuedIngredientIds: string[] = [];
+    if (industryProfile === "food_beverage" && tenant_id) {
+      const updates = (extraction.proposed_updates as Array<Record<string, unknown>>) || [];
+      const ingredientActions = updates.filter(
+        (u) => u.action === "create_food_ingredient",
+      );
+      if (ingredientActions.length > 0) {
+        const sourceType = classifyIngredientSourceType(
+          { ...extraction, file_name },
+          captureType,
+        );
+        const queueInserts = ingredientActions.map((action) => {
+          const data = (action.data as Record<string, unknown>) || {};
+          return {
+            tenant_id,
+            source_document_id: logEntry.id,
+            source_type: sourceType,
+            ai_extracted_data: data,
+            suggested_sub_category: (data.sub_category as string) || null,
+            suggested_allergens: data.allergen_flags || null,
+            suggested_haccp_level: (data.haccp_risk_level as string) || null,
+            confidence_score: Number(action.confidence ?? 0.8),
+            status: "pending" as const,
+          };
+        });
+        const { data: queueRows, error: queueErr } = await db
+          .from("ingredient_ingest_queue")
+          .insert(queueInserts)
+          .select("id");
+        if (queueErr) {
+          console.error("[process-document v62] queue insert failed:", queueErr);
+          if (!extraction.warnings) extraction.warnings = [];
+          (extraction.warnings as string[]).push(
+            `Failed to stage ${ingredientActions.length} ingredient(s) for review: ${queueErr.message}. Document logged but ingredients not queued.`
+          );
+        } else {
+          queuedIngredientIds = (queueRows || []).map((r) => r.id as string);
+        }
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success:             true,
@@ -1041,6 +1129,8 @@ CRITICAL REMINDERS:
         duplicate_confidence:  dupResult.duplicateConfidence,
         duplicate_match_type:  dupResult.matchType,
         duplicate_details:     dupResult.duplicateDetails,
+        queued_ingredient_ids:   queuedIngredientIds,
+        queued_ingredient_count: queuedIngredientIds.length,
       }),
       { headers: JSON_HEADERS },
     );
