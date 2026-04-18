@@ -1529,4 +1529,58 @@ from the repo. Retired LL-287 and Step 7 in the same commit.
 
 ---
 
+---
+
+## S-2B.4 — Ingest Queue tab + approve RPC + regression harness
+**Date:** 19 April 2026
+**PR:** 2B.4 (commit a166174)
+**Context:** Closing the Phase 2B demo loop — the UI layer for review/approve/reject of AI-extracted ingredients.
+
+### Decisions made
+
+**1. Approve transaction = Postgres RPC `fn_approve_ingested_ingredient` (Option B)**
+Alternatives: (A) two React-side statements with partial-failure risk; (C) insert-then-compensating-delete on update failure. Chose B because the operation is two writes that must either both happen or neither; RPC bundles them in a single Postgres transaction with ~30 lines of SQL. Matches the LL-254 pattern for paired writes. Owner confirmed.
+
+**2. Keep AI original + human edits separately (Option B)**
+Alternatives: (A) overwrite `ai_extracted_data` with human corrections. Chose B because the queue table already has a `user_edits` jsonb column purpose-built for this. Preserving both enables downstream questions: "how often is the AI wrong about HACCP?" — useful for prompt tuning and useful in a demo. `ai_extracted_data` stays immutable; `user_edits` holds `{changed_fields, before, after}`.
+
+**3. Regression harness includes 5th "edit-then-approve" case**
+Four cases would have validated the paths but not the differentiating feature of decision 2. Case 5 seeds a row, mutates HACCP, calls the RPC, asserts (a) `food_ingredients.haccp_risk_level` holds the human-edited value, (b) `queue.ai_extracted_data.haccp_risk_level` preserves the AI original, (c) `queue.user_edits.changed_fields` contains `"haccp_risk_level"`. Catches any future regression that would collapse the two into one.
+
+**4. Tab position = after Library (position 2)**
+Puts "pending work to review" in the natural reading flow. Alternative (position 5, end of tabs) would hide it.
+
+**5. `sub_category → category` derivation in FoodWorlds.js + SQL CASE mirror in RPC**
+Alternatives: SQL CASE only, or React helper only. Chose dual: `FNB_SUBCATEGORY_TO_CATEGORY` map + `categoryForSubcategory()` helper in FoodWorlds.js for the future Library manual-create form, and a SQL CASE mirror inside the RPC so the approve path has zero client dependencies. Cost: 28 rows duplicated. Benefit: RPC is self-contained and the React side has a reusable helper.
+
+**6. Reject reason inside `user_edits.reject_reason` jsonb (not dedicated column)**
+Zero schema churn. `user_edits` is already the human-added-metadata column. Reject reasons are free text, low volume, and never need indexing or querying by content. A dedicated column would be migration overhead for no functional gain.
+
+### Near-miss / lesson captured
+Regression harness Case 5 discovered the `food_ingredients_name_seeded_unique` constraint by colliding with Case 1's fixture name. Executor varied the name on the fly (Case 5 uses "Bread Flour (Test)" vs Case 1's "Cake Flour (Test)"). Surfaced LL-306. Had we run Case 1 + Case 5 under the same name, the harness would have silently failed the approve path without flagging why.
+
+---
+
+## S-2B.4-hotfix — tenant_id missing from EF invocation body
+**Date:** 19 April 2026
+**PR:** 2B.3.1 hotfix (shipped same session)
+**Context:** Localhost smoke test of PR 2B.4 surfaced a pre-existing PR 2B.3 bug. EF returned 500 with `"Failed to log to document_log: null value in column tenant_id of relation document_log violates not-null constraint"`.
+
+### Root cause
+`FoodIngestModal.js` receives `tenantId` as a prop but never passes it to the `supabase.functions.invoke("process-document", {body: {...}})` call in either `handleExtractUpload()` or `handleExtractPaste()`. The EF defaults `tenant_id` to null, the `document_log` insert fails the NOT NULL constraint, the 500 propagates as a generic "non-2xx status code" message because supabase-js does not parse response bodies on error.
+
+### Why PR 2B.3 regression tests missed this
+PR 2B.2 smoke test was direct-EF: a Node.js script that sets `tenant_id` explicitly in the POST body, bypassing the React layer entirely. PR 2B.3 shipped with the modal wired but was never end-to-end tested against a real HQ context — the React parameter assembly was never exercised. PR 2B.4 localhost smoke was the first time the full chain ran, and the bug surfaced immediately.
+
+### Fix
+Two lines added: `tenant_id: tenantId,` in both invoke body objects in FoodIngestModal.js.
+
+### LL escalated
+This is the second occurrence of a class of bug where React → EF parameter assembly drifts from the EF's expectations (first occurrence: Session 2B.2 planner-vs-executor catch on React hardcoding industry_profile). Two data points = LL-307.
+
+### Pattern reinforced
+LL-304 (direct-EF regression as planner-side proxy) remains valid but not sufficient. LL-307 (mandate localhost run before claiming done on any PR touching React → EF) is complementary — different coverage, not replacement.
+
+---
+
 *DECISION-JOURNAL.md · NuAi · Newest first · Add entries at session close (Step 7)*

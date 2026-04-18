@@ -2345,3 +2345,26 @@ data larger than ~10KB.
 ---
 
 *LL-304 + LL-305 added 19 April 2026 · Session 2B.2*
+
+---
+
+LL-306 (NEW S-2B.5): Regression harnesses writing to `food_ingredients` must
+         vary the `name` field across test cases. The `food_ingredients_name_seeded_unique`
+         constraint silently collides otherwise. Fixture builder must accept a
+         `name` override. Evidence: PR 2B.4 Case 5 caught this by varying to
+         "Bread Flour (Test)" vs Case 1's "Cake Flour (Test)". Generalise to:
+         any regression harness inserting into a table with a UNIQUE constraint
+         on a human-readable column must vary that column per case.
+
+LL-307 (NEW S-2B.5): Any PR that touches the React → Edge Function invocation
+         boundary MUST include a localhost end-to-end run against a real tenant
+         BEFORE the PR is marked shipped. Direct-EF regression scripts (LL-304)
+         validate the server behaviour but cannot exercise the React layer's
+         parameter assembly — where this class of bug lives. Evidence:
+         PR 2B.3 shipped without localhost smoke; `tenant_id` was missing
+         from the EF body for the entire lifetime of 2B.3 until 2B.4 localhost
+         verification surfaced it at the 500-error boundary. Hotfix 2B.3.1
+         closed it in one session but the cost of the miss was real.
+         Rule: localhost smoke is not optional for React → EF PRs.
+
+*LL-306 + LL-307 added 19 April 2026 · Session 2B.5*

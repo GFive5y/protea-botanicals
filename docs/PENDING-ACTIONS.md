@@ -428,8 +428,8 @@ Status: **CLOSED — 6 PRs shipped (18 April 2026)**
   2A.6 (3a7ab6e): DS6 compliance — Part 16 table spec
 Original plan was 4 PRs (~20h). Shipped 6 PRs. Under-scoped CRUD + audit + DS6.
 
-### LOOP-WTU-003 — Phase 2B: AI Document Ingest (in execution)
-Status: IN EXECUTION
+### LOOP-WTU-003 — Phase 2B: AI Document Ingest — CLOSED 2B.5 / 19 April 2026
+Status: CLOSED
 Source: docs/WP-TABLE-UNIFY_PHASE2B-SPLIT_v1.md
   [x] 2B.1 migration applied (ingredient_ingest_queue, 5 policies) — 73f8135
   [x] 2B.1 scoping doc committed — 73f8135
@@ -439,8 +439,9 @@ Source: docs/WP-TABLE-UNIFY_PHASE2B-SPLIT_v1.md
   [x] 2B.2 regression matrix (5 tenants) — planner-side via SQL probes + guard verification
   [x] 2B.3 HQ "+ Add from Document" modal + strategic doc + copy refinements
       (shipped cf7974c + d0bb6af + 9ef764f, 19 April 2026)
-  [ ] 2B.4 Review-and-approve UI (~3.5h)
-  [ ] 2B.5 Gate PR — 5-tenant end-to-end walkthrough (~1h)
+  [x] 2B.3.1 hotfix — tenant_id thread-through to EF body (b18b092)
+  [x] 2B.4 Ingest Queue tab + approve RPC + regression harness (a166174)
+  [x] 2B.5 Gate PR — docs close-out, LL-306 + LL-307 (this commit)
 Architectural pivot: extends process-document v61 -> v62 (Option 1)
   instead of building a new ingest-ingredient EF (parent doc Option B).
 **INCIDENT NOTE (RESOLVED):** v62/v63 original attempts via Supabase MCP
@@ -448,6 +449,38 @@ Architectural pivot: extends process-document v61 -> v62 (Option 1)
   LL-303 + Procedure 7 now govern all EF deploys.
   Second attempt (S-2B.2, commit 889a145) via Claude Code `npx supabase
   functions deploy` — succeeded on first try. v62 live at Supabase v65.
+
+### WP-FOOD-INGEST-POLISH — FoodIngestQueuePanel drawer UX (post-demo)
+Opened: S-2B.5, 19 April 2026
+Priority: LOW — demo-working without these
+Scope: four drawer-UX gaps surfaced during 2B.4 localhost smoke
+Estimate: ~2h total
+
+1. Nutrition panel render — AI extracts `nutrition_per_100g` when visible;
+   drawer does not display it. Add read-only block below Shelf Life showing
+   energy_kj, protein_g, carbs_g, fat_g, sodium_mg.
+2. Source context block — pack_size, brand, supplier_name, cost from the
+   original invoice. Read-only. Helps reviewer verify AI against the source
+   document before approving.
+3. Temperature zone select drift — options array in FoodIngestQueuePanel
+   drawer is `["frozen","chilled","ambient","hot_hold"]` but EF prompt emits
+   `"hot"` not `"hot_hold"`; also AI may emit `"refrigerated"` which matches
+   FoodWorlds.js but not the select. Align select options to EF prompt enum
+   (ambient | refrigerated | frozen | hot).
+4. Quantity / invoice-line context — related to #2. Surface the pack_size and
+   pack_count as read-only on the drawer so reviewer sees "4 × 12.5kg bags
+   Sasko Cake Flour" context, not just the library-shape "Cake Flour / kg".
+
+All four land in one post-demo PR. Not demo-blocking.
+
+### WP-EF-ERROR-PASSTHROUGH — surface EF error bodies to users (post-demo)
+Opened: S-2B.5, 19 April 2026
+Priority: LOW
+Scope: supabase-js `.invoke()` swallows 500 response bodies and returns a
+generic "non-2xx status code" error. Users see that instead of the real EF
+error (e.g. "Failed to log to document_log: ..."). Wrap invoke() with a
+fetch() fallback or a post-invoke direct fetch to recover the body.
+Estimate: ~1h. Applies to FoodIngestModal and any other invoke callsites.
 
 ### Phase 2F — Mobile Smart Capture for Ingredients
 Status: BACKLOG · opens when (a) a client requests it OR (b) bandwidth after 2C/2D

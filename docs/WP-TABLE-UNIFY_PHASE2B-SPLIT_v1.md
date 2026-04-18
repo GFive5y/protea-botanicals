@@ -6,15 +6,16 @@
 
 ---
 
-## EXECUTION STATUS (as of S-2B.2 close, 19 April 2026)
+## EXECUTION STATUS (Phase 2B SHIPPED — 19 April 2026)
 
 | PR | Status | Commit / Version | Notes |
 |---|---|---|---|
 | 2B.1 | SHIPPED | 73f8135 | Migration: ingredient_ingest_queue + 5 RLS policies |
 | 2B.2 | SHIPPED | 889a145 (EF v65) | process-document v62 — F&B branch + queue write. Direct-EF smoke test verified 10 Premier Foods ingredients correctly classified. |
-| 2B.3 | NEXT | — | HQ "+ Add from Document" modal (~3h). Upload / paste / URL tabs. |
-| 2B.4 | PENDING | — | Review-and-approve UI (~3.5h). Confidence badges, approve -> food_ingredients, reject with reason. |
-| 2B.5 | PENDING | — | Gate PR (~1h). End-to-end walkthrough. No code. |
+| 2B.3 | SHIPPED | cf7974c | HQ "+ Add from Document" modal (upload + paste + URL coming-soon). |
+| 2B.3.1 | SHIPPED | b18b092 | Hotfix: tenant_id thread-through to EF body (see LL-307). |
+| 2B.4 | SHIPPED | a166174 | Ingest Queue tab + review drawer + fn_approve_ingested_ingredient RPC + 5-case regression harness. |
+| 2B.5 | SHIPPED | (this commit) | Gate PR — docs close-out, LL-306 + LL-307 escalated, Phase 2B fully retired. |
 
 **Commercial context** (mirrored from Phase 2 scope doc Section 11):
 This is the killer-app sub-phase of Phase 2. The feature combination
@@ -571,6 +572,26 @@ Zero code changes. End-to-end walkthrough + doc updates.
 - Owner-confirmed decisions: Option 1, mobile deferred to 2F, scope now with caveats
 - Approved by: Owner, Session post-2A.6
 - Intended executor: Claude Code, starting with 2B.1 migration
+
+---
+
+---
+
+## PHASE 2B CLOSURE NOTE (S-2B.5, 19 April 2026)
+
+Phase 2B delivered the commercial thesis of Phase 2: AI invoice ingest for SA
+F&B. Live tested end-to-end on Garden Bistro with a 10-line Premier Foods
+invoice — 10 ingredients extracted in ~30 seconds with correct allergen
+flags (gluten on flour + pasta, milk on butter + cheese, fish on kingklip),
+HACCP risk levels, and SA R638 compliance context. One approve + one reject
+exercised both paths against real tenant data.
+
+Next Phase 2 sub-phases: 2C (recipe linkage), 2D (compliance view mode),
+2F (mobile Smart Capture for ingredients). 2E remains deferred per parent
+doc §0.1.
+
+No carried debt from Phase 2B. All post-demo polish items are captured in
+PENDING-ACTIONS.md under WP-FOOD-INGEST-POLISH and WP-EF-ERROR-PASSTHROUGH.
 
 ---
 
