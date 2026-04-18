@@ -1,5 +1,5 @@
 # NUAI — SESSION START PROTOCOL
-## Paste this as the FIRST message in every new Claude.ai session.
+## Read live from the repo at every session start (LL-292).
 ## Updated: 18 April 2026 — Session 320 close (architecture docs + PR 2A.1 + RLS incident + fix)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
@@ -28,7 +28,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 6. `docs/WP-TABLE-UNIFY_PHASE2_v1.md` — MANDATORY if next priority is Phase 2 exploration
 
 After reading, confirm out loud:
-- Current HEAD (should be 759c321 or later)
+- Current HEAD (verify via `git rev-parse HEAD` — should be at or past the most recent session close commit)
 - DS6 status: COMPLETE (all portals, HQ, HR, Admin, Consumer — see below)
 - WP-TABLE-UNIFY Phase 1 status: COMPLETE (HQFoodIngredients 85% clean, remainder is
   Bucket B CATEGORIES palette structural decision — post-demo)
@@ -39,7 +39,8 @@ After reading, confirm out loud:
 
 ## STANDING ALERT
 
-sim-pos-sales MUST run the day BEFORE the CA demo. Trigger date: 11 May 2026.
+sim-pos-sales MUST run the day BEFORE the CA demo.
+Trigger date: PENDING (depends on demo date confirmation).
 IF DEMO DATE CHANGES: update PENDING-ACTIONS.md first, then this file.
 
 ---
@@ -378,10 +379,10 @@ KNOWN DEBT carried forward:
 - HQStock Overview sub-tab derived counts (NO EXPIRY, COLD CHAIN)
   still aggregate over `items` not `activeItems`. Not demo-blocking.
 
-### KNOWN PERMANENT GAPS — DO NOT CHASE BEFORE 12 MAY
+### KNOWN PERMANENT GAPS
 1. POS VAT pipeline — ~R5k BS gap per tenant (amber banner explains it)
-2. Cash flow opening balance — not wired to bank recon
-3. Pricing data source red (0) — no product_pricing linked to recipes
+2. Pricing data source red (0) — no product_pricing linked to recipes
+(Cash flow opening balance — FIXED S319, was item 2.)
 
 ---
 
@@ -585,28 +586,22 @@ LL-302 (NEW S320): Run Audit 1 (self-ref) + Audit 2 (inline user_profiles) any s
 
 ---
 
-## NEXT PRIORITIES (choose with owner at session start)
+## NEXT PRIORITIES (session start, choose with owner)
 
-1. **Owner picks PRIMARY WP** — see docs/WP-REGISTER.md. Financial debt complete.
-   Candidates: WP-AINS completion, WP-TABLE-UNIFY Phase 1 close-out, any SCOPED WP.
+1. **PR 2A.2** — Pill Nav + KPI Strip + Smart Search (~6h).
+   Planner runs Procedure 6 Step 1 at fresh HEAD.
+   Spec: docs/WP-TABLE-UNIFY_PHASE2_2A-SPLIT_v1.md
 
-2. **Financial findings:** FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded FY2026),
-   FIN-003 (VAT_RATE), FIN-006 (equity join filter).
+2. **sim-pos-sales** — STANDING ALERT. Trigger date pending demo
+   date confirmation. Must run day BEFORE demo.
 
-3. **SAFETY-080/081/082:** Supplier tenancy, recursive rules, all-NULL tables.
+3. **WP-RLS-HYGIENE** (post-demo) — ~100 inline user_profiles
+   subqueries → user_tenant_id() helper. See PENDING-ACTIONS.
 
-2. **Financial findings** — FIN-001 (HQYearEnd FY filter), FIN-002 (hardcoded
-   FY2026), FIN-003 (VAT_RATE), FIN-006 (equity join filter).
+4. **LOOP-FIN-004** — Trial Balance Excel export (~2h, SheetJS)
 
-3. **sim-pos-sales** — STANDING ALERT. Trigger date depends on new demo date
-   (PENDING CONFIRMATION). Must run the day BEFORE demo.
-
-4. **WP-TABLE-UNIFY Phase 2** — `docs/WP-TABLE-UNIFY_PHASE2_v1.md` (645 lines).
-   Deferred to post-demo. Next agent reads scope doc in full before planning.
-
-5. **Optional DS6 mop-up** — 642 violations across 4 files. Not blocking demo.
-
-6. **LOOP-FIN-004** — Trial Balance Excel export (2hrs, SheetJS) — nice-to-have
+5. **fivazg@gmail.com account** — pending decision (unsuspend
+   vs leave; see S320 decision journal)
 
 ---
 
