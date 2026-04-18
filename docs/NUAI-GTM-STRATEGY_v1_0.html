@@ -1,0 +1,2111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>NuAi — Go-to-Market Strategy · v1.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   NUAI GO-TO-MARKET STRATEGY · EDITORIAL DOCUMENT
+   Single file. Print-ready. No JS deps. Inline CSS.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Ink palette — deep green-black on bone */
+  --ink: #0F1F1A;
+  --ink-800: #1a2e26;
+  --ink-600: #3d5248;
+  --ink-400: #6b7f74;
+  --ink-300: #9ba89f;
+  --ink-200: #c9d1cb;
+  --ink-100: #e5e9e6;
+
+  --bone: #F5F1E8;
+  --bone-warm: #EFE9DA;
+  --paper: #FDFBF5;
+  --cream: #FAF6EC;
+
+  /* Accents — NuAi green, measured and strict */
+  --nu-green: #3D7A63;
+  --nu-green-soft: #5a9a82;
+  --nu-green-pale: #D4E2DB;
+  --nu-gold: #C5A572;
+  --nu-rust: #B85D3C;
+
+  /* Rules */
+  --rule: #D8D2C2;
+  --rule-dark: #3d5248;
+
+  /* Type */
+  --font-display: 'Fraunces', 'Playfair Display', Georgia, serif;
+  --font-body: 'IBM Plex Sans', -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bone);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "kern" 1, "liga" 1, "ss01" 1;
+}
+
+/* —— Page container ————————————————————————————————————————————————————— */
+.page {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 0 48px;
+}
+
+.wide {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 48px;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   COVER
+   ════════════════════════════════════════════════════════════════════════════ */
+.cover {
+  background: var(--ink);
+  color: var(--bone);
+  padding: 96px 0 128px;
+  position: relative;
+  overflow: hidden;
+}
+
+.cover::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 82% 18%, rgba(61,122,99,0.18), transparent 48%),
+    radial-gradient(circle at 12% 82%, rgba(197,165,114,0.08), transparent 55%);
+  pointer-events: none;
+}
+
+.cover-inner {
+  position: relative;
+  z-index: 1;
+}
+
+.cover-masthead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-top: 1px solid rgba(245,241,232,0.14);
+  padding-top: 24px;
+  margin-bottom: 96px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-300);
+}
+
+.cover-masthead .brand {
+  color: var(--bone);
+  font-weight: 600;
+}
+
+.cover-masthead .brand em {
+  color: var(--nu-green-soft);
+  font-style: normal;
+}
+
+.cover-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--nu-green-soft);
+  margin-bottom: 40px;
+}
+
+.cover h1 {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: clamp(48px, 7vw, 84px);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  margin: 0 0 32px;
+  font-variation-settings: "opsz" 144;
+}
+
+.cover h1 em {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--nu-green-soft);
+}
+
+.cover-dek {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 300;
+  line-height: 1.4;
+  color: rgba(245,241,232,0.82);
+  max-width: 640px;
+  margin-bottom: 96px;
+  font-style: italic;
+}
+
+.cover-meta {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 32px;
+  padding-top: 40px;
+  border-top: 1px solid rgba(245,241,232,0.14);
+}
+
+.cover-meta .cell .label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-300);
+  margin-bottom: 8px;
+}
+
+.cover-meta .cell .value {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--bone);
+  letter-spacing: -0.01em;
+}
+
+.cover-meta .cell .value small {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink-300);
+  display: block;
+  margin-top: 2px;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   SECTION CHROME
+   ════════════════════════════════════════════════════════════════════════════ */
+section {
+  padding: 96px 0;
+}
+
+section.tight { padding: 64px 0; }
+
+section.ink {
+  background: var(--ink);
+  color: var(--bone);
+}
+
+section.cream { background: var(--cream); }
+
+.section-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--nu-green);
+  margin-bottom: 16px;
+  display: block;
+}
+
+.ink .section-num { color: var(--nu-green-soft); }
+
+h2 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(36px, 4.5vw, 52px);
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+  margin: 0 0 24px;
+  max-width: 720px;
+  font-variation-settings: "opsz" 144;
+}
+
+h2 em {
+  font-style: italic;
+  color: var(--nu-green);
+}
+
+.ink h2 em { color: var(--nu-green-soft); }
+
+h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 26px;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  margin: 56px 0 16px;
+  font-variation-settings: "opsz" 48;
+}
+
+h4 {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-600);
+  margin: 40px 0 12px;
+}
+
+.ink h4 { color: var(--ink-300); }
+
+.lede {
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1.45;
+  font-weight: 300;
+  letter-spacing: -0.005em;
+  color: var(--ink-800);
+  max-width: 680px;
+  margin-bottom: 48px;
+  font-variation-settings: "opsz" 72;
+}
+
+.ink .lede { color: rgba(245,241,232,0.9); }
+
+p {
+  max-width: 680px;
+  margin: 0 0 20px;
+}
+
+p.wide-p { max-width: 820px; }
+
+strong { font-weight: 600; color: var(--ink); }
+.ink strong { color: var(--bone); }
+
+em { font-style: italic; }
+
+a { color: var(--nu-green); text-decoration: none; border-bottom: 1px solid var(--nu-green-pale); }
+
+/* Drop cap on first paragraph of major sections */
+.drop-cap::first-letter {
+  font-family: var(--font-display);
+  font-size: 72px;
+  line-height: 0.85;
+  font-weight: 400;
+  float: left;
+  margin: 6px 10px -4px 0;
+  color: var(--nu-green);
+  font-variation-settings: "opsz" 144;
+}
+
+/* —— TL;DR block on cover end ————————————————————————————————————————— */
+.tldr {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  padding: 48px 56px;
+  margin: 64px 0;
+  position: relative;
+}
+
+.tldr::before {
+  content: 'TL;DR';
+  position: absolute;
+  top: -11px;
+  left: 40px;
+  background: var(--bone);
+  padding: 0 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  color: var(--nu-green);
+  font-weight: 600;
+}
+
+.tldr p:last-child { margin-bottom: 0; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   PULL QUOTE
+   ════════════════════════════════════════════════════════════════════════════ */
+.pullquote {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 32px;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  max-width: 680px;
+  margin: 56px 0;
+  padding-left: 32px;
+  border-left: 3px solid var(--nu-green);
+  font-style: italic;
+  font-variation-settings: "opsz" 96;
+}
+
+.ink .pullquote { color: var(--bone); border-left-color: var(--nu-green-soft); }
+
+.pullquote .attr {
+  display: block;
+  margin-top: 20px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-600);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   STAT GRIDS + CARDS
+   ════════════════════════════════════════════════════════════════════════════ */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  margin: 48px 0;
+  border-top: 1px solid var(--rule-dark);
+  border-bottom: 1px solid var(--rule-dark);
+}
+
+.ink .stat-grid { border-color: rgba(245,241,232,0.2); }
+
+.stat-grid .stat {
+  padding: 32px 24px;
+  border-right: 1px solid var(--rule-dark);
+}
+.ink .stat-grid .stat { border-color: rgba(245,241,232,0.2); }
+.stat-grid .stat:last-child { border-right: none; }
+
+.stat .value {
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin-bottom: 10px;
+  font-variation-settings: "opsz" 96;
+}
+
+.ink .stat .value { color: var(--bone); }
+
+.stat .value .unit {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--ink-600);
+  margin-left: 4px;
+}
+.ink .stat .value .unit { color: var(--ink-300); }
+
+.stat .label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-600);
+}
+.ink .stat .label { color: var(--ink-300); }
+
+/* Two-column prose */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  margin: 32px 0;
+}
+
+/* Sidebar callouts */
+.callout {
+  background: var(--paper);
+  border-left: 3px solid var(--nu-gold);
+  padding: 24px 28px;
+  margin: 32px 0;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.callout .label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--nu-gold);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   COMPETITIVE MATRIX
+   ════════════════════════════════════════════════════════════════════════════ */
+.matrix {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 48px 0;
+  font-size: 14px;
+}
+
+.matrix th {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-600);
+  padding: 16px 14px;
+  text-align: left;
+  border-bottom: 1.5px solid var(--ink);
+  background: var(--paper);
+  vertical-align: bottom;
+}
+
+.matrix th.capability { width: 34%; }
+.matrix th.pill { width: 11%; text-align: center; }
+
+.matrix td {
+  padding: 16px 14px;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+  line-height: 1.45;
+}
+
+.matrix tr:last-child td { border-bottom: 1.5px solid var(--ink); }
+
+.matrix td.capability {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.matrix td.capability small {
+  display: block;
+  font-weight: 400;
+  color: var(--ink-600);
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.matrix td.pill {
+  text-align: center;
+}
+
+.dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.dot.full  { background: var(--nu-green); color: var(--bone); }
+.dot.part  { background: var(--nu-green-pale); color: var(--nu-green); }
+.dot.none  { background: var(--bone-warm); color: var(--ink-400); }
+.dot.addon { background: var(--nu-gold); color: var(--ink); }
+
+.legend {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+  margin-top: 24px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-600);
+}
+.legend .item { display: flex; align-items: center; gap: 10px; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MOATS
+   ════════════════════════════════════════════════════════════════════════════ */
+.moat {
+  display: grid;
+  grid-template-columns: 100px 1fr 180px;
+  gap: 40px;
+  padding: 32px 0;
+  border-top: 1px solid var(--rule);
+  align-items: flex-start;
+}
+
+.moat:last-child { border-bottom: 1px solid var(--rule); }
+
+.moat .num {
+  font-family: var(--font-display);
+  font-size: 52px;
+  font-weight: 300;
+  line-height: 0.9;
+  color: var(--nu-green);
+  letter-spacing: -0.03em;
+  font-variation-settings: "opsz" 144;
+}
+
+.moat .body h4 {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 22px;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--ink);
+  font-variation-settings: "opsz" 48;
+}
+
+.moat .body p { margin: 0 0 8px; font-size: 15px; line-height: 1.55; }
+
+.moat .strength {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-600);
+}
+
+.strength-bar {
+  display: flex;
+  gap: 3px;
+  margin-top: 8px;
+}
+
+.strength-bar span {
+  flex: 1;
+  height: 4px;
+  background: var(--bone-warm);
+}
+.strength-bar span.filled { background: var(--nu-green); }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   PLAYBOOK CARDS — channel strategies
+   ════════════════════════════════════════════════════════════════════════════ */
+.playbook {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  margin: 40px 0;
+  overflow: hidden;
+}
+
+.playbook-head {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  gap: 32px;
+  align-items: center;
+  padding: 32px 40px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--ink);
+  color: var(--bone);
+}
+
+.playbook-head .tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  background: var(--nu-green);
+  color: var(--bone);
+  text-align: center;
+}
+
+.playbook-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--bone);
+  letter-spacing: -0.01em;
+  font-variation-settings: "opsz" 48;
+}
+
+.playbook-head h3 em {
+  color: var(--nu-green-soft);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.playbook-head .verdict {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--nu-green-soft);
+  text-align: right;
+}
+
+.playbook-head .verdict strong {
+  display: block;
+  font-size: 18px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--bone);
+  margin-top: 4px;
+  text-transform: none;
+  font-variation-settings: "opsz" 48;
+}
+
+.playbook-body {
+  padding: 40px;
+}
+
+.playbook-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  margin-bottom: 40px;
+}
+
+.playbook-grid .block h4 {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--nu-green);
+  margin: 0 0 12px;
+}
+
+.playbook-grid .block p {
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0 0 12px;
+  color: var(--ink-800);
+}
+
+.playbook-sequence {
+  margin-top: 8px;
+}
+
+.playbook-sequence h4 {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--nu-green);
+  margin: 0 0 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.playbook-sequence .step {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 24px;
+  padding: 18px 0;
+  border-bottom: 1px dashed var(--rule);
+  align-items: baseline;
+}
+
+.playbook-sequence .step:last-child { border-bottom: none; }
+
+.playbook-sequence .step .when {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-600);
+}
+
+.playbook-sequence .step .what {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-800);
+}
+
+.playbook-sequence .step .what strong { color: var(--ink); }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MATH BLOCK — unit economics
+   ════════════════════════════════════════════════════════════════════════════ */
+.math {
+  background: var(--ink);
+  color: var(--bone);
+  padding: 48px;
+  margin: 48px 0;
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
+.math .row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  padding: 12px 0;
+  border-bottom: 1px dashed rgba(245,241,232,0.2);
+}
+
+.math .row:last-child { border-bottom: none; padding-top: 20px; margin-top: 8px; border-top: 2px solid var(--nu-green-soft); }
+
+.math .row .label {
+  color: rgba(245,241,232,0.75);
+  letter-spacing: 0.04em;
+}
+
+.math .row .val {
+  color: var(--bone);
+  font-weight: 500;
+}
+
+.math .row.total .label { color: var(--nu-green-soft); font-weight: 600; letter-spacing: 0.08em; }
+.math .row.total .val { color: var(--nu-green-soft); font-size: 20px; font-weight: 600; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   ROADMAP — profile expansion
+   ════════════════════════════════════════════════════════════════════════════ */
+.roadmap {
+  margin: 48px 0;
+}
+
+.roadmap-row {
+  display: grid;
+  grid-template-columns: 200px 1fr 140px;
+  gap: 32px;
+  padding: 24px 0;
+  border-top: 1px solid var(--rule);
+  align-items: flex-start;
+}
+
+.roadmap-row:last-child { border-bottom: 1px solid var(--rule); }
+
+.roadmap-row .profile {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  font-variation-settings: "opsz" 48;
+}
+
+.roadmap-row .profile small {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-weight: 400;
+  color: var(--ink-400);
+}
+
+.roadmap-row .detail { font-size: 14px; line-height: 1.55; color: var(--ink-800); }
+.roadmap-row .detail p { margin: 0 0 6px; max-width: none; }
+
+.roadmap-row .status {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.status.live { color: var(--nu-green); }
+.status.soon { color: var(--nu-gold); }
+.status.future { color: var(--ink-400); }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HONEST GAPS
+   ════════════════════════════════════════════════════════════════════════════ */
+.gaps {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  margin: 48px 0;
+}
+
+.gap-card {
+  border: 1px solid var(--rule);
+  padding: 28px 32px;
+  background: var(--paper);
+}
+
+.gap-card h4 {
+  margin: 0 0 12px;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 18px;
+  text-transform: none;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  font-variation-settings: "opsz" 48;
+}
+
+.gap-card ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.gap-card li {
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--rule);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  align-items: baseline;
+  color: var(--ink-800);
+}
+
+.gap-card li:last-child { border-bottom: none; }
+
+.gap-card li::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  background: var(--nu-rust);
+  border-radius: 50%;
+  margin-top: 7px;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   DECISION MATRIX / NEXT STEPS
+   ════════════════════════════════════════════════════════════════════════════ */
+.decision-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  margin: 48px 0;
+  border: 1px solid var(--rule);
+}
+
+.decision-cell {
+  padding: 32px 28px;
+  border-right: 1px solid var(--rule);
+  background: var(--paper);
+}
+.decision-cell:last-child { border-right: none; }
+
+.decision-cell .time {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--nu-green);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.decision-cell h4 {
+  margin: 0 0 16px;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 20px;
+  text-transform: none;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  font-variation-settings: "opsz" 48;
+}
+
+.decision-cell ol {
+  padding-left: 0;
+  margin: 0;
+  list-style: none;
+  counter-reset: deci;
+}
+
+.decision-cell li {
+  counter-increment: deci;
+  padding: 10px 0 10px 30px;
+  font-size: 13px;
+  line-height: 1.55;
+  position: relative;
+  color: var(--ink-800);
+  border-bottom: 1px dashed var(--rule);
+}
+.decision-cell li:last-child { border-bottom: none; }
+
+.decision-cell li::before {
+  content: counter(deci, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  top: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--nu-green);
+  font-weight: 600;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   FOOTER / COLOPHON
+   ════════════════════════════════════════════════════════════════════════════ */
+footer {
+  background: var(--ink);
+  color: var(--ink-300);
+  padding: 64px 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+footer .colophon {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  padding-bottom: 48px;
+  border-bottom: 1px solid rgba(245,241,232,0.14);
+}
+
+footer h4 {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--nu-green-soft);
+  margin: 0 0 16px;
+}
+
+footer p { max-width: none; margin-bottom: 10px; }
+
+footer .sig {
+  padding-top: 32px;
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+footer .sig strong { color: var(--bone); font-weight: 500; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   PRINT
+   ════════════════════════════════════════════════════════════════════════════ */
+@media print {
+  body { background: white; color: black; font-size: 11pt; }
+  section { padding: 32pt 0; break-inside: avoid; }
+  .cover, .ink, .math, .playbook-head, footer { background: white !important; color: black !important; border: 1px solid #999; }
+  .cover h1, .cover-meta .cell .value, .playbook-head h3, footer .sig strong { color: black !important; }
+  .cover-dek, .lede { color: #222 !important; }
+  h2, h3, h4 { break-after: avoid; }
+  .matrix, .moat, .playbook, .roadmap-row, .gap-card { break-inside: avoid; }
+  a { color: black; border-bottom: none; }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ════════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 820px) {
+  .page, .wide { padding: 0 24px; }
+  .cover { padding: 56px 0 72px; }
+  .cover-meta { grid-template-columns: repeat(2, 1fr); gap: 24px; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .stat-grid .stat:nth-child(2) { border-right: none; }
+  .two-col, .gaps, .decision-grid, .playbook-grid { grid-template-columns: 1fr; }
+  .moat { grid-template-columns: 1fr; gap: 12px; }
+  .moat .num { font-size: 36px; }
+  .moat .strength { margin-top: 8px; }
+  .roadmap-row { grid-template-columns: 1fr; gap: 12px; }
+  .playbook-head { grid-template-columns: 1fr; gap: 12px; padding: 24px; }
+  .playbook-head .verdict { text-align: left; }
+  .playbook-body { padding: 24px; }
+  .playbook-sequence .step { grid-template-columns: 1fr; gap: 4px; }
+  section { padding: 56px 0; }
+  .matrix { font-size: 12px; }
+  .matrix th, .matrix td { padding: 10px 6px; }
+  .decision-cell { border-right: none; border-bottom: 1px solid var(--rule); }
+  .decision-cell:last-child { border-bottom: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     COVER
+     ═══════════════════════════════════════════════════════════════════════ -->
+<header class="cover">
+  <div class="wide cover-inner">
+    <div class="cover-masthead">
+      <span class="brand">Nu <em>Ai</em> · (Pty) Ltd</span>
+      <span>Go-to-Market Strategy · v1.0 · April 2026</span>
+    </div>
+
+    <div class="cover-eyebrow">A strategic thesis for Nu Ai (Pty) Ltd.</div>
+
+    <h1>The code is built.<br/>The <em>market</em> is the product now.</h1>
+
+    <p class="cover-dek">NuAi is a production multi-tenant SaaS ERP with deeper South African regulatory
+      compliance than any competitor on the continent, AI workflows that actually ship, and a
+      multi-store franchise architecture ready to carry a channel-led sales motion.
+      This document is the plan to convert that asset into revenue without chasing one shop at a time.</p>
+
+    <div class="cover-meta">
+      <div class="cell">
+        <div class="label">Platform</div>
+        <div class="value">224,293 lines<small>React · Supabase · Deno EF</small></div>
+      </div>
+      <div class="cell">
+        <div class="label">Database</div>
+        <div class="value">112 tables<small>409 RLS policies</small></div>
+      </div>
+      <div class="cell">
+        <div class="label">Portals live</div>
+        <div class="value">7<small>including /group-portal</small></div>
+      </div>
+      <div class="cell">
+        <div class="label">Tenants seeded</div>
+        <div class="value">9<small>across 4 industry profiles</small></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     01 · THE THESIS
+     ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <div class="page">
+    <span class="section-num">01 · The Thesis</span>
+    <h2>Stop selling to <em>shops</em>. Sell to the <em>people who own the shops</em>.</h2>
+
+    <p class="lede">One-at-a-time SME sales crush technical founders. NuAi's
+      architecture &mdash; in particular, the Group Portal that ships with it &mdash;
+      is purpose-built for the three sales motions that actually scale in
+      South Africa: franchise channel, accounting-firm channel, and industry-body
+      partnerships. The code to run a 200-outlet network is already on disk.
+      The work that remains is commercial.</p>
+
+    <div class="tldr">
+      <p><strong>What NuAi is.</strong> A multi-tenant SaaS ERP that
+      adapts to four industries from one codebase: cannabis retail, cannabis
+      dispensary, food &amp; beverage, and general retail. Full IFRS financials,
+      POS, inventory with AVCO costing, HR, loyalty, and QR authentication &mdash;
+      plus a live AI layer (Smart Capture, ingredient ingest, ProteaAI)
+      and a franchise Group Portal with cross-store analytics.</p>
+
+      <p><strong>Why it matters commercially.</strong> No South African product
+      combines SA-native regulatory depth (R638 allergens, SAHPRA Schedule 6,
+      SARS VAT 201 auto-pipeline, BCEA leave) with AI ingest and a multi-store
+      franchise architecture in one platform. The closest global comparables
+      (Apicbase, GrowerIQ, SAP Business One) each do one piece and cost three
+      to twenty times as much.</p>
+
+      <p><strong>The plan.</strong> Three parallel channels, ordered by
+      expected payback: a franchise pilot landed through FASA / Absa
+      Franchise Banking, an accounting-firm reseller relationship, and a
+      public reference campaign built around a formalised small-retailer
+      pilot. Unit-economics modelled before first paid contract. Pricing
+      validated against COGS, not intuition.</p>
+    </div>
+
+    <blockquote class="pullquote">
+      NuAi isn&rsquo;t competing with POS tools. It&rsquo;s competing with
+      the <em>spreadsheet the franchisor runs royalties on</em>, the
+      <em>email thread the accountant uses to chase client documents</em>,
+      and the <em>four different apps</em> a restaurant owner logs into
+      every morning to run their business.
+      <span class="attr">— The competitive frame that actually sells</span>
+    </blockquote>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     02 · THE PLATFORM
+     ═══════════════════════════════════════════════════════════════════════ -->
+<section class="ink">
+  <div class="wide">
+    <span class="section-num">02 · What is actually built</span>
+    <h2>Not a demo. <em>A production platform</em> with real data, real tenants, real audit trails.</h2>
+
+    <p class="lede drop-cap">Every claim in this section was verified
+      against the live Supabase project and the main branch of the repo
+      before this document was written. There is no &ldquo;will ship
+      soon&rdquo; here. The numbers are what the platform does today,
+      under live RLS, with real audit trails and real IFRS-balanced
+      books.</p>
+
+    <div class="stat-grid">
+      <div class="stat">
+        <div class="value">224k<span class="unit">LOC</span></div>
+        <div class="label">Production code</div>
+      </div>
+      <div class="stat">
+        <div class="value">14k+</div>
+        <div class="label">Stock movements, AVCO-costed</div>
+      </div>
+      <div class="stat">
+        <div class="value">409</div>
+        <div class="label">RLS policies, audited 11×</div>
+      </div>
+      <div class="stat">
+        <div class="value">206</div>
+        <div class="label">Cannabis dispensing events (S6)</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div>
+        <h4>Seven Portals</h4>
+        <p>HQ Command Centre · Tenant Portal · Admin Dashboard · HR Suite ·
+          Consumer Shop · Staff Portal · <strong>Group Portal</strong>
+          (multi-store franchise view, shipped S282 with a
+          <code>tenant_groups</code> + <code>tenant_group_members</code>
+          schema, cross-store KPI tiles, per-store comparison grid,
+          and inter-store transfer hooks).</p>
+
+        <h4>Four Industry Profiles</h4>
+        <p>One codebase that adapts at runtime to cannabis retail
+          (strain/THC/CBD + QR auth), cannabis dispensary (SAHPRA +
+          Schedule&nbsp;6 dispensing log + CSR), food &amp; beverage
+          (R638 allergens + HACCP + cold chain + recall) and
+          general retail. <strong>This is genuinely hard.</strong>
+          Most vertical SaaS either has one codebase per vertical
+          or glues modules on top of a generic core. NuAi is
+          one platform, four profiles, all live.</p>
+      </div>
+
+      <div>
+        <h4>AI that actually ships</h4>
+        <p>Not bolted-on AI features &mdash; Claude integrated into
+          workflow paths that users run every day.
+          <strong>Smart Capture</strong> photographs any SA supplier
+          invoice, extracts structured data, auto-journals with VAT,
+          creates stock movements &mdash; bookkeeping in ten seconds.
+          <strong>F&amp;B ingredient ingest</strong> (shipped this month)
+          turns a supplier invoice into ten ingredients with R638
+          allergens, HACCP risk, and nutrition panels. No other SA
+          product does this.</p>
+
+        <h4>Group Portal — the channel asset</h4>
+        <p>Combined revenue tile, network stock value at AVCO, per-store
+          comparison cards with margin &amp; top sellers, inter-store
+          transfer workflow, CSV export of network summary. This is
+          exactly what a franchise HQ sees on every Monday morning
+          today in five disconnected tools. <strong>NuAi delivers it
+          in one login.</strong></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     03 · THE MARKET
+     ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <div class="page">
+    <span class="section-num">03 · The South African Market</span>
+    <h2>A market that is both large enough to fund a category leader <em>and</em> underserved by the right shape of product.</h2>
+
+    <p>South Africa&rsquo;s business-software market is simultaneously
+      crowded at the edges and hollow in the middle. The edges have
+      either commodity accounting (Sage Pastel, Xero) at
+      R200&ndash;800 per seat per month, or enterprise ERP
+      (SAP Business One) at R10,000+ per seat per month. The middle
+      &mdash; the R3,500 to R15,000 per month, multi-function,
+      compliance-aware, AI-native band that SMEs and franchise groups
+      actually need &mdash; is effectively empty. That is the price
+      window NuAi was designed for.</p>
+
+    <div class="stat-grid">
+      <div class="stat">
+        <div class="value">R999<span class="unit">bn</span></div>
+        <div class="label">SA Franchise turnover (15% of GDP)</div>
+      </div>
+      <div class="stat">
+        <div class="value">727</div>
+        <div class="label">SA franchise systems (FASA 2023)</div>
+      </div>
+      <div class="stat">
+        <div class="value">$114<span class="unit">M</span></div>
+        <div class="label">SA Hospitality POS 2024 (9.7% CAGR)</div>
+      </div>
+      <div class="stat">
+        <div class="value">R40<span class="unit">bn</span></div>
+        <div class="label">SA cannabis at maturity</div>
+      </div>
+    </div>
+
+    <h3>Four verticals, four stories</h3>
+
+    <h4>Food &amp; Beverage</h4>
+    <p>South Africa has roughly 85,000 restaurants and 850 food-service
+      franchise systems. <strong>None</strong> have an integrated AI
+      ingredient-ingest + R638 compliance + HACCP + POS + financials
+      stack from one vendor. Apicbase (the global gold standard) is
+      Belgian, not SA-present, and starts at around
+      &pound;1,500&ndash;&pound;2,500 per site per month. NuAi ships
+      that capability at roughly a third of the price, fluent in SA
+      regulation from day one.</p>
+
+    <h4>Cannabis Dispensary</h4>
+    <p>SAHPRA has issued 120 medical cannabis licences with 93 active.
+      The commercial cannabis framework (Hemp and Cannabis
+      Commercialisation Policy) lands at Cabinet in April 2026 with a
+      Parliamentary Bill targeted for mid-2027. Operators who adopt
+      robust cannabis compliance software <strong>before</strong> the
+      licensing window opens start with two years of clean records on
+      day one of commercial approval. NuAi already ships Schedule 6
+      void-only dispensing logs, S21 patient tracking, HPCSA doctor
+      fields, and a Controlled Substance Register. <strong>This is
+      the strongest moat in the product.</strong></p>
+
+    <h4>Professional Services &amp; Trade (expansion)</h4>
+    <p>Neither vertical ships today &mdash; both are natural extensions
+      of the existing architecture. The industry-profile system already
+      handles four verticals; adding a fifth (<em>professional_services</em>)
+      and a sixth (<em>trade_services</em>) is an estimated
+      60&ndash;90 hours each, not a platform rewrite. See §06 for the
+      expansion roadmap.</p>
+
+    <h4>Franchise Groups (the channel)</h4>
+    <p>727 franchise systems. 68,463 franchisees. 15% of GDP. Multi-unit
+      ownership rising, brands favouring experienced operators.
+      <strong>The Group Portal is already built for this.</strong>
+      One franchisor adoption = 5 to 200 tenants on the platform for
+      the sales effort of a single SME deal. This is where the economics
+      of one-at-a-time SME acquisition break and channel sales win.</p>
+
+    <div class="callout">
+      <div class="label">Regulatory Timing</div>
+      <p style="margin:0;">The cannabis commercial licensing window opens
+        in 2027&ndash;2028. Every month between now and then is
+        a month NuAi&rsquo;s early dispensary customers accumulate
+        audit-ready records that their competitors will not have.
+        Time-to-compliance is a defensible moat that expires &mdash; and
+        it expires in our favour.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     04 · COMPETITIVE MATRIX
+     ═══════════════════════════════════════════════════════════════════════ -->
+<section class="cream">
+  <div class="wide">
+    <span class="section-num">04 · Competitive Landscape</span>
+    <h2>Nobody does all of this. <em>That&rsquo;s the shape of the opportunity.</em></h2>
+
+    <p class="wide-p">Eight capability clusters, eight competitors, one matrix.
+      The point is not &ldquo;NuAi wins every column.&rdquo; The point is
+      that <strong>every competitor wins one or two columns and loses the
+      rest</strong>, which is precisely what it looks like to have found an
+      unoccupied product-category shape. Ratings reflect public information,
+      product pages, and owner first-hand experience. Pricing estimates are
+      directional and normalised to monthly per-site.</p>
+
+    <table class="matrix">
+      <thead>
+        <tr>
+          <th class="capability">Capability</th>
+          <th class="pill">NuAi</th>
+          <th class="pill">Apicbase<br/><small style="font-weight:400;color:var(--ink-400);">BE · F&amp;B</small></th>
+          <th class="pill">GrowerIQ<br/><small style="font-weight:400;color:var(--ink-400);">CA · Cannabis</small></th>
+          <th class="pill">Sage<br/><small style="font-weight:400;color:var(--ink-400);">ZA · Accounts</small></th>
+          <th class="pill">Xero<br/><small style="font-weight:400;color:var(--ink-400);">GB · Accounts</small></th>
+          <th class="pill">SAP B1<br/><small style="font-weight:400;color:var(--ink-400);">DE · ERP</small></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="capability">Full IFRS financials from live ops<small>P&amp;L, BS, Cash Flow, Changes in Equity, Year-End</small></td>
+          <td class="pill"><span class="dot full">●</span></td>
+          <td class="pill"><span class="dot none">○</span></td>
+          <td class="pill"><span class="dot none">○</span></td>
+          <td class="pill"><span class="dot full">●</span></td>
+          <td class="pill"><span class="dot full">●</span></td>
+          <td class="pill"><span class="dot full">●</span></td>
+        </tr>
+        <tr>
+          <td class="capability">POS + inventory with AVCO costing<small>Real-time cost recalc on every movement</small></td>
+          <td class="pill"><span class="dot full">●</span></td>
+          <td class="pill"><span class="dot part">◐</span></td>
+          <td class="pill"><span class="dot part">◐</span></td>
+          <td class="pill"><span class="dot addon">+</span></td>
+          <td class="pill"><span class="dot addon">+</span></td>
+          <td class="pill"><span class="dot full">●</span></td>
+        </tr>
+        <tr>
+          <td class="capability">SA tax &amp; labour compliance<small>VAT201 pipeline, BCEA leave, R638 allergens, SAHPRA S6</small></td>
+          <td class="pill"><span class="dot full">●</span></td>
+          <td class="pill"><span class="dot none">○</span></td>
+          <td class="pill"><span class="dot none">○</span></td>
+          <td class="pill"><span class="dot full">●</span></td>
+          <td class="pill"><span class="dot part">◐</span></td>
+          <td class="pill"><span class="dot part">◐</span></td>
+        </tr>
+        <tr>
+          <td class="capability">AI document ingest &amp; Smart Capture<small>Invoice photo → structured data + auto-journal</small></td>
+          <td class="pill"><span class="dot full">●</span></td>
+          <td class="pill"><span class="dot full">●</span></td>
+          <td class="pill"><span class="dot none">○</span></td>
+          <td class="pill"><span class="dot part">◐</span></td>
+          <td class="pill"><span class="dot part">◐</span></td>
+          <td class="pill"><span class="dot part">◐</span></td>
+        </tr>
+        <tr>
+          <td class="capability">F&amp;B recipes, HACCP, allergens, cold chain<small>R638-compliant, SA DAFF-aware</small></td>
+          <td class="pill"><span class="dot full">●</span></td>
+          <td class="pill"><span class="dot full">●</span></td>
+          <td class="pill"><span class="dot none">○</span></td>
+          <td class="pill"><span class="dot none">○</span></td>
+          <td class="pill"><span class="dot none">○</span></td>
+          <td class="pill"><span class="dot part">◐</span></td>
+        </tr>
+        <tr>
+          <td class="capability">Cannabis dispensing compliance<small>SAHPRA S6 void-only, CSR ledger, HPCSA</small></td>
+          <td class="pill"><span class="dot full">●</span></td>
+          <td class="pill"><span class="dot none">○</span></td>
+          <td class="pill"><span class="dot full">●</span></td>
+          <td class="pill"><span class="dot none">○</span></td>
+          <td class="pill"><span class="dot none">○</span></td>
+          <td class="pill"><span class="dot none">○</span></td>
+        </tr>
+        <tr>
+          <td class="capability">Multi-store franchise Group Portal<small>Cross-store KPIs, transfers, royalty schema</small></td>
+          <td class="pill"><span class="dot full">●</span></td>
+          <td class="pill"><span class="dot part">◐</span></td>
+          <td class="pill"><span class="dot none">○</span></td>
+          <td class="pill"><span class="dot none">○</span></td>
+          <td class="pill"><span class="dot none">○</span></td>
+          <td class="pill"><span class="dot full">●</span></td>
+        </tr>
+        <tr>
+          <td class="capability">Price per site, entry tier<small>Monthly, before add-ons</small></td>
+          <td class="pill" style="font-family:var(--font-mono);font-size:12px;font-weight:600;">R3.5k</td>
+          <td class="pill" style="font-family:var(--font-mono);font-size:12px;">£1.5k+</td>
+          <td class="pill" style="font-family:var(--font-mono);font-size:12px;">CAD 500+</td>
+          <td class="pill" style="font-family:var(--font-mono);font-size:12px;">R500+</td>
+          <td class="pill" style="font-family:var(--font-mono);font-size:12px;">R400+</td>
+          <td class="pill" style="font-family:var(--font-mono);font-size:12px;">R10k+</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="legend">
+      <div class="item"><span class="dot full" style="width:14px;height:14px;">&nbsp;</span>Full native capability</div>
+      <div class="item"><span class="dot part" style="width:14px;height:14px;">&nbsp;</span>Partial or add-on</div>
+      <div class="item"><span class="dot addon" style="width:14px;height:14px;">&nbsp;</span>Via paid integration</div>
+      <div class="item"><span class="dot none" style="width:14px;height:14px;">&nbsp;</span>Not available</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     05 · MOATS
+     ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <div class="page">
+    <span class="section-num">05 · Defensibility</span>
+    <h2>Five moats, ranked <em>honestly</em> by how hard each is to replicate.</h2>
+
+    <p>Anyone can write a React frontend and a Postgres schema. The five
+      things below are not in that category. They represent either long
+      regulatory-research investments, infrastructure advantages with real
+      switching costs, or timing windows that close. Strength bars are
+      self-assessed against the question &ldquo;how long would a
+      well-funded competitor need to match this?&rdquo;</p>
+
+    <div class="moat">
+      <div class="num">01</div>
+      <div class="body">
+        <h4>SA-native regulatory compliance depth</h4>
+        <p>R638 food allergens with intrinsic-containment flags, SAHPRA Schedule 6
+          void-only dispensing, SARS VAT 201 auto-population, BCEA leave patterns,
+          HPCSA prescriber fields, 40 SA public holidays seeded. Replication cost
+          is not the code &mdash; it&rsquo;s the 12+ months of SA-specific research
+          to know which fields matter, which regulations govern, and which
+          formats are inspector-acceptable.</p>
+      </div>
+      <div class="strength">
+        High · ~12mo<div class="strength-bar">
+          <span class="filled"></span><span class="filled"></span><span class="filled"></span><span class="filled"></span><span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="moat">
+      <div class="num">02</div>
+      <div class="body">
+        <h4>Cannabis regulatory timing window</h4>
+        <p>Commercial licensing opens 2027&ndash;2028. Every tenant NuAi onboards
+          today accumulates Schedule 6 void-only logs, perpetual CSR ledger, S21
+          authorisation history. Competitors who enter the category after
+          licensing start their customers on day zero of records. This moat
+          closes &mdash; in our favour &mdash; as the window approaches.</p>
+      </div>
+      <div class="strength">
+        High · expiring<div class="strength-bar">
+          <span class="filled"></span><span class="filled"></span><span class="filled"></span><span class="filled"></span><span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="moat">
+      <div class="num">03</div>
+      <div class="body">
+        <h4>Industry-profile architecture</h4>
+        <p>One codebase, four profiles, live. Most vertical SaaS either forks
+          per vertical or glues modules onto a generic core. NuAi&rsquo;s
+          runtime-branching profile system is a genuinely difficult architectural
+          achievement: 26 files with profile branching, <code>getWaterfall()</code>
+          producing four distinct nav topologies, revenue sources that differ
+          per profile (dispensary from <code>dispensing_log</code>, F&amp;B from
+          <code>orders</code>). Replicable but non-trivial &mdash; 6&ndash;9 months
+          minimum.</p>
+      </div>
+      <div class="strength">
+        Medium · ~6mo<div class="strength-bar">
+          <span class="filled"></span><span class="filled"></span><span class="filled"></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="moat">
+      <div class="num">04</div>
+      <div class="body">
+        <h4>AI that is in the workflow, not on top of it</h4>
+        <p>Smart Capture, ingredient ingest, ProteaAI, the nightly loyalty
+          engine &mdash; Claude is a code-path citizen, not a chat widget bolted
+          onto a legacy app. Switching cost for a tenant who has run six months
+          of Smart-Capture bookkeeping is meaningful: their expense journal
+          history, VAT trail, and auto-generated entries all live here.
+          Replicable technically; switching-cost moat grows with tenure.</p>
+      </div>
+      <div class="strength">
+        Medium · compounding<div class="strength-bar">
+          <span class="filled"></span><span class="filled"></span><span class="filled"></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="moat">
+      <div class="num">05</div>
+      <div class="body">
+        <h4>Group-Portal channel readiness</h4>
+        <p><code>tenant_groups</code> and <code>tenant_group_members</code> are
+          live schema with a working NetworkDashboard, per-store comparison grid,
+          combined stock value at AVCO, and inter-store transfer hooks.
+          The <em>royalty_percentage</em> field exists in schema; UI to surface
+          it arrives in the next franchise-feature sprint. Most ERPs either don&rsquo;t
+          have a group view or sell it as a six-figure enterprise add-on.
+          NuAi ships it at standard pricing. This is the asset that makes
+          channel sales economically viable.</p>
+      </div>
+      <div class="strength">
+        Medium · widening<div class="strength-bar">
+          <span class="filled"></span><span class="filled"></span><span class="filled"></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     06 · ROADMAP — profile expansion
+     ═══════════════════════════════════════════════════════════════════════ -->
+<section class="cream">
+  <div class="wide">
+    <span class="section-num">06 · The Expansion Roadmap</span>
+    <h2>Four profiles today. <em>Eight</em> within twelve months. Same codebase.</h2>
+
+    <p class="wide-p">The industry-profile system was designed to expand. Every
+      new profile inherits the financial suite, HR, loyalty, QR, stock, and
+      POS stack automatically &mdash; the profile defines what is different
+      (nav topology, fields, compliance surfaces, revenue source), not a
+      duplicate platform.</p>
+
+    <div class="roadmap">
+      <div class="roadmap-row">
+        <div class="profile">Cannabis Retail<small>cannabis_retail</small></div>
+        <div class="detail">
+          <p>Strain / THC / CBD catalogue, molecule education, QR authentication
+            on every product, velocity-weighted reorder.</p>
+          <p>2 tenants seeded · 1,758 real orders (Medi Recreational).</p>
+        </div>
+        <div class="status live">Live</div>
+      </div>
+      <div class="roadmap-row">
+        <div class="profile">Cannabis Dispensary<small>cannabis_dispensary</small></div>
+        <div class="detail">
+          <p>SAHPRA S21 patient file · HPCSA prescriber · Schedule 6 void-only
+            dispensing · Controlled Substance Register · clinical alerts.</p>
+          <p>2 tenants seeded · 206 dispensing events · auditor-grade records.</p>
+        </div>
+        <div class="status live">Live</div>
+      </div>
+      <div class="roadmap-row">
+        <div class="profile">Food &amp; Beverage<small>food_beverage</small></div>
+        <div class="detail">
+          <p>281 SA ingredients · R638 allergens · HACCP CCP log · cold chain ·
+            recall simulation · FSCA letter generator · AI ingredient ingest
+            (shipped April 2026).</p>
+          <p>2 tenants seeded · 3,388 orders.</p>
+        </div>
+        <div class="status live">Live</div>
+      </div>
+      <div class="roadmap-row">
+        <div class="profile">General Retail<small>general_retail</small></div>
+        <div class="detail">
+          <p>Standard SKU management · wholesale B2B orders · landed-cost
+            calculator with live FX · full stock control.</p>
+          <p>3 tenants seeded.</p>
+        </div>
+        <div class="status live">Live</div>
+      </div>
+      <div class="roadmap-row">
+        <div class="profile">Professional Services<small>professional_services</small></div>
+        <div class="detail">
+          <p>Project / matter-based billing, time capture, retainers, WIP
+            accounting, SARS PAYE + IRP5 alignment, CIPRO compliance tabs.
+            Accounting firms, legal practices, consulting. Expected fit with
+            <strong>accounting-firm reseller channel</strong>.</p>
+          <p>~80 hours build, reuses 85% of platform surface.</p>
+        </div>
+        <div class="status soon">2026 Q3</div>
+      </div>
+      <div class="roadmap-row">
+        <div class="profile">Trade &amp; Project Mgmt<small>trade_services</small></div>
+        <div class="detail">
+          <p>Job cards, material take-offs, progress payments, per-project P&amp;L,
+            subcontractor ledger, site-based inventory. Electrical, plumbing,
+            construction trades &mdash; high-variance job costing that generic
+            ERPs handle poorly.</p>
+          <p>~90 hours build. Strong franchise-channel adjacency (trade franchises
+            = 12% of FASA top sectors).</p>
+        </div>
+        <div class="status soon">2026 Q4</div>
+      </div>
+      <div class="roadmap-row">
+        <div class="profile">Hospitality &amp; Hotels<small>hospitality</small></div>
+        <div class="detail">
+          <p>Room inventory, rate management, PMS-adjacent booking surface,
+            F&amp;B revenue rollup, conference package billing. Natural
+            F&amp;B profile extension once ingredient-ingest UI is hardened.</p>
+          <p>Evaluation phase.</p>
+        </div>
+        <div class="status future">2027 H1</div>
+      </div>
+      <div class="roadmap-row">
+        <div class="profile">Inter-Tenant Intelligence<small>cross-tenant commerce</small></div>
+        <div class="detail">
+          <p>Suppliers who run on NuAi appearing in their resellers&rsquo;
+            Smart Capture auto-match. Inter-tenant stock transfers with shared
+            journal entries. Network-wide financial intelligence at the Group
+            Portal &mdash; P&amp;L consolidation across subsidiary tenants with
+            royalty-flow automation. The Group Portal becomes a product in its
+            own right.</p>
+          <p>Layered on existing Group Portal schema. ~120 hours.</p>
+        </div>
+        <div class="status future">2027 H1</div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <div class="label">What this table means commercially</div>
+      <p style="margin:0;">Each new profile unlocks a new addressable market
+        without new infrastructure cost. Professional Services and Trade are
+        the highest-leverage additions because they have natural channel
+        partners already identified (accounting firms, trade franchise groups).
+        The Inter-Tenant Intelligence layer is what converts
+        &ldquo;multi-store franchise tool&rdquo; into &ldquo;operating system
+        for a network of businesses,&rdquo; which is a materially more valuable
+        positioning.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     07 · THE PLAYBOOKS
+     ═══════════════════════════════════════════════════════════════════════ -->
+<section class="ink">
+  <div class="wide">
+    <span class="section-num">07 · Go-to-Market Playbooks</span>
+    <h2>Three channels. One is the <em>main road</em>, two are the <em>offramps</em>.</h2>
+
+    <p class="lede">These are not &ldquo;options to consider.&rdquo; They are
+      sequences with concrete 30 / 60 / 90 milestones that a solo founder
+      can actually run in parallel. Each playbook specifies the access
+      mechanism, the pitch angle, the expected deal size, the concrete
+      first moves, and the known failure modes.</p>
+
+    <!-- PLAYBOOK 1 · FRANCHISE CHANNEL -->
+    <div class="playbook">
+      <div class="playbook-head">
+        <span class="tag">Main Road</span>
+        <h3>Playbook&nbsp;A &middot; The <em>Franchise Channel</em></h3>
+        <div class="verdict">Expected ARR per deal<strong>R200k – R2.4M</strong></div>
+      </div>
+      <div class="playbook-body">
+        <div class="playbook-grid">
+          <div class="block">
+            <h4>Target profile</h4>
+            <p>SA franchise systems, 5 to 50 outlets, multi-industry. F&amp;B
+              preferred first (we already have the demo assets). Start
+              mid-size &mdash; enterprise (100+) wants RFP processes we do not
+              yet have staffed.</p>
+          </div>
+          <div class="block">
+            <h4>Pitch angle</h4>
+            <p>&ldquo;Your stores run a patchwork of five tools. NuAi is one
+              login. Free 90-day pilot across HQ + 2 stores. If it doesn&rsquo;t
+              save you one EHP inspection and 20 hours per month, we refund
+              everything.&rdquo; The Group Portal demo is the closing moment.</p>
+          </div>
+          <div class="block">
+            <h4>How to access them</h4>
+            <p>FASA Professional Service Provider membership (annual fee is
+              small; directory presence is large). Absa Franchise Banking
+              warm intros &mdash; they publish sector reports and know every
+              franchisor. Whichfranchise.co.za directory as a cold-outreach
+              list. Eric Parker (FranchisingPlus) and Vera Valasis (Absa) as
+              known gatekeepers.</p>
+          </div>
+          <div class="block">
+            <h4>Known failure modes</h4>
+            <p>Franchisors are conservative. Sales cycles run 6 to 18 months.
+              Expect three meetings per deal minimum. A pilot that cannot
+              survive a first-meeting demo of the <strong>full</strong>
+              SA-native compliance surface will fail &mdash; polish 2B.3/2B.4
+              (ingredient ingest UI) and the R638 allergen demo before the
+              first franchise meeting.</p>
+          </div>
+        </div>
+
+        <div class="playbook-sequence">
+          <h4>30 / 60 / 90 sequence</h4>
+          <div class="step">
+            <div class="when">Day 0–30</div>
+            <div class="what"><strong>Finish 2B.4 &amp; 2B.5.</strong> Join FASA
+              as Professional Service Provider. Record a 2-minute demo video
+              of the ingredient-ingest moment + Group Portal cross-store view.
+              LinkedIn profile refresh to &ldquo;Founder, Nu Ai (Pty) Ltd &mdash;
+              multi-tenant ERP for SA specialty retail &amp; franchise groups.&rdquo;
+              Build a 20-name target list from FASA directory + Absa contacts.</div>
+          </div>
+          <div class="step">
+            <div class="when">Day 30–60</div>
+            <div class="what"><strong>First warm intros.</strong> Reach 5 named
+              franchisors via FASA directory, Absa connections, or mutual
+              acquaintances. Objective: 3 first meetings. Prepare a
+              one-page PDF leave-behind that mirrors this document&rsquo;s
+              cover + competitive matrix. Do not send a deck; send one
+              document.</div>
+          </div>
+          <div class="step">
+            <div class="when">Day 60–90</div>
+            <div class="what"><strong>First paid pilot committed.</strong>
+              One franchise group signs a written pilot agreement (see
+              Playbook C) covering HQ + 2 outlets for 90 days free, with
+              conversion to paid at R15k&ndash;50k/month across the network.
+              Document every click, every hour saved, every
+              invoice caught by Smart Capture &mdash; this becomes case-study
+              material for pipeline 2 and pipeline 3.</div>
+          </div>
+          <div class="step">
+            <div class="when">Day 90–180</div>
+            <div class="what"><strong>Close pilot to paid.</strong> Second
+              franchise group lands as warm referral from the first.
+              ARR reaches R400k&ndash;1.2M. LinkedIn post-of-the-quarter built
+              around pilot&rsquo;s measurable saved hours &mdash; inbound starts.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PLAYBOOK 2 · ACCOUNTING FIRM -->
+    <div class="playbook">
+      <div class="playbook-head">
+        <span class="tag" style="background:var(--nu-gold);color:var(--ink);">Offramp #1</span>
+        <h3>Playbook&nbsp;B &middot; The <em>Accounting-Firm</em> Channel</h3>
+        <div class="verdict">Expected ARR per firm<strong>R600k – R7.5M</strong></div>
+      </div>
+      <div class="playbook-body">
+        <div class="playbook-grid">
+          <div class="block">
+            <h4>Target profile</h4>
+            <p>SA accounting firms, 5 to 30 partners, with complex clients
+              (F&amp;B chains, multi-store retail, medical cannabis,
+              franchise owners). Sole practitioners acceptable if their
+              book exceeds 20 clients.</p>
+          </div>
+          <div class="block">
+            <h4>Pitch angle</h4>
+            <p>&ldquo;We are not replacing your firm. We are making your
+              clients&rsquo; books 10× better to work with. Your working
+              papers become automatic. Your year-ends drop from four days
+              to four hours. We pay R500 per client per month referral
+              fee.&rdquo;</p>
+          </div>
+          <div class="block">
+            <h4>How to access them</h4>
+            <p>SAICA events, LinkedIn outreach to partners at mid-sized
+              firms, your own accountant as first beta firm. Local
+              practice associations (SAIPA for tax practitioners).
+              Accounting-firm-focused content on LinkedIn (&ldquo;what we
+              automated for a 30-outlet F&amp;B client this month&rdquo;).</p>
+          </div>
+          <div class="block">
+            <h4>Known failure modes</h4>
+            <p>Accountants are skeptical of AI &mdash; rightly, given how
+              many tools overreach. NuAi must be demonstrably
+              <strong>conservative</strong> in what it auto-posts:
+              Smart Capture stages for review, never auto-books without
+              approval. Referral-fee margin pressure if firms want 20%+.
+              Hold at 10&ndash;15%.</p>
+          </div>
+        </div>
+
+        <div class="playbook-sequence">
+          <h4>30 / 60 / 90 sequence</h4>
+          <div class="step">
+            <div class="when">Day 0–30</div>
+            <div class="what"><strong>Build the accountant-facing demo.</strong>
+              Ten-minute screen recording of (a) Smart Capture auto-journal
+              with VAT, (b) Trial Balance Excel export &mdash; see backlog
+              item LOOP-FIN-004, 2 hours of work &mdash; (c) year-end lock
+              workflow. Accountant CFO magnet is the Excel export.
+              Draft a partner-agreement template with referral-fee
+              mechanics.</div>
+          </div>
+          <div class="step">
+            <div class="when">Day 30–60</div>
+            <div class="what"><strong>First firm conversation.</strong>
+              Target: your own accountant plus 2 others you can reach via
+              warm intro. Objective: one firm agrees to a trial with their
+              top 3 complex clients. <strong>Not</strong> a reseller
+              commitment yet &mdash; a trial.</div>
+          </div>
+          <div class="step">
+            <div class="when">Day 60–90</div>
+            <div class="what"><strong>First firm-referred client converts.</strong>
+              Firm refers one of their clients. Client signs direct with
+              NuAi; firm receives referral fee. NuAi now has a case study
+              that says &ldquo;referred by [Firm Name]&rdquo; &mdash; this is
+              worth more than a direct-sale case study because it validates
+              the accountant channel.</div>
+          </div>
+          <div class="step">
+            <div class="when">Day 90–180</div>
+            <div class="what"><strong>First formal reseller agreement.</strong>
+              Firm formalises NuAi as their recommended software for
+              multi-store F&amp;B clients. 5&ndash;10 client referrals
+              queued. ARR per firm reaches R300k&ndash;R750k.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PLAYBOOK 3 · PILOT FORMALISATION -->
+    <div class="playbook">
+      <div class="playbook-head">
+        <span class="tag" style="background:var(--bone);color:var(--ink);">Offramp #2</span>
+        <h3>Playbook&nbsp;C &middot; The <em>Reference-Customer</em> Engine</h3>
+        <div class="verdict">Expected output<strong>2 usable case studies</strong></div>
+      </div>
+      <div class="playbook-body">
+        <div class="playbook-grid">
+          <div class="block">
+            <h4>Why this exists</h4>
+            <p>Existing small-retailer pilots are running informally. They
+              need to be formalised <strong>before</strong> being used as
+              sales references, to protect both sides. An informal
+              relationship that sours leaves nothing usable in sales
+              conversations, and potentially creates POPIA exposure.</p>
+          </div>
+          <div class="block">
+            <h4>The minimum viable formalisation</h4>
+            <p>Written pilot agreement (3&ndash;6 months free, scope,
+              liability limits), POPIA consent for data holding and deletion,
+              named primary contact (person not shop), agreed success
+              criteria (measurable), written case-study permission,
+              pilot-to-paid conversion path with notice period.</p>
+          </div>
+          <div class="block">
+            <h4>Why this gates the other playbooks</h4>
+            <p>Both the franchise and accounting-firm pitches get dramatically
+              stronger when NuAi can say &ldquo;here is the tenant who saved
+              R240k on stock write-offs in their first quarter, quote
+              available, site visit available.&rdquo; Without formal
+              pilots, those sentences are unusable.</p>
+          </div>
+          <div class="block">
+            <h4>Legal cost</h4>
+            <p>R2&ndash;5k one-off for template drafting by a commercial
+              attorney. Template reused across all future pilots. Amortised
+              per pilot: negligible. Worth every rand to avoid the one
+              pilot that sours and leaves a commercial mess.</p>
+          </div>
+        </div>
+
+        <div class="playbook-sequence">
+          <h4>Sequence</h4>
+          <div class="step">
+            <div class="when">Week 1</div>
+            <div class="what"><strong>Template drafted.</strong> Commercial attorney
+              produces pilot agreement + POPIA consent + case-study release.
+              Templates stored in the repo as
+              <code>docs/legal/PILOT-TEMPLATE_v1.md</code>.</div>
+          </div>
+          <div class="step">
+            <div class="when">Week 2</div>
+            <div class="what"><strong>Existing pilots formalised.</strong> Every
+              informal pilot is converted to formal with written agreement,
+              named contact, and agreed 90-day success metrics. Takes
+              30&ndash;60 minutes per pilot. Any pilot that will not sign
+              the formalisation is not a pilot &mdash; it&rsquo;s a courtesy
+              access and gets written up that way.</div>
+          </div>
+          <div class="step">
+            <div class="when">Week 4</div>
+            <div class="what"><strong>First case study published.</strong> One
+              pilot with written permission becomes a two-page case study
+              (challenge / implementation / numbers / quote). Shared on
+              LinkedIn, embedded in the pitch document, sent as leave-behind
+              to franchise meetings. This is the single highest-leverage
+              one-page artefact in the GTM arsenal.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     08 · UNIT ECONOMICS
+     ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <div class="page">
+    <span class="section-num">08 · Unit Economics</span>
+    <h2>Know the per-tenant math <em>before</em> signing the first paid contract.</h2>
+
+    <p>NuAi&rsquo;s largest variable cost is the Anthropic API &mdash; every
+      Smart Capture, every ingredient ingest, every ProteaAI query, every
+      nightly loyalty job costs real money. This cost line has never been
+      modelled. The table below is a directional model to be validated
+      through the first paid contract. The principle is simple: <strong>COGS
+      stays below 30&thinsp;% of revenue per tenant at every usage tier, or
+      pricing changes.</strong></p>
+
+    <div class="math">
+      <div class="row">
+        <div class="label">Casual SME · 5 invoices/week</div>
+        <div class="val">R150–R350 /mo</div>
+      </div>
+      <div class="row">
+        <div class="label">Active SME · 3 invoices/day</div>
+        <div class="val">R450–R1,100 /mo</div>
+      </div>
+      <div class="row">
+        <div class="label">Franchise outlet · 10 invoices/day</div>
+        <div class="val">R1,500–R3,500 /mo</div>
+      </div>
+      <div class="row">
+        <div class="label">Enterprise F&amp;B · 50 invoices/day</div>
+        <div class="val">R7,500–R17,000 /mo</div>
+      </div>
+      <div class="row total">
+        <div class="label">Implied COGS discipline</div>
+        <div class="val">&lt; 30% of ARPU</div>
+      </div>
+    </div>
+
+    <h3>Pricing tiers to match COGS curves</h3>
+
+    <p>The work package <strong>WP-UNIT-ECONOMICS</strong> (logged in the
+      repo at <code>docs/PENDING-ACTIONS.md</code>) formalises these numbers
+      against actual Anthropic billing. Before first paid contract lands, a
+      spreadsheet must exist that shows: per-operation input/output token
+      cost for every Claude-calling edge function; per-tenant-month total
+      at each usage scenario; pricing tiers (Starter / Growth / Enterprise)
+      with ingest rate-caps that keep unit economics healthy.</p>
+
+    <div class="callout">
+      <div class="label">Gatekeeper: WP-INGEST-RATE-LIMIT</div>
+      <p style="margin:0;">A per-tenant daily cap on AI ingest calls
+        (soft warn at 20/day, hard cap at 50/day) is prerequisite for any
+        paid F&amp;B contract. Without it, a single tenant bulk-uploading
+        200 invoices in an afternoon generates 200 API calls and destroys
+        their contribution margin on day one. This work is logged, scoped at
+        approximately 3 hours, and blocks revenue on the F&amp;B vertical.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     09 · HONEST GAPS
+     ═══════════════════════════════════════════════════════════════════════ -->
+<section class="cream">
+  <div class="wide">
+    <span class="section-num">09 · What Doesn&rsquo;t Exist Yet</span>
+    <h2>The honest gap list. <em>None</em> block a pilot. <em>All</em> block enterprise sales.</h2>
+
+    <p class="wide-p">A GTM document that only lists strengths is not a GTM
+      document. This section exists because sophisticated buyers &mdash;
+      franchise groups, accounting firms, investors &mdash; will ask about
+      these items early. Addressing them proactively is faster than being
+      caught by them in a due-diligence call.</p>
+
+    <div class="gaps">
+      <div class="gap-card">
+        <h4>Polish gaps (SME-acceptable, not enterprise-acceptable)</h4>
+        <ul>
+          <li>HQ Transfer atomicity: per-line loop, no transaction wrapper &mdash; partial failures possible.</li>
+          <li>~100 RLS policies use inline <code>user_profiles</code> subqueries. Fragile under load. WP-RLS-HYGIENE logged.</li>
+          <li>POS VAT pipeline not writing to <code>vat_transactions</code> &mdash; R5k BS gap per tenant with amber banner.</li>
+          <li>Trial Balance Excel export missing (CAs want this for working papers). 2 hours.</li>
+          <li>Mobile Smart Capture for F&amp;B ingredients deferred to Phase 2F.</li>
+        </ul>
+      </div>
+
+      <div class="gap-card">
+        <h4>Enterprise-readiness gaps</h4>
+        <ul>
+          <li>White-label theming partial; HQ not themable.</li>
+          <li>Real auth invitation flow (tenant-admin-onboards-staff) still manual.</li>
+          <li>No production email infrastructure (Resend integration scoped, not shipped).</li>
+          <li>No formal SLA, no pen-test, no SOC&nbsp;2 &mdash; enterprise buyers ask.</li>
+          <li>No documented disaster-recovery procedures.</li>
+          <li>Yoco production keys waiting on CIPRO + nuai.co.za domain.</li>
+        </ul>
+      </div>
+
+      <div class="gap-card">
+        <h4>Commercial-readiness gaps</h4>
+        <ul>
+          <li>Unit-economics spreadsheet not modelled. Blocks pricing first contract.</li>
+          <li>Ingest rate-limit not enforced. Blocks first paid F&amp;B tenant.</li>
+          <li>Existing pilots informal. Blocks case-study use.</li>
+          <li>No pitch deck, no demo video, no one-page leave-behind.</li>
+          <li>No LinkedIn / brand presence beyond the founder&rsquo;s personal profile.</li>
+        </ul>
+      </div>
+
+      <div class="gap-card">
+        <h4>Organisational gaps</h4>
+        <ul>
+          <li>CAC / churn / retention: zero data. Every paid customer is also an econometric experiment.</li>
+          <li>Support tier model: nobody is defined as &ldquo;the person who answers at 2am when cash-up fails.&rdquo;</li>
+          <li>Onboarding playbooks: not written.</li>
+          <li>POPIA audit: not formally completed.</li>
+          <li>Terms of service / privacy policy / master agreement templates: drafts only.</li>
+        </ul>
+      </div>
+    </div>
+
+    <p><strong>The observation that matters.</strong> None of the polish or
+      enterprise gaps block a 30-outlet franchise pilot. They become blockers
+      only at the point someone signs a R500k+ annual contract and does
+      proper due diligence. That moment is roughly 90&ndash;180 days away on
+      the Playbook A timeline. These items are scheduled against that window,
+      not against today.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     10 · WHAT TO DO NEXT
+     ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <div class="page">
+    <span class="section-num">10 · What to do starting Monday</span>
+    <h2>One builder. Three channels. <em>Ordered</em>, not stacked.</h2>
+
+    <p>The temptation is to spread across all three playbooks at once.
+      Resist it. The sequence below is a reality-respecting ordering:
+      finish one demo-ready moment, sign one formal pilot, land one
+      franchise meeting. Every other move compounds off those three.</p>
+
+    <div class="decision-grid">
+      <div class="decision-cell">
+        <div class="time">Next 30 days</div>
+        <h4>Foundation</h4>
+        <ol>
+          <li>Ship PR&nbsp;2B.4 (Ingest Queue review UI) and PR&nbsp;2B.5 (gate PR) &mdash; closes the F&amp;B demo loop.</li>
+          <li>Produce unit-economics spreadsheet (WP-UNIT-ECONOMICS, 2 hours).</li>
+          <li>Ship WP-INGEST-RATE-LIMIT (3 hours). First paid F&amp;B contract blocked without this.</li>
+          <li>Record 2-minute demo video of ingredient-ingest moment + Group Portal cross-store view.</li>
+          <li>Draft legal templates via commercial attorney &mdash; pilot agreement, POPIA consent, case-study release.</li>
+          <li>Formalise all existing informal pilots with written agreements.</li>
+          <li>Join FASA as Professional Service Provider.</li>
+        </ol>
+      </div>
+
+      <div class="decision-cell">
+        <div class="time">Days 30–60</div>
+        <h4>First reference</h4>
+        <ol>
+          <li>One formalised pilot becomes the first written case study (2-page PDF, numbers + quote).</li>
+          <li>LinkedIn profile refreshed; founder post goes live with demo video.</li>
+          <li>One-page leave-behind built &mdash; cover + competitive matrix from this document.</li>
+          <li>Target list: 20 franchisors (FASA + Absa), 5 accounting firms (warm intros only).</li>
+          <li>First outreach wave &mdash; target: 3 franchisor meetings, 2 firm conversations.</li>
+          <li>Ship Trial Balance Excel export (LOOP-FIN-004, 2 hours). CFO magnet.</li>
+          <li>Fix HQTransfer atomicity (WATCH-003). Demo-quality fix.</li>
+        </ol>
+      </div>
+
+      <div class="decision-cell">
+        <div class="time">Days 60–180</div>
+        <h4>First paid deal</h4>
+        <ol>
+          <li>First franchise group commits to paid pilot (HQ + 2 stores, R15k&ndash;R50k/mo).</li>
+          <li>First accounting firm agrees to trial with 3 complex clients.</li>
+          <li>Second franchise meeting sourced from first pilot&rsquo;s referral.</li>
+          <li>Professional-services profile scoped (not shipped) &mdash; assets for firm-channel pitch.</li>
+          <li>WP-RLS-HYGIENE migration begins. Enterprise-readiness compounds.</li>
+          <li>POPIA formal compliance audit commissioned.</li>
+          <li>First R100k MRR target. Mix: 1 franchise + 5 SMEs + 2 firm-referred clients.</li>
+        </ol>
+      </div>
+    </div>
+
+    <blockquote class="pullquote">
+      The thing holding the value is not the code. It is that you&rsquo;ve
+      been building in isolation. A 2-minute demo video on LinkedIn will
+      generate more inbound than any cold outreach campaign. The fastest
+      lever is the one you haven&rsquo;t pulled.
+      <span class="attr">— The brutal honest take, intact</span>
+    </blockquote>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     FOOTER
+     ═══════════════════════════════════════════════════════════════════════ -->
+<footer>
+  <div class="page">
+    <div class="colophon">
+      <div>
+        <h4>About this document</h4>
+        <p>A strategic thesis for Nu Ai (Pty) Ltd, produced in collaboration
+          with the planner-agent after a live audit of the production
+          platform and its market. Every capability claim, capacity figure,
+          and architectural statement was verified against the live
+          codebase and database before it was written.</p>
+        <p>This is a working document. It will be amended as pilots
+          complete, as the market reacts, and as the unit-economics
+          model gets its first real data points. All versions retained
+          in git.</p>
+      </div>
+      <div>
+        <h4>Provenance</h4>
+        <p>Platform audit read from commit <strong>085c2ff</strong> on
+          the <code>main</code> branch of
+          github.com/GFive5y/protea-botanicals.</p>
+        <p>Market data sourced from: FASA 2023 Franchise Survey &middot;
+          Absa/FASA Franchise Industry Report 2024 &middot; Grand View
+          Research (SA Hospitality POS 2024&ndash;2030) &middot; SAHPRA
+          official statements &middot; GrowerIQ SA policy analysis
+          (2026) &middot; direct competitor product pages (Apicbase,
+          GrowerIQ, Sage, Xero, SAP B1).</p>
+        <p>Built on <code>docs/NUAI-STRATEGIC-DEEP-DIVE_v1_0.md</code>
+          (commit <code>d0bb6af</code>) &mdash; this is its
+          customer-facing successor.</p>
+      </div>
+    </div>
+    <div class="sig">
+      <span>Nu <strong>Ai</strong> (Pty) Ltd</span>
+      <span>GTM Strategy v1.0 &middot; April 2026</span>
+      <span>Classification: Internal + Select External</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
