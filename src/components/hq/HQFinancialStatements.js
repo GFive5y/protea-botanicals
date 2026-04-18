@@ -10,12 +10,13 @@
 // Status workflow: any authenticated user with access can advance (tenant self-managed)
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Printer, Mail, Lock, Download } from "lucide-react";
+import { Printer, Mail, Lock, Download, FileSpreadsheet } from "lucide-react";
 import { createPortal } from "react-dom";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
 import HQFinancialSetup from "./HQFinancialSetup";
 import { sendStatementEmail } from "../../services/emailService";
+import { exportTrialBalanceExcel } from "../../services/trialBalanceExcel";
 import { T } from "../../styles/tokens";
 
 // Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
@@ -397,6 +398,7 @@ export default function HQFinancialStatements() {
   const [downloading, setDownloading] = useState(false);
   const [tbData, setTbData] = useState(null); // WP-FIN-004 PR 3
   const [drillAccount, setDrillAccount] = useState(null); // WP-FIN-004 PR 3
+  const [exportingTb, setExportingTb] = useState(false); // WP-FIN-004 PR 4
 
   const showToast = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 4000); };
   const bounds = useMemo(
@@ -613,6 +615,33 @@ export default function HQFinancialStatements() {
     }
   }, [loading, incomeData, bsData, cfData, equityData, tenantId, selectedFY, bounds, tenant, currentStatus, statusRow]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const handleExportTbExcel = useCallback(async () => {
+    if (!tbData || !tbData.length) {
+      showToast("Trial Balance not loaded \u2014 open the Trial Balance tab first", "error");
+      return;
+    }
+    setExportingTb(true);
+    try {
+      const fyLabel = selectedFY === "custom" ? currentFY : selectedFY;
+      const res = await exportTrialBalanceExcel({
+        tenantId,
+        tenantName: tenant?.name || "Business",
+        financialYear: fyLabel,
+        periodLabel: bounds ? bounds.label : "Period not set",
+        status: currentStatus,
+        signedBy: statusRow?.signed_by ?? null,
+        signedAt: statusRow?.signed_at ?? null,
+        tbRows: tbData,
+      });
+      if (!res.ok) throw new Error(res.error || "Excel export failed");
+      showToast(`Exported ${res.filename}`);
+    } catch (err) {
+      showToast(err.message || "Excel export failed", "error");
+    } finally {
+      setExportingTb(false);
+    }
+  }, [tbData, selectedFY, currentFY, tenantId, tenant, bounds, currentStatus, statusRow]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (setupComplete === false) return <HQFinancialSetup onComplete={() => setSetupComplete(true)} />;
   if (setupComplete === null) return <div style={{ padding: 60, textAlign: "center", color: C.ink500, fontFamily: C.font }}>Loading{"\u2026"}</div>;
 
@@ -653,6 +682,11 @@ export default function HQFinancialStatements() {
           {!loading && incomeData && (
             <button onClick={handleDownloadPDF} disabled={downloading} style={{ padding: "7px 16px", borderRadius: 8, border: `1.5px solid ${C.accent}`, background: downloading ? C.bg : C.accent, color: downloading ? C.ink500 : "#fff", cursor: downloading ? "wait" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: C.font, display: "flex", alignItems: "center", gap: 6 }}>
               {downloading ? "Generating PDF\u2026" : <><Download size={14} style={{ marginRight: 6, verticalAlign: "middle" }} />Download PDF</>}
+            </button>
+          )}
+          {!loading && activeStatement === "trialbalance" && tbData && (
+            <button onClick={handleExportTbExcel} disabled={exportingTb} style={{ padding: "7px 16px", borderRadius: 8, border: `1.5px solid ${T.successBd}`, background: exportingTb ? C.bg : T.successLight, color: exportingTb ? C.ink500 : T.success, cursor: exportingTb ? "wait" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: C.font, display: "flex", alignItems: "center", gap: 6 }}>
+              {exportingTb ? "Building workbook\u2026" : <><FileSpreadsheet size={14} style={{ marginRight: 6, verticalAlign: "middle" }} />Export TB (Excel)</>}
             </button>
           )}
           {!loading && incomeData && (
