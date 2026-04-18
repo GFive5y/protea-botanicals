@@ -2368,3 +2368,66 @@ LL-307 (NEW S-2B.5): Any PR that touches the React → Edge Function invocation
          Rule: localhost smoke is not optional for React → EF PRs.
 
 *LL-306 + LL-307 added 19 April 2026 · Session 2B.5*
+
+---
+
+### LL-311 — EF auth helpers must align with RLS is_hq_user() semantics
+
+**Category:** Safety / Authorization
+**Introduced:** S-2B.7 (19 April 2026) · FIN-007 residual close
+**Evidence commits:** fd7e587 (fix), deploy versions gen-fin-stmts v12, ai-copilot v76
+
+**Pattern:**
+When an app-layer helper encodes a concept that also exists in RLS
+(`is_hq_user()`, `user_tenant_id()`, `auth_is_admin()`), both definitions
+must trace back to the same authoritative column(s) on the same table. A
+helper that uses different columns or different predicates than RLS will
+silently drift. The drift hides behind the common-case code path until an
+uncommon path exercises the mismatch.
+
+**Canonical example (S-2B.7, FIN-007):**
+`verifyTenantAuth.ts` (S306) defined HQ operator as:
+    tenant_id === HQ_OPERATOR_TENANT_ID AND role === 'admin'
+React + RLS `is_hq_user()` define HQ operator as:
+    user_profiles.hq_access === true
+
+admin@protea.dev (demo login) has `hq_access=true` but sits on a separate
+tenant. Every existing EF using verifyTenantAuth (ai-copilot, process-document
+auth path) is always called with body.tenant_id equal to the caller's own
+tenant_id, so the `tenantMatch` arm passes and the broken `isHQOperator` arm
+never fires. FIN-002's generate-financial-statements is the first EF where an
+HQ operator tenant-switches BEFORE calling the EF (body.tenant_id === selected
+tenant, not caller's tenant), forcing the `isHQOperator` branch. Helper rejects.
+
+**Fix pattern:**
+Broaden the helper to accept the RLS-authoritative predicate first, with the
+legacy check retained as fallback:
+    const hasHqAccess = (profile.hq_access as boolean | null) === true;
+    const isHQOperator = hasHqAccess || (userTenantId === HQ_OPERATOR_TENANT_ID && role === 'admin');
+
+**Data safety before broadening:**
+Always census `user_profiles` to confirm the broadening predicate's scope:
+    SELECT email, tenant_id, role, hq_access
+    FROM user_profiles JOIN auth.users ...
+    WHERE hq_access = true;
+Only proceed if the set of users satisfying the new predicate is a superset
+of the intended HQ-operator population and does NOT include tenant admins.
+
+**Anti-pattern:**
+Writing a new helper that mirrors RLS in spirit but uses its own column
+choices. When in doubt, the helper should query the same column the
+`is_hq_user()` SECURITY DEFINER function queries, full stop.
+
+**Generalises to:**
+Any helper-layer function that checks identity, role, or access. Every such
+helper must be traceable to the corresponding RLS helper by column — NOT
+by description.
+
+**Watch items emerging from this:**
+- WATCH-013: process-document EF does NOT use the shared verifyTenantAuth
+  helper — it has its own inline auth path. Apply LL-311 to it when picked up.
+- Future WP-HQ-GRANULARITY work: the `hq_access` boolean will be superseded
+  by the `access_level` enum. When that migrates, both RLS `is_hq_user()`
+  AND every helper using hq_access must migrate together in the same PR.
+
+*LL-311 added 19 April 2026 · Session S-2B.7*

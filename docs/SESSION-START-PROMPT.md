@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Read live from the repo at every session start (LL-292).
-## Updated: 19 April 2026 — Session S-2B.6 close (WP-FIN-004 PRs 1-3 shipped — HEAD f5a2332)
+## Updated: 19 April 2026 — Session S-2B.7 close (FIN-007 shipped, helper-alignment fix — HEAD fd7e587)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: f5a2332
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: fd7e587
 
 ---
 
@@ -53,7 +53,44 @@ IF DEMO DATE CHANGES: update PENDING-ACTIONS.md first, then this file.
 
 ---
 
-## CURRENT STATE — 19 April 2026 — WP-FIN-004 PRs 1-3 shipped + Phase 2B SHIPPED
+## CURRENT STATE — 19 April 2026 — WP-FIN-004 PRs 1-3 shipped + FIN-007 CLOSED + Phase 2B SHIPPED
+
+### FIN-007 CLOSED — 19 April 2026 — Session S-2B.7
+
+Two-stage fix for generate-financial-statements EF 401 ES256:
+
+**Stage 1 (gateway ES256):** EF deployed with `verify_jwt: false` flag.
+Supabase edge gateway's built-in verifier rejects ES256 JWTs emitted by
+the current Auth service. Fix: skip gateway verification, rely on
+in-handler verifyTenantAuth (which uses service-role client → JWKS → handles
+ES256 natively). EF version 10 → 11. No source change.
+
+**Stage 2 (helper HQ-operator definition):** verifyTenantAuth.ts helper
+used a narrower HQ-operator check than React/RLS. Helper wanted
+`tenant_id === HQ_OPERATOR_TENANT_ID AND role === 'admin'`. React/RLS
+use `user_profiles.hq_access === true`. admin@protea.dev has hq_access=true
+but sits on a separate tenant, so the helper rejected it when tenant-switched
+to another tenant. Broadened helper to accept hq_access=true OR legacy
+tenant+role check. EF version 11 → 12 (generate-financial-statements),
+75 → 76 (ai-copilot). Commit fd7e587.
+
+**Data verification:** only 2 users in the database have hq_access=true,
+both platform operators. No tenant admin holds it. Broadening the check
+was safe.
+
+**Shipped:**
+- fd7e587 — fix(fin-007): verifyTenantAuth — accept hq_access=true as HQ operator
+
+**Smoke test passed** on all 5 demo tenants (Garden Bistro, Metro Hardware,
+MediCare, Medi Recreational, Nourish) via admin@protea.dev + HQ tenant switch.
+5 fresh PDFs in storage.objects bucket financial-statements, ~16KB each,
+7 pages, auditor badges rendered correctly.
+
+**New LL:** LL-311 — EF auth helpers MUST align with RLS is_hq_user() semantics.
+**New WATCH:** WATCH-013 — process-document doesn't use shared helper (separate path).
+**WP-HQ-GRANULARITY:** Reference entry in PENDING-ACTIONS updated — the
+hq_access=true branch added here becomes the canonical check for the future
+`access_level` enum migration.
 
 ### WP-FIN-004 PARTIAL SHIP — 19 April 2026 — PRs 1-3 landed
 
@@ -543,7 +580,7 @@ KNOWN DEBT carried forward:
 
 | Store | Email | Industry |
 |---|---|---|
-| HQ / Master | admin@protea.dev | operator |
+| HQ / Master | admin@protea.dev | HQ operator (hq_access=true, own tenant) |
 | Medi Can Dispensary | medican@nuai.dev | cannabis_dispensary |
 | Medi Recreational | HQ switch only | cannabis_retail |
 | MediCare Dispensary | jane@jane.co.za | cannabis_dispensary |
@@ -741,16 +778,14 @@ LL-302 (NEW S320): Run Audit 1 (self-ref) + Audit 2 (inline user_profiles) any s
 
 ## NEXT PRIORITIES (session start, choose with owner)
 
-Phase 2B is fully shipped. WP-FIN-004 PRs 1-3 landed. FIN-007 surfaced.
+Phase 2B fully shipped. WP-FIN-004 PRs 1-3 landed. FIN-007 closed S-2B.7.
 
-1. **FIN-007 — generate-financial-statements EF auth fix** (~15-30min).
-   ES256 JWT rejection. Blocks all PDF downloads. Fix before PR 4 if
-   PR 4 scope touches any EF invocation path. See PENDING-ACTIONS.
+1. **LOOP-FIN-004 PR 4 — Trial Balance Excel export** (~1.5h + 15min bundled
+   snapshot empty-state fix). Scoped in chat S-2B.7. Resume at PR 4.
+   See docs/WP-FIN-004_TRIAL-BALANCE-EXPORT_v1.md.
 
-2. **LOOP-FIN-004 PRs 4-5 — Trial Balance Excel export + session close** (~2h).
-   PRs 1-3 shipped this session at HEAD f5a2332. Resume at PR 4 (Excel export
-   via SheetJS, 5-sheet workbook). PR 5 closes the loop. See
-   docs/WP-FIN-004_TRIAL-BALANCE-EXPORT_v1.md Sections PR 4 and PR 5 for scope.
+2. **LOOP-FIN-004 PR 5 — audit log + session close** (~0.5h).
+   PR 5 closes the loop.
 
 3. **sim-pos-sales** — STANDING ALERT. Trigger date pending demo
    date confirmation. Must run day BEFORE demo. See STANDING ALERT
@@ -784,6 +819,15 @@ Phase 2B is fully shipped. WP-FIN-004 PRs 1-3 landed. FIN-007 surfaced.
   against live queries, not reasoning continuity from earlier diagnostics.
 - **LL-CANDIDATE-H (1 data point):** Executor-stated intent ("Proceeding to PR N")
   is a request for planner greenlight, not an announcement of execution.
+- **LL-311 (NEW S-2B.7):** EF auth helpers must align with RLS is_hq_user() semantics.
+  verifyTenantAuth (S306) shipped with a narrower definition of "HQ operator"
+  than React/RLS used (tenant+role instead of hq_access=true). Latent until
+  the first EF invocation where an HQ operator was tenant-switched to another
+  tenant. Generalises: whenever an app-layer helper encodes a concept that also
+  exists in RLS (is_hq_user, user_tenant_id, auth_is_admin), both definitions
+  must trace back to the same column(s). A drift between helper-layer and
+  RLS-layer definitions hides behind the common-case code path until an
+  uncommon path exercises it.
 
 ---
 

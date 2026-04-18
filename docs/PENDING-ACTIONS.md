@@ -710,18 +710,22 @@ pair. Reversible per-policy if anything regresses.
 **Reference:** LL-300 (incident), LL-301 (audit lesson), LL-302 (session-start
 audit queries).
 
-### FIN-007 — generate-financial-statements EF auth broken (ES256 unsupported)
-Status: OPEN · CRITICAL · Surfaced S-2B.6 (19 April 2026)
-Source: Owner observation during PR 3 LL-307 verification
-Symptom: "Download PDF" button on HQFinancialStatements returns 401:
-  code: UNAUTHORIZED_UNSUPPORTED_TOKEN_ALGORITHM
-  message: "Unsupported JWT algorithm ES256"
-Affects: ALL 4 IFRS statements PDF download, Email Statement feature
-NOT caused by WP-FIN-004 — EF shipped S287 at commit 95782e5, predates TB work
-Likely cause: Supabase auth gateway JWT algorithm policy migration
-Fix estimate: 15-30min (most likely supabase.functions.invoke() config)
-Blocks: any EF invocation path in PR 4 IF that path is chosen (unlikely —
-  SheetJS runs client-side). Worth verifying before PR 4 scopes.
+### FIN-007 — CLOSED S-2B.7 (19 April 2026)
+Status: CLOSED
+Two-stage fix shipped:
+  Stage 1: Deploy generate-financial-statements with --no-verify-jwt
+           (gateway rejected ES256 tokens). Same pattern as ai-copilot,
+           process-document. EF version 10 → 11.
+  Stage 2: Broaden verifyTenantAuth helper to accept user_profiles.hq_access=true
+           as HQ operator (aligns with React/RLS is_hq_user() definition).
+           Helper was rejecting admin@protea.dev when HQ-switched to another
+           tenant. Commit fd7e587. EF versions: gen-fin-stmts v11 → v12,
+           ai-copilot v75 → v76.
+Smoke: 5 demo tenants (Garden Bistro, Metro Hardware, MediCare, Medi Rec,
+Nourish) downloaded 7-page PDFs successfully. 5 fresh files in storage
+bucket financial-statements.
+New LL: LL-311 (helper/RLS alignment).
+New WATCH: WATCH-013 (process-document auth path).
 
 ### WP-TB-PDF-APPENDIX — TB sheet in audit PDF (post-demo)
 Status: BACKLOG
@@ -762,6 +766,19 @@ Scope: SYSTEM-GROUND-TRUTH.md claimed equity_ledger.net_profit_for_year NULL
   for all tenants; MediCare was populated per S288 LL-273. Audit doc for
   other stale claims.
 Effort: ~1h
+
+### WATCH-013 — process-document EF auth path not aligned with shared helper
+Status: OPEN · LOW priority · Post-demo
+Source: S-2B.7 FIN-007 residual investigation
+process-document has its own tenant_id handling, not verifyTenantAuth shared
+helper. Today this is fine — every call site passes body.tenant_id equal to
+the caller's own tenant_id (Smart Capture, Ingest Modal all fire from the
+logged-in user's tenant). If any future code path invokes process-document
+from an HQ-switched session with body.tenant_id ≠ caller tenant (the FIN-007
+failure mode), the same LL-311 mismatch will bite.
+Fix: migrate process-document to import verifyTenantAuth from _shared, once
+post-demo. Or ensure all future callsites pass the caller's own tenant_id only.
+Estimate: ~1h (refactor) or zero (convention enforcement).
 
 ### WATCH-012 — financial_statement_notes legacy hq_all_ policy
 Status: OPEN · LOW priority
