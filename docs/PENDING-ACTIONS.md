@@ -434,17 +434,19 @@ Source: docs/WP-TABLE-UNIFY_PHASE2B-SPLIT_v1.md
   [x] 2B.1 migration applied (ingredient_ingest_queue, 5 policies) — 73f8135
   [x] 2B.1 scoping doc committed — 73f8135
   [x] 2B.2 v62 spec captured (docs/WP-TABLE-UNIFY_PHASE2B-2_V62-SPEC_v1.md)
-  [ ] 2B.2 v62 source regeneration + deploy (NEXT — per Procedure 7)
-  [ ] 2B.2 regression matrix (5 tenants)
-  [ ] 2B.2 commit v62 to supabase/functions/process-document/index.ts
+  [x] 2B.2 v62 shipped clean — 889a145 (Supabase version 65) — 19 April 2026
+  [x] 2B.2 direct-EF smoke test (LL-304 pattern) — 10 queue rows verified
+  [x] 2B.2 regression matrix (5 tenants) — planner-side via SQL probes + guard verification
   [ ] 2B.3 HQ "+ Add from Document" modal (with Phase 2F placemarker) (~3h)
   [ ] 2B.4 Review-and-approve UI (~3.5h)
   [ ] 2B.5 Gate PR — 5-tenant end-to-end walkthrough (~1h)
 Architectural pivot: extends process-document v61 -> v62 (Option 1)
   instead of building a new ingest-ingredient EF (parent doc Option B).
-**INCIDENT NOTE:** v62/v63 EF deploys via Supabase MCP were truncated stubs.
-  Rolled back to v61 (Supabase v64). LL-303 + Procedure 7 now govern all
-  EF deploys. Next 2B.2 attempt via Claude Code npx deploy.
+**INCIDENT NOTE (RESOLVED):** v62/v63 original attempts via Supabase MCP
+  were truncated stubs. Rolled back to v61 (Supabase v64).
+  LL-303 + Procedure 7 now govern all EF deploys.
+  Second attempt (S-2B.2, commit 889a145) via Claude Code `npx supabase
+  functions deploy` — succeeded on first try. v62 live at Supabase v65.
 
 ### Phase 2F — Mobile Smart Capture for Ingredients
 Status: BACKLOG · opens when (a) a client requests it OR (b) bandwidth after 2C/2D

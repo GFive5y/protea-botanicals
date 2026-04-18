@@ -2254,3 +2254,94 @@ concern), LL-203 (instruction block format).
 ---
 
 *LL-303 added 19 April 2026 · Session post-2B.1*
+
+---
+
+## Session 2B.2 — 19 April 2026 — Post-LL-303 validation patterns
+
+### LL-304 — DIRECT-EF SMOKE TEST AS PLANNER-SIDE REGRESSION PROXY
+
+**Rule:** When an Edge Function ships a new code path that the React
+caller does NOT yet exercise (e.g., caller hardcodes a parameter that
+would skip the new branch), the planner-side regression proxy is a
+direct curl/fetch against the EF with the forcing parameters injected.
+
+**Why this exists:** PR 2B.2 shipped v62 with a new F&B ingredient
+extraction path gated on `industry_profile === "food_beverage"`. The
+React caller in HQDocuments.js passes `industry_profile` from
+`useTenant()`, which returns the authenticated user's profile — not
+the selected "view as" tenant. HQ operators viewing Garden Bistro still
+pass their own HQ industry_profile, so the F&B branch never fires from
+the UI. Without a direct-EF test, v62's new code would have remained
+dormant until the React layer gets a separate fix (Phase 2B.3+), at
+which point any v62 bug becomes a regression in a later sub-phase.
+
+**The pattern:**
+1. Construct a synthetic but plausible payload that exercises the new
+   branch (for v62: a PNG invoice with F&B ingredients)
+2. Build a pure-language script (Node.js preferred — see LL-305 for why
+   shell+Python is fragile) that reads the payload as binary, constructs
+   the request body, POSTs directly to the EF's Supabase URL
+3. Planner confirms the request shape is correct via a small
+   "request_preview.json" dump before the POST fires
+4. Planner runs SQL probes post-response to verify DB state
+   (insertions, tenant binding, payload correctness)
+5. Planner issues a cleanup SQL block to remove the test artefacts
+
+**Applies when:**
+- React caller's `useTenant()` / hook doesn't exercise the new EF path
+- React caller always passes a fixed parameter that skips the new branch
+- New EF behaviour requires multiple consumers (mobile, React, CLI)
+  but only one is built yet
+
+**Does NOT apply when:**
+- React caller already exercises the new path end-to-end
+- The regression can be verified via normal UI smoke tests
+
+**Evidence:** Session 2B.2, 19 April 2026. 10 ingredient queue rows
+produced, all correctly classified. Zero bugs surfaced. Verified
+before `git push`.
+
+---
+
+### LL-305 — WINDOWS ENCODING TRAP: BINARY READS OVER TEXT/SHELL CHAINS
+
+**Rule:** When transferring binary data between planner and executor
+(base64 of a file, binary blob, anything that must survive byte-for-
+byte), prefer a single-language script that reads the source file as
+a binary buffer. Avoid shell + text intermediate files on Windows.
+
+**The failure mode:** Downloading a text file (e.g., pre-encoded base64)
+in a browser on Windows can silently recode the content. The file may
+gain a UTF-16 BOM, have line endings normalised, or (observed in
+practice) be truncated to roughly a quarter of its original size. The
+corruption is silent — the file opens as text, contains base64-like
+characters, and only fails downstream when the EF or API rejects it.
+
+**Discovery (Session 2B.2):** First smoke test attempt used a
+bash+Python harness. The base64 intermediate file (197KB expected)
+arrived on the Windows laptop as a 38KB text file. The EF built a
+request with the malformed base64 and forwarded to the Anthropic API,
+which rejected with "invalid base64 data" (HTTP 500). Diagnosis took
+10+ minutes because the symptom pointed at the Anthropic API, not
+the intermediate file.
+
+**The correct pattern:**
+```javascript
+// Pure Node.js — reads PNG as binary buffer, base64 in memory
+const fs = require("fs");
+const pngBuf = fs.readFileSync("invoice.png");
+const b64 = pngBuf.toString("base64");
+
+// Verify before firing: decode first 12 chars, check PNG magic bytes
+const magicCheck = Buffer.from(b64.slice(0, 12), "base64").slice(0, 8);
+const PNG_MAGIC = Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]);
+if (!magicCheck.equals(PNG_MAGIC)) { /* fail fast */ }
+```
+
+**Applies to:** Any planner-to-executor handoff involving binary
+data larger than ~10KB.
+
+---
+
+*LL-304 + LL-305 added 19 April 2026 · Session 2B.2*

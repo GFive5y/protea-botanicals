@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Read live from the repo at every session start (LL-292).
-## Updated: 19 April 2026 — Session post-2B.1-incident close (LL-303 + v62 spec + handoff)
+## Updated: 19 April 2026 — Session 2B.2 close (v62 shipped clean — PR 889a145)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 684ad18
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 889a145
 
 ---
 
@@ -45,7 +45,7 @@ IF DEMO DATE CHANGES: update PENDING-ACTIONS.md first, then this file.
 
 ---
 
-## CURRENT STATE — 17 April 2026 — Session 293 Close
+## CURRENT STATE — 19 April 2026 — PR 2B.2 shipped (v62 live)
 
 ### WP-TABLE-UNIFY PHASE 1 — HQFoodIngredients DS6 Migration — COMPLETE
 
@@ -149,7 +149,30 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (320) — 18 April 2026
+### CLOSED THIS SESSION (2B.2) — 19 April 2026
+- **PR 2B.2 shipped clean** (commit 889a145, EF version 65).
+  process-document v62 live on Supabase. F&B tenants now produce
+  `create_food_ingredient` actions + `ingredient_ingest_queue` writes.
+  All three LL-303 markers verified on deployed source
+  (classifyIngredientSourceType, ingredient_ingest_queue x5,
+  queued_ingredient_ids x2). Non-F&B tenants unaffected (guards
+  verified via live queue = 0 rows for cannabis/dispensary/retail).
+- **First direct-EF smoke test executed successfully.** Bypassed
+  React layer (which hardcodes industry_profile via useTenant())
+  to force `industry_profile=food_beverage` + Garden Bistro tenant.
+  10 synthetic Premier Foods line items -> 10 queue rows with correct
+  sub_category, HACCP risk, and R638 allergen intrinsic-containment.
+  Test artefacts cleaned up post-verification (0 residual rows).
+- **Python/Node test harness pivot.** First smoke test attempt
+  failed on Windows due to base64 text-file encoding corruption.
+  Rebuilt in pure Node.js with binary buffer read + PNG magic byte
+  verification. See DECISION-JOURNAL entry S-2B.2 and LL-305.
+- **New LLs:** LL-304 (direct-EF smoke test as planner-side
+  regression proxy when React layer doesn't exercise the new
+  code path), LL-305 (Windows encoding trap — prefer binary
+  reads over text/shell chains for base64 or other binary data).
+
+### CLOSED SESSION 320 — 18 April 2026
 - **Architecture docs landed** (4 commits): Phase 2 scope amendment, Principle 7 +
   Procedure 6 (planner/executor rhythm), Two-HQ architecture addendum + WP-HQ-GRANULARITY,
   Phase 2A split plan (4 PRs).
@@ -588,37 +611,21 @@ LL-302 (NEW S320): Run Audit 1 (self-ref) + Audit 2 (inline user_profiles) any s
 
 ## NEXT PRIORITIES (session start, choose with owner)
 
-1. **PR 2B.2 — process-document EF v62 deployment** (HIGHEST PRIORITY)
-   Under LL-303 / Procedure 7 — the revised EF deploy loop.
+1. **PR 2B.3 — HQ "+ Add from Document" modal** (next sub-phase of 2B)
+   With 2B.2 shipped and v62 proven in production, the next sub-phase
+   is the HQ-side modal that lets an operator upload a document and
+   see the staged ingredient queue rows. ~3h scoped in
+   WP-TABLE-UNIFY_PHASE2B-SPLIT_v1.md. Includes a Phase 2F placemarker
+   for mobile Smart Capture.
 
-   The v62 source file was produced in session 18 April 2026 and
-   captured as specification in docs/WP-TABLE-UNIFY_PHASE2B-2_V62-SPEC_v1.md.
-   The source file itself was not committed (planner scratch didn't
-   survive; LL-303 Layer 1 forbids planner-side commits anyway).
+   Under Procedure 6 (planner/executor rhythm): planner reads the
+   scope doc at live HEAD first, confirms nothing has drifted, then
+   scopes PR 2B.3 as a single-commit instruction block for Claude Code.
 
-   **Next planner's job:**
-   1. Read Procedure 7 in AGENT-METHODOLOGY.md (MANDATORY — exists
-      because of the v62/v63 incident)
-   2. Read v62-SPEC doc — 7 deltas + verification markers
-   3. Read v61 source: supabase/functions/process-document/index.ts
-   4. Produce full v62 source applying all 7 deltas from spec
-   5. Verify structural sanity (braces/parens/size) before proceeding
-   6. Write Claude Code instruction block per Procedure 7 Step 2
-   7. Hand off to Claude Code for commit + deploy
-   8. Verify via get_edge_function markers:
-      classifyIngredientSourceType, ingredient_ingest_queue,
-      queued_ingredient_ids
-   9. Run 5-tenant regression matrix per v62-SPEC
-   10. Clean: Claude Code pushes. Dirty: git revert + redeploy v61.
-
-   Do NOT deploy from planner side. See DECISION-JOURNAL entry
-   S-post-2B.1-incident for the incident that created LL-303.
-
-   **Mandatory reading before 2B.2:**
-   - docs/AGENT-METHODOLOGY.md (Procedure 7)
+   **Mandatory reading before 2B.3:**
+   - docs/AGENT-METHODOLOGY.md (Procedure 6)
    - docs/WP-TABLE-UNIFY_PHASE2B-SPLIT_v1.md (5-PR Phase 2B plan)
-   - docs/WP-TABLE-UNIFY_PHASE2B-2_V62-SPEC_v1.md (v62 deltas)
-   - LL-303 in NUAI-AGENT-BIBLE.md
+   - Current state of HQDocuments.js for Smart Capture patterns
 
 2. **sim-pos-sales** — STANDING ALERT. Trigger date pending demo
    date confirmation. Must run day BEFORE demo.

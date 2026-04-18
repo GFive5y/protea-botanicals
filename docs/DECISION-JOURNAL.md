@@ -4,6 +4,94 @@
 
 ---
 
+## S-2B.2 — 19 April 2026 — PR 2B.2 shipped + validation pattern codified
+
+### Session outcome
+v62 of process-document EF shipped clean at commit `889a145` (Supabase
+version 65). F&B ingredient extraction branch fired exactly as designed
+on the first planner-side regression test: 10 synthetic Premier Foods
+line items produced 10 `ingredient_ingest_queue` rows with correct
+sub_category classifications, HACCP risk levels, R638 allergen
+intrinsic-containment flags, and all bound to the right tenant.
+Guard verification confirmed zero queue writes from cannabis/
+dispensary/general_retail tenants.
+
+### LL-303 compliance verified end-to-end
+This was the first EF deploy since LL-303 landed. Every layer worked:
+- Layer 1: Planner produced v62 source as 4-part artifact for safe
+  reassembly; Claude Code did the actual `npx supabase functions deploy`
+- Layer 2: Planner verified deployed content via get_edge_function —
+  all 3 required markers present (classifyIngredientSourceType,
+  ingredient_ingest_queue x5, queued_ingredient_ids x2)
+- Layer 3: Not invoked — deploy succeeded first try. But the
+  rollback path was prepared and documented before the push.
+
+Procedure 7 was followed step-for-step. No retries, no escalation,
+no ambiguity on who executed what.
+
+### The validation problem + the solution
+The React caller (HQDocuments.js) passes `industry_profile` from
+`useTenant()`, which returns the authenticated user's profile, not
+the selected "view as" tenant. An HQ operator viewing Garden Bistro
+still passes their HQ industry_profile — so the F&B branch would
+never fire from the UI as it exists today. The new v62 code path
+would have stayed dormant until a separate Phase 2B.3+ React fix
+exercised it.
+
+Decision: build a direct-EF smoke test harness. Bypass the React
+layer entirely, force `industry_profile=food_beverage` and the
+Garden Bistro tenant_id, let the EF run against a synthetic F&B
+invoice. Verify queue rows post-hoc via SQL probes. Clean up the
+test artefacts afterward.
+
+This pattern is now codified as LL-304 (direct-EF smoke test as
+planner-side regression proxy).
+
+### The Python-to-Node pivot (LL-305)
+First attempt used bash + Python + a pre-encoded base64 intermediate
+file. Failed on Windows: the 197KB base64 file downloaded as a 38KB
+corrupted blob. Suspected causes: UTF-16 BOM, line-ending
+normalisation, or some other encoding artifact. The corruption was
+silent — file opened as text, looked base64-shaped. Only failed
+when the EF forwarded to Anthropic API, which rejected with
+"invalid base64 data."
+
+Rebuilt in pure Node.js: single script, reads PNG as binary buffer,
+base64 in memory, verifies PNG magic bytes before firing the request.
+Node is already required by the repo and runs identically on all
+three OSes. Ran clean on first attempt. LL-305 now captures the
+"prefer single-language binary reads over shell+text chains" principle.
+
+### Alternative considered: Ship without smoke test
+Defensible. All 4 structural audits (markers, balanced structure,
+guards, tenant mapping) passed. Non-F&B tenants could not reach
+the new code path. Worst-case failure on first real F&B upload
+would be a graceful warning (the queue insert is in a try/catch
+with warnings.push).
+
+Rejected because: this was the FIRST EF deploy after LL-303 landed.
+Demonstrating that the full end-to-end guardrail works — not just
+the structural parts — was worth the hour of extra test harness
+work. Also: smoke-test artefacts built here (synthetic invoice,
+Node.js harness) are reusable for Phase 2B.3/2B.4.
+
+### Handoff state
+Open loops: LOOP-WTU-003 2B.3 onwards (unblocked), WP-AUDIT-UNIFY,
+  WP-ROLE-TAXONOMY, WP-REALTIME-PUB, WP-EF-MODULES,
+  WP-EF-LL120-RECONCILE, WP-IMAGE-HASH-REAL, WP-RLS-HYGIENE,
+  WP-HQ-GRANULARITY
+Next priority: PR 2B.3 per SESSION-START-PROMPT.md
+Production: process-document v65 (v62 content), ingredient_ingest_queue
+  live and verified, 0 test residuals.
+
+### LLs landed this session
+- LL-304 — Direct-EF smoke test as planner-side regression proxy
+- LL-305 — Windows encoding trap: binary reads over text/shell chains
+
+**Fresh at close:** Yes.
+
+---
+
 ## S-close-post-2B.1-incident — 19 April 2026 — Session closure + handoff
 
 ### Session outcome
