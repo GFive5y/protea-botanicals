@@ -27,7 +27,8 @@ const DATE_FMT = "yyyy-mm-dd";
 // (WP-TB-SNAPSHOT-EMPTY-STATE bundled into PR 4)
 const SNAPSHOT_ACCOUNTS = new Set([
   "12000", // Inventory
-  "15000", // Fixed assets
+  "15000", // Fixed assets — cost
+  "15100", // Fixed assets — accumulated depreciation (snapshot pair with 15000)
   "30000", // Share capital
   "30100", // Retained earnings
 ]);
@@ -41,6 +42,19 @@ function safeCellDate(d) {
   if (!d) return "";
   const dt = new Date(d);
   return isNaN(dt.getTime()) ? String(d) : dt;
+}
+
+// For inline display in text (notes, audit trail) — not for spreadsheet cells.
+// Avoids Date.toString() leaking "Fri Apr 17 2026 12:20:56 GMT+1200" format.
+function fmtDateDisplay(d) {
+  if (!d) return "\u2014";
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return String(d);
+  return dt.toLocaleDateString("en-ZA", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 }
 
 // ── Sheet 1: Cover ───────────────────────────────────────────────────────────
@@ -272,7 +286,7 @@ function buildNotesSheet({ financialYear, periodLabel, status, signedBy, signedA
     ["7. Audit Trail"],
     [`Status at export: ${(status || "draft").toUpperCase()}`],
     [`Signed by: ${signedBy || "\u2014"}`],
-    [`Sign-off date: ${signedAt ? safeCellDate(signedAt) : "\u2014"}`],
+    [`Sign-off date: ${fmtDateDisplay(signedAt)}`],
     ["Each row on the GL Detail sheet ties back to a journal_lines or operational-table row via the Reference column."],
   ];
   const ws = XLSX.utils.aoa_to_sheet(rows);
