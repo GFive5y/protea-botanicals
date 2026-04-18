@@ -475,6 +475,99 @@ Source: Phase 2B scoping (S-post-2A.6)
 process-document uses mime+size+slice(80) proxy hash. Real SHA-256 is more
 reliable for duplicate detection. Estimate: ~1.5h.
 
+### WP-INGEST-RATE-LIMIT — Per-tenant rate limit on AI ingest
+Status: BACKLOG · BLOCKING first paid F&B contract
+Source: S-2B.2 strategic deep-dive (Section 2.6 + Section 3.5)
+Trigger: Before granting any paid F&B tenant access to the
+PR 2B.3 "+ Add from Document" modal, OR when daily extract
+volume across all tenants exceeds 50/day on any one day.
+
+**Why this exists:**
+Every Claude Vision call via process-document v62 is a COGS line item.
+PR 2B.3 (shipped at cf7974c) opens the ingest UI to any F&B
+tenant HQ user. With no rate limit, a single tenant bulk-uploading
+200 invoices in an afternoon generates 200 Anthropic API calls at
+~R1-R3 each. That's R200-R600 of COGS on a single tenant in one day,
+which at R3,500/mo ARPU destroys the tenant's contribution margin.
+
+**Scope:**
+1. Add `daily_extract_count` (integer) + `daily_extract_reset_at`
+   (timestamptz) to `tenants` or `tenant_config` (decide at scope time)
+2. process-document v62+ increments the counter on every extract,
+   resets at tenant-local midnight
+3. Soft cap: warn tenant user at 20 extracts/day via toast
+4. Hard cap: reject at 50 extracts/day with clear message + route to
+   "Contact support for higher limits" CTA
+5. HQ operator tier gets bypass (is_hq_user() = true → no cap)
+6. Enterprise tier gets configurable cap (set on tenant_config)
+
+**Effort estimate:** ~3h. One EF edit, one migration, one tenant_config
+field, one React toast. Modest.
+
+**Related:** WP-UNIT-ECONOMICS (the cost model that justifies the
+specific cap numbers).
+
+**Reference:** DECISION-JOURNAL S-2B.2-strategic entry.
+
+### WP-UNIT-ECONOMICS — Per-tenant Anthropic API cost model
+Status: BACKLOG · Pre-revenue gate
+Source: S-2B.2 strategic deep-dive (Section 2.6)
+Trigger: Before pricing the first paid contract. Before quoting a
+franchise group or accounting firm.
+
+**Why this exists:**
+NuAi pricing is currently R3,500-R12,000/mo based on docs, not
+validated against actual per-tenant COGS. Anthropic API costs
+(Smart Capture, ingredient ingest, ProteaAI, loyalty AI nightly
+jobs) are the largest variable cost and have never been modelled.
+At 10 tenants casual use: ~R2-R5k/mo total. At 100 tenants with
+heavy ingest: R50-R100k+/mo. At franchise-scale (200+ outlets
+each photographing daily invoices): material COGS line requiring
+explicit pricing tier design.
+
+**Scope:**
+1. Per-operation Anthropic cost table (input/output tokens × rate
+   for each EF that calls Claude: process-document, ai-copilot,
+   loyalty AI, etc.)
+2. Usage-pattern scenarios: casual SME (5 invoices/week), active
+   SME (3/day), franchise outlet (10/day), enterprise (50/day)
+3. Per-tenant-month total cost at each scenario
+4. Pricing tier proposals: Starter / Growth / Enterprise with caps
+   that keep COGS < 30% of revenue
+5. Franchise group pricing: tiered by outlet count with volume discount
+
+**Effort estimate:** ~2h spreadsheet work + 1h review. Not code.
+
+**Reference:** DECISION-JOURNAL S-2B.2-strategic entry. Informs
+the WP-INGEST-RATE-LIMIT cap numbers.
+
+### WP-PILOT-FORMALISATION — Written agreements for informal pilots
+Status: BACKLOG · Reference-customer gate
+Source: S-2B.2 strategic deep-dive (Section 4.3)
+Trigger: Before using any existing informal pilot as a sales
+reference, case study, or LinkedIn testimonial.
+
+**Why this exists:**
+Owner confirmed some small-retailer pilots are running informally
+"on the books, also not 100%." Informal pilots are fine for product
+learning but cannot be used in sales conversations without formalisation.
+An informal relationship that sours leaves zero usable reference
+material, and worse, creates potential POPIA / liability exposure.
+
+**Scope:**
+1. Written pilot agreement template (3-6 month free pilot, scope,
+   liability limits)
+2. POPIA compliance consent — data-holding + deletion-request language
+3. Named primary contact per pilot (person, not shop)
+4. Agreed success criteria per pilot (measurable, per-pilot)
+5. Case-study / reference permission (written, dated)
+6. Pilot → paid-conversion path with notice period
+
+**Effort estimate:** ~4h for templates + 1h per existing pilot to
+apply. Not code. Possibly needs legal review (R2-5k cost).
+
+**Reference:** DECISION-JOURNAL S-2B.2-strategic entry.
+
 ### LOOP-FIN-004 — Trial Balance Excel Export (CA working papers format)
 Status: OPEN · Nice-to-have for demo
 Priority: MEDIUM — CAs import TB into Sage/MYOB for working papers

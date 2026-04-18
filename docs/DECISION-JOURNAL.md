@@ -4,6 +4,109 @@
 
 ---
 
+## S-2B.2-strategic — 19 April 2026 — Strategic deep-dive captured into loop docs
+
+### The trigger
+Owner asked, mid-session: "The code is there. Is it worth anything?
+How do I get this to scale without chasing individual shop owners?"
+Planner produced a strategic analysis using live Supabase + repo
+inspection, web-research on SA market size (hospitality POS,
+cannabis, franchising, accounting software), and direct competitor
+scan (Apicbase, meez, MarketMan, GrowerIQ, Sage, Xero).
+
+### The decision
+The analysis is captured as `docs/NUAI-STRATEGIC-DEEP-DIVE_v1_0.md`
+— a working document, not a binding strategy. Filed alongside the
+technical loop docs because future sessions benefit from market
+context when scoping features. Specifically: the Phase 2B demo moment,
+the Group Portal channel story, and the cannabis compliance moat are
+now linked to the commercial thesis they unlock, not just the code
+that implements them.
+
+### Three moves the owner agreed warrant follow-up
+1. **Franchise channel** — one FASA-sourced deal unlocks 5-200 tenants
+   on the Group Portal for the sales effort of one SME. The Group Portal
+   architecture (tenant_groups + tenant_group_members + royalty_percentage
+   stored) already supports this. This is pre-existing engineering that
+   becomes economically valuable only if the GTM story finds it.
+2. **Accounting firm channel** — one SA accounting firm = 10-50
+   complex-client conversions for the effort of one direct SME sale.
+   IFRS compliance + auto-journal + Smart Capture are the product
+   hooks. The firms are the buyers, not the shops.
+3. **Unit-economics gap named, not filled** — Anthropic API costs
+   at 10/50/200 tenants are not modelled. Every ingest, every ProteaAI
+   query, every loyalty-AI nightly job accrues COGS. Before the first
+   paid contract, a per-tenant-month cost model needs to exist.
+
+### Alternatives considered
+- Skip capturing the doc until closing S-2B.2. Rejected — owner
+  explicitly requested Option 2 (capture before continuing to 2B.3
+  copy refinements). The strategic context affects copy decisions
+  (demo-grade toast, progress messaging, mobile placemarker framing).
+  Capturing first ensures the refinements ship with that context
+  grounded in the journal, not as afterthought.
+- Fold the doc's WP candidates into the immediate scope. Rejected —
+  scope discipline. WPs get logged in PENDING-ACTIONS; execution
+  waits for owner priority call. This session's code-side commitment
+  is 2B.3 and the follow-up copy refinement only.
+- Treat the doc as binding strategy. Rejected — owner's own words,
+  Section 6 of the doc: "This is NOT a binding strategy document. It
+  is a working analysis." Future session can amend, owner can
+  disagree with any part, and git retains versions.
+
+### Backlog items logged from the deep-dive
+- **WP-INGEST-RATE-LIMIT** (new) — per-tenant rate limit on
+  ingredient_ingest_queue writes + daily extract count on document_log
+  for billing visibility. MUST ship before the first paid F&B tenant
+  starts using PR 2B.3's new modal. Logged in PENDING-ACTIONS backlog.
+- **WP-UNIT-ECONOMICS** (new) — spreadsheet modelling per-tenant
+  Anthropic API cost at low/medium/heavy usage, with pricing tiers
+  that keep COGS below 30% of revenue. 2-hour exercise, deferred to
+  a pre-revenue session. Logged in PENDING-ACTIONS backlog.
+- **WP-PILOT-FORMALISATION** (new) — written pilot agreement
+  template, POPIA consent, named contact, agreed success criteria,
+  case-study permission. Blocks using any current informal pilot as
+  a sales reference. Logged in PENDING-ACTIONS backlog.
+
+### Planner state correction captured
+While reviewing the strategic doc, owner pointed out planner had
+drafted a 2B.3 instruction block as if 2B.3 hadn't shipped — it had,
+at cf7974c. Planner lag: assumed it would scope 2B.3 without first
+confirming the executor's push had landed. Not a Loop bug, a planner
+discipline miss. Recorded here because the continuous-capture habit
+(S-2B.2-methodology) says "notice-it-log-it" rather than wait for
+a full LL. If this recurs, escalate to LL status.
+
+Mitigation going forward: Planner's first action after receiving
+owner input should be a HEAD check against expected state, before
+drafting any scope. Takes one tool call; prevents rework.
+
+### 2B.3 copy decisions traceable to this doc
+The strategic framing sharpens three copy choices that otherwise
+would have read like debug output:
+1. Progress message during extraction: demo-grade phrasing that
+   narrates the AI work (reading document, identifying ingredients,
+   checking R638 allergens) rather than "Extracting…".
+2. Success toast: foregrounds the allergen/HACCP/nutrition richness
+   + honestly foreshadows 2B.4 ("Ingest Queue tab coming in PR 2B.4").
+3. Mobile placemarker banner copy: hints at 2F value (receiving-point
+   capture) rather than just deferring it as roadmap.
+
+These ship as a follow-up commit after this doc commit (see next
+session instruction). No scope change, no estimate change.
+
+### Handoff state
+HEAD advances by one commit (this doc integration).
+Next commit in same session: S-2B.2-copy-refinements against the
+already-shipped 2B.3 files.
+Strategic doc now readable by future planner cold-reads via
+PENDING-ACTIONS backlog references + SESSION-START-PROMPT optional-
+read list.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S-2B.2-methodology — 19 April 2026 — Continuous-capture habit named at procedure level
 
 ### The trigger

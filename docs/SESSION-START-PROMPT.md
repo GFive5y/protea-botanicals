@@ -35,6 +35,14 @@ After reading, confirm out loud:
 - All open loops from PENDING-ACTIONS.md
 - Any new violations
 
+### OPTIONAL STRATEGIC CONTEXT (read when scoping GTM or customer-facing decisions)
+
+7. `docs/NUAI-STRATEGIC-DEEP-DIVE_v1_0.md` — working analysis of
+   market position, competitor scan, and three recommended GTM
+   paths (franchise channel, accounting firm channel, industry body
+   partnership). Produced S-2B.2. Not binding. Read when a decision
+   has commercial/market context; skip for pure engineering work.
+
 ---
 
 ## STANDING ALERT
