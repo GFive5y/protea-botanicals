@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Read live from the repo at every session start (LL-292).
-## Updated: 19 April 2026 — Session 2B.2 close (v62 shipped clean — PR 889a145)
+## Updated: 19 April 2026 — Session 2B.3 close (modal + strategic doc + copy refined — HEAD 9ef764f)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -13,7 +13,7 @@ SaaS ERP platform. 224,293 lines of code. 109 DB tables. 6 portals.
 
 **Tools:** GitHub MCP (READ ONLY — RULE 0Q), Supabase MCP (FULL ACCESS).
 **Repo:** github.com/GFive5y/protea-botanicals — main
-**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 889a145
+**Supabase:** uvicrqapgzcdvozxrreo — HEAD: 9ef764f
 
 ---
 
@@ -53,7 +53,7 @@ IF DEMO DATE CHANGES: update PENDING-ACTIONS.md first, then this file.
 
 ---
 
-## CURRENT STATE — 19 April 2026 — PR 2B.2 shipped (v62 live)
+## CURRENT STATE — 19 April 2026 — PR 2B.3 shipped (modal live + strategic doc captured + copy refined)
 
 ### WHY PHASE 2B MATTERS — READ THIS BEFORE SCOPING ANY OF 2B.3/2B.4/2B.5
 
@@ -181,6 +181,59 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
+
+### CLOSED THIS SESSION (2B.3) — 19 April 2026
+Four commits shipped this session. Full chain:
+- **1aafbbd** — AGENT-METHODOLOGY continuous-capture preamble added
+  to Section 2. Cross-cutting habit (notice-it-log-it) named at
+  procedure level. Evidence session: S-2B.2-preservation. Not
+  escalated to LL status yet — requires 2+ recurrences.
+- **cf7974c** — PR 2B.3 shipped: HQ "+ Add from Document" modal.
+  New component src/components/hq/food/FoodIngestModal.js (~600L,
+  640px modal, 3 tabs Upload/Paste/URL-coming-soon, drop zone + file
+  picker + paste). HQFoodIngredients.js wired with industryProfile
+  destructure + showIngestModal state + header button gated on
+  isTenantHq && industry_profile === "food_beverage" + onSuccess
+  toast. Audit placemarker fires on successful extract via
+  logAudit({action: "ingredient.ingest.extract", ...}). Phase 2F
+  mobile placemarker banner present.
+- **d0bb6af** — Strategic deep-dive captured as
+  docs/NUAI-STRATEGIC-DEEP-DIVE_v1_0.md (635L working doc, not
+  binding strategy). Three WPs logged in PENDING-ACTIONS backlog:
+  WP-INGEST-RATE-LIMIT (blocks first paid F&B contract),
+  WP-UNIT-ECONOMICS (pre-revenue gate), WP-PILOT-FORMALISATION
+  (reference-customer gate). Decision Journal entry
+  S-2B.2-strategic captures reasoning + three 2B.3 copy decisions
+  traceable to the doc. Optional-read section added to this file
+  (position 7, explicitly not mandatory).
+- **9ef764f** — Three copy refinements against the shipped 2B.3
+  files: (a) mobile placemarker banner reframed as concrete 2F
+  value — "Desktop ingest is live today. Phase 2F adds mobile
+  Smart Capture — photograph ingredients at the stock-receiving
+  point for receive-and-go ingestion." (b) Extraction progress
+  replaced with 3-stage faux-progress stack (Reading… / Identifying
+  allergens + HACCP… / Matching SA suppliers + R638…) + 8-15
+  seconds sub-line. Spinner alignment: alignItems flex-start,
+  flexShrink 0, marginTop 2 on spinner. (c) Success toast surfaces
+  allergen/HACCP/nutrition richness + honestly foreshadows 2B.4
+  Ingest Queue tab. Negative branch gains "Try a clearer invoice
+  or spec sheet" recovery hint.
+- **Executor deviation (approved):** spec referenced T.ink500 for
+  middle progress lines; that token doesn't exist in tokens.js.
+  Used T.ink400 (correct muted secondary-text token, consistent
+  with the rest of the modal). Planner error caught by executor —
+  worth noting but not escalated to LL.
+- **Planner lesson captured** (not escalated to LL yet): at one
+  point planner began drafting a 2B.3 instruction block without
+  checking HEAD first — 2B.3 had already shipped at cf7974c.
+  Owner caught it. Mitigation: planner's first action after
+  receiving owner input is a HEAD check via GitHub:get_commit
+  before drafting any scope. One occurrence = journal entry;
+  recurrence would escalate.
+- **No new LLs this session.** The continuous-capture habit,
+  the planner-HEAD-check habit, and the mandatory-read discipline
+  are all in "captured, not escalated" state per the S-2B.2-methodology
+  threshold (2+ recurrences before LL).
 
 ### CLOSED THIS SESSION (2B.2) — 19 April 2026
 - **PR 2B.2 shipped clean** (commit 889a145, EF version 65).
@@ -644,82 +697,81 @@ LL-302 (NEW S320): Run Audit 1 (self-ref) + Audit 2 (inline user_profiles) any s
 
 ## NEXT PRIORITIES (session start, choose with owner)
 
-1. **PR 2B.3 + PR 2B.4 — the AI ingredient ingest demo moment**
-   (FULL DEMO PATH, two consecutive sessions, ~6.5h total)
+1. **PR 2B.4 — Ingest Queue tab — THE REMAINING DEMO PIECE** (~3.5h)
 
-   ### Why this is priority #1, not just the next PR in the stack
+   ### Why this is priority #1
 
-   Phase 2B is the "killer app" sub-phase of WP-TABLE-UNIFY Phase 2.
-   The commercial thesis (Phase 2 scope doc Section 11) is blunt:
-   this feature combination does NOT exist in any SA F&B product today.
-   Apicbase has it at GBP2000/mo. SAP Food One at GBP10000+/mo. Nobody
-   else in SA does. Phase 2B is the moment NuAi stops looking like
-   "nice ERP" and starts looking like "the obvious choice for SA F&B."
+   PR 2B.3 shipped the upload UI. PR 2B.4 ships the review UI.
+   Without 2B.4, a user can upload an invoice and see "10 ingredients
+   queued" in a toast, but has no way to see the extracted data
+   inside the app. 2B.4 closes the demo loop: the "Ingest Queue"
+   tab lists pending `ingredient_ingest_queue` rows with per-field
+   confidence badges (green >=0.70 / amber 0.50-0.69 / red <0.50),
+   the reviewer edits or approves, approval inserts into
+   food_ingredients with tenant_id + source_document_id linkage,
+   rejection captures a reason. Audit placemarker on every
+   approve/reject. F&B tenants only.
 
-   The backend (2B.1 + 2B.2) is live. The UI layer (2B.3 + 2B.4) is
-   what makes it visible to a CA watching a screen share. Without
-   2B.4, the feature exists but nobody outside a SQL console can see
-   it work end-to-end. Owner-confirmed plan (S-2B.2 close):
-   ship 2B.3 + 2B.4 across two focused sessions, then 2B.5 gate PR.
+   ### What to read before scoping
 
-   ### What to build
-
-   **Session N (PR 2B.3 — ~3h):** HQ "+ Add from Document" modal
-   in HQFoodIngredients.js. Upload / paste / URL tabs. Extract button
-   calls the already-live process-document v62 EF. On success, rows
-   appear in ingredient_ingest_queue. UI placemarker for Phase 2F
-   (mobile Smart Capture). F&B tenants only (Garden Bistro, Nourish).
-
-   **Session N+1 (PR 2B.4 — ~3.5h):** "Ingest Queue" tab in
-   HQFoodIngredients. Lists pending queue rows with per-field
-   confidence badges (green >=0.70, amber 0.50-0.69, red <0.50).
-   Reviewer can edit, approve (inserts to food_ingredients with
-   tenant_id + source_document_id linkage), or reject (captures
-   reason). Audit placemarker on every approve/reject.
-
-   **Session N+2 (PR 2B.5 — ~1h):** Gate PR. Zero code, just the
-   end-to-end walkthrough, DECISION-JOURNAL entry, PENDING-ACTIONS
-   close-out.
-
-   ### Demo moment this unlocks
-
-   Owner uploads a Premier Foods invoice in front of a CA.
-   In under 30 seconds, AI extracts 10 ingredients with SA R638
-   allergen flags, HACCP risk levels, nutrition panels, and supplier
-   linkage. Owner clicks Approve. The ingredients appear in Garden
-   Bistro's library, ready to be used in recipes. No manual data
-   entry. That is the moment the AI tells its own story.
-
-   ### Procedure 6 rhythm (planner/executor)
-
-   Each session: planner reads the scope doc at live HEAD first,
-   confirms nothing has drifted (the parent Phase 2 doc was amended
-   at S320, the split plan at S-post-2A.6, and today's session
-   adds v62 verification — don't trust memory), scopes ONE sub-phase
-   as a single-commit Claude Code instruction block, then reviews
-   the commit after executor pushes.
-
-   ### Mandatory reading before scoping PR 2B.3
-
-   - `docs/AGENT-METHODOLOGY.md` (Procedure 6 — planner/executor rhythm)
-   - `docs/WP-TABLE-UNIFY_PHASE2_v1.md` Section 0 (S320 amendments)
-     and Section 11 (what success looks like — the thesis)
-   - `docs/WP-TABLE-UNIFY_PHASE2B-SPLIT_v1.md` (authoritative for
-     per-PR specs + gate conditions + confidence badge thresholds)
-   - Current state of `HQFoodIngredients.js` and `HQDocuments.js`
-     (the modal pattern to mirror)
+   - `docs/WP-TABLE-UNIFY_PHASE2B-SPLIT_v1.md` §5 — canonical
+     2B.4 spec including confidence badge thresholds, approve-flow
+     insert shape, reject reason schema. Read first.
+   - `docs/DECISION-JOURNAL.md` S-2B.3 entry (just shipped) — for
+     why copy matters and where the strategic framing lands.
+   - Current state of `HQFoodIngredients.js` at HEAD 9ef764f —
+     the tabs array near the bottom is where the new "Ingest Queue"
+     tab mounts. Tab should show a count badge of pending rows.
+   - `ingredient_ingest_queue` schema (15 cols, 5 RLS policies,
+     migrated in 2B.1 at 73f8135). Includes: tenant_id,
+     source_document_id, industry_profile (guard), extracted_name,
+     extracted_allergens (jsonb), extracted_haccp_risk,
+     extracted_nutrition (jsonb), confidence_* per field, status
+     enum, reject_reason, reviewed_by, reviewed_at.
    - `docs/NUAI-AGENT-BIBLE.md` LL-304 (direct-EF regression test
-     pattern — we'll need this again for 2B.4 since React approve
-     flow writes to food_ingredients, which manual testing won't
-     cover in one session)
+     pattern). **This WILL be needed for 2B.4.**
+
+   ### Why LL-304 is mandatory for 2B.4
+
+   The React approve flow writes to food_ingredients, not the
+   queue table. The new code path is:
+     React UI → supabase.from("food_ingredients").insert({
+       tenant_id, source_document_id, ...extracted_data
+     }) + update ingredient_ingest_queue status to 'approved'
+   Manual testing in one session across 5 tenants cannot reliably
+   cover: RLS enforcement on the insert, source_document_id FK
+   integrity, the approval/update transaction boundary (two
+   statements, no wrapper — partial failure possible), and the
+   cross-tenant guard behaviour. Plan a direct-EF or direct-SQL
+   regression harness per LL-304 as part of the 2B.4 scope
+   BEFORE writing the React instruction block.
+
+   ### Planner first moves
+
+   1. HEAD check (expect 9ef764f + this close commit)
+   2. Read WP-TABLE-UNIFY_PHASE2B-SPLIT_v1.md §5 at live HEAD
+   3. Read ingredient_ingest_queue rows in live Supabase (if any)
+      to confirm queue shape matches spec
+   4. Scope PR 2B.4 as single-commit Claude Code instruction block
+   5. Include LL-304 regression-harness design in the same block
 
 2. **sim-pos-sales** — STANDING ALERT. Trigger date pending demo
    date confirmation. Must run day BEFORE demo.
 
-3. **WP-RLS-HYGIENE** (post-demo) — ~100 inline user_profiles
+3. **PR 2B.5 — gate PR** (~1h) — Zero code, just the end-to-end
+   walkthrough, DECISION-JOURNAL entry, PENDING-ACTIONS close-out.
+   Ships in the same session as 2B.4 if time permits, otherwise
+   next session after.
+
+4. **WP-INGEST-RATE-LIMIT** (~3h) — per-tenant daily cap on
+   ingredient_ingest_queue writes. BLOCKING first paid F&B
+   contract. Does NOT block 2B.4 or 2B.5. See PENDING-ACTIONS
+   backlog + DECISION-JOURNAL S-2B.2-strategic for rationale.
+
+5. **WP-RLS-HYGIENE** (post-demo) — ~100 inline user_profiles
    subqueries → user_tenant_id() helper. See PENDING-ACTIONS.
 
-4. **LOOP-FIN-004** — Trial Balance Excel export (~2h, SheetJS)
+6. **LOOP-FIN-004** — Trial Balance Excel export (~2h, SheetJS).
 
 ---
 

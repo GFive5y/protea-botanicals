@@ -437,7 +437,8 @@ Source: docs/WP-TABLE-UNIFY_PHASE2B-SPLIT_v1.md
   [x] 2B.2 v62 shipped clean — 889a145 (Supabase version 65) — 19 April 2026
   [x] 2B.2 direct-EF smoke test (LL-304 pattern) — 10 queue rows verified
   [x] 2B.2 regression matrix (5 tenants) — planner-side via SQL probes + guard verification
-  [ ] 2B.3 HQ "+ Add from Document" modal (with Phase 2F placemarker) (~3h)
+  [x] 2B.3 HQ "+ Add from Document" modal + strategic doc + copy refinements
+      (shipped cf7974c + d0bb6af + 9ef764f, 19 April 2026)
   [ ] 2B.4 Review-and-approve UI (~3.5h)
   [ ] 2B.5 Gate PR — 5-tenant end-to-end walkthrough (~1h)
 Architectural pivot: extends process-document v61 -> v62 (Option 1)

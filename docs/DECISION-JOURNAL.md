@@ -4,6 +4,106 @@
 
 ---
 
+## S-2B.3 — 19 April 2026 — PR 2B.3 shipped + strategic context integrated + copy refined
+
+### Session outcome
+Four commits shipped this session. Phase 2B.3 ends this session in
+a materially better place than "3-hour upload modal delivered":
+the modal is live (cf7974c), the commercial context that justified
+prioritising it is captured as a working doc future planners can
+cold-read (d0bb6af), and the demo-facing copy was refined against
+that context so what the audience sees matches what the strategic
+thesis said they would see (9ef764f).
+
+### The four commits and what they mean as a unit
+- 1aafbbd — AGENT-METHODOLOGY continuous-capture preamble. Procedural
+  fix against the specific failure of "owner caught the gap, not
+  planner mid-session." Lives in the methodology doc rather than as
+  an LL because it's about how agents work, not what they must do.
+- cf7974c — PR 2B.3 shipped. FoodIngestModal.js (new, ~600L) +
+  HQFoodIngredients.js wiring. Modal structure, DS6-clean, audit
+  placemarker firing, mobile placemarker banner present. Tab gated
+  correctly on isTenantHq && industry_profile === "food_beverage".
+- d0bb6af — Strategic deep-dive doc + 3 backlog WPs. Not a strategy
+  commitment, a working analysis made durable. Three WPs
+  (WP-INGEST-RATE-LIMIT, WP-UNIT-ECONOMICS, WP-PILOT-FORMALISATION)
+  are the concrete follow-ups implied by Sections 2.6, 2.6, and 4.3
+  respectively of the strategic doc.
+- 9ef764f — Three copy refinements traceable to the strategic doc.
+  Mobile banner, extraction progress faux-stage stack, success
+  toast. Executor caught planner error on T.ink500 (non-existent
+  token) and substituted T.ink400 correctly.
+
+### Decisions and alternatives this session
+1. **"Option 2: capture strategic context before continuing."**
+   Owner's explicit call mid-session, when WP-INGEST-RATE-LIMIT
+   surfaced and planner was about to just log it and carry on.
+   Alternative rejected: capture at session close alongside other
+   WPs. Rejected because capturing before 2B.3's copy refinements
+   meant the three copy decisions had a durable rationale, not an
+   afterthought reference to a doc that didn't exist yet.
+2. **Split into two commits (strategic + refinements) rather than
+   one combined "S-2B.3 close" commit.** Alternative: single
+   commit. Rejected because the strategic doc is an independent
+   working artifact that deserves its own commit message for
+   future readers looking for "when did the GTM thesis land in
+   the repo." The copy refinements are code touching already-
+   shipped 2B.3 files — different kind of change, different audit
+   trail.
+3. **Faux-progress stack, not real streaming.** Alternative: add
+   React state that cycles through stages at intervals while the
+   EF runs. Rejected: adds state machinery for cosmetic timing;
+   the EF is synchronous, so any "progress" shown is fiction
+   regardless of whether it animates. Three simultaneous lines
+   with strong copy carries the narrative without the complexity.
+4. **Honest "Ingest Queue tab coming in PR 2B.4" in the success
+   toast.** Alternative: arrow/CTA that leads to the existing
+   ingredient library page. Rejected: misleads the user on where
+   the reviewed ingredients will live. Honest signposting is
+   better UX than aspirational CTA that leads somewhere wrong.
+
+### Planner discipline miss (captured, not LL'd)
+Planner drafted a full 2B.3 instruction block in the turn before
+owner confirmed continuation, without first verifying via
+GitHub:get_commit that PR 2B.3 had already shipped at cf7974c.
+Owner caught the lag. Mitigation for future sessions: planner's
+first action after owner input is a HEAD check, not a scope draft.
+One occurrence documented here. If this recurs, escalate to LL.
+
+### Planner-to-executor handoff quality
+The new continuous-capture habit (1aafbbd) and Procedure 6 rhythm
+(pre-existing) both held across four commits. Executor's return
+reports were complete enough that the planner review loop closed
+in minutes, not turns. The T.ink500 vs T.ink400 catch by executor
+is exactly the kind of thing Procedure 6 is designed to surface —
+planner drafts, executor grounds against disk, discrepancies get
+caught before they're a bug in production.
+
+### Handoff state
+HEAD advances to the session-close docs commit. Open code work:
+PR 2B.4 (Ingest Queue tab, ~3.5h), PR 2B.5 (gate PR, ~1h).
+Open strategic work: WP-INGEST-RATE-LIMIT blocks first paid F&B
+tenant use of the modal; WP-UNIT-ECONOMICS blocks first paid
+contract pricing; WP-PILOT-FORMALISATION blocks reference-
+customer use.
+
+Next-session priority in SESSION-START-PROMPT is PR 2B.4.
+LL-304 (direct-EF regression test) flagged as mandatory for the
+2B.4 scope because the React approve-flow writes to
+food_ingredients with RLS + source_document_id linkage that
+manual testing won't reliably cover across 5 tenants in one
+session.
+
+### LLs landed this session
+None. Two candidate LLs stay in "captured, not escalated" status:
+the continuous-capture habit (evidence base: 1 session) and the
+planner-HEAD-check discipline (evidence base: 1 session). Per
+S-2B.2-methodology threshold: escalate to LL on 2+ recurrences.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S-2B.2-strategic — 19 April 2026 — Strategic deep-dive captured into loop docs
 
 ### The trigger
