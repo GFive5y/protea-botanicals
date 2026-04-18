@@ -69,6 +69,9 @@ import { T } from "../../styles/tokens";
 import ViewToggle from "./food/ViewToggle";
 import FoodTileView from "./food/FoodTileView";
 import FoodListView from "./food/FoodListView";
+import FoodPillNav, { pillMatches } from "./food/FoodPillNav";
+import FoodKPIStrip from "./food/FoodKPIStrip";
+import FoodSmartSearch, { matchesSmartSearch } from "./food/FoodSmartSearch";
 
 // WP-UNIFY: F&B local palette mapped to tokens.js T where equivalent
 const C = {
@@ -3210,6 +3213,7 @@ export default function HQFoodIngredients() {
   const [selectedIngredient, setSelectedIngredient] = useState(null);
   const [compareList, setCompareList] = useState([]);
   const [viewMode, setViewMode] = useState("tile"); // WP-TABLE-UNIFY 2A.1
+  const [pillFilter, setPillFilter] = useState({ worldId: null, groupId: null, subId: null }); // WP-TABLE-UNIFY 2A.2
   const [toast, setToast] = useState(null);
 
   // New ingredient form
@@ -3357,16 +3361,14 @@ export default function HQFoodIngredients() {
   // ── Filtered ingredients ───────────────────────────────────────────────────
   const filtered = useMemo(() => {
     let list = ingredients;
-    if (searchQ) {
-      const q = searchQ.toLowerCase();
-      list = list.filter(
-        (i) =>
-          i.name.toLowerCase().includes(q) ||
-          (i.common_name || "").toLowerCase().includes(q) ||
-          (i.sub_category || "").toLowerCase().includes(q) ||
-          (i.e_number || "").toLowerCase().includes(q),
+    // Smart-search: plain words + FNB tokens (allergen:x, zone:y, expiry<N, etc.)
+    if (searchQ) list = list.filter((i) => matchesSmartSearch(i, searchQ));
+    // Pill nav drill-down
+    if (pillFilter.worldId)
+      list = list.filter((i) =>
+        pillMatches(i, pillFilter.worldId, pillFilter.groupId, pillFilter.subId),
       );
-    }
+    // Legacy selects (kept live until PR 2A.4 cleanup)
     if (filterCat) list = list.filter((i) => i.category === filterCat);
     if (filterAllergen)
       list = list.filter((i) => i.allergen_flags?.[filterAllergen]);
@@ -3378,6 +3380,7 @@ export default function HQFoodIngredients() {
   }, [
     ingredients,
     searchQ,
+    pillFilter,
     filterCat,
     filterAllergen,
     filterHaccp,
@@ -3507,85 +3510,8 @@ export default function HQFoodIngredients() {
         </div>
       </div>
 
-      {/* KPI strip */}
-      <div
-        style={{ display: "flex", gap: T.gap.md, flexWrap: "wrap", marginBottom: 24 }}
-      >
-        {[
-          {
-            label: "Total Ingredients",
-            value: kpis.total,
-            sub: `${kpis.categories} categories`,
-            accent: C.accent,
-          },
-          {
-            label: "Contain Allergens",
-            value: kpis.allergenCount,
-            sub: "R638 flagged",
-            accent: "#D97706",
-            bg: C.amberBg,
-          },
-          {
-            label: "HACCP Critical CCPs",
-            value: kpis.criticalHaccp,
-            sub: "Require monitoring",
-            accent: C.red,
-            bg: C.redBg,
-          },
-          {
-            label: "Cold Chain Items",
-            value: kpis.refrigerated,
-            sub: "Fridge or frozen",
-            accent: C.blue,
-            bg: C.blueBg,
-          },
-          {
-            label: "Regulatory Controlled",
-            value: kpis.controlled,
-            sub: "FSCA or additive",
-            accent: C.purple,
-            bg: C.purpleBg,
-          },
-        ].map((kpi) => (
-          <div
-            key={kpi.label}
-            style={{
-              background: kpi.bg || C.accentBg,
-              border: `1px solid ${kpi.accent}20`,
-              borderRadius: T.radius.mdPlus,
-              padding: "16px 20px",
-              flex: 1,
-              minWidth: 140,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 26, // KPI tile number — distinct display size
-                fontWeight: T.weight.extrabold,
-                color: kpi.accent,
-                letterSpacing: "-0.02em",
-              }}
-            >
-              {kpi.value}
-            </div>
-            <div
-              style={{
-                fontSize: T.text.sm,
-                color: kpi.accent,
-                fontWeight: T.weight.semibold,
-                marginTop: 2,
-              }}
-            >
-              {kpi.label}
-            </div>
-            <div
-              style={{ fontSize: T.text.xs, color: kpi.accent + "BB", marginTop: 2 }}
-            >
-              {kpi.sub}
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* KPI strip — WP-TABLE-UNIFY 2A.2 */}
+      <FoodKPIStrip items={ingredients} />
 
       {/* Sub-tabs */}
       <div
@@ -3638,7 +3564,17 @@ export default function HQFoodIngredients() {
       {/* ── LIBRARY TAB ──────────────────────────────────────────────────── */}
       {!loading && activeTab === "library" && (
         <div>
-          {/* Filters row */}
+          {/* Pill nav — WP-TABLE-UNIFY 2A.2 */}
+          <div style={{ marginBottom: T.gap.md }}>
+            <FoodPillNav
+              worldId={pillFilter.worldId}
+              groupId={pillFilter.groupId}
+              subId={pillFilter.subId}
+              onChange={setPillFilter}
+            />
+          </div>
+
+          {/* Filters row — smart search replaces plain input; selects retained */}
           <div
             style={{
               display: "flex",
@@ -3648,21 +3584,7 @@ export default function HQFoodIngredients() {
               alignItems: "center",
             }}
           >
-            <input
-              value={searchQ}
-              onChange={(e) => setSearchQ(e.target.value)}
-              placeholder="Search name, common name, E-number…"
-              style={{
-                padding: "9px 14px",
-                border: `1px solid ${C.border}`,
-                borderRadius: T.radius.smPlus,
-                fontSize: T.text.base,
-                fontFamily: "inherit",
-                flex: 2,
-                minWidth: 220,
-                background: C.surface,
-              }}
-            />
+            <FoodSmartSearch value={searchQ} onChange={setSearchQ} />
             <select
               value={filterCat}
               onChange={(e) => setFilterCat(e.target.value)}
@@ -3744,7 +3666,8 @@ export default function HQFoodIngredients() {
               filterCat ||
               filterAllergen ||
               filterHaccp ||
-              filterTemp) && (
+              filterTemp ||
+              pillFilter.worldId) && (
               <button
                 onClick={() => {
                   setSearchQ("");
@@ -3752,6 +3675,7 @@ export default function HQFoodIngredients() {
                   setFilterAllergen("");
                   setFilterHaccp("");
                   setFilterTemp("");
+                  setPillFilter({ worldId: null, groupId: null, subId: null });
                 }}
                 style={{
                   padding: "8px 12px",
