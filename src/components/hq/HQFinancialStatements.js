@@ -209,6 +209,168 @@ function ChangesInEquityStatement({ data, tenantName, periodLabel, financialYear
   );
 }
 
+// ── Statement 5: Trial Balance ─── WP-FIN-004 PR 3 ──────────────────────────
+const TB_TYPE_ORDER = ["asset", "liability", "equity", "revenue", "expense"];
+const TB_TYPE_LABELS = { asset: "Assets", liability: "Liabilities", equity: "Equity", revenue: "Revenue", expense: "Expenses" };
+
+function TrialBalanceStatement({ data, tenantName, periodLabel, financialYear, status, onDrill }) {
+  const groups = {};
+  TB_TYPE_ORDER.forEach((t) => { groups[t] = []; });
+  (data || []).forEach((row) => {
+    const t = row.account_type;
+    if (groups[t]) groups[t].push(row);
+  });
+
+  const totalDebit = (data || []).reduce((s, r) => s + (parseFloat(r.period_debit) || 0), 0);
+  const totalCredit = (data || []).reduce((s, r) => s + (parseFloat(r.period_credit) || 0), 0);
+  const diff = Math.abs(totalDebit - totalCredit);
+  const balanced = diff < 2;
+
+  return (
+    <div style={{ background: T.surface, borderRadius: T.radius.lg, border: `1px solid ${C.border}`, overflow: "hidden", marginBottom: 24, position: "relative" }}>
+      {status !== "signed" && (
+        <div style={{ position: "absolute", top: 80, right: 32, transform: "rotate(-18deg)", fontSize: 38, fontWeight: 900, color: "rgba(200,50,50,0.10)", letterSpacing: "0.08em", fontFamily: C.font, pointerEvents: "none", zIndex: 1 }}>DRAFT — UNAUDITED</div>
+      )}
+      <Letterhead tenantName={tenantName} statementTitle="Working Paper" statementSubtitle="Trial Balance" periodLabel={periodLabel} status={status} financialYear={financialYear} />
+      <div style={{ padding: "0 0 8px" }}>
+        {/* TB header */}
+        <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 140px", padding: "10px 16px", borderBottom: `2px solid ${C.accent}`, fontSize: 11, fontWeight: 700, color: T.ink400, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: C.font }}>
+          <span>Code</span><span>Account</span><span style={{ textAlign: "right" }}>Debit (ZAR)</span><span style={{ textAlign: "right" }}>Credit (ZAR)</span>
+        </div>
+
+        {TB_TYPE_ORDER.map((type) => {
+          const rows = groups[type];
+          if (!rows.length) return null;
+          const groupDebit = rows.reduce((s, r) => s + (parseFloat(r.period_debit) || 0), 0);
+          const groupCredit = rows.reduce((s, r) => s + (parseFloat(r.period_credit) || 0), 0);
+          return (
+            <div key={type}>
+              <SSection label={TB_TYPE_LABELS[type]} />
+              {rows.map((row) => {
+                const dr = parseFloat(row.period_debit) || 0;
+                const cr = parseFloat(row.period_credit) || 0;
+                if (dr === 0 && cr === 0) return null;
+                return (
+                  <div
+                    key={row.account_code}
+                    onClick={() => onDrill(row.account_code, row.account_name)}
+                    style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 140px", padding: "8px 16px", borderBottom: `1px solid ${T.bg}`, cursor: "pointer", fontFamily: C.font, fontSize: 13 }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = T.surfaceHover; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  >
+                    <span style={{ color: C.ink500, fontSize: 12, fontVariantNumeric: "tabular-nums" }}>{row.account_code}</span>
+                    <span style={{ color: C.ink700 }}>{row.account_name}</span>
+                    <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: dr > 0 ? C.ink700 : C.ink300 }}>{dr > 0 ? fmtZar(dr) : "\u2014"}</span>
+                    <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: cr > 0 ? C.ink700 : C.ink300 }}>{cr > 0 ? fmtZar(cr) : "\u2014"}</span>
+                  </div>
+                );
+              })}
+              {/* Group subtotal */}
+              <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 140px", padding: "8px 16px", borderBottom: `1px solid ${C.border}`, background: C.bg, fontFamily: C.font, fontSize: 13, fontWeight: 700 }}>
+                <span />
+                <span style={{ color: C.ink500 }}>Total {TB_TYPE_LABELS[type]}</span>
+                <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: C.ink700 }}>{groupDebit > 0 ? fmtZar(groupDebit) : "\u2014"}</span>
+                <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: C.ink700 }}>{groupCredit > 0 ? fmtZar(groupCredit) : "\u2014"}</span>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* TB balance check row */}
+        <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 140px", padding: "12px 16px", borderTop: `2px solid ${C.accent}`, background: balanced ? T.successLight : T.dangerLight, fontFamily: C.font, fontSize: 14, fontWeight: 700 }}>
+          <span style={{ color: balanced ? T.success : T.danger, fontSize: 18 }}>{balanced ? "\u2713" : "\u26A0"}</span>
+          <span style={{ color: balanced ? T.successText : T.dangerText }}>
+            Total Debits: {fmtZar(totalDebit)} {"\u00b7"} Total Credits: {fmtZar(totalCredit)} {"\u00b7"} Diff: {fmtZar(diff)}
+          </span>
+          <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: balanced ? C.accent : C.danger }}>{fmtZar(totalDebit)}</span>
+          <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: balanced ? C.accent : C.danger }}>{fmtZar(totalCredit)}</span>
+        </div>
+      </div>
+      <StatementNote text="Trial Balance derived from operational tables with journal overlay for manual adjustments. Revenue and expense accounts shown individually (pre-closing TB). Balance check verifies total debits equal total credits within R2 tolerance." />
+    </div>
+  );
+}
+
+// ── GL Drill Drawer ─── WP-FIN-004 PR 3 ─────────────────────────────────────
+function GLDrillDrawer({ tenantId, financialYear, account, onClose }) {
+  const [lines, setLines] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!tenantId || !account) return;
+    setLoading(true);
+    supabase.rpc("fn_gl_detail", {
+      p_tenant_id: tenantId,
+      p_financial_year: financialYear,
+      p_account_code: account.code,
+      p_limit: 10000,
+    }).then(({ data }) => { setLines(data || []); setLoading(false); });
+  }, [tenantId, financialYear, account]);
+
+  useEffect(() => {
+    const handleKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  const truncated = lines.length > 0 && lines[lines.length - 1]?.truncated;
+
+  return createPortal(
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: T.z.overlay }} />
+      <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: 450, background: T.surface, boxShadow: T.shadow.xl, zIndex: T.z.modal, display: "flex", flexDirection: "column", fontFamily: C.font }}>
+        {/* Header */}
+        <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.ink900 }}>{account.code} — {account.name}</div>
+            <div style={{ fontSize: 11, color: C.ink500, marginTop: 2 }}>General Ledger Detail · {financialYear}</div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: C.ink400, padding: 4 }} aria-label="Close">✕</button>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: "auto", padding: 0 }}>
+          {loading && <div style={{ padding: 40, textAlign: "center", color: C.ink500, fontSize: 13 }}>Loading GL detail…</div>}
+          {!loading && lines.length === 0 && <div style={{ padding: 40, textAlign: "center", color: C.ink400, fontSize: 13 }}>No transactions for this account in the period.</div>}
+          {!loading && lines.length > 0 && (
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead>
+                <tr>
+                  {["Date", "Ref", "Description", "Debit", "Credit", "Balance"].map((h) => (
+                    <th key={h} style={{ padding: "8px 8px", textAlign: h === "Debit" || h === "Credit" || h === "Balance" ? "right" : "left", fontSize: 10, fontWeight: 700, color: T.ink400, letterSpacing: "0.08em", textTransform: "uppercase", borderBottom: `1.5px solid ${C.ink}`, position: "sticky", top: 0, background: T.surface, fontFamily: C.font }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {lines.map((line, i) => {
+                  const dr = parseFloat(line.debit_amount) || 0;
+                  const cr = parseFloat(line.credit_amount) || 0;
+                  return (
+                    <tr key={i} style={{ borderBottom: `1px solid ${T.bg}` }}>
+                      <td style={{ padding: "6px 8px", color: C.ink500, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{line.transaction_date}</td>
+                      <td style={{ padding: "6px 8px", color: C.ink500, maxWidth: 60, overflow: "hidden", textOverflow: "ellipsis" }}>{line.reference || "\u2014"}</td>
+                      <td style={{ padding: "6px 8px", color: C.ink700, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis" }}>{line.description || "\u2014"}</td>
+                      <td style={{ padding: "6px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums", color: dr > 0 ? C.ink700 : C.ink300 }}>{dr > 0 ? fmtZar(dr) : "\u2014"}</td>
+                      <td style={{ padding: "6px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums", color: cr > 0 ? C.ink700 : C.ink300 }}>{cr > 0 ? fmtZar(cr) : "\u2014"}</td>
+                      <td style={{ padding: "6px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums", color: C.ink700, fontWeight: 500 }}>{fmtZar(line.running_balance)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+          {truncated && (
+            <div style={{ padding: "12px 16px", background: T.warningLight, fontSize: 11, color: T.warningText, fontFamily: C.font }}>
+              GL detail truncated at 10,000 rows. For the full GL, filter the period selector to a quarter and re-export.
+            </div>
+          )}
+        </div>
+      </div>
+    </>,
+    document.body
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function HQFinancialStatements() {
   const { tenant, industryProfile } = useTenant();
@@ -233,6 +395,8 @@ export default function HQFinancialStatements() {
   const [equityData, setEquityData] = useState(null);
   const [printing, setPrinting] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [tbData, setTbData] = useState(null); // WP-FIN-004 PR 3
+  const [drillAccount, setDrillAccount] = useState(null); // WP-FIN-004 PR 3
 
   const showToast = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 4000); };
   const bounds = useMemo(
@@ -370,6 +534,12 @@ export default function HQFinancialStatements() {
 
       // Equity
       setEquityData({ shareCapital, openingRetained: openingRE, currentYearPL: netProfit });
+
+      // Trial Balance (WP-FIN-004)
+      supabase.rpc("fn_trial_balance", {
+        p_tenant_id: tenantId,
+        p_financial_year: selectedFY === "custom" ? currentFY : selectedFY,
+      }).then(({ data }) => setTbData(data || []));
     } catch (err) { console.error("HQFinancialStatements fetch error:", err); }
     finally { setLoading(false); }
   }, [tenantId, bounds, selectedFY, currentFY, industryProfile]);
@@ -446,7 +616,7 @@ export default function HQFinancialStatements() {
   if (setupComplete === false) return <HQFinancialSetup onComplete={() => setSetupComplete(true)} />;
   if (setupComplete === null) return <div style={{ padding: 60, textAlign: "center", color: C.ink500, fontFamily: C.font }}>Loading{"\u2026"}</div>;
 
-  const STATEMENTS = [{ id: "income", label: "Income Statement" }, { id: "balance", label: "Balance Sheet" }, { id: "cashflow", label: "Cash Flow" }, { id: "equity", label: "Changes in Equity" }];
+  const STATEMENTS = [{ id: "income", label: "Income Statement" }, { id: "balance", label: "Balance Sheet" }, { id: "cashflow", label: "Cash Flow" }, { id: "equity", label: "Changes in Equity" }, { id: "trialbalance", label: "Trial Balance" }];
   const FY_OPTIONS = [{ id: currentFY, label: currentFY }, { id: priorFY, label: `${priorFY} (prior year)` }, { id: "custom", label: "Custom range" }];
   const periodLabel = bounds ? bounds.label : "Period not set";
   const asAtLabel = new Date().toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" });
@@ -554,7 +724,26 @@ export default function HQFinancialStatements() {
           {activeStatement === "balance" && bsData && <BalanceSheetStatement data={bsData} tenantName={tenantName} asAtLabel={asAtLabel} financialYear={financialYear} status={currentStatus} />}
           {activeStatement === "cashflow" && cfData && <CashFlowStatement data={cfData} tenantName={tenantName} periodLabel={periodLabel} financialYear={financialYear} status={currentStatus} />}
           {activeStatement === "equity" && equityData && <ChangesInEquityStatement data={equityData} tenantName={tenantName} periodLabel={periodLabel} financialYear={financialYear} status={currentStatus} />}
+          {activeStatement === "trialbalance" && tbData && (
+            <TrialBalanceStatement
+              data={tbData}
+              tenantName={tenantName}
+              periodLabel={periodLabel}
+              financialYear={financialYear}
+              status={currentStatus}
+              onDrill={(code, name) => setDrillAccount({ code, name })}
+            />
+          )}
         </>
+      )}
+
+      {drillAccount && (
+        <GLDrillDrawer
+          tenantId={tenantId}
+          financialYear={fy}
+          account={drillAccount}
+          onClose={() => setDrillAccount(null)}
+        />
       )}
 
       {showSignModal && (
