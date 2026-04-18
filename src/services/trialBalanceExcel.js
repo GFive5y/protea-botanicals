@@ -197,7 +197,20 @@ async function buildGlSheet({ tenantId, financialYear, tbRows }) {
     });
 
     if (error) {
-      rows.push([acc.account_code, acc.account_name, "", "", `Error: ${error.message}`, "", "", ""]);
+      // Graceful handling — fn_gl_detail RPC can fail for certain accounts
+      // (see WATCH-014, e.g. 15100 and 61100 depreciation journal construction).
+      // Data still aggregates correctly in the Trial Balance sheet; we just
+      // can't enumerate the per-line detail for this account.
+      rows.push([
+        acc.account_code,
+        acc.account_name,
+        "",
+        "",
+        "GL detail unavailable for this account. Aggregated amount is correct in the Trial Balance sheet \u2014 see Trial Balance tab for the period total.",
+        "",
+        "",
+        "",
+      ]);
       continue;
     }
 
