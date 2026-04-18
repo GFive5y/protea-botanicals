@@ -675,3 +675,31 @@ bug not in register; S316 integrated missed nothing but was a one-liner.
 See LOOP-CALIBRATION.md for measured rates.
 
 *LL-299 added: Session 318 · 18 April 2026*
+
+---
+
+## LL-300 — Session 320 (18 April 2026)
+
+LL-300: RLS policies on user_profiles MUST NOT inline-query user_profiles.
+Use SECURITY DEFINER helpers (user_tenant_id(), is_hq_user(), auth_is_admin()).
+Inline subqueries cause 42P17 infinite recursion — platform-wide login break.
+Discovery: tenant_admins_own_users policy on user_profiles inlined a subquery
+against its own table. Fix: replace with user_tenant_id() helper. Same
+mechanism as LL-262 (tenant_groups recursion, S282).
+
+## LL-301 — Session 320 (18 April 2026)
+
+LL-301: Structural RLS audits (shape-checking) do not catch operational
+fragility. The S294-S314 campaign declared Tier 2C "complete" after fixing
+146 policies but did not detect the dormant recursion in tenant_admins_own_users.
+Future completion declarations require both shape verification AND operational
+verification (login smoke test, representative queries under all role combos).
+
+## LL-302 — Session 320 (18 April 2026)
+
+LL-302: Session-start RLS audit queries. Run Audit 1 (self-referencing policies,
+must return 0) and Audit 2 (inline user_profiles queries, watched count ~100
+post-S320 baseline) before and after any session that modifies RLS. Canonical
+SQL in NUAI-AGENT-BIBLE.md LL-301 section.
+
+*LL-300 + LL-301 + LL-302 added: Session 320 · 18 April 2026*

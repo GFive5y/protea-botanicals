@@ -4,6 +4,148 @@
 
 ---
 
+## S320 — 18 April 2026 — RLS incident: platform-wide login break + fix
+
+**Context:** During PR 2A.1 gate verification, owner discovered admin@protea.dev
+login routing to /admin instead of /hq, and fivazg@gmail.com not working.
+DevTools revealed 500 errors across all user_profiles queries with PostgreSQL
+error 42P17 "infinite recursion detected in policy for relation user_profiles".
+Platform-wide auth break.
+
+**Root cause:** `tenant_admins_own_users` policy on user_profiles contained
+an inline subquery against user_profiles in its USING clause. RLS evaluation
+re-triggered the same policy = recursion. Classic LL-262 pattern but on the
+root auth table. Policy pre-existed S320 work; the morning addition of
+`hq_all_food_ingredients` may have altered RLS evaluation order enough to
+surface the dormant recursion. Unprovable, but the timing is suspicious.
+
+**Fix applied:** DROP + CREATE of the policy using `user_tenant_id()`
+SECURITY DEFINER helper instead of inline subquery. One migration
+(`s320_fix_user_profiles_recursion_ll262`). Login restored immediately.
+
+**Alternative considered:** Move admin@protea.dev to the operator tenant to
+resolve the routing ambiguity first. Rejected — diagnose before mutating.
+The routing issue was a symptom, not the cause. Tenant-move would have masked
+the recursion without fixing it.
+
+**Alternative considered:** Unsuspend fivazg@gmail.com as the quick path back
+to HQ login. Rejected — don't unsuspend blindly. The suspension might have
+been deliberate.
+
+**Almost-mistake avoided:** Initially wanted to apply the fix immediately.
+Owner's "stop, think about what else this affects" intervention led to
+Audit 1 + Audit 2, which surfaced LL-301 (operational fragility across
+~100 policies). Without the pause, we would have fixed one policy and
+moved on, missing the pattern.
+
+**Calibration update:** The S294-S314 campaign declared "Tier 2C complete"
+but did not catch this bug. LL-301 captures why: structural audits !=
+operational audits. Every completion declaration going forward needs both.
+
+**Fresh at close:** Yes.
+
+---
+
+## S320 — 18 April 2026 — Two-HQ architecture: capture before it decays
+
+**Context:** During PR 2A.1 scoping, decision needed on whether
+`hq_all_food_ingredients` should use `is_hq_user()` (matching 8+ existing
+tables) or a new tighter `is_platform_operator()` helper. Owner clarified
+architecture that was never written down:
+- Every tenant eventually gets a "Tenant HQ" portal (their command centre)
+- "Platform HQ" (Nu Ai Pty Ltd) sits above all tenants, cross-tenant visibility
+- Today's `hq_access` boolean conflates the two because only the owner has it
+
+**Decision:** Option A now (use `is_hq_user()` matching existing pattern),
+log WP-HQ-GRANULARITY as trigger-gated backlog item. Migration path is
+clean because every `hq_all_*` policy calls the helper function, not the
+raw column — changing the function body migrates all tables simultaneously.
+
+**Alternative considered:** Option 2 now (platform-wide enum migration with
+`is_platform_operator()` / `is_tenant_hq()` helpers). Rejected — premature
+optimisation. No real customer needs tenant-HQ distinction today. The 8+
+tables with hq_access bypass would all need classification, and the churn
+exceeds any current benefit.
+
+**Alternative considered:** Option 3 (hybrid — new helper for new tables,
+keep existing). Rejected — creates two classes of HQ policy indefinitely.
+Every future agent has to remember which helper applies where. Subtle bug
+factory.
+
+**Captured as:** PLATFORM-OVERVIEW_v1_0.md S320 addendum ("Two-HQ
+architecture clarification"). This is the first time the distinction
+appears in any loop doc. Before today, every agent was working from the
+same latent assumption as the owner — Platform HQ and Tenant HQ are the
+same thing. They are not.
+
+**Trigger for WP-HQ-GRANULARITY execution:** Any decision to grant
+`hq_access=true` to a non-platform-operator user. The moment that
+decision forms, this WP must ship BEFORE the grant.
+
+**Fresh at close:** Yes.
+
+---
+
+## S320 — 18 April 2026 — Principle 7 + Procedure 6: execution rhythm as system
+
+**Context:** Owner articulated that multi-sub-phase WPs kept drifting because
+the rhythm between Claude.ai planner and Claude Code executor was not named.
+RULE 0Q says planner can't push. LL-299 says planner/executor split catches
+more bugs. But neither describes the per-sub-phase cycle: step back -> scope
+-> executor ships -> planner reviews -> next sub-phase.
+
+**Decision:** Name the rhythm. LOOP-PRINCIPLES.md Principle 7 captures the
+philosophy (planner and executor are different agents by design).
+AGENT-METHODOLOGY.md Procedure 6 captures the operational six-step cycle.
+AGENT-ORIENTATION.md points to both so new agents see it at session start.
+
+**Alternative considered:** Inline the rhythm into RULE 0Q. Rejected — RULE 0Q
+is about what not to do (the push prohibition). Principle 7 is about what to
+do (the positive pattern). Different registers, different doc types.
+
+**Alternative considered:** Leave it ad-hoc; rely on agents to develop the
+rhythm organically. Rejected — organic development took 320 sessions to
+surface this pattern. Naming it saves every future agent that discovery time.
+
+**Almost-mistake avoided:** Initially wanted to write the scope for 2A.1
+and hand off without first reviewing whether the S293 scope doc was still
+accurate. Owner's "step back, look at bigger picture" intervention caught
+that. The food_ingredients vs inventory_items drift was real (S293 scoped
+wrong table). Had we not paused, PR 2A.1 would have built against the
+wrong spec and we'd have discovered it mid-execution.
+
+**Fresh at close:** Yes.
+
+---
+
+## S320 — 18 April 2026 — PR 2A.1 ships: scaffolding + ViewToggle + List + Tile
+
+**Context:** First code PR of WP-TABLE-UNIFY Phase 2A. Plan called for
+extracting tile render and building list view. Disk inspection showed
+existing render IS a list/table — so FoodListView is the extraction,
+FoodTileView is net-new.
+
+**Decision:** Correct the scope description inline in the Claude Code
+instruction block rather than amending the split plan doc. Estimate
+unchanged (~4h). Same deliverables, corrected work distribution.
+
+**Result:** Commit 31e93d3. Three new files under src/components/hq/food/
+(ViewToggle 55L, FoodListView 188L, FoodTileView 210L). HQFoodIngredients.js
+dropped 197 lines (cleaner than estimated 150). Build passed, smoke test
+across all 5 tenants confirmed by owner:
+- Garden Bistro (160 items): tile + list + toggle work
+- Nourish Kitchen (121 seeded): tile + list + toggle work
+- Medi Recreational, MediCare, Metro Hardware: tab correctly hidden
+
+**Debt logged for 2A.4:** Component map comment block at top of
+HQFoodIngredients.js still lists viewMode as "MISSING" and references
+old line numbers (L3185/L3228/L3273 now shifted by ~200 lines).
+Pure documentation — will be fixed when PR 2A.4 updates the map wholesale.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S319 — 18 April 2026 — GAP-002: Cash flow reconciliation wiring
 
 **Context:** Register framed GAP-002 as "cosmetic blank field requiring

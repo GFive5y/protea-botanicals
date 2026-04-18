@@ -1,6 +1,6 @@
 # NUAI — SESSION START PROTOCOL
 ## Paste this as the FIRST message in every new Claude.ai session.
-## Updated: 18 April 2026 — Session 319 close (GAP-002 — cash flow opening/closing balance)
+## Updated: 18 April 2026 — Session 320 close (architecture docs + PR 2A.1 + RLS incident + fix)
 ## THIS FILE HAS NO VERSION NUMBER. IT IS UPDATED IN-PLACE EVERY SESSION.
 ## Detail lives in the loop docs. This file is the entry point only.
 ## If you are writing NEXT-SESSION-PROMPT_vXXX.md — STOP. Update this file instead. (LL-264)
@@ -148,7 +148,19 @@ NuAi Demo Portfolio (a55373b2) · 6 stores · All 8 tabs verified working.
 ### OPEN LOOPS (see PENDING-ACTIONS.md for close conditions)
 - No blocking loops open. All items tracked in DEBT_REGISTER_v1.md.
 
-### CLOSED THIS SESSION (319) — 18 April 2026
+### CLOSED THIS SESSION (320) — 18 April 2026
+- **Architecture docs landed** (4 commits): Phase 2 scope amendment, Principle 7 +
+  Procedure 6 (planner/executor rhythm), Two-HQ architecture addendum + WP-HQ-GRANULARITY,
+  Phase 2A split plan (4 PRs).
+- **PR 2A.1 shipped** (31e93d3): ViewToggle + FoodListView + FoodTileView + wire-up.
+  3 new files under src/components/hq/food/. HQFI dropped 197 lines.
+- **RLS incident discovered + fixed:** Platform-wide 42P17 recursion on user_profiles.
+  `tenant_admins_own_users` inlined subquery against own table. Fix: `user_tenant_id()` helper.
+  LL-300 (pattern), LL-301 (audit lesson), LL-302 (session-start audit queries).
+- **Audit 2 finding:** ~100 policies inline-query user_profiles. Logged as WP-RLS-HYGIENE.
+- **WATCH-012:** financial_statement_notes legacy `role = 'operator'` pattern.
+
+### CLOSED SESSION 319 — 18 April 2026
 - **GAP-002 FIXED** — Cash flow opening/closing balance reconciliation.
   Commit 1: Frontend (+1 query to bank_accounts, +3 render rows, updated note).
   Commit 2: EF deploy (mirrored reconciliation on PDF page 4).
@@ -551,6 +563,15 @@ LL-297 (NEW S317): FY labels computed from tenant's financial_year_start + curre
          date. Never hardcode "FY2026". Garden Bistro (Mar-Feb FY) is the canary.
 LL-298 (NEW S317): VAT divisor from tenant_config.vat_rate (decimal 0.15), not
          hardcoded 1.15. Dispensary revenue is NOT VAT-inclusive (LL-231).
+LL-299 (NEW S317/S318): Planner/executor split catches bugs integrated flow misses.
+         Prefer split for anything larger than a one-liner.
+LL-300 (NEW S320): RLS policies on user_profiles MUST NOT inline-query user_profiles.
+         Use user_tenant_id() / is_hq_user() / auth_is_admin() SECURITY DEFINER helpers.
+         Inline subqueries cause 42P17 recursion. See bible section for full context.
+LL-301 (NEW S320): Structural RLS audits do not catch operational fragility.
+         Every "complete" declaration needs shape audit + live behaviour verification.
+LL-302 (NEW S320): Run Audit 1 (self-ref) + Audit 2 (inline user_profiles) any session
+         that touches RLS. Audit 1 must be 0; Audit 2 is a watched count trending down.
 
 ---
 

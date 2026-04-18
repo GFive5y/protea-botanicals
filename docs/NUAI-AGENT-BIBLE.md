@@ -2022,3 +2022,132 @@ See also: LOOP-CALIBRATION.md "Planner / executor split cost and benefit".
 ---
 
 *LL-297 + LL-298 + LL-299 added 18 April 2026 · Sessions 317-318*
+
+---
+
+## Session 320 — 18 April 2026 — RLS incident + two-HQ architecture
+
+### LL-300 — RLS POLICIES ON user_profiles MUST NOT INLINE-QUERY user_profiles
+
+**Rule:** Any RLS policy on `user_profiles` MUST use the `SECURITY DEFINER`
+helper functions (`user_tenant_id()`, `is_hq_user()`, `auth_is_admin()`)
+instead of inline subqueries against `user_profiles` itself.
+
+**Why this matters:** When a policy on `user_profiles` contains an inline
+subquery like `tenant_id = (SELECT up.tenant_id FROM user_profiles up
+WHERE up.id = auth.uid())`, RLS evaluates the subquery by reapplying the
+same policies — triggering infinite recursion (PostgreSQL error 42P17).
+Every query against user_profiles returns 500. Platform-wide login breaks.
+
+**Discovery (S320):** `tenant_admins_own_users` policy on user_profiles
+used this inline pattern. Platform-wide 42P17 during PR 2A.1 gate
+verification. admin@protea.dev and fivazg@gmail.com both unable to log in.
+tenantService profile fetch, loyalty_config fetch, all user_profiles reads
+returning 500 simultaneously.
+
+**The fix pattern (canonical):**
+```sql
+-- WRONG — recurses
+USING (tenant_id = (SELECT up.tenant_id FROM user_profiles up WHERE up.id = auth.uid()))
+
+-- RIGHT — user_tenant_id() is SECURITY DEFINER, bypasses RLS
+USING (tenant_id = user_tenant_id())
+```
+
+**Related:** Same mechanism as LL-262 (tenant_groups recursion, S282).
+LL-254 is the general principle. LL-300 names the user_profiles-specific
+case because user_profiles sits at the root of almost every other policy
+path on the platform — when it breaks, everything breaks.
+
+**Applied S320:** Migration `s320_fix_user_profiles_recursion_ll262` replaced
+the broken policy body with `user_tenant_id()` helper. Login restored
+immediately. Audit 1 (self-referencing policies) post-fix: 0 remaining.
+
+---
+
+### LL-301 — STRUCTURAL RLS AUDITS DO NOT CATCH OPERATIONAL FRAGILITY
+
+**Rule:** An RLS campaign that audits policy *shape* (does it have a
+tenant_id filter? does it have with_check?) does not detect policies that
+are structurally valid but operationally brittle.
+
+**The gap:** The S294–S314 campaign declared Tier 2C "complete" after
+fixing 146 policies across 11 sessions. The audit methodology looked for:
+- `using_clause = 'true'` on tenant-scoped tables (Bucket A)
+- Missing `with_check` on UPDATE/INSERT policies (Bucket C)
+- Non-tenant-aware functions like `auth_is_admin()` (Bucket B)
+
+It did NOT look for:
+- Inline subqueries against the policy's own table (self-referencing)
+- Inline subqueries against user_profiles when SECURITY DEFINER helpers exist
+- Policies that work under normal evaluation order but fail when another
+  policy on the same table changes
+
+**Evidence (S320):** `tenant_admins_own_users` passed the S314 audit — it
+had a valid tenant_id filter, included auth_is_admin() check, had a matching
+with_check. It was structurally pristine. But it contained an inline
+subquery against the same table it protected. When the S320 addition of
+`hq_all_food_ingredients` altered the RLS evaluation environment (possibly
+by changing which policy fires first or the query planner's inlining
+decisions), the dormant recursion surfaced. Login broke platform-wide.
+
+**Corrective principle:** Future RLS "complete" declarations require an
+additional audit pass beyond shape-checking:
+
+```sql
+-- Audit 1: Self-referencing policies (recursion risk)
+SELECT tablename, policyname
+FROM pg_policies
+WHERE schemaname = 'public'
+AND (qual ILIKE '%FROM ' || tablename || '%'
+OR with_check ILIKE '%FROM ' || tablename || '%');
+
+-- Audit 2: Inline user_profiles queries (recursion + fragility risk)
+SELECT tablename, policyname
+FROM pg_policies
+WHERE schemaname = 'public'
+AND tablename != 'user_profiles'
+AND (qual ILIKE '%FROM user_profiles%' OR with_check ILIKE '%FROM user_profiles%');
+```
+
+Audit 1 must return 0 rows. Audit 2 will return many today (~100
+policies) — each one is technical debt candidate for WP-RLS-HYGIENE
+(PENDING-ACTIONS), not a blocker, but the count should trend down.
+
+**Generalises:** Every "campaign complete" declaration from here forward
+requires both shape verification AND operational verification. A shape
+audit is necessary but not sufficient. Evidence-based completeness means
+sampling representative policies against live behaviour (login still
+works for all role combinations after changes), not just looking at the
+SQL text.
+
+---
+
+### LL-302 — SESSION-START RLS AUDIT QUERIES
+
+**Rule:** Every session that modifies RLS policies on any table should
+run Audit 1 (self-referencing) and Audit 2 (inline user_profiles) before
+declaring gate-passed. Audit 1 must be 0; Audit 2 is a watched count that
+trends down over time.
+
+**Canonical queries:** Copied from LL-301. Run via Supabase MCP.
+
+**Thresholds:**
+- Audit 1 MUST return 0 rows. Any result is an emergency — fix before
+  closing session.
+- Audit 2 is a watched metric. Post-S320 baseline: ~100 policies. Any
+  session that adds new inline-user_profiles patterns increases the
+  baseline — log to WP-RLS-HYGIENE. Sessions that replace them decrease
+  it — log the reduction in session close.
+
+**When to run:**
+- Before any session that modifies RLS
+- After any session that modifies RLS
+- At any moment a platform-wide auth anomaly is suspected
+
+**Reference:** LL-300 (the incident), LL-301 (the audit lesson),
+WP-RLS-HYGIENE (the cleanup WP).
+
+---
+
+*LL-300 + LL-301 + LL-302 added 18 April 2026 · Session 320*

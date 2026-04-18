@@ -490,3 +490,53 @@ franchise owners.
 **Reference:** PLATFORM-OVERVIEW_v1_0.md S320 addendum ("Two-HQ architecture
 clarification") contains the full architectural rationale. Read that first
 when this WP is picked up.
+
+### WP-RLS-HYGIENE — Migrate inline user_profiles subqueries to SECURITY DEFINER helpers
+Status: BACKLOG · Post-demo
+Source: S320 Audit 2 findings (LL-301)
+Trigger: Any session that can afford 2-3 focused RLS passes, post-demo.
+
+**Why this exists:**
+Audit 2 from LL-301 found ~100 RLS policies across dozens of tables using
+the pattern `tenant_id = (SELECT user_profiles.tenant_id FROM user_profiles
+WHERE user_profiles.id = auth.uid())` instead of the `user_tenant_id()`
+SECURITY DEFINER helper. These policies are structurally valid and
+currently working, but:
+1. They're fragile — if user_profiles RLS ever blocks (as S320 showed),
+   all ~100 policies fail simultaneously
+2. They're inefficient — subquery evaluated per row instead of cached
+   per statement (SECURITY DEFINER STABLE semantics)
+3. One outlier (`financial_statement_notes.hq_all_financial_statement_notes`)
+   uses `role = 'operator'` inline — same pattern LL-NEW-5 (S313) called
+   out as legacy-wrong
+
+**Scope:**
+1. Produce canonical table of ~100 affected policies (Audit 2 output)
+2. For each, determine target helper (`user_tenant_id()` for tenant-scope,
+   `is_hq_user()` for HQ-bypass variants)
+3. Migrate in batches of ~20 per session (safer than bulk, allows per-batch
+   gate check via login smoke test)
+4. Zero data changes, zero code changes — pure policy rewrites
+5. Fix the `financial_statement_notes` legacy outlier in the same sweep
+   (move to `is_hq_user()` per LL-NEW-5)
+
+**Effort estimate:** 2-3 focused sessions (~4h each). Conservative because
+each batch needs Audit 1 verification + login smoke test before next batch.
+
+**Rollback:** Each migration produces a named DROP POLICY + CREATE POLICY
+pair. Reversible per-policy if anything regresses.
+
+**Reference:** LL-300 (incident), LL-301 (audit lesson), LL-302 (session-start
+audit queries).
+
+### WATCH-012 — financial_statement_notes legacy hq_all_ policy
+Status: OPEN · LOW priority
+Source: S320 Audit 2 discovery
+`financial_statement_notes.hq_all_financial_statement_notes` uses
+`role = 'operator'::text` inline in its USING clause, rather than
+`is_hq_user()`. This is the exact pattern LL-NEW-5 (S313) identified as
+legacy-wrong and fixed on three dispensary tables. This one was missed.
+
+Fix: DROP + CREATE with `is_hq_user()`. One-liner migration. Include in
+WP-RLS-HYGIENE first batch, or opportunistically if a session touches
+this table.
