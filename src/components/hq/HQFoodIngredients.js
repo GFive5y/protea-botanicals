@@ -5275,8 +5275,8 @@ export default function HQFoodIngredients() {
             setShowIngestModal(false);
             showToast(
               queuedCount > 0
-                ? `✅ ${queuedCount} ingredient${queuedCount === 1 ? "" : "s"} queued for review`
-                : "Document processed — no ingredients detected"
+                ? `✅ ${queuedCount} ingredient${queuedCount === 1 ? "" : "s"} extracted with allergens, HACCP risk, and nutrition. Ingest Queue tab coming in PR 2B.4.`
+                : "Document processed — no ingredients detected. Try a clearer invoice or spec sheet."
             );
             // Phase 2B.4 will add an "Ingest Queue" tab and switch to it here.
             // For 2B.3, no tab switch yet. The toast is the confirmation.

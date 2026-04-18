@@ -465,8 +465,9 @@ export default function FoodIngestModal({ isOpen, onClose, onSuccess, tenantId, 
           <div style={sInfoBanner}>
             <AlertCircle size={16} style={{ marginTop: 2, flexShrink: 0, color: T.info }} />
             <span>
-              Desktop ingest only. Mobile Smart Capture for ingredients
-              is on the Phase 2F roadmap.
+              Desktop ingest is live today. Phase 2F adds mobile Smart
+              Capture — photograph ingredients at the stock-receiving
+              point for receive-and-go ingestion.
             </span>
           </div>
 
@@ -631,11 +632,10 @@ export default function FoodIngestModal({ isOpen, onClose, onSuccess, tenantId, 
             <div
               style={{
                 display: "flex",
-                alignItems: "center",
+                alignItems: "flex-start",
                 gap: T.gap.sm,
                 marginTop: T.gap.lg,
                 fontSize: T.text.sm,
-                color: T.ink400,
               }}
             >
               <span
@@ -647,9 +647,24 @@ export default function FoodIngestModal({ isOpen, onClose, onSuccess, tenantId, 
                   borderTopColor: T.accent,
                   borderRadius: "50%",
                   animation: "spin 0.8s linear infinite",
+                  flexShrink: 0,
+                  marginTop: 2,
                 }}
               />
-              Extracting… this can take up to 20s for PDFs.
+              <div style={{ display: "flex", flexDirection: "column", gap: T.gap.xs }}>
+                <div style={{ color: T.ink, fontWeight: T.weight.medium }}>
+                  Reading your document…
+                </div>
+                <div style={{ color: T.ink400 }}>
+                  Identifying ingredients, allergens, and HACCP risk…
+                </div>
+                <div style={{ color: T.ink400 }}>
+                  Matching against SA suppliers and R638 compliance…
+                </div>
+                <div style={{ color: T.ink400, fontSize: T.text.xs, marginTop: T.gap.xs }}>
+                  Usually 8-15 seconds for a typical invoice.
+                </div>
+              </div>
             </div>
           )}
         </div>
