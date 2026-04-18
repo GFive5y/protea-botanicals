@@ -72,6 +72,8 @@ import FoodListView from "./food/FoodListView";
 import FoodPillNav, { pillMatches } from "./food/FoodPillNav";
 import FoodKPIStrip from "./food/FoodKPIStrip";
 import FoodSmartSearch, { matchesSmartSearch } from "./food/FoodSmartSearch";
+import FoodBulkActionBar from "./food/FoodBulkActionBar";
+import FoodColumnPicker, { DEFAULT_COL_VISIBILITY } from "./food/FoodColumnPicker";
 
 // WP-UNIFY: F&B local palette mapped to tokens.js T where equivalent
 const C = {
@@ -2598,6 +2600,19 @@ function TempBadge({ zone }) {
 }
 
 // ─── Nutrition mini display ───────────────────────────────────────────────────
+// WTU 2A.3 — sort value extractor
+function getSortValue(item, field) {
+  switch (field) {
+    case "name":        return (item.name || "").toLowerCase();
+    case "category":    return (item.category || "").toLowerCase();
+    case "allergens":   return Object.values(item.allergen_flags || {}).filter(Boolean).length;
+    case "haccp":       { const o = { low: 0, medium: 1, high: 2, critical: 3 }; return o[item.haccp_risk_level] ?? -1; }
+    case "zone":        return (item.temperature_zone || "").toLowerCase();
+    case "shelf":       return item.shelf_life_days ?? 999999;
+    default:            return "";
+  }
+}
+
 function NutritionMini({ n }) {
   if (!n || Object.keys(n).length === 0)
     return <span style={{ color: C.inkLight, fontSize: T.text.xs }}>No data</span>;
@@ -3214,6 +3229,10 @@ export default function HQFoodIngredients() {
   const [compareList, setCompareList] = useState([]);
   const [viewMode, setViewMode] = useState("tile"); // WP-TABLE-UNIFY 2A.1
   const [pillFilter, setPillFilter] = useState({ worldId: null, groupId: null, subId: null }); // WP-TABLE-UNIFY 2A.2
+  const [sortField, setSortField] = useState("name");            // WTU 2A.3
+  const [sortDir, setSortDir] = useState("asc");                 // "asc" | "desc"
+  const [selectedIds, setSelectedIds] = useState(new Set());     // Set<uuid>
+  const [colVisibility, setColVisibility] = useState(DEFAULT_COL_VISIBILITY); // WTU 2A.3
   const [toast, setToast] = useState(null);
 
   // New ingredient form
@@ -3276,6 +3295,31 @@ export default function HQFoodIngredients() {
   useEffect(() => {
     fetchIngredients();
   }, [fetchIngredients]);
+
+  // WTU 2A.3 — load column visibility per tenant
+  useEffect(() => {
+    if (!tenantId) return;
+    try {
+      const raw = localStorage.getItem(`nuai.food-ingredients.cols.${tenantId}`);
+      if (raw) setColVisibility({ ...DEFAULT_COL_VISIBILITY, ...JSON.parse(raw) });
+    } catch (_) { /* localStorage unavailable */ }
+  }, [tenantId]);
+
+  // WTU 2A.3 — realtime subscription (matches HQOverview pattern)
+  useEffect(() => {
+    if (!tenantId) return;
+    const sub = supabase
+      .channel("hq-food-ingredients")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "food_ingredients" },
+        () => fetchIngredients(),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(sub);
+    };
+  }, [tenantId, fetchIngredients]);
 
   // ── Seed the library ──────────────────────────────────────────────────────
   async function handleSeedLibrary() {
@@ -3360,7 +3404,7 @@ export default function HQFoodIngredients() {
 
   // ── Filtered ingredients ───────────────────────────────────────────────────
   const filtered = useMemo(() => {
-    let list = ingredients;
+    let list = ingredients.filter((i) => i.is_active !== false);
     // Smart-search: plain words + FNB tokens (allergen:x, zone:y, expiry<N, etc.)
     if (searchQ) list = list.filter((i) => matchesSmartSearch(i, searchQ));
     // Pill nav drill-down
@@ -3376,6 +3420,17 @@ export default function HQFoodIngredients() {
       list = list.filter((i) => i.haccp_risk_level === filterHaccp);
     if (filterTemp)
       list = list.filter((i) => i.temperature_zone === filterTemp);
+    // Sort (WTU 2A.3)
+    list = [...list].sort((a, b) => {
+      const av = getSortValue(a, sortField);
+      const bv = getSortValue(b, sortField);
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (av < bv) return sortDir === "asc" ? -1 : 1;
+      if (av > bv) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
     return list;
   }, [
     ingredients,
@@ -3385,6 +3440,8 @@ export default function HQFoodIngredients() {
     filterAllergen,
     filterHaccp,
     filterTemp,
+    sortField,
+    sortDir,
   ]);
 
   // ── KPIs ──────────────────────────────────────────────────────────────────
@@ -3412,6 +3469,169 @@ export default function HQFoodIngredients() {
       categories,
     };
   }, [ingredients]);
+
+  // ── WTU 2A.3 — sort handler ──────────────────────────────────────────────
+  function handleSort(field) {
+    if (sortField === field) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  }
+
+  // ── WTU 2A.3 — selection handlers ──────────────────────────────────────
+  function toggleSelect(id) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function toggleSelectAll() {
+    setSelectedIds((prev) => {
+      if (prev.size === filtered.length && filtered.every((i) => prev.has(i.id))) {
+        return new Set();
+      }
+      return new Set(filtered.map((i) => i.id));
+    });
+  }
+  function clearSelection() { setSelectedIds(new Set()); }
+
+  // ── WTU 2A.3 — column visibility persisted ────────────────────────────
+  function handleColVisibilityChange(next) {
+    setColVisibility(next);
+    try {
+      localStorage.setItem(`nuai.food-ingredients.cols.${tenantId}`, JSON.stringify(next));
+    } catch (_) { /* localStorage unavailable */ }
+  }
+
+  // ── WTU 2A.3 — bulk: change zone ──────────────────────────────────────
+  async function handleBulkChangeZone() {
+    const zone = window.prompt("Change temperature zone to:\n  ambient \u00B7 refrigerated \u00B7 frozen", "ambient");
+    if (!zone) return;
+    if (!["ambient", "refrigerated", "frozen"].includes(zone)) {
+      showToast("Invalid zone. Use ambient, refrigerated, or frozen.", "error");
+      return;
+    }
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    try {
+      const { data, error } = await supabase
+        .from("food_ingredients")
+        .update({ temperature_zone: zone })
+        .in("id", ids)
+        .eq("tenant_id", tenantId)       // LL-285
+        .eq("is_seeded", false)           // never mutate library rows
+        .select("id");
+      if (error) throw error;
+      const updated = (data || []).length;
+      const skipped = ids.length - updated;
+      showToast(
+        `Updated ${updated} to ${zone}` + (skipped > 0 ? ` \u00B7 ${skipped} skipped (library items)` : ""),
+        skipped > 0 ? "warning" : "success",
+      );
+      clearSelection();
+      fetchIngredients();
+    } catch (err) {
+      showToast("Bulk update failed: " + err.message, "error");
+    }
+  }
+
+  // ── WTU 2A.3 — bulk: archive ──────────────────────────────────────────
+  async function handleBulkArchive() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (!window.confirm(`Archive ${ids.length} ingredient(s)? Library items will be skipped.`)) return;
+    try {
+      const { data, error } = await supabase
+        .from("food_ingredients")
+        .update({ is_active: false })
+        .in("id", ids)
+        .eq("tenant_id", tenantId)       // LL-285
+        .eq("is_seeded", false)
+        .select("id");
+      if (error) throw error;
+      const archived = (data || []).length;
+      const skipped = ids.length - archived;
+      showToast(
+        `Archived ${archived}` + (skipped > 0 ? ` \u00B7 ${skipped} skipped (library items)` : ""),
+        skipped > 0 ? "warning" : "success",
+      );
+      clearSelection();
+      fetchIngredients();
+    } catch (err) {
+      showToast("Archive failed: " + err.message, "error");
+    }
+  }
+
+  // ── WTU 2A.3 — CSV export ─────────────────────────────────────────────
+  function rowsToCSV(rows) {
+    const headers = [
+      "Name", "Common Name", "Category", "Sub Category",
+      "Default Unit", "Temperature Zone", "Shelf Life (days)",
+      "HACCP Risk", "E-Number", "Allergens",
+      "Energy (kJ)", "Protein (g)", "Fat (g)", "Carbs (g)", "Sugars (g)", "Sodium (mg)",
+      "Library", "Active",
+    ];
+    const csvEscape = (v) => {
+      if (v == null) return "";
+      const s = String(v);
+      if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    };
+    const lines = [headers.join(",")];
+    rows.forEach((r) => {
+      const allergens = Object.entries(r.allergen_flags || {})
+        .filter(([, v]) => v === true)
+        .map(([k]) => k)
+        .join("; ");
+      const n = r.nutrition_per_100g || {};
+      lines.push([
+        csvEscape(r.name), csvEscape(r.common_name), csvEscape(r.category),
+        csvEscape(r.sub_category), csvEscape(r.default_unit), csvEscape(r.temperature_zone),
+        csvEscape(r.shelf_life_days), csvEscape(r.haccp_risk_level), csvEscape(r.e_number),
+        csvEscape(allergens), csvEscape(n.energy_kj), csvEscape(n.protein_g),
+        csvEscape(n.fat_total_g), csvEscape(n.carbohydrate_g), csvEscape(n.sugars_g),
+        csvEscape(n.sodium_mg), csvEscape(r.is_seeded ? "yes" : "no"),
+        csvEscape(r.is_active === false ? "no" : "yes"),
+      ].join(","));
+    });
+    return lines.join("\n");
+  }
+  function downloadCSV(csv, filename) {
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  function dedupeRowsByName(rows) {
+    const map = new Map();
+    rows.forEach((r) => {
+      const key = (r.name || "").toLowerCase().trim();
+      if (!map.has(key)) map.set(key, r);
+      else if (!r.is_seeded && map.get(key).is_seeded) map.set(key, r);
+    });
+    return Array.from(map.values());
+  }
+  function handleExportSelected() {
+    const rows = filtered.filter((r) => selectedIds.has(r.id));
+    if (rows.length === 0) return;
+    const ts = new Date().toISOString().slice(0, 10);
+    downloadCSV(rowsToCSV(rows), `ingredients-selected-${ts}.csv`);
+  }
+  function handleExportAllFiltered() {
+    const rows = dedupeRowsByName(filtered);
+    if (rows.length === 0) { showToast("No ingredients to export", "error"); return; }
+    const ts = new Date().toISOString().slice(0, 10);
+    downloadCSV(rowsToCSV(rows), `ingredients-${ts}.csv`);
+  }
 
   // ─── RENDER ───────────────────────────────────────────────────────────────
   const TABS = [
@@ -3740,8 +3960,27 @@ export default function HQFoodIngredients() {
             </div>
           )}
 
-          {/* View toggle + ingredient grid — PR 2A.1 */}
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: T.gap.md }}>
+          {/* View toggle + export + column picker — PR 2A.1 + 2A.3 */}
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: T.gap.md, gap: T.gap.sm, alignItems: "center" }}>
+            <button
+              type="button"
+              onClick={handleExportAllFiltered}
+              style={{
+                padding: "7px 12px",
+                background: T.surface,
+                border: `1px solid ${T.border}`,
+                borderRadius: T.radius.smPlus,
+                fontSize: T.text.sm,
+                fontFamily: "inherit",
+                color: T.ink700,
+                cursor: "pointer",
+              }}
+            >
+              Export CSV
+            </button>
+            {viewMode === "list" && (
+              <FoodColumnPicker value={colVisibility} onChange={handleColVisibilityChange} />
+            )}
             <ViewToggle value={viewMode} onChange={setViewMode} />
           </div>
 
@@ -3762,6 +4001,13 @@ export default function HQFoodIngredients() {
               AllergenBadge={AllergenBadge}
               HaccpBadge={HaccpBadge}
               TempBadge={TempBadge}
+              sortField={sortField}
+              sortDir={sortDir}
+              onSort={handleSort}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
+              onToggleSelectAll={toggleSelectAll}
+              colVisibility={colVisibility}
             />
           )}
         </div>
@@ -4850,6 +5096,15 @@ export default function HQFoodIngredients() {
           </div>
         </div>
       )}
+
+      {/* Bulk action bar — WTU 2A.3 */}
+      <FoodBulkActionBar
+        selectedCount={selectedIds.size}
+        onChangeZone={handleBulkChangeZone}
+        onExportSelected={handleExportSelected}
+        onArchive={handleBulkArchive}
+        onClear={clearSelection}
+      />
 
       {/* Ingredient detail drawer */}
       {selectedIngredient && (
