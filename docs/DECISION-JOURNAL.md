@@ -4,6 +4,44 @@
 
 ---
 
+## S-2B.2-preservation — 19 April 2026 — Elevate Phase 2B thesis to top of read stack
+
+### The trigger
+Owner raised a concern at session close, reading our own handoff as
+a check on the Loop: "This needs to be preserved — it's a major
+function and only part of the picture. I hope the Loop and Loop
+docs and Loop's institutionalised learning recognise this and
+update itself session by session."
+
+### What the audit found
+Execution docs: complete. But the commercial framing — why a 3-hour
+upload modal matters more than any other 3-hour task — was only
+visible to an agent who reads all the way to Section 11 of a 645-line
+scope doc. A future planner opening cold, reading the top of
+SESSION-START-PROMPT first, would see "PR 2B.3 ~3h scoped" and treat
+it as a routine sub-phase. That is a preservation failure at the top
+of the read stack, not in the deep docs.
+
+### The fix
+Three small edits:
+1. SESSION-START-PROMPT NEXT PRIORITIES: rewrote from a 3-hour task
+   to a 2-session "demo moment" narrative with commercial thesis
+2. SESSION-START-PROMPT CURRENT STATE: added "WHY PHASE 2B MATTERS"
+   block that any future planner hits before reading sub-phase briefs
+3. WP-TABLE-UNIFY_PHASE2B-SPLIT_v1.md: added EXECUTION STATUS table
+   at top + commercial-context paragraph
+
+### Loop self-audit lesson (flagged, not LL'd yet)
+When a session closes with "this is the biggest thing we've built"
+energy, check whether a cold-reading planner would feel that same
+energy from the session-start doc. If not, surface the thesis at the
+top of the read stack. One instance isn't a pattern — if it recurs,
+we'll LL it.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S-2B.2 — 19 April 2026 — PR 2B.2 shipped + validation pattern codified
 
 ### Session outcome

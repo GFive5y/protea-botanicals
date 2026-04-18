@@ -47,6 +47,31 @@ IF DEMO DATE CHANGES: update PENDING-ACTIONS.md first, then this file.
 
 ## CURRENT STATE — 19 April 2026 — PR 2B.2 shipped (v62 live)
 
+### WHY PHASE 2B MATTERS — READ THIS BEFORE SCOPING ANY OF 2B.3/2B.4/2B.5
+
+Phase 2B is not just another sub-phase. It is the commercial thesis
+of the platform's F&B offering. Every future planner opening this
+file should understand, before reading a single line of per-PR scope:
+
+- **Market position:** No SA F&B product has AI ingredient ingest today.
+  International systems that do (Apicbase, SAP Food One) sit at
+  GBP2000-GBP10000+/mo. NuAi's delivery of this feature at its current
+  price point is the single biggest commercial differentiator in the
+  product.
+- **Demo moment:** "Photograph an invoice -> 10 ingredients appear with
+  allergens, HACCP, nutrition, supplier links." 30 seconds. This is
+  the moment the room goes quiet in a CA demo.
+- **Current state:** Backend shipped (2B.1 + 2B.2). Queue table live,
+  EF v62 live, regression-verified on 10 synthetic Premier Foods
+  ingredients. UI layer (2B.3 + 2B.4) is the remaining 6.5h of work
+  that makes it visible.
+- **Scope doc:** `docs/WP-TABLE-UNIFY_PHASE2_v1.md` Section 11 is the
+  canonical "what success looks like." Read it before scoping.
+
+Do NOT treat 2B.3 as "a 3-hour upload button." It is 3 hours of work
+ON THE CRITICAL PATH TO THE PLATFORM'S COMMERCIAL STORY. Scope
+it accordingly.
+
 ### WP-TABLE-UNIFY PHASE 1 — HQFoodIngredients DS6 Migration — COMPLETE
 
 6 PRs shipped across Sessions 292 and 293. 362 violations → ~55 violations
@@ -611,21 +636,74 @@ LL-302 (NEW S320): Run Audit 1 (self-ref) + Audit 2 (inline user_profiles) any s
 
 ## NEXT PRIORITIES (session start, choose with owner)
 
-1. **PR 2B.3 — HQ "+ Add from Document" modal** (next sub-phase of 2B)
-   With 2B.2 shipped and v62 proven in production, the next sub-phase
-   is the HQ-side modal that lets an operator upload a document and
-   see the staged ingredient queue rows. ~3h scoped in
-   WP-TABLE-UNIFY_PHASE2B-SPLIT_v1.md. Includes a Phase 2F placemarker
-   for mobile Smart Capture.
+1. **PR 2B.3 + PR 2B.4 — the AI ingredient ingest demo moment**
+   (FULL DEMO PATH, two consecutive sessions, ~6.5h total)
 
-   Under Procedure 6 (planner/executor rhythm): planner reads the
-   scope doc at live HEAD first, confirms nothing has drifted, then
-   scopes PR 2B.3 as a single-commit instruction block for Claude Code.
+   ### Why this is priority #1, not just the next PR in the stack
 
-   **Mandatory reading before 2B.3:**
-   - docs/AGENT-METHODOLOGY.md (Procedure 6)
-   - docs/WP-TABLE-UNIFY_PHASE2B-SPLIT_v1.md (5-PR Phase 2B plan)
-   - Current state of HQDocuments.js for Smart Capture patterns
+   Phase 2B is the "killer app" sub-phase of WP-TABLE-UNIFY Phase 2.
+   The commercial thesis (Phase 2 scope doc Section 11) is blunt:
+   this feature combination does NOT exist in any SA F&B product today.
+   Apicbase has it at GBP2000/mo. SAP Food One at GBP10000+/mo. Nobody
+   else in SA does. Phase 2B is the moment NuAi stops looking like
+   "nice ERP" and starts looking like "the obvious choice for SA F&B."
+
+   The backend (2B.1 + 2B.2) is live. The UI layer (2B.3 + 2B.4) is
+   what makes it visible to a CA watching a screen share. Without
+   2B.4, the feature exists but nobody outside a SQL console can see
+   it work end-to-end. Owner-confirmed plan (S-2B.2 close):
+   ship 2B.3 + 2B.4 across two focused sessions, then 2B.5 gate PR.
+
+   ### What to build
+
+   **Session N (PR 2B.3 — ~3h):** HQ "+ Add from Document" modal
+   in HQFoodIngredients.js. Upload / paste / URL tabs. Extract button
+   calls the already-live process-document v62 EF. On success, rows
+   appear in ingredient_ingest_queue. UI placemarker for Phase 2F
+   (mobile Smart Capture). F&B tenants only (Garden Bistro, Nourish).
+
+   **Session N+1 (PR 2B.4 — ~3.5h):** "Ingest Queue" tab in
+   HQFoodIngredients. Lists pending queue rows with per-field
+   confidence badges (green >=0.70, amber 0.50-0.69, red <0.50).
+   Reviewer can edit, approve (inserts to food_ingredients with
+   tenant_id + source_document_id linkage), or reject (captures
+   reason). Audit placemarker on every approve/reject.
+
+   **Session N+2 (PR 2B.5 — ~1h):** Gate PR. Zero code, just the
+   end-to-end walkthrough, DECISION-JOURNAL entry, PENDING-ACTIONS
+   close-out.
+
+   ### Demo moment this unlocks
+
+   Owner uploads a Premier Foods invoice in front of a CA.
+   In under 30 seconds, AI extracts 10 ingredients with SA R638
+   allergen flags, HACCP risk levels, nutrition panels, and supplier
+   linkage. Owner clicks Approve. The ingredients appear in Garden
+   Bistro's library, ready to be used in recipes. No manual data
+   entry. That is the moment the AI tells its own story.
+
+   ### Procedure 6 rhythm (planner/executor)
+
+   Each session: planner reads the scope doc at live HEAD first,
+   confirms nothing has drifted (the parent Phase 2 doc was amended
+   at S320, the split plan at S-post-2A.6, and today's session
+   adds v62 verification — don't trust memory), scopes ONE sub-phase
+   as a single-commit Claude Code instruction block, then reviews
+   the commit after executor pushes.
+
+   ### Mandatory reading before scoping PR 2B.3
+
+   - `docs/AGENT-METHODOLOGY.md` (Procedure 6 — planner/executor rhythm)
+   - `docs/WP-TABLE-UNIFY_PHASE2_v1.md` Section 0 (S320 amendments)
+     and Section 11 (what success looks like — the thesis)
+   - `docs/WP-TABLE-UNIFY_PHASE2B-SPLIT_v1.md` (authoritative for
+     per-PR specs + gate conditions + confidence badge thresholds)
+   - Current state of `HQFoodIngredients.js` and `HQDocuments.js`
+     (the modal pattern to mirror)
+   - `docs/NUAI-AGENT-BIBLE.md` LL-304 (direct-EF regression test
+     pattern — we'll need this again for 2B.4 since React approve
+     flow writes to food_ingredients, which manual testing won't
+     cover in one session)
 
 2. **sim-pos-sales** — STANDING ALERT. Trigger date pending demo
    date confirmation. Must run day BEFORE demo.

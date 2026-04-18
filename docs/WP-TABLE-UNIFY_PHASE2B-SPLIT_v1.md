@@ -1,7 +1,31 @@
 # WP-TABLE-UNIFY PHASE 2B — SPLIT PLAN
 ## AI Document Ingest for Food & Beverage Ingredients
 ## Produced: Session post-2A.6, 18 April 2026 (Claude.ai planner)
-## Status: READY FOR EXECUTION · pending Claude Code pickup
+## Amended: S-2B.2, 19 April 2026 — 2B.1 + 2B.2 shipped, 2B.3-5 pending
+## Status: IN EXECUTION · 2 of 5 PRs shipped
+
+---
+
+## EXECUTION STATUS (as of S-2B.2 close, 19 April 2026)
+
+| PR | Status | Commit / Version | Notes |
+|---|---|---|---|
+| 2B.1 | SHIPPED | 73f8135 | Migration: ingredient_ingest_queue + 5 RLS policies |
+| 2B.2 | SHIPPED | 889a145 (EF v65) | process-document v62 — F&B branch + queue write. Direct-EF smoke test verified 10 Premier Foods ingredients correctly classified. |
+| 2B.3 | NEXT | — | HQ "+ Add from Document" modal (~3h). Upload / paste / URL tabs. |
+| 2B.4 | PENDING | — | Review-and-approve UI (~3.5h). Confidence badges, approve -> food_ingredients, reject with reason. |
+| 2B.5 | PENDING | — | Gate PR (~1h). End-to-end walkthrough. No code. |
+
+**Commercial context** (mirrored from Phase 2 scope doc Section 11):
+This is the killer-app sub-phase of Phase 2. The feature combination
+(AI ingest + SA R638 allergen rules + HACCP + SA supplier context)
+does not exist in any SA F&B product today. 2B.3 + 2B.4 shipped
+together = the demo moment that sells the platform.
+
+**Under Procedure 6** (planner/executor rhythm per LOOP-PRINCIPLES
+Principle 7), each PR is one planner scope + one Claude Code commit
++ one planner review. Do not scope 2B.3 and 2B.4 in the same
+instruction block — consecutive sessions, separate reviews.
 
 ---
 
