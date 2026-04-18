@@ -49,6 +49,11 @@ agent config (.claude/), and any future surface. Drift on any surface
 produces agents operating on wrong state. The fix is architectural
 (eliminate the snapshot), not procedural (remember to refresh).
 
+A corollary: when a rule is retired, its residual instructions do
+not retire themselves. Every retirement requires a sweep across
+surfaces for references that still tell agents what to do. See LL-292
+"Retirement sweep" addendum (NUAI-AGENT-BIBLE.md) for operational detail.
+
 ## 7. Planner and executor are different agents by design
 
 Claude.ai plans, reviews, and operates the database. Claude Code writes

@@ -1798,6 +1798,32 @@ because Step 7 (manual refresh) was often skipped. The fix is to eliminate
 the snapshot entirely: project knowledge holds only stable pointers
 (AGENT-ORIENTATION.md), and all state is read live.
 
+**Retirement sweep — addendum (S320):** When an LL is retired or
+superseded, references to it do NOT automatically disappear from the
+rest of the Loop. Docs, handoff artifacts, project knowledge, and
+agent memories can carry the retired text forward as living instructions
+unless actively purged. Every retirement therefore requires a sweep:
+
+1. `grep -rn "LL-NNN" docs/` — find every reference to the retired LL
+2. Check each hit: is it the retirement record itself, or a stale
+   action-instruction that still tells agents what to do?
+3. Remove or rewrite the action-instructions. Leave the retirement
+   records and history notes intact.
+4. If the retired LL described a process (e.g., "paste SESSION-START-PROMPT
+   into project knowledge"), also sweep for references to the PROCESS,
+   not just the LL number.
+
+Discovery (S320): Owner caught an LL-287-era reminder ("Paste updated
+SESSION-START-PROMPT.md into Claude.ai project knowledge") surviving in
+a handoff artifact nine sessions after LL-287's retirement. The Bible
+had been updated correctly; the sweep for residual instructions had
+not happened.
+
+This addendum generalises the sweep requirement. Every retirement is
+two actions: (a) retire the rule, (b) sweep for its residual instructions.
+One without the other leaves drift. The sweep belongs in the same
+session as the retirement, not "later."
+
 **Supersedes:** LL-287 (retired S303.5)
 
 ---
