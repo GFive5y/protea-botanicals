@@ -1,8 +1,15 @@
 // src/components/hq/food/FoodListView.js
-// WP-TABLE-UNIFY Phase 2A.1 -> 2A.3 — dense list view for F&B ingredient library
+// WP-TABLE-UNIFY Phase 2A.1 -> 2A.6 — dense list view for F&B ingredient library
 //
 // Presentational component. Receives already-filtered + sorted items from parent.
 // 2A.3 additions: sortable headers, checkbox column, column visibility.
+// 2A.6 — DS6 compliance pass per NUAI-VISUAL-SPEC.md Part 16 Tier 1:
+//   - Card wrapper padding "0 16px" creates "lines stop short" effect
+//   - sTh/sTd padding "11px 12px" per spec
+//   - Header color T.ink400 + 0.08em spacing per Part 16.2
+//   - Row hover T.surfaceHover per Part 10.2
+//   - Row zebra T.surface / T.surfaceAlt per Part 16.3
+//   - borderBottom moved from <tr> to <td> per StockPricingPanel pattern
 
 import React from "react";
 import { T } from "../../../styles/tokens";
@@ -13,16 +20,6 @@ const C = {
   ink: T.ink900,
   inkLight: T.ink500,
   accent: T.accentMid,
-};
-
-// WTU 2A.5 — column rhythm. minWidth per column for consistent breathing.
-const COLUMN_WIDTHS = {
-  ingredient: 260,
-  category:   180,
-  allergens:  160,
-  haccp:      110,
-  zone:       130,
-  shelf:      80,
 };
 
 const HEADER_MAP = [
@@ -97,22 +94,24 @@ export default function FoodListView({
   return (
     <div
       style={{
+        background: C.surface,
         border: `1px solid ${C.border}`,
         borderRadius: T.radius.lg,
-        overflow: "hidden",
-        background: C.surface,
+        overflow: "auto",
+        padding: "0 16px",
       }}
     >
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
-          <tr style={{ background: "#FAFAF9" }}>
+          <tr>
             {/* Checkbox header */}
             <th
               style={{
                 width: 40,
                 textAlign: "center",
-                padding: "10px 8px",
-                borderBottom: `1px solid ${C.border}`,
+                padding: "11px 12px",
+                borderBottom: `2px solid ${C.border}`,
+                background: C.surface,
               }}
             >
               <input
@@ -130,14 +129,16 @@ export default function FoodListView({
                   key={h.key}
                   style={{
                     textAlign: "left",
-                    padding: "12px 16px",
-                    minWidth: COLUMN_WIDTHS[h.key] || "auto",
-                    fontSize: T.text.xs,
-                    fontWeight: T.weight.bold,
-                    color: C.inkLight,
-                    letterSpacing: "0.04em",
+                    padding: "11px 12px",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: T.ink400,
+                    letterSpacing: "0.08em",
                     textTransform: "uppercase",
-                    borderBottom: `1px solid ${C.border}`,
+                    borderBottom: `2px solid ${C.border}`,
+                    background: C.surface,
+                    whiteSpace: "nowrap",
+                    fontFamily: T.font,
                   }}
                 >
                   <button
@@ -175,28 +176,32 @@ export default function FoodListView({
               <tr
                 key={ing.id}
                 style={{
-                  borderTop: `1px solid ${C.border}`,
                   background: checked
                     ? T.accentLight
                     : idx % 2 === 0
-                      ? C.surface
-                      : "#FCFCFB",
+                      ? T.surface
+                      : T.surfaceAlt,
                   cursor: "pointer",
                   transition: "background 120ms",
                 }}
                 onClick={() => onSelect(ing)}
                 onMouseEnter={(e) => {
-                  if (!checked) e.currentTarget.style.background = "#F5F3EE";
+                  if (!checked) e.currentTarget.style.background = T.surfaceHover;
                 }}
                 onMouseLeave={(e) => {
                   if (!checked) {
-                    e.currentTarget.style.background = idx % 2 === 0 ? C.surface : "#FCFCFB";
+                    e.currentTarget.style.background = idx % 2 === 0 ? T.surface : T.surfaceAlt;
                   }
                 }}
               >
                 {/* Checkbox cell */}
                 <td
-                  style={{ width: 40, textAlign: "center", padding: "12px 8px" }}
+                  style={{
+                    width: 40,
+                    textAlign: "center",
+                    padding: "11px 12px",
+                    borderBottom: `1px solid ${C.border}`,
+                  }}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <input
@@ -207,12 +212,17 @@ export default function FoodListView({
                   />
                 </td>
                 {/* Ingredient — always visible */}
-                <td style={{ padding: "12px 16px", minWidth: COLUMN_WIDTHS.ingredient }}>
+                <td style={{
+                  padding: "11px 12px",
+                  borderBottom: `1px solid ${C.border}`,
+                  fontFamily: T.font,
+                  verticalAlign: "middle",
+                }}>
                   <div
                     style={{
                       fontWeight: T.weight.semibold,
-                      fontSize: T.text.smPlus,
-                      color: C.ink,
+                      fontSize: 13,
+                      color: T.ink900,
                     }}
                   >
                     {ing.name}
@@ -239,32 +249,54 @@ export default function FoodListView({
                   )}
                 </td>
                 {vis.category !== false && (
-                  <td style={{ padding: "12px 16px", fontSize: T.text.sm, minWidth: COLUMN_WIDTHS.category }}>
+                  <td style={{
+                    padding: "11px 12px",
+                    borderBottom: `1px solid ${C.border}`,
+                    fontSize: 13,
+                    fontFamily: T.font,
+                    color: T.ink900,
+                    verticalAlign: "middle",
+                  }}>
                     <span>{cat.icon} {cat.label}</span>
                   </td>
                 )}
                 {vis.allergens !== false && (
-                  <td style={{ padding: "12px 16px", minWidth: COLUMN_WIDTHS.allergens }}>
+                  <td style={{
+                    padding: "11px 12px",
+                    borderBottom: `1px solid ${C.border}`,
+                    verticalAlign: "middle",
+                  }}>
                     <AllergenBadge flags={ing.allergen_flags} compact />
                   </td>
                 )}
                 {vis.haccp !== false && (
-                  <td style={{ padding: "12px 16px", minWidth: COLUMN_WIDTHS.haccp }}>
+                  <td style={{
+                    padding: "11px 12px",
+                    borderBottom: `1px solid ${C.border}`,
+                    verticalAlign: "middle",
+                  }}>
                     <HaccpBadge level={ing.haccp_risk_level} />
                   </td>
                 )}
                 {vis.zone !== false && (
-                  <td style={{ padding: "12px 16px", minWidth: COLUMN_WIDTHS.zone }}>
+                  <td style={{
+                    padding: "11px 12px",
+                    borderBottom: `1px solid ${C.border}`,
+                    verticalAlign: "middle",
+                  }}>
                     <TempBadge zone={ing.temperature_zone} />
                   </td>
                 )}
                 {vis.shelf !== false && (
                   <td
                     style={{
-                      padding: "12px 16px",
-                      minWidth: COLUMN_WIDTHS.shelf,
-                      fontSize: T.text.sm,
-                      color: C.inkLight,
+                      padding: "11px 12px",
+                      borderBottom: `1px solid ${C.border}`,
+                      fontSize: 13,
+                      fontFamily: T.font,
+                      color: T.ink400,
+                      verticalAlign: "middle",
+                      fontVariantNumeric: "tabular-nums",
                     }}
                   >
                     {ing.shelf_life_days ? `${ing.shelf_life_days}d` : "\u2014"}

@@ -462,3 +462,27 @@ Prevention: Claude Code must NEVER use `git add -A`. Use
 
 *Note: VL-012 is already used for the 10 Apr push_files incident.
 This is logged as VL-013 to preserve the existing numbering.*
+
+---
+
+## VL-014 — FoodListView DS6 violations shipped in PR 2A.5 (18 April 2026)
+
+**Severity:** LOW — visual-only, no data or security impact.
+**What happened:** PR 2A.5 added column rhythm + row hover to FoodListView
+without consulting NUAI-VISUAL-SPEC.md Part 16. Three violations:
+
+| # | Violation | Spec reference | Fix (PR 2A.6) |
+|---|---|---|---|
+| 1 | Row hover #F5F3EE (cream) | Part 13.2 "no cream in ERP" | T.surfaceHover (#e9ecef) per Part 10.2 |
+| 2 | Card wrapper missing padding "0 16px" | Part 16.8 card inset | Added — lines now stop short of card wall |
+| 3 | Header/cell padding mismatched (12px 16px) | Part 16.2 sTh/sTd | Normalized to 11px 12px |
+
+**Root cause:** Planner (Claude.ai) wrote the 2A.5 spec without reading the
+visual spec for table styling. Executor (Claude Code) applied it faithfully.
+The spec was wrong, not the execution.
+
+**Prevention:** Any PR that modifies table rendering MUST read
+NUAI-VISUAL-SPEC.md Part 16 before the planner writes the spec. Added as
+a check in Procedure 6 Step 2 (planner scoping).
+
+**Fixed:** PR 2A.6. Same session as discovery.

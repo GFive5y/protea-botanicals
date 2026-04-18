@@ -1692,6 +1692,7 @@ These are NOT in monospace. They use T.font like everything else.
 | StockPricingPanel | yes S285 | yes S285 | yes S285 | N/A |
 | StockChannelPanel | yes S285 | yes existing | yes S285 | N/A |
 | StockReceiveHistoryPanel | pending | pending | pending | pending |
+| FoodListView (food/*) | yes S2A.6 | yes S2A.6 | yes S2A.6 | N/A |
 
 ---
 
@@ -1708,6 +1709,6 @@ These are NOT in monospace. They use T.font like everything else.
 
 ---
 
-*NUAI-VISUAL-SPEC.md · v1.1 · Session 285 · 16 April 2026*
+*NUAI-VISUAL-SPEC.md · v1.2 · Session post-2A.5 · 18 April 2026*
 *Updated each session in-place when new violations are found or specs added.*
 *This document does not expire. It grows.*
