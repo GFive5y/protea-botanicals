@@ -4,6 +4,66 @@
 
 ---
 
+## S-post-2A.6 — 18 April 2026 — Phase 2A closure + Phase 2B scope locked
+
+### Phase 2A closed as 6 PRs (original plan was 4)
+
+PR breakdown:
+- 2A.1 (31e93d3): SmartInventory scaffolding — food/TileView, ListView, ViewToggle
+- 2A.2 (7f42ad8): PillNav, KPIStrip, SmartSearch (FNB_PILL_HIERARCHY wired)
+- 2A.3 (a14f84d): Sort, bulk select, CSV export, realtime, column picker
+- 2A.4 (173df3a): FoodWorld banner fix, tile size S/M/L, dedup
+- 2A.5 (0ab918f): Row CRUD (Edit/Archive/Delete), audit placemarker, DELETE RLS policy
+- 2A.6 (3a7ab6e): DS6 compliance — Part 16 table spec, "lines stop short" on FoodListView
+
+Net: +2,072 lines / -657 lines across 6 PRs, shipped over 3 sessions.
+HQFoodIngredients.js went from 5,150 to 5,053 lines despite gaining ~250
+lines of functionality via component extraction.
+
+What under-scoped:
+- Single-row CRUD (Edit/Archive/Delete) — added in 2A.5
+- Audit placemarker + WP-AUDIT-UNIFY work-package — added in 2A.5
+- DS6 table compliance on FoodListView — added in 2A.6 (catch-up: 2A.1
+  shipped card wrapper without padding "0 16px", violation noticed only
+  when owner flagged "Excel box" feel post-2A.5)
+
+Decision: do not amend parent doc to retroactively show 6 PRs. The split
+plan WP-TABLE-UNIFY_PHASE2_2A-SPLIT_v1.md is ground truth for what
+originally scoped; this journal entry records what actually shipped.
+
+### Phase 2B scope locked — ready for execution
+
+Doc produced: WP-TABLE-UNIFY_PHASE2B-SPLIT_v1.md (this commit)
+
+Architectural decision superseding parent doc Section 6.2:
+Option 1 (extend process-document EF v61 -> v62) chosen over Option B
+(new ingest-ingredient EF). Rationale: process-document already
+industry-aware, fingerprint + dedup + SARS infrastructure lives there,
+sibling EF would duplicate ~500 lines.
+
+Owner decisions:
+- Option 1 confirmed
+- Cronometer/USDA nutrition autofill dropped (SA needs DAFF data, no public API)
+- Mobile Smart Capture for ingredients -> Phase 2F, UI placemarker in 2B.3 modal
+- Scope now with caveats called out (7 caveats in split plan)
+
+Migration for 2B.1 applied via Supabase MCP:
+  ingredient_ingest_queue: 15 cols, 3 indexes, 5 RLS policies
+  Verified helpers: is_hq_user(), is_staff_or_admin(), user_tenant_id()
+
+Phase 2B split: 2B.1 migration + docs (THIS), 2B.2 process-document v62
+(~5h, highest risk), 2B.3 HQ modal (~3h), 2B.4 review UI (~3.5h),
+2B.5 gate PR (~1h). Total: ~14h.
+
+Anomaly closure: parent doc Section 0.5 recipe anomaly resolved. 4 Garden Bistro
+recipes in status=approved have zero line items — seeded shells, not FK drift.
+
+Technical debt opened: WP-EF-MODULES, WP-EF-LL120-RECONCILE, WP-IMAGE-HASH-REAL.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S320 — 18 April 2026 — RLS incident: platform-wide login break + fix
 
 **Context:** During PR 2A.1 gate verification, owner discovered admin@protea.dev

@@ -759,6 +759,32 @@ database access.
 
 ---
 
-*DEBT_REGISTER_v1.md · NuAi · Session 294 · 17 April 2026*
-*Audit-only session. No code changes. No fixes applied.*
+---
+
+## SECTION 7: EF TECHNICAL DEBT (opened S-post-2A.6 by Phase 2B scoping)
+
+### WP-EF-MODULES — Refactor process-document to shared Deno modules
+- **Opened:** S-post-2A.6, 18 April 2026
+- **Summary:** process-document/index.ts is 1,247 lines as of v61, growing to ~1,400 in v62. Contains fingerprint + SARS + dedup + lump-sum + expense classifier + capture classifier + system prompt all inline. Should be refactored into supabase/functions/_shared/ modules.
+- **Risk level:** Low (working code, just monolithic)
+- **Blocking:** Nothing
+- **Estimate:** ~4h when picked up
+
+### WP-EF-LL120-RECONCILE — Route process-document Anthropic calls through ai-copilot
+- **Opened:** S-post-2A.6, 18 April 2026
+- **Summary:** LL-120 mandates all AI calls route through ai-copilot EF. process-document v61 violates this by calling api.anthropic.com directly. Predates the LL. Fix requires designing an ai-copilot endpoint that can accept structured-output requests (system prompt + document bytes -> JSON extraction), then refactor process-document to use it.
+- **Risk level:** Medium (changes hot-path EF behaviour)
+- **Blocking:** Nothing currently; blocks "single AI gateway" audit story
+- **Estimate:** ~6h when picked up
+
+### WP-IMAGE-HASH-REAL — Replace image hash proxy with real SHA-256
+- **Opened:** S-post-2A.6, 18 April 2026
+- **Summary:** process-document v61 uses a proxy hash `${mime_type}:${file_size_kb}:${file_base64.slice(0,80)}` as the image_hash. Real SHA-256 on file_base64 is strictly more reliable for duplicate detection. Proxy works 95% of the time but fails when the same document is re-compressed or resampled with tiny byte differences that don't change the first 80 base64 chars.
+- **Risk level:** Low (purely improvement; no regression path)
+- **Blocking:** Nothing
+- **Estimate:** ~1.5h when picked up
+
+---
+
+*DEBT_REGISTER_v1.md · NuAi · Session 294 · 17 April 2026 · Updated S-post-2A.6*
 *Next step: Owner reviews Section 4, picks top items for Stage 1.*

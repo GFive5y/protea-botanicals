@@ -410,21 +410,54 @@ shared-reference-data pattern (LL-293). NULL tenant_id is design, not bug.
 
 ## BACKLOG — FUTURE BUILD ITEMS (post-demo, no date constraint)
 
-### LOOP-WTU-002 (NEW S293) — WP-TABLE-UNIFY Phase 2 execution (ingredient encyclopedia)
-Status: SCOPED · POST-DEMO (do not start before 13 May 2026)
-Source: docs/WP-TABLE-UNIFY_PHASE2_v1.md (645 lines, 12 sections)
-Scope: 5 sub-phases totalling ~72 hours of focused work.
-  2A SmartInventory feature parity   ~20h · tile/list/toggle/sort/search/bulk
-  2B AI ingredient ingest            ~15h · new ingest-ingredient EF + queue table
-  2C Recipe linkage surface          ~12h · hover-card, drawer tabs, graph walk
-  2D Compliance view mode            ~10h · R638 inspection pack PDF + heat-map
-  2E Consumer shop allergen filter   ~15h · deferred further, post-opt-in only
-Prerequisites: Phase 1 COMPLETE (Y), FoodWorlds.js LIVE (Y),
-  ProteaAI v1.8 LIVE (Y), process-document EF v53 (Y), ai-copilot EF v59 (Y).
-New DB schema required (scoped in Section 4.4): ingredient_ingest_queue table +
-  4 additional inventory_items columns.
-New LLs drafted (Section 10): LL-291 through LL-294 — adopt as each sub-phase ships.
-Next agent: READ THE SCOPE DOC IN FULL before planning any Phase 2 work.
+### LOOP-WTU-002 — WP-TABLE-UNIFY Phase 2A — **CLOSED**
+Status: **CLOSED — 6 PRs shipped (18 April 2026)**
+  2A.1 (31e93d3): Scaffolding — food/TileView, ListView, ViewToggle
+  2A.2 (7f42ad8): PillNav, KPIStrip, SmartSearch
+  2A.3 (a14f84d): Sort, bulk select, CSV, realtime, col picker
+  2A.4 (173df3a): Banner fix, tile size, dedup, legacy filter removal
+  2A.5 (0ab918f): Row CRUD, audit placemarker, DELETE RLS policy
+  2A.6 (3a7ab6e): DS6 compliance — Part 16 table spec
+Original plan was 4 PRs (~20h). Shipped 6 PRs. Under-scoped CRUD + audit + DS6.
+
+### LOOP-WTU-003 — Phase 2B: AI Document Ingest (in execution)
+Status: IN EXECUTION
+Source: docs/WP-TABLE-UNIFY_PHASE2B-SPLIT_v1.md
+  [x] 2B.1 migration applied (ingredient_ingest_queue, 5 RLS policies)
+  [x] 2B.1 scoping doc committed (this PR)
+  [ ] 2B.2 process-document v62 — F&B branch + queue write (~5h, highest risk)
+  [ ] 2B.3 HQ "+ Add from Document" modal (with Phase 2F placemarker) (~3h)
+  [ ] 2B.4 Review-and-approve UI (~3.5h)
+  [ ] 2B.5 Gate PR — 5-tenant end-to-end walkthrough (~1h)
+Architectural pivot: extends process-document v61 -> v62 (Option 1)
+  instead of building a new ingest-ingredient EF (parent doc Option B).
+
+### Phase 2F — Mobile Smart Capture for Ingredients
+Status: BACKLOG · opens when (a) a client requests it OR (b) bandwidth after 2C/2D
+Source: S-post-2A.6 owner instruction
+Extend mobile Smart Capture flow (currently handles petrol slips, invoices,
+proofs of payment for bookkeeping) to also handle F&B ingredient photos.
+Separate UX problem from desktop ingest: kitchen lighting, camera quality
+on small-print allergen panels, one-handed use. Not demo-blocking.
+
+### WP-EF-MODULES — Refactor process-document to shared Deno modules
+Status: BACKLOG · Post-demo
+Source: Phase 2B scoping (S-post-2A.6)
+process-document/index.ts is 1,247 lines (v61), growing to ~1,400 in v62.
+Should be refactored into supabase/functions/_shared/ modules.
+Estimate: ~4h when picked up.
+
+### WP-EF-LL120-RECONCILE — Route EF Anthropic calls through ai-copilot
+Status: BACKLOG · Post-demo
+Source: Phase 2B scoping (S-post-2A.6)
+LL-120 mandates all AI calls route through ai-copilot EF. process-document
+v61 violates this by calling api.anthropic.com directly. Estimate: ~6h.
+
+### WP-IMAGE-HASH-REAL — Replace image hash proxy with real SHA-256
+Status: BACKLOG · Post-demo
+Source: Phase 2B scoping (S-post-2A.6)
+process-document uses mime+size+slice(80) proxy hash. Real SHA-256 is more
+reliable for duplicate detection. Estimate: ~1.5h.
 
 ### LOOP-FIN-004 — Trial Balance Excel Export (CA working papers format)
 Status: OPEN · Nice-to-have for demo
