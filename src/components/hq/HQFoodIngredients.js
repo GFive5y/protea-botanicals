@@ -51,6 +51,7 @@ import FoodKPIStrip from "./food/FoodKPIStrip";
 import FoodSmartSearch, { matchesSmartSearch } from "./food/FoodSmartSearch";
 import FoodBulkActionBar from "./food/FoodBulkActionBar";
 import FoodColumnPicker, { DEFAULT_COL_VISIBILITY } from "./food/FoodColumnPicker";
+import FoodIngestModal from "./food/FoodIngestModal";
 import { useIsTenantHq } from "../../hooks/useIsTenantHq";
 import { logAudit } from "../../services/auditPlacemarker";
 
@@ -3273,7 +3274,7 @@ function IngredientDrawer({ ingredient, onClose, isTenantHq, onEdit, onArchive, 
 // MAIN COMPONENT
 // ═════════════════════════════════════════════════════════════════════════════
 export default function HQFoodIngredients() {
-  const { tenantId } = useTenant(); // RULE 0G — inside component
+  const { tenantId, industryProfile } = useTenant(); // RULE 0G — inside component
   const isTenantHq = useIsTenantHq(); // WTU 2A.5 — gates edit/delete UI
 
   const [activeTab, setActiveTab] = useState("library");
@@ -3293,6 +3294,7 @@ export default function HQFoodIngredients() {
   const [selectedIds, setSelectedIds] = useState(new Set());     // Set<uuid>
   const [colVisibility, setColVisibility] = useState(DEFAULT_COL_VISIBILITY); // WTU 2A.3
   const [toast, setToast] = useState(null);
+  const [showIngestModal, setShowIngestModal] = useState(false); // WTU 2B.3
 
   // New ingredient form
   const emptyForm = {
@@ -3898,6 +3900,27 @@ export default function HQFoodIngredients() {
               compliant
             </p>
           </div>
+          {isTenantHq && industryProfile === "food_beverage" && (
+            <button
+              onClick={() => setShowIngestModal(true)}
+              style={{
+                padding: "10px 18px",
+                background: T.surface,
+                color: T.accent,
+                border: `1px solid ${T.accentBd}`,
+                borderRadius: T.radius.md,
+                cursor: "pointer",
+                fontWeight: T.weight.bold,
+                fontSize: T.text.base,
+                fontFamily: "inherit",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: T.gap.xs,
+              }}
+            >
+              + Add from Document
+            </button>
+          )}
           {!seeded && !loading && (
             <button
               onClick={handleSeedLibrary}
@@ -5241,6 +5264,27 @@ export default function HQFoodIngredients() {
             onDelete={handleSingleDelete}
           />
         </>
+      )}
+
+      {/* WTU 2B.3 — Food ingest modal */}
+      {showIngestModal && (
+        <FoodIngestModal
+          isOpen={showIngestModal}
+          onClose={() => setShowIngestModal(false)}
+          onSuccess={({ documentLogId, queuedCount }) => {
+            setShowIngestModal(false);
+            showToast(
+              queuedCount > 0
+                ? `✅ ${queuedCount} ingredient${queuedCount === 1 ? "" : "s"} queued for review`
+                : "Document processed — no ingredients detected"
+            );
+            // Phase 2B.4 will add an "Ingest Queue" tab and switch to it here.
+            // For 2B.3, no tab switch yet. The toast is the confirmation.
+            fetchIngredients();
+          }}
+          tenantId={tenantId}
+          industryProfile={industryProfile}
+        />
       )}
     </div>
   );
