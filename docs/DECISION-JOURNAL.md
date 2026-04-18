@@ -4,6 +4,56 @@
 
 ---
 
+## S-post-2B.1-incident — 19 April 2026 — EF deploy guardrail LL-303
+
+### Incident
+v62 and v63 of process-document EF were deployed with truncated
+placeholder content by Claude.ai planner via Supabase MCP
+`deploy_edge_function` tool. Cannabis tenants (Pure PTV, Medi
+Recreational, MediCare Dispensary) could not ingest documents until
+rollback. Root cause: Claude.ai's tool call format forces truncation
+on ~56KB EF files; planner failed to validate with a small test
+deploy first; after v62 failed, planner retried instead of
+escalating, making it worse with v63.
+
+### Rollback
+Claude Code ran `npx supabase functions deploy process-document
+--no-verify-jwt --project-ref uvicrqapgzcdvozxrreo` from local
+on-disk v61 source (git).
+Live state after rollback: Supabase version 64, content identical
+to original v61 (confirmed via smoke test: HTTP 400
+`file_base64 and mime_type are required`).
+
+### Decision — LL-303 encoded (three layers)
+See NUAI-AGENT-BIBLE.md LL-303 for full text.
+  Layer 1: Claude.ai planner NEVER deploys EFs. Claude Code does,
+           via `npx supabase functions deploy`.
+  Layer 2: Every EF deploy verified post-hoc via get_edge_function
+           marker or SHA check.
+  Layer 3: Failed EF deploy -> rollback + escalate, NEVER retry.
+
+AGENT-METHODOLOGY.md updated with Procedure 7 (EF deploy sequence).
+
+### Workflow change for PR 2B.2
+Original 2B.2 plan had planner deploying v62 via Supabase MCP. Under
+LL-303 this is now invalid. Revised sequence:
+  1. Planner produces v62 source file
+  2. Claude Code commits v62 to supabase/functions/process-document/index.ts
+  3. Claude Code deploys via `npx supabase functions deploy`
+  4. Planner verifies v62 live via get_edge_function
+  5. Planner runs 5-tenant regression matrix
+  6. If clean: Claude Code pushes. If dirty: git revert + redeploy v61.
+
+### Process lesson
+Before committing to a workflow that depends on an MCP tool handling
+a specific payload size, validate the payload with a throwaway test.
+The Supabase MCP docs do not document size limits on
+deploy_edge_function content; don't assume unbounded.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S-post-2A.6 — 18 April 2026 — Phase 2A closure + Phase 2B scope locked
 
 ### Phase 2A closed as 6 PRs (original plan was 4)

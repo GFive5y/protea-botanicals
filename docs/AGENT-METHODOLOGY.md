@@ -502,6 +502,48 @@ below prevents both failures.
 - S292-S293 WP-TABLE-UNIFY Phase 1 — 6 PRs with per-PR gate checks. No
   regressions across the 6 commits. Gate discipline held.
 
+### Procedure 7: Edge Function deploys (per LL-303)
+
+Edge Function source code deploys follow a specific sequence that
+differs from frontend code changes. Claude.ai does NOT deploy EFs
+directly — Claude Code does.
+
+1. **Planner (Claude.ai)** produces the complete EF source file as
+   an artifact. Applies any migrations the EF depends on via Supabase
+   MCP.
+2. **Planner (Claude.ai)** writes the Claude Code instruction block.
+   Embeds the full file content inline. If the file is too large to
+   fit inline without truncation, planner provides the content in a
+   followup message before Claude Code executes.
+3. **Claude Code** copies the file into `supabase/functions/<name>/index.ts`.
+4. **Claude Code** commits to git FIRST. Before deploy. The on-disk
+   file becomes source of record.
+5. **Claude Code** runs:
+   ```
+   npx supabase functions deploy <name> \
+     --no-verify-jwt \
+     --project-ref uvicrqapgzcdvozxrreo
+   ```
+   (Match the `--verify-jwt` flag to the function's existing config.)
+6. **Planner (Claude.ai)** verifies the deploy via
+   `Supabase:get_edge_function`. Checks for a known marker (new
+   function name, new SHA). If the marker is missing, declare
+   incident — do not retry.
+7. **Planner (Claude.ai)** runs the regression SQL matrix against
+   the specified test tenants.
+8. **Claude Code** pushes the commit (only after step 7 is clean).
+   On regression failure: `git revert` the commit and redeploy last
+   known good source via the same `npx supabase functions deploy`
+   sequence.
+
+**If an EF deploy fails at any step:** STOP. Rollback. Escalate to
+owner. Do NOT retry without a root-cause hypothesis.
+
+**Evidence:** Session post-2B.1. v62 and v63 process-document deploys
+shipped truncated content via Supabase MCP tool. Cannabis tenants
+broken. Rollback via `npx supabase functions deploy` from Claude
+Code's on-disk v61 source restored production at Supabase version 64.
+
 ---
 
 ## SECTION 3 — DESIGN PATTERNS REGISTRY

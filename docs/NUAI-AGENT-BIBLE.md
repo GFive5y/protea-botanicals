@@ -2177,3 +2177,80 @@ WP-RLS-HYGIENE (the cleanup WP).
 ---
 
 *LL-300 + LL-301 + LL-302 added 18 April 2026 · Session 320*
+
+---
+
+## Session post-2B.1 — 19 April 2026 — EF deploy guardrail
+
+### LL-303 — CLAUDE.AI PLANNER NEVER DEPLOYS EDGE FUNCTIONS DIRECTLY
+
+**Rule (three layers — all mandatory):**
+
+**Layer 1 — Who deploys.**
+Claude.ai planner NEVER deploys Edge Functions directly via the
+Supabase MCP `deploy_edge_function` tool. Claude.ai's role for any
+EF change is:
+  1. Produce the complete source file as an artifact
+  2. Apply any migrations the new EF version depends on via Supabase
+     MCP (DDL deploys are still planner territory)
+  3. Write a Claude Code instruction block that embeds the full file
+     content inline, OR provides the content in a followup message
+  4. Run post-deploy regression SQL against the specified test matrix
+
+Claude Code owns the deploy:
+  1. Copy the planner-provided source file into the correct repo path
+     (`supabase/functions/<name>/index.ts`)
+  2. Commit to git FIRST (before deploy — the on-disk file becomes the
+     source of record, reviewable, and rollback-able via `git revert`)
+  3. Run `npx supabase functions deploy <name> --no-verify-jwt
+     --project-ref uvicrqapgzcdvozxrreo` from the local checkout
+     (match `--verify-jwt` to the function's existing config)
+  4. Report back to planner with the new Supabase version number
+
+**Layer 2 — Verify before declaring success.**
+After any EF deploy, planner MUST verify the deployed content is the
+intended content. Two acceptable verification methods:
+  (a) Call `Supabase:get_edge_function` and check for a known marker
+      string newly introduced in this version
+  (b) Compare the SHA returned from `get_edge_function` against the
+      SHA of the on-disk source file
+If the marker is missing or the SHA doesn't match, rollback
+IMMEDIATELY via `npx supabase functions deploy` from the last known
+good source. Surface the deploy failure as an incident — do NOT
+try the deploy again.
+
+**Layer 3 — Never escalate a failed EF deploy.**
+If an EF deploy fails (wrong content, wrong version, runtime error,
+marker missing), the response is STOP and ESCALATE, not RETRY.
+Retrying without understanding the failure mode is how v62 became v63
+in the 2B.1 incident. The correct sequence after any EF deploy failure:
+  1. Rollback to last known good version immediately
+  2. Verify rollback succeeded via Layer 2 method
+  3. Report the incident to the owner
+  4. Wait for owner direction before the next deploy attempt
+
+**Origin:** Session post-2B.1, 19 April 2026. v62 and v63 deploys of
+process-document EF via Supabase MCP `deploy_edge_function` tool both
+shipped truncated placeholder content because planner's tool call
+format forced the 56KB source file to be truncated. Cannabis tenants
+(Pure PTV, Medi Recreational, MediCare Dispensary) could not ingest
+documents. Rollback via `npx supabase functions deploy` from Claude
+Code's on-disk v61 source restored production at Supabase version 64.
+
+**Scope:** Any Edge Function source code deployment. This includes
+"small" EFs as well as large ones like process-document or ai-copilot.
+
+**NOT affected by LL-303:**
+- Database migrations via Supabase MCP `apply_migration` (still planner)
+- Raw SQL execution via Supabase MCP `execute_sql` (still planner)
+- RLS policy changes, table schema changes (still planner)
+
+**Related:** RULE-0Q (extends to EFs), LL-120 (call routing, separate
+concern), LL-203 (instruction block format).
+
+**Tools affected for Claude.ai:**
+`Supabase:deploy_edge_function` is PROHIBITED for Claude.ai planner.
+
+---
+
+*LL-303 added 19 April 2026 · Session post-2B.1*
