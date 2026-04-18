@@ -4,6 +4,102 @@
 
 ---
 
+## S-2B.2-methodology — 19 April 2026 — Continuous-capture habit named at procedure level
+
+### The trigger
+Owner re-read the preservation fix from S-2B.2-preservation and named
+a sharper meta-concern: "My question was more in line with the
+awareness of each new agent in recognising these things and updating
+them. E.g. a new agent busy with a task sees something he doesn't
+know or something that might help the next agent during the session
+he passes that over to Claude Code to update along with any
+gits/heads etc."
+
+Translation: the preservation fix we just shipped was itself evidence
+of the gap. The commercial thesis for Phase 2B was preserved in a
+deep doc but not surfaced, and that fact was caught by the OWNER at
+session close, not by the planner MID-session. An agent following
+existing methodology correctly could have missed it. That's a
+methodology gap, not a Phase-2B gap.
+
+### What the audit found
+LOOP-PRINCIPLES.md has the philosophy:
+- Principle 1: reasoning has a half-life
+- Principle 2: reasoning has to be deliberately written
+- Principle 4: institutional memory is a first-class deliverable
+
+AGENT-METHODOLOGY.md Procedure 6 has discrete capture moments:
+- Step 1: step back, review bigger picture
+- Step 5: record Decision Journal entry if substantive decisions
+
+But there is no explicit treatment of the middle-of-session moment
+when an agent notices something incidental that would help the next
+agent. The implicit expectation is "mention it in the commit body"
+or "log it at close" — both of which fail to reach the next agent
+reliably.
+
+### The fix
+One surgical edit to AGENT-METHODOLOGY.md:
+- New cross-cutting preamble at the top of Section 2, BEFORE
+  Procedure 1. Titled "The continuous-capture habit — applies
+  throughout every procedure below."
+- Explains the habit, triggers, cost calibration, boundaries, and
+  relationship to existing Principles.
+- Includes this session as the evidence session (S-2B.2-preservation).
+
+### Alternative considered — add Principle 8 to LOOP-PRINCIPLES
+Owner's explicit call. Rejected in favour of procedure-level
+placement because: Principles sit in a philosophy doc that agents
+read once per session (if that). Procedures are consulted during
+work. "Ingrained" is the right word — procedures are the place
+where ingraining happens.
+
+### Alternative considered — add to Procedure 6 only
+Procedure 6 is planner-agent territory. But the habit applies to
+all procedures (1 through 7) and to the executor as much as the
+planner. An executor running Procedure 3 (grep-before-drop) who
+spots dead code outside their WP should log it. Scoping to
+Procedure 6 alone would miss that case.
+
+Placement: cross-cutting preamble at TOP of Section 2 (before
+Procedure 1). Any agent opening any procedure hits it first.
+
+### Alternative considered — add LL-306
+Also offered. Rejected because the LL system is already at 306+
+entries and diluting it into general methodology rules weakens
+its signal. The Bible holds rules about code patterns (schema
+quirks, deploy sequences, tenant-scoping). Methodology lives in
+AGENT-METHODOLOGY.md. Keeping them separate keeps both readable.
+
+If this habit gets named 2+ more times as sessions evidence it
+missing (i.e., future sessions where an in-session capture would
+have prevented a problem), escalate to LL status. One instance
+from today is not sufficient evidence for an LL.
+
+### The deeper pattern worth noting
+The owner's question was a Loop stress-test disguised as a
+preservation request. It asked: "does the Loop actually capture
+its own teachings about capture?" The answer was "partially" —
+the philosophy was there, the mechanics were there, but the
+specific continuous-capture habit was not named. That gap had to
+be pointed at before it could be closed.
+
+This suggests a useful practice for future sessions: periodically
+stress-test the Loop by asking whether it captures the thing it's
+meant to capture. Meta-audits catch gaps that routine work does
+not. Not frequently — maybe once per major WP close — but
+regularly enough that methodology gaps surface while they're
+still cheap to close.
+
+### Handoff state unchanged
+HEAD advances by one commit to this methodology update.
+Next-session priority unchanged: PR 2B.3 + PR 2B.4 across two
+consecutive sessions.
+
+**Fresh at close:** Yes.
+
+---
+
 ## S-2B.2-preservation — 19 April 2026 — Elevate Phase 2B thesis to top of read stack
 
 ### The trigger

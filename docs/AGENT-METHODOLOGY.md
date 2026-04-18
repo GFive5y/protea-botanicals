@@ -218,6 +218,115 @@ misattribution (silently corrupt, hard to detect).
 
 ## SECTION 2 — INVESTIGATION PROCEDURES
 
+### The continuous-capture habit — applies throughout every procedure below
+
+This is not a procedure. It is a standing obligation carried by
+every agent into every procedure that follows. Read it once per
+session; apply it continuously.
+
+**The habit:** When you notice something mid-task that a future
+agent would benefit from knowing — a pattern, a gotcha, a piece
+of context buried in a deep doc, a schema drift, a naming
+collision, an almost-mistake you caught, a doc that says X while
+the code does Y — route it to Claude Code immediately as a
+targeted doc edit. Do not defer to session close. Do not trust
+the commit body to reach the next agent. Do not assume "it was
+obvious to me, it'll be obvious to them."
+
+**Why this is separated from Procedure 6:**
+Procedure 6 (planner/executor rhythm) names a session-start
+"step back" and a session-close "record Decision Journal entry."
+Both are discrete moments. The continuous-capture habit lives
+BETWEEN those moments — during the middle of the session, when
+an incidental learning surfaces. Without naming it here, agents
+default to "I'll mention it in the commit body" or "I'll log
+it at close" or (most often) nothing at all.
+
+**Triggers that should fire the habit:**
+
+- "Huh, that's not what the doc says." → Update the doc inline.
+  Code is truth; documentation lags. Close the gap now.
+- "If I'd known this at the start of the session I'd have saved
+  an hour." → Write it somewhere the NEXT agent will hit at session
+  start. Usually SESSION-START-PROMPT.md or the relevant WP scope doc.
+- "The next agent is definitely going to trip on this." → One-line
+  LL candidate, or a WATCH- entry in PENDING-ACTIONS, or a gotcha
+  note in the relevant source file's header comment.
+- "This thing in doc X really should also be in doc Y where they'll
+  actually see it." → Cross-link or duplicate the hint. Preservation
+  is about reach, not existence (see Decision Journal entry
+  S-2B.2-preservation for the canonical example).
+- "I just discovered a schema drift / pattern / pitfall while
+  grepping for something else." → Log it. The fact that you
+  weren't looking for it is exactly why the next agent won't find
+  it either.
+- "This is my third time explaining this in a commit body." →
+  It belongs in a Procedure, a Failure Mode, or an LL. Escalate
+  it out of commit bodies and into methodology.
+
+**What this looks like in practice:**
+
+During Procedure 1 (classify-before-fix), the classification query
+returns a surprising result — a table everyone thought was tenant-
+scoped turns out to use a shared-defaults pattern. You fix the
+immediate finding. Before moving on, you add one line to the
+relevant doc noting the discovery. 90 seconds. The next agent to
+grep for that table finds the note.
+
+During Procedure 3 (grep-before-drop), your grep surfaces dead
+code referencing a view that was dropped three sessions ago.
+That's not in scope for your current WP. You log a WATCH- entry
+in PENDING-ACTIONS naming the dead reference. 60 seconds. The
+next agent cleaning technical debt picks it up.
+
+During Procedure 6 step 4 (executor ships), Claude Code writes
+code and in the process notices that two files use slightly
+different names for the same token (Plus suffix vs Extra suffix).
+Claude Code adds a one-line note to the commit body AND updates
+the relevant doc inline. 2 minutes extra. The naming drift is now
+surfaced, not buried in a commit.
+
+**Cost calibration:**
+- Typical in-session capture: 1-5 minutes, one small commit or a
+  line appended to an existing in-flight commit
+- Batched at session close: 15-30 minutes, often skipped under
+  fatigue, loses fidelity
+- Not captured at all: next agent re-derives the learning from
+  scratch, sometimes re-making the same mistake
+
+**Boundary — when NOT to stop-and-capture:**
+- If the task you're in the middle of is critical-path AND the
+  learning is preservation-safe (nothing else will overwrite it
+  before you can come back) — finish the task, then capture
+  before moving to the next step. Don't interrupt a migration
+  mid-transaction to edit a doc.
+- If you've already got three captures queued for this session,
+  batch them into one commit rather than five. Judgement call.
+- If the learning is genuinely trivial ("oh, the function is in
+  this file not that file") and nobody will ever be confused —
+  skip. The Loop is not a stream-of-consciousness journal.
+
+**Relationship to existing Principles:**
+Principle 1 (reasoning has a half-life) says WHY to capture.
+Principle 2 (outcomes capture themselves, reasoning does not)
+says WHAT to capture. Principle 4 (institutional memory is a
+first-class deliverable) says capture is not optional. This
+preamble says WHEN: continuously, not only at session close.
+
+**Evidence session:** S-2B.2-preservation (19 April 2026).
+Phase 2B's commercial thesis was preserved in Section 11 of a
+645-line scope doc, but not at the top of SESSION-START-PROMPT
+where the next planner would actually see it. The gap was caught
+by the owner at session close, not by the planner mid-session.
+The fix took 15 minutes; catching it a session later could have
+meant a planner scoping PR 2B.3 without the commercial context.
+The pattern suggested by that event — "when a session closes
+with 'biggest thing we've built in weeks' energy, surface it at
+the top of the read stack" — is one instance. If it recurs,
+consider it for LL status.
+
+---
+
 ### Procedure 1: Classify before fixing
 
 When the audit script or a manual review flags a finding:
