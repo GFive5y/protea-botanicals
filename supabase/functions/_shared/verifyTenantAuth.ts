@@ -44,7 +44,7 @@ export async function verifyTenantAuth(req: Request, opts: AuthOpts): Promise<Au
   // 3. Fetch user profile for tenant + role
   const { data: profile, error: profileError } = await db
     .from('user_profiles')
-    .select('tenant_id, role')
+    .select('tenant_id, role, hq_access')
     .eq('id', user.id)
     .single();
 
@@ -54,7 +54,12 @@ export async function verifyTenantAuth(req: Request, opts: AuthOpts): Promise<Au
 
   const userTenantId = profile.tenant_id as string;
   const role = profile.role as string;
-  const isHQOperator = userTenantId === HQ_OPERATOR_TENANT_ID && role === 'admin';
+  // FIN-007 residual: align with React/RLS is_hq_user() definition.
+  // A platform operator is anyone with hq_access=true on user_profiles.
+  // The legacy tenant-UUID + role=admin check is kept as a fallback for
+  // accounts sitting on the HQ tenant without the explicit flag.
+  const hasHqAccess = (profile.hq_access as boolean | null) === true;
+  const isHQOperator = hasHqAccess || (userTenantId === HQ_OPERATOR_TENANT_ID && role === 'admin');
 
   // 4. Apply authorization check based on mode
   if (opts.mode === 'operator-only') {
